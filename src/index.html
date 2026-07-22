@@ -41,6 +41,7 @@
       <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="arrow-down-circle"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
       <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="arrow-down-tray"></button>
+      <button class="sb-btn" id="sb-history" title="Historial" data-ico="clock"></button>
       <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="star"></button>
       <button class="sb-btn" id="sb-passwords" title="Contraseñas" data-ico="key"></button>
       <button class="sb-btn" id="sb-res" title="Vista en otras resoluciones" data-ico="computer-desktop"></button>
@@ -181,6 +182,14 @@
     <div class="mp-filters"><button class="mp-chip active" data-filter="all">Todo</button><button class="mp-chip" data-filter="image">Imágenes</button><button class="mp-chip" data-filter="video">Vídeos</button></div>
     <div id="mp-grid"></div>
     <div class="mp-foot"><button id="mp-all" class="primary-btn" data-ico="arrow-down-tray"> Descargar todo</button></div>
+  </aside>
+
+  <!-- ===== Panel de historial ===== -->
+  <aside id="history-panel" class="hidden side-panel">
+    <div class="mp-head"><span id="history-title">Historial</span><span class="mp-tools"><button id="history-close" data-ico="x-mark" title="Cerrar"></button></span></div>
+    <div class="hist-search"><input id="history-filter" type="text" placeholder="Buscar en el historial…" spellcheck="false" /></div>
+    <div id="history-list"></div>
+    <div class="mp-foot"><button id="history-clear" class="danger-btn"><span data-ico="trash"></span> Borrar todo el historial</button></div>
   </aside>
 
   <!-- ===== Panel de contraseñas ===== -->

@@ -20,7 +20,8 @@ const els = {};
   'wp-file', 'tile-styles', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
-  'sb-media', 'sb-downloads', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
@@ -324,8 +325,15 @@ els.sbBookmarks.addEventListener('click', () => { if (els.bmPage.classList.conta
 
 /* Modal de texto */
 let promptCb = null;
-function promptModal(title, ph, cb) { els.promptTitle.textContent = title; els.promptInput.value = ''; els.promptInput.placeholder = ph || ''; els.promptModal.classList.remove('hidden'); els.promptInput.focus(); promptCb = cb; }
-els.promptOk.addEventListener('click', () => { els.promptModal.classList.add('hidden'); promptCb?.(els.promptInput.value); });
+function promptModal(title, ph, cb) { els.promptTitle.textContent = title; els.promptInput.style.display = ''; els.promptInput.value = ''; els.promptInput.placeholder = ph || ''; els.promptOk.textContent = 'Crear'; els.promptModal.classList.remove('hidden'); els.promptInput.focus(); promptCb = cb; }
+function promptConfirm(title, text, cb) {
+  els.promptTitle.innerHTML = `${escapeHtml(title)}<br><span style="font-weight:400;color:var(--text-dim);font-size:13px">${escapeHtml(text)}</span>`;
+  els.promptInput.style.display = 'none';
+  els.promptOk.textContent = 'Borrar';
+  els.promptModal.classList.remove('hidden');
+  promptCb = () => cb();
+}
+els.promptOk.addEventListener('click', () => { els.promptModal.classList.add('hidden'); const cb = promptCb; promptCb = null; cb?.(els.promptInput.value); });
 els.promptCancel.addEventListener('click', () => els.promptModal.classList.add('hidden'));
 els.promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') els.promptOk.click(); });
 
@@ -554,7 +562,54 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloads());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); }
+
+/* ============ Historial ============ */
+let histFilter = '';
+function renderHistory() {
+  const q = histFilter.toLowerCase();
+  const items = history
+    .filter((h) => !q || (h.title || '').toLowerCase().includes(q) || (h.url || '').toLowerCase().includes(q))
+    .sort((a, b) => b.ts - a.ts);
+  els.historyList.innerHTML = '';
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 864e5).toDateString();
+  let lastDay = null;
+  for (const h of items) {
+    const day = new Date(h.ts).toDateString();
+    if (day !== lastDay) {
+      lastDay = day;
+      const lbl = document.createElement('div'); lbl.className = 'hist-day';
+      lbl.textContent = day === today ? 'Hoy' : day === yesterday ? 'Ayer' : new Date(h.ts).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+      els.historyList.appendChild(lbl);
+    }
+    const item = document.createElement('div'); item.className = 'hist-item'; item.title = h.url;
+    const ic = document.createElement('span'); ic.className = 'hist-ic'; ic.innerHTML = window.icon('clock');
+    getTile(h.url).then((t) => { if (t?.icon) { ic.innerHTML = ''; const im = document.createElement('img'); im.src = t.icon; ic.appendChild(im); } });
+    const info = document.createElement('div'); info.className = 'hist-info';
+    info.innerHTML = `<div class="hist-t">${escapeHtml(h.title || h.url)}</div><div class="hist-u">${escapeHtml(hostOf(h.url))}</div>`;
+    const time = document.createElement('span'); time.className = 'hist-time'; time.textContent = new Date(h.ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    const x = document.createElement('button'); x.className = 'hist-x'; x.title = 'Quitar'; x.innerHTML = window.icon('x-mark');
+    x.addEventListener('click', (e) => { e.stopPropagation(); history = history.filter((y) => y.url !== h.url); store.set('cobalt.history', history); renderHistory(); });
+    item.append(ic, info, time, x);
+    item.addEventListener('click', () => navigateActive(h.url));
+    els.historyList.appendChild(item);
+  }
+}
+function toggleHistory(force) {
+  const open = force !== undefined ? force : els.historyPanel.classList.contains('hidden');
+  if (open) { closeRightPanels(); els.historyPanel.classList.remove('hidden'); els.sbHistory.classList.add('open'); histFilter = ''; els.historyFilter.value = ''; renderHistory(); }
+  else { els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); }
+}
+els.sbHistory.addEventListener('click', () => toggleHistory());
+els.historyClose.addEventListener('click', () => toggleHistory(false));
+els.historyFilter.addEventListener('input', () => { histFilter = els.historyFilter.value; renderHistory(); });
+els.historyClear.addEventListener('click', () => {
+  if (!history.length) { toast('El historial ya está vacío'); return; }
+  promptConfirm('¿Borrar todo el historial?', `Se eliminarán ${history.length} entradas. No se puede deshacer.`, () => {
+    history = []; store.set('cobalt.history', history); renderHistory(); toast('Historial borrado');
+  });
+})
 
 /* ============ Gestor de contraseñas ============ */
 async function renderPasswords() {
@@ -849,6 +904,7 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); }
   if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); els.urlbar.focus(); }
   if (e.ctrlKey && e.key.toLowerCase() === 'j') { e.preventDefault(); toggleDownloads(); }
+  if (e.ctrlKey && e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHistory(); }
   if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); }
 });
 window.cobalt.onOpenUrl((url) => createTab(url));
