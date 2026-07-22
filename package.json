@@ -41,7 +41,8 @@
     "publish": {
       "provider": "github",
       "owner": "DosaAKA2A",
-      "repo": "Cobalt"
+      "repo": "Cobalt",
+      "releaseType": "release"
     },
     "win": {
       "target": [
