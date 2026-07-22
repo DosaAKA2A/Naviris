@@ -38,9 +38,12 @@
       <div class="sb-sep"></div>
       <button class="sb-btn accent" id="sb-claude" title="Claude" data-brand="claude"></button>
       <div class="sb-spacer"></div>
-      <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="arrow-down-circle"></button>
+      <!-- Herramientas -->
+      <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="rat"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
       <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="arrow-down-tray"></button>
+      <div class="sb-sep"></div>
+      <!-- Funciones del navegador -->
       <button class="sb-btn" id="sb-history" title="Historial" data-ico="clock"></button>
       <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="star"></button>
       <button class="sb-btn" id="sb-passwords" title="Contraseñas" data-ico="key"></button>
@@ -82,6 +85,15 @@
 
       <div id="bookmarks-bar"></div>
 
+      <!-- Barra de permisos de sitio -->
+      <div id="perm-bar" class="hidden">
+        <span class="perm-ic" data-ico="lock-closed"></span>
+        <span id="perm-text"></span>
+        <label class="perm-remember"><input type="checkbox" id="perm-remember" checked /> Recordar</label>
+        <button id="perm-block">Bloquear</button>
+        <button id="perm-allow" class="primary">Permitir</button>
+      </div>
+
       <!-- ===== Contenido ===== -->
       <main id="content">
         <div id="res-label" class="hidden"></div>
@@ -95,6 +107,7 @@
             <button id="hub-edit" class="hub-fab" title="Editar hub"><span data-ico="squares-plus"></span><span class="lbl">Editar</span></button>
             <button id="hub-customize" class="hub-fab" title="Cambiar fondo"><span data-ico="photo"></span></button>
           </div>
+          <div id="hub-version" title="Versión de Cobalt">Cobalt</div>
 
           <!-- Paleta de widgets (modo edición) -->
           <div id="widget-palette" class="hub-panel hidden">
@@ -134,6 +147,7 @@
     <button data-action="bookmarks">Ver todos los marcadores</button>
     <button data-action="toggle-bookmarks">Mostrar/ocultar barra de marcadores</button>
     <button data-action="sidebar">Personalizar sidebar…</button>
+    <button data-action="permissions">Permisos de sitios…</button>
     <hr />
     <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
     <label class="menu-toggle"><span>Mostrar contenido sensible en X<br /><small>Salta el aviso de sensibilidad de X/Twitter</small></span><input type="checkbox" id="opt-xsensitive" /></label>
@@ -218,6 +232,8 @@
   <div id="prompt-modal" class="modal hidden"><div class="modal-card"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
 
   <div id="sidebar-modal" class="modal hidden"><div class="modal-card"><h3>Personalizar sidebar</h3><p>Activa solo las webs que quieras tener a mano. Puedes dejarlo vacío.</p><div id="sidebar-config"></div><div class="modal-actions"><button id="sidebar-add" class="ghost-btn" style="margin-right:auto"><span data-ico="plus"></span> Añadir web</button><button id="sidebar-done" class="primary">Listo</button></div></div></div>
+
+  <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Cobalt pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
 
   <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Cobalt <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
     <div class="upd-box"><div id="upd-status">Comprueba si hay una versión nueva.</div><div id="upd-bar" class="upd-bar hidden"><i></i></div></div>

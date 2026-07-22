@@ -51,6 +51,14 @@
     if (name === 'star-solid') {
       return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="${STAR_SOLID}"/></svg>`;
     }
+    if (name === 'rat') {
+      // Silueta de rata: cabeza, oreja, cuerpo y cola larga (icono de Rat Tool)
+      return '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<g fill="currentColor"><circle cx="15.2" cy="6.8" r="2.7"/><ellipse cx="10.4" cy="14.2" rx="7.3" ry="4.4"/>' +
+        '<circle cx="16.2" cy="11" r="4"/><circle cx="19.8" cy="11.3" r=".95"/></g>' +
+        '<path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3.4 15.4c-2.8.5-2.9 5 .6 4.7"/>' +
+        '</svg>';
+    }
     const paths = Array.isArray(P[name]) ? P[name] : [P[name]];
     const body = paths.map((d) => `<path d="${d}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
     return `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${body}</svg>`;

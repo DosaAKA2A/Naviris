@@ -238,6 +238,33 @@ button { font-family: inherit; }
 .primary-btn:active { transform: scale(.98); }
 .primary-btn svg { width: 15px; height: 15px; }
 
+/* Barra de permisos */
+#perm-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
+@keyframes perm-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+#perm-bar .perm-ic { color: var(--text-dim); display: flex; }
+#perm-bar .perm-ic svg { width: 15px; height: 15px; }
+#perm-text { flex: 1; }
+#perm-text b { color: #fff; }
+.perm-remember { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12px; cursor: pointer; }
+.perm-remember input { accent-color: #d9dadd; width: 14px; height: 14px; }
+#perm-bar button { border: none; border-radius: 8px; padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: #232328; color: var(--text); }
+#perm-bar button:hover { background: #2b2b31; }
+#perm-bar button.primary { background: var(--accent); color: #121215; font-weight: 600; }
+#perm-bar button.primary:hover { background: #fff; }
+#perm-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+#perm-list:empty::after { content: "No hay permisos guardados."; color: #5c5e64; font-size: 12.5px; padding: 12px 4px; display: block; }
+.perm-row { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 8px; }
+.perm-row:hover { background: var(--bg-2); }
+.perm-row .pr-info { flex: 1; min-width: 0; }
+.perm-row .pr-site { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perm-row .pr-perm { font-size: 11.5px; color: var(--text-dim); }
+.perm-row .pr-state { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+.perm-row .pr-state.allow { color: var(--ok); background: rgba(127,211,155,.12); }
+.perm-row .pr-state.block { color: var(--danger); background: rgba(229,72,77,.12); }
+.perm-row .pr-x { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 26px; height: 26px; border-radius: 6px; }
+.perm-row .pr-x:hover { color: var(--danger); background: var(--bg); }
+.perm-row .pr-x svg { width: 13px; height: 13px; }
+
 /* Historial */
 .hist-search { padding: 0 16px 12px; }
 .hist-search input { width: 100%; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 12px; font-size: 12.5px; outline: none; }
@@ -324,7 +351,7 @@ button { font-family: inherit; }
 #hub.active { display: block; }
 #hub .hub-scroll { position: absolute; inset: 0; overflow-y: auto; z-index: 1; }
 /* Fondo degradado genérico, editable por el usuario */
-#hub::before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--hub-bg, linear-gradient(160deg, #14141a 0%, #0a0a0d 100%)); }
+#hub::before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--hub-bg, linear-gradient(160deg, #24242b 0%, #191920 100%)); background-size: cover; background-position: center; }
 #hub .hub-scroll { color: var(--text); }
 
 #widget-grid { max-width: 880px; margin: 0 auto; padding: 6vh 26px 96px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; grid-auto-flow: row dense; }
@@ -400,7 +427,8 @@ button { font-family: inherit; }
 .w-tools button svg { width: 12px; height: 12px; }
 
 /* FAB + paneles del hub */
-.hub-actions { position: absolute; right: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
+.hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
+#hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: #6a6c73; background: rgba(20,20,24,.55); border: 1px solid rgba(255,255,255,.05); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
 .hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #2c2c32; background: rgba(14,14,17,.82); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(8px); transition: border-color .15s, background .15s; }
 .hub-fab:hover { border-color: #47484f; }
 .hub-fab.on { background: var(--accent); color: #121215; border-color: var(--accent); }

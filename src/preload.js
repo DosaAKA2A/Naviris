@@ -43,5 +43,12 @@ contextBridge.exposeInMainWorld('cobalt', {
   pwList: () => ipcRenderer.invoke('pw:list'),
   pwAdd: (site, username, password) => ipcRenderer.invoke('pw:add', { site, username, password }),
   pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
-  pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id)
+  pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),
+
+  onPermAsk: (cb) => ipcRenderer.on('perm:ask', (_e, req) => cb(req)),
+  permRespond: (id, decision, remember) => ipcRenderer.send('perm:respond', { id, decision, remember }),
+  permList: () => ipcRenderer.invoke('perm:list'),
+  permRemove: (key) => ipcRenderer.invoke('perm:remove', key),
+  permClear: () => ipcRenderer.invoke('perm:clear'),
+  secStatus: () => ipcRenderer.invoke('sec:status')
 });

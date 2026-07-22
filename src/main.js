@@ -28,7 +28,8 @@ const DEFAULT_SETTINGS = {
   agentMode: false,
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
-  blockPasskeys: true       // evita el prompt de Windows Hello (claves de acceso)
+  blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
+  permissions: {}           // decisiones de permisos por sitio: "origin|tipo" -> allow|block
 };
 
 // Registra un autenticador virtual (vía CDP interno) para que las peticiones
@@ -100,9 +101,12 @@ if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
 // ---------- Modo agente: Chrome DevTools Protocol en localhost ----------
 if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', '9223');
 
-// ---------- Flags de bajo consumo ----------
-app.commandLine.appendSwitch('renderer-process-limit', '6');
-app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent');
+// ---------- Rendimiento y seguridad ----------
+// (Se quitó renderer-process-limit: limitaba procesos y debilitaba el aislamiento
+//  de sitios. El ahorro de memoria lo cubre el sueño de pestañas.)
+// HttpsUpgrades: sube automáticamente las navegaciones http:// a https:// con
+//  reintento si el sitio no soporta https. Aislamiento estricto de sitios activo por defecto.
+app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 // ---------- Bloqueador de anuncios ----------
@@ -201,7 +205,57 @@ function setupSession(ses) {
   });
 
   ses.on('will-download', (_e, item) => registerDownloadItem(item));
+  setupPermissions(ses);
 }
+
+// ---------- Gestión de permisos por sitio ----------
+// Permisos que se conceden sin preguntar (poco sensibles)
+const AUTO_ALLOW = new Set(['fullscreen', 'pointerLock', 'clipboard-sanitized-write', 'idle-detection', 'background-sync', 'wake-lock']);
+// Permisos sensibles que SIEMPRE preguntamos si no hay decisión guardada
+const SENSITIVE = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read', 'hid', 'serial', 'usb', 'bluetooth']);
+let permSeq = 0;
+const permPending = new Map();
+
+function originOf(url) { try { return new URL(url).origin; } catch { return ''; } }
+
+function setupPermissions(ses) {
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const origin = originOf(details.requestingUrl || (wc && wc.getURL && wc.getURL()) || '');
+    if (!origin) return callback(false);
+    if (AUTO_ALLOW.has(permission)) return callback(true);
+    const key = origin + '|' + permission;
+    const saved = settings.permissions[key];
+    if (saved === 'allow') return callback(true);
+    if (saved === 'block') return callback(false);
+    if (!SENSITIVE.has(permission)) return callback(false); // desconocido/no listado → denegar por seguridad
+    // Preguntar al usuario
+    const id = 'perm' + (++permSeq);
+    permPending.set(id, { callback, key });
+    const mediaTypes = (details && details.mediaTypes) || [];
+    broadcast('perm:ask', { id, origin, permission, mediaTypes });
+  });
+  ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => {
+    if (AUTO_ALLOW.has(permission)) return true;
+    return settings.permissions[originOf(requestingOrigin) + '|' + permission] === 'allow';
+  });
+}
+
+ipcMain.on('perm:respond', (_e, { id, decision, remember }) => {
+  const pend = permPending.get(id);
+  if (!pend) return;
+  permPending.delete(id);
+  const allow = decision === 'allow';
+  if (remember) { settings.permissions[pend.key] = allow ? 'allow' : 'block'; saveSettings(settings); }
+  pend.callback(allow);
+});
+ipcMain.handle('perm:list', () => settings.permissions);
+ipcMain.handle('perm:remove', (_e, key) => { delete settings.permissions[key]; saveSettings(settings); return settings.permissions; });
+ipcMain.handle('perm:clear', () => { settings.permissions = {}; saveSettings(settings); return settings.permissions; });
+ipcMain.handle('sec:status', () => ({
+  sandbox: true,                                                   // sandbox activado en cada webview
+  siteIsolation: !app.commandLine.hasSwitch('disable-site-isolation-trials'), // Chromium: por defecto activo
+  httpsUpgrades: true                                             // auto-subida http→https
+}));
 
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
@@ -287,6 +341,13 @@ function createWindow(isPrivate = false) {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: true, contextIsolation: true, nodeIntegration: false, spellcheck: false
     }
+  });
+  // Sandbox + aislamiento en cada webview (contenido de sitios)
+  win.webContents.on('will-attach-webview', (_e, webPreferences) => {
+    webPreferences.sandbox = true;
+    webPreferences.contextIsolation = true;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
   win.once('ready-to-show', () => win.show());
