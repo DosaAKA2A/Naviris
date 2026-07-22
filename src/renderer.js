@@ -28,7 +28,8 @@ const els = {};
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'dl-panel', 'dl-list',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
-  'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close'
+  'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
+  'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 const SLEEP_AFTER_MS = 5 * 60 * 1000;
@@ -127,6 +128,7 @@ function attachWebview(tab, url) {
   wv.addEventListener('did-navigate-in-page', onNav);
   wv.addEventListener('did-start-loading', () => { if (tab.id === activeId) els.navReload.innerHTML = window.icon('x-mark'); });
   wv.addEventListener('did-stop-loading', () => { if (tab.id === activeId) { els.navReload.innerHTML = window.icon('arrow-path'); syncNavUI(); } });
+  wv.addEventListener('ipc-message', (e) => onWebviewMessage(wv, e));
   els.content.appendChild(wv);
 }
 function activateTab(id) {
@@ -891,6 +893,50 @@ els.optGpu.addEventListener('change', async () => { settings = await window.coba
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
+
+/* ============ Contraseñas: guardar y autorrellenar en sitios ============ */
+const pwPrompted = new Set(); // evita volver a preguntar por la misma cuenta en la sesión
+function hidePwBar() { els.pwBar.classList.add('hidden'); }
+function showPwBar(html, yesLabel, onYes) {
+  els.pwText.innerHTML = html;
+  els.pwYes.textContent = yesLabel;
+  els.pwYes.onclick = () => { hidePwBar(); onYes(); };
+  els.pwNo.onclick = hidePwBar;
+  els.pwBar.classList.remove('hidden');
+}
+async function onWebviewMessage(wv, e) {
+  if (activeTab()?.webview !== wv) return; // solo la pestaña activa
+  const data = (e.args && e.args[0]) || {};
+  if (e.channel === 'cobalt-capture') {
+    if (IS_PRIVATE) return; // en ventana privada no se guardan contraseñas
+    const { url, username, password } = data;
+    if (!password) return;
+    const host = hostOf(url); if (!host) return;
+    const key = host + '|' + (username || '');
+    if (pwPrompted.has(key)) return;
+    pwPrompted.add(key);
+    const existing = (await window.cobalt.pwForHost(host)).find((c) => (c.username || '') === (username || ''));
+    const who = username ? `<b>${escapeHtml(username)}</b> en <b>${escapeHtml(host)}</b>` : `<b>${escapeHtml(host)}</b>`;
+    if (existing) showPwBar(`¿Actualizar la contraseña de ${who}?`, 'Actualizar', () => doSavePw(host, username, password));
+    else showPwBar(`¿Guardar la contraseña de ${who} en Cobalt?`, 'Guardar', () => doSavePw(host, username, password));
+  } else if (e.channel === 'cobalt-loginform') {
+    const host = hostOf(data.url); if (!host) return;
+    const creds = await window.cobalt.pwForHost(host);
+    if (!creds.length) return;
+    const cred = creds[0];
+    const who = cred.username ? `<b>${escapeHtml(cred.username)}</b>` : 'la cuenta guardada';
+    showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred));
+  }
+}
+async function doSavePw(host, username, password) {
+  const r = await window.cobalt.pwAdd(host, username || '', password);
+  toast(r && r.ok ? (r.updated ? 'Contraseña actualizada' : 'Contraseña guardada en Cobalt') : 'No se pudo guardar');
+}
+async function doFillPw(wv, cred) {
+  const r = await window.cobalt.pwReveal(cred.id);
+  if (r.ok) { try { wv.send('cobalt-fill', { username: cred.username, password: r.password }); toast('Contraseña rellenada'); } catch { toast('No se pudo rellenar'); } }
+  else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
+}
 
 /* ============ Permisos de sitios ============ */
 const PERM_LABELS = { media: 'usar la cámara y el micrófono', geolocation: 'saber tu ubicación', notifications: 'enviarte notificaciones', midi: 'usar dispositivos MIDI', midiSysex: 'usar dispositivos MIDI', 'clipboard-read': 'leer tu portapapeles', hid: 'acceder a dispositivos HID', serial: 'acceder a puertos serie', usb: 'acceder a dispositivos USB', bluetooth: 'usar Bluetooth' };

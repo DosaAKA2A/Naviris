@@ -342,12 +342,13 @@ function createWindow(isPrivate = false) {
       webviewTag: true, contextIsolation: true, nodeIntegration: false, spellcheck: false
     }
   });
-  // Sandbox + aislamiento en cada webview (contenido de sitios)
+  // Sandbox + aislamiento en cada webview (contenido de sitios) + preload de contraseñas
   win.webContents.on('will-attach-webview', (_e, webPreferences) => {
     webPreferences.sandbox = true;
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.preload = path.join(__dirname, 'webview-preload.js');
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
   win.once('ready-to-show', () => win.show());
@@ -423,15 +424,33 @@ $task.Wait()
   });
 }
 
+// Reduce un sitio/URL a su dominio base para emparejar credenciales entre subdominios
+function hostKey(s) {
+  let h = String(s || '');
+  try { h = new URL(/^https?:\/\//.test(h) ? h : 'https://' + h).hostname; } catch { /* nada */ }
+  h = h.toLowerCase().replace(/^www\./, '');
+  const p = h.split('.');
+  return p.length > 2 ? p.slice(-2).join('.') : h;
+}
+
 ipcMain.handle('pw:available', async () => ({ encryption: safeStorage.isEncryptionAvailable() }));
 ipcMain.handle('pw:list', () => loadPasswords().map((e) => ({ id: e.id, site: e.site, username: e.username })));
+// Credenciales guardadas para un sitio (sin exponer la contraseña; el revelado exige Windows Hello)
+ipcMain.handle('pw:for-host', (_e, host) => {
+  const k = hostKey(host);
+  return loadPasswords().filter((e) => hostKey(e.site) === k).map((e) => ({ id: e.id, site: e.site, username: e.username }));
+});
 ipcMain.handle('pw:add', (_e, { site, username, password }) => {
   if (!site || !password || !safeStorage.isEncryptionAvailable()) return { ok: false };
   const list = loadPasswords();
   const enc = safeStorage.encryptString(String(password)).toString('base64');
-  list.push({ id: 'pw' + (++pwSeq), site: String(site), username: String(username || ''), enc });
+  const user = String(username || '');
+  // Si ya existe una credencial para el mismo dominio + usuario, actualiza la contraseña
+  const existing = list.find((e) => e.username === user && hostKey(e.site) === hostKey(site));
+  if (existing) { existing.enc = enc; existing.site = String(site); }
+  else list.push({ id: 'pw' + (++pwSeq), site: String(site), username: user, enc });
   savePasswords(list);
-  return { ok: true };
+  return { ok: true, updated: !!existing };
 });
 ipcMain.handle('pw:delete', (_e, id) => { savePasswords(loadPasswords().filter((e) => e.id !== id)); return { ok: true }; });
 ipcMain.handle('pw:reveal', async (_e, id) => {

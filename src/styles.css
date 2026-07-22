@@ -251,6 +251,16 @@ button { font-family: inherit; }
 #perm-bar button:hover { background: #2b2b31; }
 #perm-bar button.primary { background: var(--accent); color: #121215; font-weight: 600; }
 #perm-bar button.primary:hover { background: #fff; }
+/* Barra de contraseñas (guardar / autorrellenar) — reutiliza el estilo de #perm-bar */
+#pw-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
+#pw-bar .perm-ic { color: var(--text-dim); display: flex; }
+#pw-bar .perm-ic svg { width: 15px; height: 15px; }
+#pw-text { flex: 1; }
+#pw-text b { color: #fff; }
+#pw-bar button { border: none; border-radius: 8px; padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: #232328; color: var(--text); }
+#pw-bar button:hover { background: #2b2b31; }
+#pw-bar button.primary { background: var(--accent); color: #121215; font-weight: 600; }
+#pw-bar button.primary:hover { background: #fff; }
 #perm-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 #perm-list:empty::after { content: "No hay permisos guardados."; color: #5c5e64; font-size: 12.5px; padding: 12px 4px; display: block; }
 .perm-row { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 8px; }
