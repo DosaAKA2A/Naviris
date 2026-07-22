@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -331,6 +331,7 @@ ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
 ipcMain.on('shell:open-external', (_e, url) => { if (/^https?:/.test(url)) shell.openExternal(url); });
+ipcMain.handle('clipboard:read', () => { try { return clipboard.readText(); } catch { return ''; } });
 
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });

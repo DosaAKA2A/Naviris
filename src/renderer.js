@@ -592,6 +592,15 @@ els.sbRat.addEventListener('click', async (e) => {
   if (!open) return;
   const tab = activeTab(); let url = tab?.kind === 'web' ? tab.url : '';
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
+  // Detecta el último enlace copiado: si el portapapeles tiene una URL, gana
+  // (prioridad total si además es un enlace de vídeo).
+  try {
+    const clip = (await window.cobalt.readClipboard() || '').trim();
+    const isUrl = /^https?:\/\/\S+$/i.test(clip);
+    const clipIsVideo = isUrl && /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//.test(clip);
+    const urlIsVideo = /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//.test(url);
+    if (isUrl && (clipIsVideo || !urlIsVideo)) url = clip;
+  } catch {}
   els.ratUrl.value = url; updateRatPlat();
   els.ratXcheck.checked = !!settings.xRevealSensitive;
   const ok = await window.cobalt.ytAvailable();
