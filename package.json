@@ -1,0 +1,72 @@
+{
+  "name": "cobalt-browser",
+  "productName": "Cobalt",
+  "version": "1.0.0",
+  "description": "Cobalt — navegador ligero de Estudio de Iris. Motor Chromium, bajo consumo y aceleración por GPU.",
+  "author": "Estudio de Iris",
+  "license": "MIT",
+  "main": "src/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DosaAKA2A/Cobalt.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "icon": "electron build/render-icon.js",
+    "fetch-bin": "node build/fetch-bin.js",
+    "dist": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.estudiodeiris.cobalt",
+    "productName": "Cobalt",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin"
+      }
+    ],
+    "icon": "build/icon.png",
+    "publish": {
+      "provider": "github",
+      "owner": "DosaAKA2A",
+      "repo": "Cobalt"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Cobalt"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cobalt</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===== Splash ===== -->
+  <div id="splash">
+    <span class="iris-slot splash-iris" data-iris="92"></span>
+    <div class="splash-name">COBALT</div>
+    <div class="splash-sub">by Estudio de Iris</div>
+    <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+  </div>
+
+  <!-- ===== Titlebar + pestañas ===== -->
+  <header id="titlebar">
+    <div class="tb-logo" title="Cobalt"><span class="iris-slot" data-iris="20"></span></div>
+    <span id="private-badge" class="hidden" title="Ventana privada"></span>
+    <nav id="tabstrip"></nav>
+    <button id="newtab-btn" title="Nueva pestaña (Ctrl+T)" data-ico="plus"></button>
+    <div class="tb-drag"></div>
+    <div class="win-controls">
+      <button id="win-min" title="Minimizar" data-ico="minus"></button>
+      <button id="win-max" title="Maximizar" data-ico="stop"></button>
+      <button id="win-close" title="Cerrar" data-ico="x-mark"></button>
+    </div>
+  </header>
+
+  <div id="app-row">
+    <!-- ===== Sidebar ===== -->
+    <aside id="sidebar">
+      <button class="sb-btn" id="sb-home" title="Hub de inicio" data-ico="home"></button>
+      <div class="sb-sep"></div>
+      <div id="sb-sites"></div>
+      <div class="sb-sep"></div>
+      <button class="sb-btn accent" id="sb-claude" title="Claude" data-brand="claude"></button>
+      <div class="sb-spacer"></div>
+      <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="arrow-down-circle"></button>
+      <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
+      <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="arrow-down-tray"></button>
+      <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="star"></button>
+      <button class="sb-btn" id="sb-res" title="Vista en otras resoluciones" data-ico="computer-desktop"></button>
+      <button class="sb-btn" id="sb-settings" title="Menú" data-ico="cog-6-tooth"></button>
+    </aside>
+
+    <!-- ===== Panel web lateral ===== -->
+    <section id="web-panel" class="hidden">
+      <div class="wpz-head">
+        <span id="wpz-title">Panel</span>
+        <span class="wpz-tools">
+          <button id="wpz-tab" title="Abrir en pestaña" data-ico="arrow-up-right"></button>
+          <button id="wpz-reload" title="Recargar" data-ico="arrow-path"></button>
+          <button id="wpz-close" title="Cerrar panel" data-ico="x-mark"></button>
+        </span>
+      </div>
+      <div id="wpz-host"></div>
+      <div id="wpz-grip" title="Arrastra para ajustar el ancho"></div>
+    </section>
+
+    <div id="main-col">
+      <!-- ===== Navbar ===== -->
+      <div id="navbar">
+        <button id="nav-back" title="Atrás" data-ico="arrow-left"></button>
+        <button id="nav-fwd" title="Adelante" data-ico="arrow-right"></button>
+        <button id="nav-reload" title="Recargar" data-ico="arrow-path"></button>
+        <button id="nav-home" title="Hub de inicio" data-ico="home"></button>
+        <div id="urlbox">
+          <span id="url-secure" title="Conexión" data-ico="lock-closed"></span>
+          <input id="urlbar" type="text" spellcheck="false" autocomplete="off"
+                 placeholder="Busca en Google o escribe una dirección" />
+          <div id="suggest" class="hidden"></div>
+        </div>
+        <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-check"></button>
+        <button id="nav-star" title="Añadir a marcadores" data-ico="star"></button>
+        <button id="nav-menu" title="Menú" data-ico="ellipsis-vertical"></button>
+      </div>
+
+      <div id="bookmarks-bar"></div>
+
+      <!-- ===== Contenido ===== -->
+      <main id="content">
+        <div id="res-label" class="hidden"></div>
+
+        <!-- Hub con widgets -->
+        <section id="hub">
+          <div class="hub-scroll">
+            <div id="widget-grid"></div>
+          </div>
+          <div class="hub-actions">
+            <button id="hub-edit" class="hub-fab" title="Editar hub"><span data-ico="squares-plus"></span><span class="lbl">Editar</span></button>
+            <button id="hub-customize" class="hub-fab" title="Cambiar fondo"><span data-ico="photo"></span></button>
+          </div>
+
+          <!-- Paleta de widgets (modo edición) -->
+          <div id="widget-palette" class="hub-panel hidden">
+            <div class="hp-title">Añadir widget</div>
+            <div id="palette-list"></div>
+          </div>
+
+          <!-- Fondo del hub (editable) -->
+          <div id="customize-panel" class="hub-panel hidden">
+            <div class="hp-title">Fondo del hub</div>
+            <div id="bg-presets"></div>
+            <label class="wp-custom">Imagen propia…<input type="file" id="wp-file" accept="image/*" hidden /></label>
+          </div>
+        </section>
+
+        <!-- Página de marcadores -->
+        <section id="bm-page" class="overlay-page hidden">
+          <div class="bmp-inner">
+            <div class="bmp-head">
+              <h2>Marcadores</h2>
+              <div class="bmp-tools">
+                <input id="bm-filter" type="text" placeholder="Buscar…" spellcheck="false" />
+                <button id="bm-newfolder" class="ghost-btn"><span data-ico="folder-plus"></span> Carpeta</button>
+              </div>
+            </div>
+            <div id="bm-tree"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- ===== Menú ===== -->
+  <div id="menu-pop" class="hidden">
+    <button data-action="newtab">Nueva pestaña <span class="kbd">Ctrl+T</span></button>
+    <button data-action="private">Nueva ventana privada <span class="kbd">Ctrl+Shift+N</span></button>
+    <button data-action="bookmarks">Ver todos los marcadores</button>
+    <button data-action="toggle-bookmarks">Mostrar/ocultar barra de marcadores</button>
+    <button data-action="sidebar">Personalizar sidebar…</button>
+    <hr />
+    <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
+    <label class="menu-toggle"><span>Mostrar contenido sensible en X<br /><small>Salta el aviso de sensibilidad de X/Twitter</small></span><input type="checkbox" id="opt-xsensitive" /></label>
+    <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme pestañas inactivas</small></span><input type="checkbox" id="opt-powersaver" /></label>
+    <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
+    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Cobalt · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
+    <hr />
+    <button data-action="update">Buscar actualizaciones</button>
+    <button data-action="about">Acerca de Cobalt</button>
+  </div>
+
+  <!-- ===== Bloqueador ===== -->
+  <div id="shield-pop" class="hidden">
+    <div class="sp-head"><span class="sp-title">Bloqueador de anuncios</span><label class="switch"><input type="checkbox" id="adblock-toggle" /><span class="slider"></span></label></div>
+    <div class="sp-count" id="adblock-count">0 peticiones bloqueadas</div>
+    <button id="adblock-site" class="sp-site hidden"></button>
+    <div class="sp-list-title">Dominios con anuncios permitidos</div>
+    <div id="adblock-list" class="sp-list"></div>
+  </div>
+
+  <!-- ===== Resoluciones ===== -->
+  <div id="res-pop" class="hidden">
+    <div class="rp-title">Vista en otras resoluciones</div>
+    <div class="rp-sub">Renderiza la página como en otra pantalla, centrada</div>
+    <div id="res-list"></div>
+  </div>
+
+  <!-- ===== Rat Tool (descarga vídeo/audio) ===== -->
+  <div id="rat-pop" class="hidden">
+    <div class="rat-head"><span class="rat-brand">Rat Tool</span><span class="rat-sub">Descargar vídeo o audio</span></div>
+    <div id="rat-detect" class="rat-detect hidden"><span id="rat-detect-logo"></span><div class="rat-detect-info"><div id="rat-detect-name"></div><div id="rat-detect-url"></div></div></div>
+    <input id="rat-url" type="text" spellcheck="false" placeholder="Pega un enlace de YouTube, Instagram, X, TikTok…" />
+    <div class="rat-plat" id="rat-plat"></div>
+    <div class="rat-btns">
+      <button id="rat-video" class="rat-btn"><span data-ico="film"></span> Vídeo MP4</button>
+      <button id="rat-audio" class="rat-btn"><span data-ico="musical-note"></span> Audio MP3</button>
+    </div>
+    <label id="rat-xtoggle" class="rat-xrow hidden"><span>Mostrar contenido sensible en X</span><span class="switch"><input type="checkbox" id="rat-xcheck" /><span class="slider"></span></span></label>
+    <div class="rat-note" id="rat-note"></div>
+  </div>
+
+  <!-- ===== Panel recursos gráficos ===== -->
+  <aside id="media-panel" class="hidden side-panel">
+    <div class="mp-head"><span id="mp-title">Recursos gráficos</span><span class="mp-tools"><button id="mp-refresh" data-ico="arrow-path" title="Volver a escanear"></button><button id="mp-close" data-ico="x-mark" title="Cerrar"></button></span></div>
+    <div class="mp-filters"><button class="mp-chip active" data-filter="all">Todo</button><button class="mp-chip" data-filter="image">Imágenes</button><button class="mp-chip" data-filter="video">Vídeos</button></div>
+    <div id="mp-grid"></div>
+    <div class="mp-foot"><button id="mp-all" class="primary-btn" data-ico="arrow-down-tray"> Descargar todo</button></div>
+  </aside>
+
+  <!-- ===== Panel descargas ===== -->
+  <aside id="dl-panel" class="hidden side-panel">
+    <div class="mp-head"><span>Descargas</span><span class="mp-tools"><button id="dl-clear" data-ico="trash" title="Limpiar completadas"></button><button id="dl-close" data-ico="x-mark" title="Cerrar"></button></span></div>
+    <div class="dl-hint">Haz clic en una descarga para abrirla en Cobalt.</div>
+    <div id="dl-list"></div>
+  </aside>
+
+  <!-- ===== Modales ===== -->
+  <div id="dial-modal" class="modal hidden"><div class="modal-card"><h3>Añadir acceso al hub</h3><input id="dial-name" type="text" placeholder="Nombre (ej. YouTube)" /><input id="dial-url" type="text" placeholder="https://..." /><div class="modal-actions"><button id="dial-cancel">Cancelar</button><button id="dial-save" class="primary">Añadir</button></div></div></div>
+
+  <div id="prompt-modal" class="modal hidden"><div class="modal-card"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
+
+  <div id="sidebar-modal" class="modal hidden"><div class="modal-card"><h3>Personalizar sidebar</h3><p>Activa solo las webs que quieras tener a mano. Puedes dejarlo vacío.</p><div id="sidebar-config"></div><div class="modal-actions"><button id="sidebar-add" class="ghost-btn" style="margin-right:auto"><span data-ico="plus"></span> Añadir web</button><button id="sidebar-done" class="primary">Listo</button></div></div></div>
+
+  <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Cobalt <span id="about-version"></span></h3><p>Navegador ligero de <b>Estudio de Iris</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
+    <div class="upd-box"><div id="upd-status">Comprueba si hay una versión nueva.</div><div id="upd-bar" class="upd-bar hidden"><i></i></div></div>
+    <div class="modal-actions"><button id="upd-btn" style="margin-right:auto">Buscar actualizaciones</button><button id="about-close" class="primary">Cerrar</button></div></div></div>
+
+  <div id="toast" role="status"></div>
+
+  <script src="icons.js"></script>
+  <script src="brands.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
