@@ -10,6 +10,7 @@ Cobalt por **Studio Iris** — navegador ligero sobre motor Chromium (Electron).
 - **Bloqueador de anuncios** funcional, incluido un saltador de anuncios de YouTube ligero que no ralentiza la reproducción.
 - **Detector de recursos gráficos** con previsualización y descarga.
 - **Contenido sensible de X** revelable de forma nativa.
+- **Gestor de contraseñas** cifrado con tu cuenta de Windows (DPAPI) y verificación con Windows Hello (PIN o biometría) para ver cada contraseña.
 - **Búsqueda inteligente** con autocompletado desde tu historial.
 - **Navegación privada**, ahorro de energía (duerme pestañas), aceleración por GPU.
 - **Marcadores con carpetas**, visor de resoluciones y modo agente (CDP) para automatización.

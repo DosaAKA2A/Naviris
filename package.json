@@ -1,7 +1,7 @@
 {
   "name": "cobalt-browser",
   "productName": "Cobalt",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Cobalt — navegador ligero de Iris Studio. Motor Chromium, bajo consumo y aceleración por GPU.",
   "author": "Iris Studio",
   "license": "MIT",
@@ -29,7 +29,8 @@
     },
     "files": [
       "src/**/*",
-      "build/icon.png"
+      "build/icon.png",
+      "build/icon.ico"
     ],
     "extraResources": [
       {
@@ -37,7 +38,7 @@
         "to": "bin"
       }
     ],
-    "icon": "build/icon.png",
+    "icon": "build/icon.ico",
     "publish": {
       "provider": "github",
       "owner": "DosaAKA2A",
@@ -64,7 +65,10 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Cobalt"
+      "shortcutName": "Cobalt",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   },
   "dependencies": {

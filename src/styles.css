@@ -238,6 +238,32 @@ button { font-family: inherit; }
 .primary-btn:active { transform: scale(.98); }
 .primary-btn svg { width: 15px; height: 15px; }
 
+/* Contraseñas */
+.pw-hint { font-size: 11.5px; color: var(--text-dim); padding: 0 16px 12px; line-height: 1.5; }
+.pw-hint b { color: var(--text); font-weight: 600; }
+.pw-form { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.pw-form input { height: 34px; border-radius: 8px; border: 1px solid #3a3b41; background: var(--bg); color: var(--text); padding: 0 11px; font-size: 12.5px; outline: none; }
+.pw-form input:focus { border-color: #55565c; }
+.pw-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pw-form-actions button { border: none; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; background: #232328; color: var(--text); }
+.pw-form-actions button:hover { background: #2b2b31; }
+#pw-list { flex: 1; overflow-y: auto; padding: 0 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+#pw-list::-webkit-scrollbar { width: 8px; }
+#pw-list::-webkit-scrollbar-thumb { background: #2b2b31; border-radius: 4px; }
+#pw-list:empty::after { content: "Aún no has guardado contraseñas. Pulsa + para añadir una."; color: #5c5e64; font-size: 12.5px; text-align: center; padding: 30px 12px; line-height: 1.6; display: block; }
+.pw-item { background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; }
+.pw-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.pw-ic img { width: 18px; height: 18px; border-radius: 4px; }
+.pw-ic svg { width: 15px; height: 15px; color: var(--text-dim); }
+.pw-info { flex: 1; min-width: 0; }
+.pw-site { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.pw-acts { display: flex; gap: 2px; flex-shrink: 0; }
+.pw-acts button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.pw-acts button:hover { background: var(--bg-2); color: var(--text); }
+.pw-acts button.del:hover { color: var(--danger); background: rgba(229,72,77,.1); }
+.pw-acts button svg { width: 14px; height: 14px; }
+
 /* Descargas */
 .dl-hint { font-size: 11px; color: #5c5e64; padding: 0 16px 8px; }
 #dl-list { flex: 1; overflow-y: auto; padding: 0 12px 14px; display: flex; flex-direction: column; gap: 8px; }

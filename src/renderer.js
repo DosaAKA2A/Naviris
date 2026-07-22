@@ -20,7 +20,8 @@ const els = {};
   'wp-file', 'tile-styles', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
-  'sb-media', 'sb-downloads', 'sb-bookmarks', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'sb-media', 'sb-downloads', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'dl-panel', 'dl-list',
@@ -553,7 +554,58 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloads());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); }
+
+/* ============ Gestor de contraseñas ============ */
+async function renderPasswords() {
+  const list = await window.cobalt.pwList();
+  els.pwList.innerHTML = '';
+  for (const e of list) {
+    const item = document.createElement('div'); item.className = 'pw-item';
+    const ic = document.createElement('span'); ic.className = 'pw-ic'; ic.innerHTML = window.icon('key');
+    getTile('https://' + e.site).then((t) => { if (t?.icon) { ic.innerHTML = ''; const im = document.createElement('img'); im.src = t.icon; ic.appendChild(im); } });
+    const info = document.createElement('div'); info.className = 'pw-info';
+    const sub = document.createElement('div'); sub.className = 'pw-sub'; sub.textContent = e.username || '••••••••';
+    info.innerHTML = `<div class="pw-site">${escapeHtml(e.site)}</div>`; info.appendChild(sub);
+    const acts = document.createElement('div'); acts.className = 'pw-acts';
+    const eye = document.createElement('button'); eye.title = 'Ver contraseña (Windows Hello)'; eye.innerHTML = window.icon('eye');
+    eye.addEventListener('click', async () => {
+      eye.disabled = true; const r = await window.cobalt.pwReveal(e.id); eye.disabled = false;
+      if (r.ok) { sub.textContent = r.password; setTimeout(() => { sub.textContent = e.username || '••••••••'; }, 15000); }
+      else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo verificar');
+    });
+    const copy = document.createElement('button'); copy.title = 'Copiar contraseña (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
+    copy.addEventListener('click', async () => {
+      copy.disabled = true; const r = await window.cobalt.pwReveal(e.id); copy.disabled = false;
+      if (r.ok) { try { await navigator.clipboard.writeText(r.password); toast('Contraseña copiada (se borra en 20 s)'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 20000); } catch { toast('No se pudo copiar'); } }
+      else toast('Verificación cancelada');
+    });
+    const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
+    del.addEventListener('click', async () => { await window.cobalt.pwDelete(e.id); renderPasswords(); });
+    acts.append(eye, copy, del); item.append(ic, info, acts); els.pwList.appendChild(item);
+  }
+}
+function togglePwPanel(force) {
+  const open = force !== undefined ? force : els.pwPanel.classList.contains('hidden');
+  if (open) { closeRightPanels(); els.pwPanel.classList.remove('hidden'); els.sbPasswords.classList.add('open'); renderPasswords(); }
+  else { els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.pwForm.classList.add('hidden'); }
+}
+els.sbPasswords.addEventListener('click', async () => {
+  const info = await window.cobalt.pwAvailable();
+  if (!info.encryption) { toast('El cifrado seguro no está disponible en este sistema'); return; }
+  togglePwPanel();
+});
+$('#pw-close').addEventListener('click', () => togglePwPanel(false));
+els.pwAddbtn.addEventListener('click', () => { els.pwForm.classList.toggle('hidden'); els.pwSite.value = ''; els.pwUser.value = ''; els.pwPass.value = ''; els.pwSite.focus(); });
+els.pwCancel.addEventListener('click', () => els.pwForm.classList.add('hidden'));
+els.pwForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const site = hostOf(els.pwSite.value.includes('://') ? els.pwSite.value : 'https://' + els.pwSite.value) || els.pwSite.value.trim();
+  if (!site || !els.pwPass.value) { toast('Falta el sitio o la contraseña'); return; }
+  const r = await window.cobalt.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value);
+  if (r.ok) { els.pwForm.classList.add('hidden'); renderPasswords(); toast('Contraseña guardada y cifrada'); }
+  else toast('No se pudo guardar');
+});
 
 /* ============ Rat Tool ============ */
 const GRABBABLE = ['youtube.com', 'youtu.be', 'twitter.com', 'x.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'twitch.tv', 'vimeo.com', 'dailymotion.com', 'reddit.com'];

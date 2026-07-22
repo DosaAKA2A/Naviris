@@ -37,5 +37,11 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, url) => cb(url)),
   openExternal: (url) => ipcRenderer.send('shell:open-external', url),
-  readClipboard: () => ipcRenderer.invoke('clipboard:read')
+  readClipboard: () => ipcRenderer.invoke('clipboard:read'),
+
+  pwAvailable: () => ipcRenderer.invoke('pw:available'),
+  pwList: () => ipcRenderer.invoke('pw:list'),
+  pwAdd: (site, username, password) => ipcRenderer.invoke('pw:add', { site, username, password }),
+  pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
+  pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id)
 });

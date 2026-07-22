@@ -42,6 +42,7 @@
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
       <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="arrow-down-tray"></button>
       <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="star"></button>
+      <button class="sb-btn" id="sb-passwords" title="Contraseñas" data-ico="key"></button>
       <button class="sb-btn" id="sb-res" title="Vista en otras resoluciones" data-ico="computer-desktop"></button>
       <button class="sb-btn" id="sb-settings" title="Menú" data-ico="cog-6-tooth"></button>
     </aside>
@@ -180,6 +181,19 @@
     <div class="mp-filters"><button class="mp-chip active" data-filter="all">Todo</button><button class="mp-chip" data-filter="image">Imágenes</button><button class="mp-chip" data-filter="video">Vídeos</button></div>
     <div id="mp-grid"></div>
     <div class="mp-foot"><button id="mp-all" class="primary-btn" data-ico="arrow-down-tray"> Descargar todo</button></div>
+  </aside>
+
+  <!-- ===== Panel de contraseñas ===== -->
+  <aside id="pw-panel" class="hidden side-panel">
+    <div class="mp-head"><span>Contraseñas</span><span class="mp-tools"><button id="pw-addbtn" data-ico="plus" title="Añadir"></button><button id="pw-close" data-ico="x-mark" title="Cerrar"></button></span></div>
+    <div class="pw-hint">Cifradas con tu cuenta de Windows. Ver una contraseña requiere <b>Windows Hello</b> (PIN o biometría).</div>
+    <form id="pw-form" class="pw-form hidden">
+      <input id="pw-site" type="text" placeholder="Sitio (ej. github.com)" spellcheck="false" />
+      <input id="pw-user" type="text" placeholder="Usuario o correo" spellcheck="false" />
+      <input id="pw-pass" type="password" placeholder="Contraseña" />
+      <div class="pw-form-actions"><button type="button" id="pw-cancel">Cancelar</button><button type="submit" class="primary-btn" style="width:auto;padding:8px 16px">Guardar</button></div>
+    </form>
+    <div id="pw-list"></div>
   </aside>
 
   <!-- ===== Panel descargas ===== -->

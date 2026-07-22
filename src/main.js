@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -332,6 +332,53 @@ ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
 ipcMain.on('shell:open-external', (_e, url) => { if (/^https?:/.test(url)) shell.openExternal(url); });
 ipcMain.handle('clipboard:read', () => { try { return clipboard.readText(); } catch { return ''; } });
+
+// ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
+const pwPath = () => path.join(app.getPath('userData'), 'cobalt-passwords.json');
+function loadPasswords() { try { return JSON.parse(fs.readFileSync(pwPath(), 'utf8')); } catch { return []; } }
+function savePasswords(list) { try { fs.writeFileSync(pwPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('pw save', e); } }
+let pwSeq = Date.now();
+
+// Verifica identidad con Windows Hello (PIN/biometría). Devuelve true si "Verified".
+function verifyWindowsHello(reason) {
+  return new Promise((resolve) => {
+    const msg = String(reason || 'Cobalt te pide verificar tu identidad').replace(/'/g, ' ');
+    const script = `
+[Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+$op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('${msg}')
+$task = $asTask.MakeGenericMethod([Windows.Security.Credentials.UI.UserConsentVerificationResult]).Invoke($null, @($op))
+$task.Wait()
+[Console]::Out.Write('RESULT=' + $task.Result)`;
+    const enc = Buffer.from(script, 'utf16le').toString('base64');
+    let out = '';
+    const ps = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc], { windowsHide: true });
+    ps.stdout.on('data', (d) => { out += d.toString(); });
+    ps.on('close', () => resolve(/RESULT=Verified/.test(out)));
+    ps.on('error', () => resolve(false));
+  });
+}
+
+ipcMain.handle('pw:available', async () => ({ encryption: safeStorage.isEncryptionAvailable() }));
+ipcMain.handle('pw:list', () => loadPasswords().map((e) => ({ id: e.id, site: e.site, username: e.username })));
+ipcMain.handle('pw:add', (_e, { site, username, password }) => {
+  if (!site || !password || !safeStorage.isEncryptionAvailable()) return { ok: false };
+  const list = loadPasswords();
+  const enc = safeStorage.encryptString(String(password)).toString('base64');
+  list.push({ id: 'pw' + (++pwSeq), site: String(site), username: String(username || ''), enc });
+  savePasswords(list);
+  return { ok: true };
+});
+ipcMain.handle('pw:delete', (_e, id) => { savePasswords(loadPasswords().filter((e) => e.id !== id)); return { ok: true }; });
+ipcMain.handle('pw:reveal', async (_e, id) => {
+  const entry = loadPasswords().find((e) => e.id === id);
+  if (!entry) return { ok: false, error: 'no encontrada' };
+  const verified = await verifyWindowsHello('Cobalt: verifica tu identidad para ver la contraseña de ' + entry.site);
+  if (!verified) return { ok: false, error: 'verificacion cancelada' };
+  try { return { ok: true, password: safeStorage.decryptString(Buffer.from(entry.enc, 'base64')) }; }
+  catch { return { ok: false, error: 'no se pudo descifrar' }; }
+});
 
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });
