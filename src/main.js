@@ -233,7 +233,9 @@ function ytDownload({ url, mode }) {
     // TikTok = archivo único sin marca de agua (play_addr); sin merge para evitar errores
     args = ['-f', 'b', '--force-overwrites', ...common, url];
   } else {
-    args = ['-f', 'bv*[height<=1080]+ba/b[height<=1080]/b', '--merge-output-format', 'mp4', ...common, url];
+    // Vídeo: siempre la máxima calidad disponible (mejor vídeo + mejor audio),
+    // ordenando por resolución/fps y prefiriendo contenedor mp4.
+    args = ['-f', 'bv*+ba/b', '-S', 'res,fps,ext:mp4:m4a', '--merge-output-format', 'mp4', ...common, url];
   }
 
   const child = spawn(ytDlpPath(), args, { windowsHide: true });

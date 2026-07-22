@@ -42,6 +42,9 @@ const toUrl = (input) => {
 };
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const activeTab = () => tabs.find((t) => t.id === activeId) || null;
+// Detecta si una URL es de un vídeo descargable (YouTube /watch?, /shorts, youtu.be,
+// TikTok /video|/photo, X /status, Instagram /reel|/reels|/p|/tv, etc.)
+const isVideoUrl = (u) => /youtu\.be\/|\/(watch|shorts|video|status|reel|reels|clip|p|tv|embed)(\/|\?|$)/i.test(u || '');
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
@@ -468,16 +471,18 @@ function renderPalette() {
 }
 els.hubCustomize.addEventListener('click', () => { const show = els.customizePanel.classList.contains('hidden'); els.customizePanel.classList.toggle('hidden', !show); els.widgetPalette.classList.add('hidden'); if (show) renderBgPresets(); });
 
-// Fondos degradados genéricos (oscuros)
+// Fondos oscuros pero con tinte de color distinguible
 const BACKGROUNDS = [
-  'linear-gradient(160deg, #14141a 0%, #0a0a0d 100%)',
-  'radial-gradient(ellipse at 50% 0%, #16161c 0%, #08080a 70%)',
-  'linear-gradient(135deg, #0c0c0e 0%, #232329 100%)',
-  'linear-gradient(150deg, #0e1013 0%, #1c2127 100%)',
-  'radial-gradient(ellipse at 30% 10%, #1a1420 0%, #0b090e 65%)',
-  'radial-gradient(ellipse at 70% 10%, #101a14 0%, #090b09 65%)',
-  'radial-gradient(ellipse at 30% 10%, #1a1014 0%, #0b090a 65%)',
-  'radial-gradient(ellipse at 50% 0%, #171410 0%, #0b0a08 65%)'
+  'linear-gradient(160deg, #14141a 0%, #0a0a0d 100%)',                 // Neutro
+  'linear-gradient(135deg, #20202a 0%, #0c0c10 100%)',                 // Grafito
+  'radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #0c0a16 62%)',    // Violeta
+  'radial-gradient(120% 80% at 50% -10%, #132a4a 0%, #080d18 62%)',    // Azul
+  'radial-gradient(120% 80% at 50% -10%, #0e3330 0%, #070f0e 62%)',    // Teal
+  'radial-gradient(120% 80% at 50% -10%, #3a1420 0%, #120809 62%)',    // Vino
+  'radial-gradient(120% 80% at 50% -10%, #35240c 0%, #120c06 62%)',    // Ámbar
+  'radial-gradient(120% 80% at 50% -10%, #123326 0%, #070f0b 62%)',    // Bosque
+  'radial-gradient(120% 80% at 50% -10%, #1c2740 0%, #0b0e15 62%)',    // Acero
+  'linear-gradient(135deg, #2a1030 0%, #100a1e 45%, #0a0a0d 100%)'     // Aurora
 ];
 function applyBackground(v) { els.hub.style.setProperty('--hub-bg', v); store.set('cobalt.hubBg', v); document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v)); }
 function renderBgPresets() {
@@ -669,7 +674,7 @@ function platOf(url) { const h = hostOf(url); for (const d in PLAT_MAP) if (h ==
 // Extrae la URL del vídeo que se está viendo. En el feed de TikTok (/foryou) la
 // barra no cambia, así que buscamos el vídeo concreto por varias vías.
 function resolveMediaUrl() {
-  const RX = /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//;
+  const RX = /youtu\.be\/|\/(watch|shorts|video|status|reel|reels|clip|p|tv|embed)(\/|\?|$)/i;
   const ok = (u) => u && RX.test(u) ? u : null;
   // 1. Si la propia URL ya es de un vídeo, úsala
   if (ok(location.href)) return location.href;
@@ -698,16 +703,12 @@ els.sbRat.addEventListener('click', async (e) => {
   const open = els.ratPop.classList.contains('hidden'); els.ratPop.classList.toggle('hidden'); els.sbRat.classList.toggle('open', open);
   if (!open) return;
   const tab = activeTab(); let url = tab?.kind === 'web' ? tab.url : '';
+  // 1º: el vídeo de la PÁGINA ACTUAL (así, al pasar de TikTok a YouTube, detecta YouTube)
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
-  // Detecta el último enlace copiado: si el portapapeles tiene una URL, gana
-  // (prioridad total si además es un enlace de vídeo).
-  try {
-    const clip = (await window.cobalt.readClipboard() || '').trim();
-    const isUrl = /^https?:\/\/\S+$/i.test(clip);
-    const clipIsVideo = isUrl && /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//.test(clip);
-    const urlIsVideo = /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//.test(url);
-    if (isUrl && (clipIsVideo || !urlIsVideo)) url = clip;
-  } catch {}
+  // 2º: solo si la página actual NO es un vídeo, usa el enlace copiado (útil en Instagram: copiar enlace → detectar)
+  if (!isVideoUrl(url)) {
+    try { const clip = (await window.cobalt.readClipboard() || '').trim(); if (/^https?:\/\/\S+$/i.test(clip)) url = clip; } catch {}
+  }
   els.ratUrl.value = url; updateRatPlat();
   els.ratXcheck.checked = !!settings.xRevealSensitive;
   const ok = await window.cobalt.ytAvailable();
@@ -726,7 +727,7 @@ function updateRatPlat() {
   // Toggle de sensibilidad solo en X
   const onX = p && p[0] === 'X' && onSite;
   els.ratXtoggle.classList.toggle('hidden', !onX);
-  const looksVideo = /\/(video|photo|status|watch|reel|shorts|clip|p)\/|youtu\.be\//.test(url);
+  const looksVideo = isVideoUrl(url);
   if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un vídeo concreto</b> o pega su enlace (en el feed no se detecta).`;
   else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p[0]}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
 }
