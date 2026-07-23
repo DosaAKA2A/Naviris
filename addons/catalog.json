@@ -12,13 +12,13 @@
     {
       "id": "steam-inventory-helper",
       "name": "Valve Rat Tool",
-      "version": "1.1.0",
+      "version": "1.3.0",
       "kind": "content",
       "icon": "puzzle-piece",
       "matches": [
         "steamcommunity.com"
       ],
-      "description": "Precios en tu inventario de Steam con comparativa multi-mercado (Buff163, Skinport, CSFloat) para CS2, valor total con selector de mercado, venta rápida y suma del valor por lado en las ofertas de intercambio.",
+      "description": "Precios en tu inventario de Steam y comparativa con el mercado real de Skinport (CS2): valor total con selector de mercado, venta rápida al precio actual y suma del valor por lado en las ofertas de intercambio.",
       "entry": "https://naviris.site/addons/steam-inventory-helper.js"
     },
     {
