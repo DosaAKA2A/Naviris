@@ -248,7 +248,25 @@ function makeTabEl(tab, mini) {
   el.appendChild(close);
   el.addEventListener('click', () => activateTab(tab.id));
   el.addEventListener('auxclick', (e) => { if (e.button === 1) closeTab(tab.id); });
+  // Reordenar pestañas arrastrando (no en las mini del grupo AutoLoot)
+  if (!mini) {
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => { dragTabId = tab.id; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.querySelectorAll('.tab.drag-over').forEach((t) => t.classList.remove('drag-over')); });
+    el.addEventListener('dragover', (e) => { if (dragTabId != null && dragTabId !== tab.id) { e.preventDefault(); el.classList.add('drag-over'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drag-over'); reorderTab(dragTabId, tab.id); dragTabId = null; });
+  }
   return el;
+}
+let dragTabId = null;
+// Mueve la pestaña arrastrada justo delante de la de destino
+function reorderTab(fromId, toId) {
+  const from = tabs.findIndex((t) => t.id === fromId), to = tabs.findIndex((t) => t.id === toId);
+  if (from === -1 || to === -1 || from === to) return;
+  const [moved] = tabs.splice(from, 1);
+  tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
+  renderTabs(); saveSession();
 }
 let lootExpanded = false;
 function renderTabs() {

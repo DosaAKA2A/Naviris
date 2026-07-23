@@ -795,8 +795,18 @@ ipcMain.handle('yt:formats', (_e, url) => new Promise((resolve) => {
 }));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
-  if (d?.item) d.item.cancel();
-  if (ytJobs.has(id)) { try { ytJobs.get(id).kill(); } catch {} }
+  if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }
+  if (ytJobs.has(id)) {
+    const child = ytJobs.get(id);
+    // yt-dlp lanza ffmpeg como subproceso; en Windows kill() no mata el árbol,
+    // así que se usa taskkill /T (árbol) /F (forzado) por PID.
+    try {
+      if (process.platform === 'win32' && child.pid) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
+      else child.kill('SIGKILL');
+    } catch { try { child.kill(); } catch { /* nada */ } }
+    ytJobs.delete(id);
+    if (d) { d.meta.state = 'cancelled'; broadcast('download:update', d.meta); }
+  }
 });
 ipcMain.on('download:open', (_e, id) => { const d = downloads.get(id); if (d) shell.openPath(d.meta.path); });
 ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) shell.showItemInFolder(d.meta.path); });
