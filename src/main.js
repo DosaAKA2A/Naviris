@@ -7,14 +7,14 @@ const { autoUpdater } = require('electron-updater');
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
 
-// Migración de perfil: el rebrand Cobalt→Naviri cambia la carpeta de userData,
+// Migración de perfil: el rebrand Cobalt→Naviris cambia la carpeta de userData,
 // así que si existe el perfil antiguo y no el nuevo, se renombra para conservar
 // sesiones, contraseñas y ajustes de los usuarios existentes.
 try {
   const oldProfile = path.join(app.getPath('appData'), 'Cobalt');
-  const newProfile = path.join(app.getPath('appData'), 'Naviri');
+  const newProfile = path.join(app.getPath('appData'), 'Naviris');
   if (fs.existsSync(oldProfile) && !fs.existsSync(newProfile)) fs.renameSync(oldProfile, newProfile);
-} catch (e) { console.log('[Naviri] No se pudo migrar el perfil:', e.message); }
+} catch (e) { console.log('[Naviris] No se pudo migrar el perfil:', e.message); }
 
 // ---------- Rutas de binarios (yt-dlp / ffmpeg) ----------
 function binDir() {
@@ -53,8 +53,8 @@ function suppressWebAuthn(contents) {
     .then(() => contents.debugger.sendCommand('WebAuthn.addVirtualAuthenticator', {
       options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
     }))
-    .then((r) => console.log('[Naviri] Autenticador virtual registrado (Windows Hello desactivado):', r && r.authenticatorId))
-    .catch((e) => console.log('[Naviri] WebAuthn suppress error:', e.message));
+    .then((r) => console.log('[Naviris] Autenticador virtual registrado (Windows Hello desactivado):', r && r.authenticatorId))
+    .catch((e) => console.log('[Naviris] WebAuthn suppress error:', e.message));
 }
 
 // ---------- Scripts inyectados en las páginas ----------
@@ -362,7 +362,7 @@ function createWindow(isPrivate = false) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 560,
     frame: false, show: false, backgroundColor: '#0a0a0c',
-    title: isPrivate ? 'Naviri — Privado' : 'Naviri',
+    title: isPrivate ? 'Naviris — Privado' : 'Naviris',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: true, contextIsolation: true, nodeIntegration: false, spellcheck: false
@@ -445,7 +445,7 @@ let pwSeq = Date.now();
 // Verifica identidad con Windows Hello (PIN/biometría). Devuelve true si "Verified".
 function verifyWindowsHello(reason) {
   return new Promise((resolve) => {
-    const msg = String(reason || 'Naviri te pide verificar tu identidad').replace(/'/g, ' ');
+    const msg = String(reason || 'Naviris te pide verificar tu identidad').replace(/'/g, ' ');
     const script = `
 [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -495,7 +495,7 @@ ipcMain.handle('pw:delete', (_e, id) => { savePasswords(loadPasswords().filter((
 ipcMain.handle('pw:reveal', async (_e, id) => {
   const entry = loadPasswords().find((e) => e.id === id);
   if (!entry) return { ok: false, error: 'no encontrada' };
-  const verified = await verifyWindowsHello('Naviri: verifica tu identidad para ver la contraseña de ' + entry.site);
+  const verified = await verifyWindowsHello('Naviris: verifica tu identidad para ver la contraseña de ' + entry.site);
   if (!verified) return { ok: false, error: 'verificacion cancelada' };
   try { return { ok: true, password: safeStorage.decryptString(Buffer.from(entry.enc, 'base64')) }; }
   catch { return { ok: false, error: 'no se pudo descifrar' }; }

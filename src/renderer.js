@@ -1,4 +1,4 @@
-/* Naviri — renderer principal */
+/* Naviris — renderer principal */
 const $ = (s) => document.querySelector(s);
 const IS_PRIVATE = new URLSearchParams(location.search).get('private') === '1';
 const PARTITION = IS_PRIVATE ? 'cobalt-private' : 'persist:cobalt';
@@ -198,7 +198,7 @@ function closeTab(id) {
 }
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
-  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (mini ? ' mini loot-member' : ''); el.title = tab.url || 'Hub de Naviri';
+  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (mini ? ' mini loot-member' : ''); el.title = tab.url || 'Hub de Naviris';
   const zzz = document.createElement('span'); zzz.className = 't-zzz'; zzz.innerHTML = window.icon('moon');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
@@ -1091,7 +1091,7 @@ els.menuPop.addEventListener('click', (e) => {
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
 els.optXsensitive.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.optXsensitive.checked }); els.ratXcheck.checked = els.optXsensitive.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); });
-els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviri)'); activeTab()?.webview?.reload(); });
+els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
@@ -1134,7 +1134,7 @@ async function onWebviewMessage(wv, e) {
     const existing = (await window.cobalt.pwForHost(host)).find((c) => (c.username || '') === (username || ''));
     const who = username ? `<b>${escapeHtml(username)}</b> en <b>${escapeHtml(host)}</b>` : `<b>${escapeHtml(host)}</b>`;
     if (existing) showPwBar(`¿Actualizar la contraseña de ${who}?`, 'Actualizar', () => doSavePw(host, username, password));
-    else showPwBar(`¿Guardar la contraseña de ${who} en Naviri?`, 'Guardar', () => doSavePw(host, username, password));
+    else showPwBar(`¿Guardar la contraseña de ${who} en Naviris?`, 'Guardar', () => doSavePw(host, username, password));
   } else if (e.channel === 'cobalt-loginform') {
     const host = hostOf(data.url); if (!host) return;
     const creds = await window.cobalt.pwForHost(host);
@@ -1146,7 +1146,7 @@ async function onWebviewMessage(wv, e) {
 }
 async function doSavePw(host, username, password) {
   const r = await window.cobalt.pwAdd(host, username || '', password);
-  toast(r && r.ok ? (r.updated ? 'Contraseña actualizada' : 'Contraseña guardada en Naviri') : 'No se pudo guardar');
+  toast(r && r.ok ? (r.updated ? 'Contraseña actualizada' : 'Contraseña guardada en Naviris') : 'No se pudo guardar');
 }
 async function doFillPw(wv, cred) {
   const r = await window.cobalt.pwReveal(cred.id);
@@ -1215,7 +1215,7 @@ updBtn.addEventListener('click', async () => {
 window.cobalt.onUpdateStatus((s) => {
   updState = s.state;
   if (s.state === 'checking') { setUpd('Buscando actualizaciones…'); updBtn.disabled = true; }
-  else if (s.state === 'available') { setUpd('¡Versión ' + s.version + ' disponible!', 'hot'); updBtn.textContent = 'Descargar e instalar'; updBtn.disabled = false; if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviri disponible (menú → Acerca de)'); }
+  else if (s.state === 'available') { setUpd('¡Versión ' + s.version + ' disponible!', 'hot'); updBtn.textContent = 'Descargar e instalar'; updBtn.disabled = false; if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Acerca de)'); }
   else if (s.state === 'latest') { setUpd('Ya tienes la última versión.'); updBtn.textContent = 'Buscar actualizaciones'; updBtn.disabled = false; }
   else if (s.state === 'downloading') { setUpd('Descargando… ' + s.percent + '%'); updBar.classList.remove('hidden'); updBar.querySelector('i').style.width = s.percent + '%'; }
   else if (s.state === 'downloaded') { setUpd('Listo para instalar la versión ' + s.version + '.', 'hot'); updBtn.textContent = 'Reiniciar e instalar'; updBtn.disabled = false; updBar.classList.add('hidden'); }
@@ -1249,7 +1249,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
-  window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviri v' + v; });
+  window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   renderSidebarSites(); renderBookmarksBar(); renderHub(); createTab();
   setTimeout(() => { els.splash.classList.add('gone'); if (els.hub.classList.contains('active')) focusHubSearch(); }, 1800);
 })();

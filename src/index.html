@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Naviri</title>
+  <title>Naviris</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -10,14 +10,14 @@
   <!-- ===== Splash ===== -->
   <div id="splash">
     <span class="iris-slot splash-iris" data-iris="92"></span>
-    <div class="splash-name">NAVIRI</div>
+    <div class="splash-name">NAVIRIS</div>
     <div class="splash-sub">by Iris Studio</div>
     <div class="splash-bar"><div class="splash-bar-fill"></div></div>
   </div>
 
   <!-- ===== Titlebar + pestañas ===== -->
   <header id="titlebar">
-    <div class="tb-logo" title="Naviri"><span class="iris-slot" data-iris="20"></span></div>
+    <div class="tb-logo" title="Naviris"><span class="iris-slot" data-iris="20"></span></div>
     <span id="private-badge" class="hidden" title="Ventana privada"></span>
     <nav id="tabstrip"></nav>
     <button id="newtab-btn" title="Nueva pestaña (Ctrl+T)" data-ico="plus"></button>
@@ -117,7 +117,7 @@
             <button id="hub-edit" class="hub-fab" title="Editar hub"><span data-ico="squares-plus"></span><span class="lbl">Editar</span></button>
             <button id="hub-customize" class="hub-fab" title="Cambiar fondo"><span data-ico="photo"></span></button>
           </div>
-          <div id="hub-version" title="Versión de Naviri">Naviri</div>
+          <div id="hub-version" title="Versión de Naviris">Naviris</div>
 
           <!-- Paleta de widgets (modo edición) -->
           <div id="widget-palette" class="hub-panel hidden">
@@ -170,10 +170,10 @@
     <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita el prompt de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme pestañas inactivas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
-    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviri · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
+    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <hr />
     <button data-action="update">Buscar actualizaciones</button>
-    <button data-action="about">Acerca de Naviri</button>
+    <button data-action="about">Acerca de Naviris</button>
   </div>
 
   <!-- ===== Bloqueador ===== -->
@@ -251,7 +251,7 @@
   <!-- ===== Panel descargas ===== -->
   <aside id="dl-panel" class="hidden side-panel">
     <div class="mp-head"><span>Descargas</span><span class="mp-tools"><button id="dl-clear" data-ico="trash" title="Limpiar completadas"></button><button id="dl-close" data-ico="x-mark" title="Cerrar"></button></span></div>
-    <div class="dl-hint">Haz clic en una descarga para abrirla en Naviri.</div>
+    <div class="dl-hint">Haz clic en una descarga para abrirla en Naviris.</div>
     <div id="dl-list"></div>
   </aside>
 
@@ -269,9 +269,9 @@
 
   <div id="sidebar-modal" class="modal hidden"><div class="modal-card"><h3>Personalizar sidebar</h3><p>Activa solo las webs que quieras tener a mano. Puedes dejarlo vacío.</p><div id="sidebar-config"></div><div class="modal-actions"><button id="sidebar-add" class="ghost-btn" style="margin-right:auto"><span data-ico="plus"></span> Añadir web</button><button id="sidebar-done" class="primary">Listo</button></div></div></div>
 
-  <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviri pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
+  <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
 
-  <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Naviri <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
+  <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Naviris <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
     <div class="upd-box"><div id="upd-status">Comprueba si hay una versión nueva.</div><div id="upd-bar" class="upd-bar hidden"><i></i></div></div>
     <div class="modal-actions"><button id="upd-btn" style="margin-right:auto">Buscar actualizaciones</button><button id="about-close" class="primary">Cerrar</button></div></div></div>
 

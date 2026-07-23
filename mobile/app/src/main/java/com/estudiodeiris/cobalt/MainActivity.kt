@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
     private val HOME = "file:///android_asset/hub.html"
     private val DESKTOP_UA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    private val REPO_API = "https://api.github.com/repos/DosaAKA2A/Cobalt/releases/latest"
+    private val REPO_API = "https://api.github.com/repos/DosaAKA2A/Naviris/releases/latest"
 
     private val prefs by lazy { getSharedPreferences("cobalt", Context.MODE_PRIVATE) }
     private var adblock = true
@@ -437,7 +437,7 @@ class MainActivity : AppCompatActivity() {
                 val conn = URL(REPO_API).openConnection() as HttpURLConnection
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
-                conn.setRequestProperty("User-Agent", "Naviri-Android")
+                conn.setRequestProperty("User-Agent", "Naviris-Android")
                 conn.setRequestProperty("Accept", "application/vnd.github+json")
                 val body = conn.inputStream.bufferedReader().readText()
                 conn.disconnect()
@@ -474,12 +474,12 @@ class MainActivity : AppCompatActivity() {
                 .show()
             return
         }
-        // La versión del APK viene en el nombre del asset (Naviri-X.Y.Z.apk); el tag es el de escritorio
+        // La versión del APK viene en el nombre del asset (Naviris-X.Y.Z.apk); el tag es el de escritorio
         val remote = Regex("\\d+(\\.\\d+)+").find(apkName)?.value ?: tag
         if (compareVersions(remote, cur) <= 0) {
             AlertDialog.Builder(this)
                 .setTitle("Estás al día")
-                .setMessage("Naviri $cur es la versión más reciente para Android.")
+                .setMessage("Naviris $cur es la versión más reciente para Android.")
                 .setPositiveButton("OK", null)
                 .show()
             return
@@ -518,7 +518,7 @@ class MainActivity : AppCompatActivity() {
     private fun showAbout() {
         val cur = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
         AlertDialog.Builder(this)
-            .setTitle("Naviri para Android")
+            .setTitle("Naviris para Android")
             .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores, historial y contraseñas.")
             .setPositiveButton("OK", null)
             .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate() }

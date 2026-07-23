@@ -1,6 +1,6 @@
 // Preload que corre dentro de cada webview (sitio). Detecta formularios de login
 // para capturar contraseñas al iniciar sesión y para autorrellenarlas después.
-// Se comunica con la interfaz de Naviri (host) mediante ipcRenderer.sendToHost.
+// Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
 const { ipcRenderer } = require('electron');
 
 function findLogin() {
