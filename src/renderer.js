@@ -18,15 +18,15 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'tile-styles', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
-  'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
+  'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'opt-twitch', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
-  'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'dl-panel', 'dl-list',
-  'bm-page', 'bm-tree', 'bm-newfolder', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
+  'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
+  'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
@@ -377,6 +377,24 @@ function moveToFolder(b) {
   });
 }
 els.bmNewfolder.addEventListener('click', () => promptModal('Nueva carpeta', 'Nombre de la carpeta', (name) => { if (!name.trim()) return; bookmarks.unshift({ type: 'folder', name: name.trim(), children: [] }); saveBm(); renderBookmarkTree(); renderBookmarksBar(); }));
+els.bmImport.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const avail = await window.cobalt.importAvailable();
+  const items = Object.entries(avail).filter(([, v]) => v.present).map(([key, v]) => ({ label: 'Desde ' + v.label, icon: 'arrow-down-tray', action: () => doImportBookmarks(key, v.label) }));
+  if (!items.length) { toast('No se encontró Chrome/Brave/Edge con marcadores'); return; }
+  const r = els.bmImport.getBoundingClientRect(); showCtxMenu(r.left, r.bottom + 4, items);
+});
+async function doImportBookmarks(key, label) {
+  const r = await window.cobalt.importBookmarks(key);
+  if (!r.ok || !r.items || !r.items.length) { toast('No se pudo importar de ' + label); return; }
+  const existing = new Set();
+  bookmarks.forEach((it) => { if (it.type === 'link') existing.add(it.url); else if (it.type === 'folder') it.children.forEach((c) => existing.add(c.url)); });
+  const fresh = r.items.filter((b) => !existing.has(b.url));
+  if (!fresh.length) { toast('Ya tenías esos marcadores'); return; }
+  bookmarks.unshift({ type: 'folder', name: 'Importados de ' + label, children: fresh.map((b) => ({ type: 'link', title: b.title, url: b.url })) });
+  saveBm(); renderBookmarkTree(); renderBookmarksBar();
+  toast(`${fresh.length} marcadores importados de ${label}`);
+}
 els.bmFilter.addEventListener('input', () => { bmFilter = els.bmFilter.value; renderBookmarkTree(); });
 els.sbBookmarks.addEventListener('click', () => { if (els.bmPage.classList.contains('active')) { hideBookmarkPage(); activateTab(activeId); } else showBookmarkPage(); });
 
@@ -786,6 +804,7 @@ els.sbRat.addEventListener('click', async (e) => {
   }
   els.ratUrl.value = url; updateRatPlat();
   els.ratXcheck.checked = !!settings.xRevealSensitive;
+  els.ratQrow.classList.add('hidden'); loadRatQualities();
   const ok = await window.cobalt.ytAvailable();
   els.ratNote.textContent = ok ? 'Se guarda en Descargas. En TikTok abre un vídeo concreto; se baja sin marca de agua.' : 'Faltan yt-dlp/ffmpeg en resources/bin.';
 });
@@ -806,9 +825,23 @@ function updateRatPlat() {
   if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un vídeo concreto</b> o pega su enlace (en el feed no se detecta).`;
   else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p[0]}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
 }
-els.ratUrl.addEventListener('input', updateRatPlat);
+let ratQualityToken = 0, ratQualityTimer = null;
+async function loadRatQualities() {
+  const url = els.ratUrl.value.trim();
+  if (!/^https?:\/\//.test(url)) { els.ratQrow.classList.add('hidden'); return; }
+  const token = ++ratQualityToken;
+  els.ratQrow.classList.remove('hidden');
+  els.ratQuality.innerHTML = '<option value="">Cargando resoluciones…</option>';
+  let heights = [];
+  try { heights = await window.cobalt.ytFormats(url); } catch {}
+  if (token !== ratQualityToken) return; // llegó otra petición más nueva
+  if (!heights.length) { els.ratQuality.innerHTML = '<option value="">Máxima calidad</option>'; return; }
+  els.ratQuality.innerHTML = '<option value="">Máxima calidad</option>';
+  heights.forEach((h) => { const o = document.createElement('option'); o.value = String(h); o.textContent = h + 'p'; els.ratQuality.appendChild(o); });
+}
+els.ratUrl.addEventListener('input', () => { updateRatPlat(); clearTimeout(ratQualityTimer); ratQualityTimer = setTimeout(loadRatQualities, 700); });
 els.ratXcheck.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.ratXcheck.checked }); els.optXsensitive.checked = els.ratXcheck.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
-async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode); toast(mode === 'audio' ? 'Extrayendo MP3…' : 'Descargando vídeo…'); }
+async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando vídeo (${quality}p)…` : 'Descargando vídeo…')); }
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 
@@ -940,6 +973,7 @@ els.menuPop.addEventListener('click', (e) => {
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
 els.optXsensitive.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.optXsensitive.checked }); els.ratXcheck.checked = els.optXsensitive.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); });
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Cobalt)'); activeTab()?.webview?.reload(); });
+els.optTwitch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ twitchAutoClaim: els.optTwitch.checked }); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)twitch\.tv$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.optTwitch.checked ? 'Auto-reclamo de Twitch activado' : 'Auto-reclamo de Twitch desactivado'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
@@ -1081,6 +1115,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
+  els.optTwitch.checked = settings.twitchAutoClaim !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);

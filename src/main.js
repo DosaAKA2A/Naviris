@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
+  twitchAutoClaim: true,    // reclama puntos/drops de Twitch dejando el stream de fondo
   permissions: {}           // decisiones de permisos por sitio: "origin|tipo" -> allow|block
 };
 
@@ -75,6 +76,31 @@ const X_REVEAL = `(function(){
   }
   setInterval(reveal,700);
   try{ new MutationObserver(reveal).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+})();`;
+// Twitch: reclama automáticamente los puntos del canal (cofre) y drops/recompensas,
+// para poder dejar un stream de fondo sin perderlos. Sin extensiones.
+const TWITCH_CLAIM = `(function(){
+  if(window.__cobaltTw)return; window.__cobaltTw=1;
+  function clickChest(){
+    try{
+      var icon=document.querySelector('.claimable-bonus__icon');
+      if(icon){ var b=icon.closest('button'); if(b){ b.click(); return true; } }
+      var sum=document.querySelector('[data-test-selector="community-points-summary"]');
+      if(sum && sum.querySelector('.claimable-bonus__icon')){ var sb=sum.querySelector('button'); if(sb){ sb.click(); return true; } }
+    }catch(e){}
+    return false;
+  }
+  function claimDrops(){
+    try{
+      document.querySelectorAll('button, a[role="button"]').forEach(function(el){
+        if(el.offsetParent===null) return;
+        var t=(el.textContent||'').trim().toLowerCase();
+        if(/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) el.click();
+      });
+    }catch(e){}
+  }
+  setInterval(function(){ clickChest(); claimDrops(); }, 12000);
+  try{ new MutationObserver(clickChest).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
 
 function loadSettings() {
@@ -260,7 +286,7 @@ ipcMain.handle('sec:status', () => ({
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
 
-function ytDownload({ url, mode }) {
+function ytDownload({ url, mode, quality }) {
   const id = 'yt' + (++downloadSeq);
   const outDir = app.getPath('downloads');
   const meta = {
@@ -287,9 +313,11 @@ function ytDownload({ url, mode }) {
     // TikTok = archivo único sin marca de agua (play_addr); sin merge para evitar errores
     args = ['-f', 'b', '--force-overwrites', ...common, url];
   } else {
-    // Vídeo: siempre la máxima calidad disponible (mejor vídeo + mejor audio),
-    // ordenando por resolución/fps y prefiriendo contenedor mp4.
-    args = ['-f', 'bv*+ba/b', '-S', 'res,fps,ext:mp4:m4a', '--merge-output-format', 'mp4', ...common, url];
+    // Vídeo: por defecto la máxima calidad; si se pide una resolución, se limita a
+    // esa altura (p. ej. 720 => hasta 720p). Mejor vídeo + mejor audio, contenedor mp4.
+    const h = parseInt(quality, 10);
+    const sel = h > 0 ? `bv*[height<=${h}]+ba/b[height<=${h}]/b` : 'bv*+ba/b';
+    args = ['-f', sel, '-S', 'res,fps,ext:mp4:m4a', '--merge-output-format', 'mp4', ...common, url];
   }
 
   const child = spawn(ytDlpPath(), args, { windowsHide: true });
@@ -349,6 +377,7 @@ function createWindow(isPrivate = false) {
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
+    webPreferences.backgroundThrottling = true; // baja CPU/timers en pestañas de fondo
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
   win.once('ready-to-show', () => win.show());
@@ -377,6 +406,9 @@ app.on('web-contents-created', (_event, contents) => {
       }
       if (settings.xRevealSensitive && /(^|\.)(twitter\.com|x\.com)$/.test(host)) {
         contents.executeJavaScript(X_REVEAL, true).catch(() => {});
+      }
+      if (settings.twitchAutoClaim && /(^|\.)twitch\.tv$/.test(host)) {
+        contents.executeJavaScript(TWITCH_CLAIM, true).catch(() => {});
       }
     });
   }
@@ -480,6 +512,56 @@ ipcMain.on('download:url', (_e, { url, isPrivate }) => {
 });
 ipcMain.handle('yt:download', (_e, opts) => ytDownload(opts));
 ipcMain.handle('yt:available', () => fs.existsSync(ytDlpPath()) && fs.existsSync(ffmpegPath()));
+
+// ---------- Importar marcadores de otros navegadores (Chromium) ----------
+const CHROMIUM_BROWSERS = {
+  chrome: { label: 'Chrome', parts: ['Google', 'Chrome'] },
+  brave: { label: 'Brave', parts: ['BraveSoftware', 'Brave-Browser'] },
+  edge: { label: 'Edge', parts: ['Microsoft', 'Edge'] },
+  opera: { label: 'Opera', parts: ['..', 'Roaming', 'Opera Software', 'Opera Stable'] }
+};
+function chromiumBookmarksPath(key) {
+  const la = process.env.LOCALAPPDATA; const b = CHROMIUM_BROWSERS[key]; if (!la || !b) return null;
+  return path.join(la, ...b.parts, 'User Data', 'Default', 'Bookmarks');
+}
+function flattenChromiumBookmarks(node, out) {
+  if (!node) return;
+  if (node.type === 'url' && node.url && /^https?:/.test(node.url)) out.push({ title: node.name || node.url, url: node.url });
+  if (Array.isArray(node.children)) node.children.forEach((c) => flattenChromiumBookmarks(c, out));
+}
+ipcMain.handle('import:available', () => {
+  const avail = {};
+  Object.keys(CHROMIUM_BROWSERS).forEach((k) => { const p = chromiumBookmarksPath(k); avail[k] = { label: CHROMIUM_BROWSERS[k].label, present: !!(p && fs.existsSync(p)) }; });
+  return avail;
+});
+ipcMain.handle('import:bookmarks', (_e, key) => {
+  try {
+    const p = chromiumBookmarksPath(key);
+    if (!p || !fs.existsSync(p)) return { ok: false, error: 'no encontrado' };
+    const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const out = [];
+    Object.values(data.roots || {}).forEach((root) => flattenChromiumBookmarks(root, out));
+    return { ok: true, items: out, label: CHROMIUM_BROWSERS[key].label };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Lista las alturas de vídeo disponibles (1080, 720, …) para el selector de calidad
+ipcMain.handle('yt:formats', (_e, url) => new Promise((resolve) => {
+  if (!/^https?:/.test(url) || !fs.existsSync(ytDlpPath())) return resolve([]);
+  const child = spawn(ytDlpPath(), ['--no-playlist', '--no-warnings', '--dump-single-json', url], { windowsHide: true });
+  let out = ''; const timer = setTimeout(() => { try { child.kill(); } catch {} resolve([]); }, 20000);
+  child.stdout.on('data', (d) => { out += d.toString(); });
+  child.on('error', () => { clearTimeout(timer); resolve([]); });
+  child.on('close', () => {
+    clearTimeout(timer);
+    try {
+      const info = JSON.parse(out);
+      const heights = new Set();
+      (info.formats || []).forEach((f) => { if (f.height && (f.vcodec !== 'none' || f.acodec === 'none')) heights.add(f.height); });
+      resolve([...heights].filter((h) => h >= 144).sort((a, b) => b - a));
+    } catch { resolve([]); }
+  });
+}));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
   if (d?.item) d.item.cancel();

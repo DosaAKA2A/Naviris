@@ -18,8 +18,11 @@ contextBridge.exposeInMainWorld('cobalt', {
   adblockWhitelist: (action, domain) => ipcRenderer.invoke('adblock:whitelist', { action, domain }),
 
   download: (url, isPrivate) => ipcRenderer.send('download:url', { url, isPrivate }),
-  ytDownload: (url, mode) => ipcRenderer.invoke('yt:download', { url, mode }),
+  ytDownload: (url, mode, quality) => ipcRenderer.invoke('yt:download', { url, mode, quality }),
+  ytFormats: (url) => ipcRenderer.invoke('yt:formats', url),
   ytAvailable: () => ipcRenderer.invoke('yt:available'),
+  importAvailable: () => ipcRenderer.invoke('import:available'),
+  importBookmarks: (key) => ipcRenderer.invoke('import:bookmarks', key),
   cancelDownload: (id) => ipcRenderer.send('download:cancel', id),
   openDownload: (id) => ipcRenderer.send('download:open', id),
   revealDownload: (id) => ipcRenderer.send('download:reveal', id),

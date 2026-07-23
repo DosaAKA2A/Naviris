@@ -206,6 +206,9 @@ button { font-family: inherit; }
 #rat-detect-name { font-size: 12.5px; font-weight: 600; }
 #rat-detect-url { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rat-xrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-dim); padding: 4px 2px; cursor: pointer; }
+.rat-qrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-dim); padding: 2px 2px; }
+.rat-qrow select { height: 30px; border-radius: 8px; border: 1px solid #3a3b41; background: var(--bg); color: var(--text); padding: 0 8px; font-size: 12.5px; outline: none; cursor: pointer; min-width: 130px; }
+.rat-qrow select:focus { border-color: #55565c; }
 .rat-btns { display: flex; gap: 8px; }
 .rat-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); font-size: 12.5px; padding: 10px; border-radius: 9px; cursor: pointer; transition: background .12s, border-color .12s; }
 .rat-btn svg { width: 15px; height: 15px; color: var(--text-dim); }
