@@ -1,7 +1,7 @@
 {
   "name": "naviris-browser",
   "productName": "Naviris",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Naviris",
   "author": "Iris Studio",
   "license": "MIT",
@@ -30,13 +30,14 @@
     "files": [
       "src/**/*",
       "build/icon.png",
-      "build/icon.ico"
+      "build/icon.ico",
+      "!node_modules/adblock-rs/{target,src,benches,fuzz}/**",
+      "!node_modules/adblock-rs/{Cargo.lock,Cargo.toml,rust-toolchain.toml,rustfmt.toml,CHANGELOG.md,README.md,SECURITY.md}"
     ],
-    "extraResources": [
-      {
-        "from": "resources/bin",
-        "to": "bin"
-      }
+    "electronLanguages": [
+      "es",
+      "es-419",
+      "en-US"
     ],
     "icon": "build/icon.ico",
     "publish": {
