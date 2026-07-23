@@ -1,4 +1,4 @@
-/* Naviris addon: Inventory Helper para Steam v1.0.0
+/* Naviris addon: Valve Rat Tool v1.0.1
    Se inyecta en steamcommunity.com. Funciones al estilo Steam Inventory Helper:
    - Precio de mercado bajo cada objeto del inventario (con caché de 24 h)
    - Valor total estimado del inventario visible
@@ -110,7 +110,7 @@
     const vals = Object.values(totals);
     const sum = vals.reduce((a, b) => a + b, 0);
     totalBox.innerHTML = 'Valor estimado (visible): <b>' + sum.toFixed(2) + ' ' + (sym || '') + '</b>' +
-      '<div class="sub">' + vals.length + ' objeto(s) con precio · Naviris Inventory Helper</div>';
+      '<div class="sub">' + vals.length + ' objeto(s) con precio · Valve Rat Tool</div>';
   }
 
   /* ---------- Venta rápida ---------- */
