@@ -73,16 +73,15 @@
   window.irisLogo = function (size) {
     const id = 'irisg' + (++irisSeq);
     const stops = ['#b9aae6', '#9dc3e6', '#a4d9c2', '#e6d6a4', '#e6a9b4'];
-    const cycle = (offset) => {
-      const seq = stops.slice(offset).concat(stops.slice(0, offset));
-      return seq.concat(seq[0]).join(';');
-    };
+    // Sin <animate> (SMIL): en Electron 33 esas animaciones fugan memoria en el
+    // renderer sin parar (~7 MB/s medidos). El gradiente es estático y el
+    // movimiento de color se hace por CSS (hue-rotate) solo al pasar el ratón.
     return `<span class="iris-wrap" style="--sz:${size}px">` +
-      `<svg viewBox="${IRIS_VB}" width="${size}" height="${size}" aria-hidden="true">` +
+      `<svg class="iris-logo" viewBox="${IRIS_VB}" width="${size}" height="${size}" aria-hidden="true">` +
       `<defs><linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">` +
-      `<stop offset="0%" stop-color="${stops[0]}"><animate attributeName="stop-color" values="${cycle(0)}" dur="9s" repeatCount="indefinite"/></stop>` +
-      `<stop offset="50%" stop-color="${stops[2]}"><animate attributeName="stop-color" values="${cycle(2)}" dur="9s" repeatCount="indefinite"/></stop>` +
-      `<stop offset="100%" stop-color="${stops[4]}"><animate attributeName="stop-color" values="${cycle(4)}" dur="9s" repeatCount="indefinite"/></stop>` +
+      `<stop offset="0%" stop-color="${stops[0]}"/>` +
+      `<stop offset="50%" stop-color="${stops[2]}"/>` +
+      `<stop offset="100%" stop-color="${stops[4]}"/>` +
       `</linearGradient></defs>` +
       `<path fill="url(#${id})" fill-rule="evenodd" d="${IRIS_D}"/>` +
       `</svg></span>`;
