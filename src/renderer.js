@@ -1273,7 +1273,7 @@ const naviris = {
   registerTool({ id, label, icon, onClick }) {
     if (document.getElementById('adt-' + id)) return;
     const b = document.createElement('button');
-    b.id = 'adt-' + id; b.title = label; b.innerHTML = window.icon(icon || 'puzzle-piece');
+    b.id = 'adt-' + id; b.className = 'sb-btn'; b.title = label; b.innerHTML = window.icon(icon || 'puzzle-piece');
     b.addEventListener('click', () => onClick(b));
     adEls.tools.appendChild(b);
   },

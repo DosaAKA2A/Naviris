@@ -622,13 +622,10 @@ button { font-family: inherit; }
 .adp-btn.primary { background: var(--accent, #e8e9ec); color: #121215; border-color: var(--accent, #e8e9ec); font-weight: 600; }
 .adp-btn.danger:hover { border-color: #7a3040; color: #f2a9b4; }
 
-/* Botones de herramientas registrados por addons (navbar) */
-#addon-tools { display: flex; align-items: center; gap: 2px; }
-#addon-tools:empty { display: none; }
-#addon-tools button { border: none; background: none; color: var(--muted, #9a9ca3); width: 34px; height: 34px; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-#addon-tools button:hover { background: rgba(255,255,255,.07); color: var(--text, #ececef); }
-#addon-tools button svg { width: 17px; height: 17px; }
-#addon-tools button.busy { color: #9ee2b8; pointer-events: none; }
+/* Botones de herramientas registrados por addons: viven en el sidebar,
+   después de las herramientas nativas (Rat Tool siempre va primero) */
+#addon-tools { display: contents; }
+#addon-tools .sb-btn.busy { color: #9ee2b8; pointer-events: none; }
 
 /* Botón Addons del hub: placa inclinada con borde de gradiente animado */
 #hub-addons { position: relative; transform: skewX(-10deg); border: 1px solid transparent; border-radius: 10px;
