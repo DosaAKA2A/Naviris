@@ -2,11 +2,11 @@
   "addons": [
     {
       "id": "autoloot",
-      "name": "AutoLoot para Twitch",
-      "version": "1.1.0",
+      "name": "Rat Loot",
+      "version": "1.2.0",
       "kind": "tool",
       "icon": "gift",
-      "description": "Rat Loot: deja canales de Twitch recolectando puntos y drops en segundo plano — silenciados, en resolución mínima (solo esa pestaña) y agrupados a la izquierda. Incluye el registro de todo el loot obtenido. Requiere Naviris 2.3+.",
+      "description": "Sesiones de recolección de Twitch: Activar silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupada a la izquierda. Panel con sesiones activas e historial del loot obtenido. Requiere Naviris 2.3+.",
       "entry": "https://naviris.site/addons/autoloot.js"
     },
     {
