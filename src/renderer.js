@@ -52,6 +52,40 @@ const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '
 let toastTimer;
 function toast(msg) { els.toast.textContent = msg; els.toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => els.toast.classList.remove('show'), 3200); }
 
+/* ============ Menú contextual reutilizable ============ */
+let ctxMenuEl = null;
+function closeCtxMenu() { ctxMenuEl?.remove(); ctxMenuEl = null; }
+window.addEventListener('mousedown', (e) => { if (ctxMenuEl && !ctxMenuEl.contains(e.target)) closeCtxMenu(); });
+window.addEventListener('blur', closeCtxMenu);
+window.addEventListener('resize', closeCtxMenu);
+function showCtxMenu(x, y, items) {
+  closeCtxMenu();
+  const m = document.createElement('div'); m.className = 'ctx-menu';
+  for (const it of items) {
+    if (it.sep) { const s = document.createElement('div'); s.className = 'ctx-sep'; m.appendChild(s); continue; }
+    const b = document.createElement('button'); b.className = 'ctx-item' + (it.danger ? ' danger' : '');
+    b.innerHTML = (it.icon ? `<span class="ctx-ic">${window.icon(it.icon)}</span>` : '') + `<span>${escapeHtml(it.label)}</span>`;
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); closeCtxMenu(); it.action(); });
+    m.appendChild(b);
+  }
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.max(6, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+  m.style.top = Math.max(6, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+  ctxMenuEl = m;
+}
+// Abre una URL en una pestaña de fondo, sin cambiar la pestaña actual
+function openBackground(url) { createTab(url, false); toast('Abierto en segundo plano'); }
+// Opciones comunes de un enlace (dial del hub, marcador…)
+function linkMenu(url, onRemove) {
+  const items = [
+    { label: 'Abrir', icon: 'arrow-up-right', action: () => navigateActive(url) },
+    { label: 'Abrir en segundo plano', icon: 'plus', action: () => openBackground(url) }
+  ];
+  if (onRemove) items.push({ sep: true }, { label: 'Eliminar', icon: 'trash', danger: true, action: onRemove });
+  return items;
+}
+
 /* ============ Marcas → icono monocromo ============ */
 const BRAND_BY_HOST = { 'youtube.com': 'youtube', 'youtu.be': 'youtube', 'twitch.tv': 'twitch', 'discord.com': 'discord', 'whatsapp.com': 'whatsapp', 'github.com': 'github', 'x.com': 'x', 'twitter.com': 'x', 'crunchyroll.com': 'crunchyroll', 'spotify.com': 'spotify', 'reddit.com': 'reddit', 'claude.ai': 'claude', 'mail.google.com': 'gmail', 'instagram.com': 'instagram' };
 function brandOf(url) { const h = hostOf(url); for (const dom in BRAND_BY_HOST) if (h === dom || h.endsWith('.' + dom)) return BRAND_BY_HOST[dom]; return null; }
@@ -128,6 +162,8 @@ function attachWebview(tab, url) {
   wv.addEventListener('did-navigate-in-page', onNav);
   wv.addEventListener('did-start-loading', () => { if (tab.id === activeId) els.navReload.innerHTML = window.icon('x-mark'); });
   wv.addEventListener('did-stop-loading', () => { if (tab.id === activeId) { els.navReload.innerHTML = window.icon('arrow-path'); syncNavUI(); } });
+  wv.addEventListener('media-started-playing', () => { tab.audible = true; if (tab.muted) { try { wv.setAudioMuted(true); } catch {} } renderTabs(); });
+  wv.addEventListener('media-paused', () => { tab.audible = false; renderTabs(); });
   wv.addEventListener('ipc-message', (e) => onWebviewMessage(wv, e));
   els.content.appendChild(wv);
 }
@@ -172,11 +208,25 @@ function renderTabs() {
       else fav.innerHTML = '<span class="t-dot"></span>';
       el.appendChild(fav);
     }
-    el.append(zzz, title, close);
+    el.append(zzz, title);
+    // Botón de silencio: aparece si la pestaña suena o está silenciada
+    if (tab.kind === 'web' && (tab.audible || tab.muted)) {
+      const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
+      spk.title = tab.muted ? 'Activar sonido' : 'Silenciar pestaña';
+      spk.innerHTML = window.icon(tab.muted ? 'speaker-x-mark' : 'speaker-wave');
+      spk.addEventListener('click', (e) => { e.stopPropagation(); toggleMute(tab); });
+      el.appendChild(spk);
+    }
+    el.appendChild(close);
     el.addEventListener('click', () => activateTab(tab.id));
     el.addEventListener('auxclick', (e) => { if (e.button === 1) closeTab(tab.id); });
     els.tabstrip.appendChild(el);
   }
+}
+function toggleMute(tab) {
+  tab.muted = !tab.muted;
+  try { tab.webview?.setAudioMuted(tab.muted); } catch {}
+  renderTabs();
 }
 function navigateActive(input) {
   const url = toUrl(input); if (!url) return; hideBookmarkPage();
@@ -266,11 +316,12 @@ function renderBookmarksBar() {
   }
 }
 function makeBmChip(b) {
-  const el = document.createElement('button'); el.className = 'bookmark'; el.title = b.url + '  (clic derecho: eliminar)';
+  const el = document.createElement('button'); el.className = 'bookmark'; el.title = b.url + '  (clic central: segundo plano · clic derecho: opciones)';
   const img = document.createElement('img'); getTile(b.url).then((t) => { if (t?.icon) img.src = t.icon; else img.remove(); });
   const label = document.createElement('span'); label.textContent = b.title; el.append(img, label);
   el.addEventListener('click', () => navigateActive(b.url));
-  el.addEventListener('contextmenu', (e) => { e.preventDefault(); removeBookmark(b.url); renderBookmarksBar(); syncNavUI(); renderBookmarkTree(); });
+  el.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); openBackground(b.url); } });
+  el.addEventListener('contextmenu', (e) => { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, linkMenu(b.url, () => { removeBookmark(b.url); renderBookmarksBar(); syncNavUI(); renderBookmarkTree(); toast('Marcador eliminado'); })); });
   return el;
 }
 let folderPop = null;
@@ -283,8 +334,8 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
-function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.sbBookmarks.classList.remove('open'); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
   if (!els.bmPage.classList.contains('active')) return;
@@ -369,7 +420,8 @@ function makeDialEl(d) {
   const x = document.createElement('button'); x.className = 'd-x'; x.title = 'Eliminar'; x.innerHTML = window.icon('x-mark'); x.addEventListener('click', (e) => { e.stopPropagation(); removeDial(d); });
   el.append(tile, name, x);
   el.addEventListener('click', () => { if (!els.hub.classList.contains('editing')) navigateActive(d.url); });
-  el.addEventListener('contextmenu', (e) => { e.preventDefault(); removeDial(d); });
+  el.addEventListener('auxclick', (e) => { if (e.button === 1 && !els.hub.classList.contains('editing')) { e.preventDefault(); openBackground(d.url); } });
+  el.addEventListener('contextmenu', (e) => { e.preventDefault(); if (els.hub.classList.contains('editing')) return; showCtxMenu(e.clientX, e.clientY, linkMenu(d.url, () => removeDial(d))); });
   return el;
 }
 
@@ -1022,7 +1074,7 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHistory(); }
   if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); }
 });
-window.cobalt.onOpenUrl((url) => createTab(url));
+window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
 
 /* Arranque */
 (async function init() {

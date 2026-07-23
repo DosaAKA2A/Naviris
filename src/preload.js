@@ -35,7 +35,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   updateInstall: () => ipcRenderer.send('update:install'),
   onUpdateStatus: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s)),
 
-  onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, url) => cb(url)),
+  onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
   openExternal: (url) => ipcRenderer.send('shell:open-external', url),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 

@@ -360,9 +360,10 @@ function createWindow(isPrivate = false) {
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
-    contents.setWindowOpenHandler(({ url }) => {
+    contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
-        contents.hostWebContents?.send('tab:open-url', url);
+        // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano
+        contents.hostWebContents?.send('tab:open-url', { url, background: disposition === 'background-tab' });
       }
       return { action: 'deny' };
     });
