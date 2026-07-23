@@ -192,7 +192,7 @@ button { font-family: inherit; }
 .bm-folder-pop:empty::after { content: "Carpeta vacía"; color: #5c5e64; font-size: 12px; padding: 8px; display: block; }
 
 /* Popups */
-#menu-pop, #shield-pop, #res-pop, #rat-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 44px rgba(0,0,0,.6); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; }
+#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 44px rgba(0,0,0,.6); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 #menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
@@ -647,3 +647,10 @@ button { font-family: inherit; }
    del gradiente fugaban memoria en Electron 33; ver icons.js) */
 .iris-wrap:hover .iris-logo, #splash .iris-logo { animation: iris-hue 5s linear infinite; }
 @keyframes iris-hue { to { filter: hue-rotate(360deg); } }
+
+/* AutoLoot: botón propio en la topbar (solo visible en Twitch) */
+#nav-loot { color: #b98cff; }
+#nav-loot.on { color: #9ee2b8; }
+#nav-loot.hidden { display: none; }
+#loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#loot-pop .sp-count { line-height: 1.5; }
