@@ -29,7 +29,6 @@ const DEFAULT_SETTINGS = {
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
-  twitchAutoClaim: true,    // reclama puntos/drops de Twitch dejando el stream de fondo
   permissions: {}           // decisiones de permisos por sitio: "origin|tipo" -> allow|block
 };
 
@@ -80,22 +79,14 @@ const X_REVEAL = `(function(){
   setInterval(reveal,700);
   try{ new MutationObserver(reveal).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
-// Twitch: oculta anuncios de banner/display y, durante un anuncio de vídeo, lo silencia
-// para reducir la molestia. Los anuncios incrustados en el stream NO se pueden quitar
-// sin un proxy del m3u8, así que esto es lo razonable sin romper la reproducción.
+// Twitch: oculta anuncios de banner/display. NO silencia el vídeo (el silencio es
+// decisión del usuario). Los anuncios incrustados en el stream no se pueden quitar
+// sin un proxy del m3u8, así que esto no rompe la reproducción.
 const TWITCH_ADHIDE = `(function(){
   if(window.__cobaltTwAd)return; window.__cobaltTwAd=1;
   var s=document.createElement('style');
-  s.textContent='[data-a-target="video-ad-label"],[data-test-selector="sad-overlay"],.video-player__ad-info-container,[data-a-target="advertising-billboard"],div[aria-label="Advertisement"]{display:none!important}';
+  s.textContent='[data-test-selector="sad-overlay"],.video-player__ad-info-container,[data-a-target="advertising-billboard"],div[aria-label="Advertisement"]{display:none!important}';
   document.documentElement.appendChild(s);
-  function tick(){
-    try{
-      var ad=document.querySelector('[data-a-target="video-ad-countdown"],[data-a-target="video-ad-label"]');
-      var v=document.querySelector('video');
-      if(v){ if(ad){ v.__cobaltAd=true; v.muted=true; } else if(v.__cobaltAd){ v.__cobaltAd=false; v.muted=false; } }
-    }catch(e){}
-  }
-  setInterval(tick,1000);
 })();`;
 
 function loadSettings() {
@@ -516,7 +507,6 @@ ipcMain.on('download:url', (_e, { url, isPrivate }) => {
   if (!/^https?:/.test(url)) return;
   session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(url);
 });
-ipcMain.handle('tw:enabled', () => !!settings.twitchAutoClaim);
 ipcMain.handle('yt:download', (_e, opts) => ytDownload(opts));
 ipcMain.handle('yt:available', () => fs.existsSync(ytDlpPath()) && fs.existsSync(ffmpegPath()));
 

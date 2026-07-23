@@ -52,51 +52,46 @@ try {
   setTimeout(() => obs.disconnect(), 8000);
 } catch (e) { /* nada */ }
 
-// --- Twitch: auto-reclamo de puntos y drops, con retroalimentación a la interfaz ---
+// --- Twitch: AutoLoot por pestaña. Lo activa/para la interfaz con 'cobalt-autoloot'. ---
 if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
-  ipcRenderer.invoke('tw:enabled').then((on) => {
-    if (!on) return;
-    let claims = 0, lastPoints = 0;
-    ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
-    function clickChest() {
-      try {
-        if (Date.now() - lastPoints < 5000) return false; // evita doble conteo del mismo cofre
-        var icon = document.querySelector('.claimable-bonus__icon');
-        var btn = icon && icon.closest('button');
-        if (!btn) {
-          var sum = document.querySelector('[data-test-selector="community-points-summary"]');
-          if (sum && sum.querySelector('.claimable-bonus__icon')) btn = sum.querySelector('button');
-        }
-        if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); return true; }
-      } catch (e) { /* nada */ }
-      return false;
-    }
-    function claimDrops() {
-      try {
-        document.querySelectorAll('button, a[role="button"]').forEach(function (el) {
-          if (el.offsetParent === null) return;
-          var t = (el.textContent || '').trim().toLowerCase();
-          if (/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) { el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
-        });
-      } catch (e) { /* nada */ }
-    }
-    // Mantiene el stream vivo aunque la pestaña esté en segundo plano: reanuda el vídeo
-    // si se pausa y cierra el aviso "¿sigues ahí?", que si no cortaría el progreso de drops.
-    function keepAlive() {
-      try {
-        var v = document.querySelector('video');
-        if (v && v.paused) { try { v.play(); } catch (e) { /* nada */ } }
-        document.querySelectorAll('button').forEach(function (el) {
-          if (el.offsetParent === null) return;
-          var t = (el.textContent || '').trim().toLowerCase();
-          if (/(seguir viendo|continuar viendo|still watching|continue watching|sigo aqu|i'?m still here)/.test(t)) el.click();
-        });
-      } catch (e) { /* nada */ }
-    }
-    setInterval(function () { clickChest(); claimDrops(); keepAlive(); }, 12000);
-    let moTimer = null;
-    try { new MutationObserver(function () { if (moTimer) return; moTimer = setTimeout(function () { moTimer = null; clickChest(); }, 1500); }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* nada */ }
-  }).catch(function () { /* nada */ });
+  let claims = 0, lastPoints = 0, timer = null;
+  function clickChest() {
+    try {
+      if (Date.now() - lastPoints < 5000) return; // evita doble conteo del mismo cofre
+      var icon = document.querySelector('.claimable-bonus__icon');
+      var btn = icon && icon.closest('button');
+      if (!btn) { var sum = document.querySelector('[data-test-selector="community-points-summary"]'); if (sum && sum.querySelector('.claimable-bonus__icon')) btn = sum.querySelector('button'); }
+      if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); }
+    } catch (e) { /* nada */ }
+  }
+  function claimDrops() {
+    try {
+      document.querySelectorAll('button, a[role="button"]').forEach(function (el) {
+        if (el.offsetParent === null) return;
+        var t = (el.textContent || '').trim().toLowerCase();
+        if (/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) { el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
+      });
+    } catch (e) { /* nada */ }
+  }
+  // Mantiene el stream vivo en segundo plano: reanuda el vídeo y cierra el "¿sigues ahí?".
+  function keepAlive() {
+    try {
+      var v = document.querySelector('video');
+      if (v && v.paused) { try { v.play(); } catch (e) { /* nada */ } }
+      document.querySelectorAll('button').forEach(function (el) {
+        if (el.offsetParent === null) return;
+        var t = (el.textContent || '').trim().toLowerCase();
+        if (/(seguir viendo|continuar viendo|still watching|continue watching|sigo aqu|i'?m still here)/.test(t)) el.click();
+      });
+    } catch (e) { /* nada */ }
+  }
+  function setLowRes() { try { localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' })); } catch (e) { /* nada */ } }
+  ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
+    if (opt && opt.on) {
+      if (opt.lowRes) setLowRes();
+      if (!timer) { ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' }); clickChest(); timer = setInterval(function () { clickChest(); claimDrops(); keepAlive(); }, 12000); }
+    } else if (timer) { clearInterval(timer); timer = null; }
+  });
 }
 
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---

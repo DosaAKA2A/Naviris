@@ -39,7 +39,6 @@
       <button class="sb-btn accent" id="sb-claude" title="Claude" data-brand="claude"></button>
       <div class="sb-spacer"></div>
       <!-- Herramientas -->
-      <div class="sb-group-label">Herramientas</div>
       <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="rat"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
       <button class="sb-btn" id="sb-loot" title="Loot — recompensas reclamadas" data-ico="gift"></button>
@@ -168,7 +167,6 @@
     <hr />
     <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
     <label class="menu-toggle"><span>Mostrar contenido sensible en X<br /><small>Salta el aviso de sensibilidad de X/Twitter</small></span><input type="checkbox" id="opt-xsensitive" /></label>
-    <label class="menu-toggle"><span>Auto-reclamar en Twitch<br /><small>Reclama puntos y drops con el stream de fondo</small></span><input type="checkbox" id="opt-twitch" /></label>
     <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita el prompt de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme pestañas inactivas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
@@ -194,19 +192,31 @@
     <div id="res-list"></div>
   </div>
 
-  <!-- ===== Rat Tool (descarga vídeo/audio) ===== -->
+  <!-- ===== Rat Tool (descarga vídeo/audio · modo Twitch) ===== -->
   <div id="rat-pop" class="hidden">
-    <div class="rat-head"><span class="rat-brand">Rat Tool</span><span class="rat-sub">Descargar vídeo o audio</span></div>
-    <div id="rat-detect" class="rat-detect hidden"><span id="rat-detect-logo"></span><div class="rat-detect-info"><div id="rat-detect-name"></div><div id="rat-detect-url"></div></div></div>
-    <input id="rat-url" type="text" spellcheck="false" placeholder="Pega un enlace de YouTube, Instagram, X, TikTok…" />
-    <div class="rat-plat" id="rat-plat"></div>
-    <label id="rat-qrow" class="rat-qrow hidden"><span>Resolución</span><select id="rat-quality"><option value="">Máxima</option></select></label>
-    <div class="rat-btns">
-      <button id="rat-video" class="rat-btn"><span data-ico="film"></span> Vídeo MP4</button>
-      <button id="rat-audio" class="rat-btn"><span data-ico="musical-note"></span> Audio MP3</button>
+    <div class="rat-head"><span class="rat-brand">Rat Tool</span><span class="rat-sub" id="rat-headsub">Descargar vídeo o audio</span></div>
+
+    <!-- Modo normal: descarga -->
+    <div id="rat-normal">
+      <div id="rat-detect" class="rat-detect hidden"><span id="rat-detect-logo"></span><div class="rat-detect-info"><div id="rat-detect-name"></div><div id="rat-detect-url"></div></div></div>
+      <input id="rat-url" type="text" spellcheck="false" placeholder="Pega un enlace de YouTube, Instagram, X, TikTok…" />
+      <div class="rat-plat" id="rat-plat"></div>
+      <label id="rat-qrow" class="rat-qrow hidden"><span>Resolución</span><select id="rat-quality"><option value="">Máxima</option></select></label>
+      <div class="rat-btns">
+        <button id="rat-video" class="rat-btn"><span data-ico="film"></span> Vídeo MP4</button>
+        <button id="rat-audio" class="rat-btn"><span data-ico="musical-note"></span> Audio MP3</button>
+      </div>
+      <label id="rat-xtoggle" class="rat-xrow hidden"><span>Mostrar contenido sensible en X</span><span class="switch"><input type="checkbox" id="rat-xcheck" /><span class="slider"></span></span></label>
+      <div class="rat-note" id="rat-note"></div>
     </div>
-    <label id="rat-xtoggle" class="rat-xrow hidden"><span>Mostrar contenido sensible en X</span><span class="switch"><input type="checkbox" id="rat-xcheck" /><span class="slider"></span></span></label>
-    <div class="rat-note" id="rat-note"></div>
+
+    <!-- Modo Twitch: AutoLoot -->
+    <div id="rat-twitch" class="hidden">
+      <label class="rat-tw-row"><span><b>Auto Loot</b><small>Reclama puntos y drops de este canal</small></span><span class="switch"><input type="checkbox" id="rt-autoloot" /><span class="slider"></span></span></label>
+      <label class="rat-tw-row"><span><b>Silenciar vídeo</b><small>Silencia esta pestaña (puedes seguir viéndolo)</small></span><span class="switch"><input type="checkbox" id="rt-mute" /><span class="slider"></span></span></label>
+      <button id="rt-ratloot" class="rat-loot-btn"><span data-ico="gift"></span> Rat Loot</button>
+      <div class="rat-note">Rat Loot silencia el stream, baja la resolución al mínimo y activa Auto Loot en segundo plano, agrupando la pestaña con las demás.</div>
+    </div>
   </div>
 
   <!-- ===== Panel recursos gráficos ===== -->
