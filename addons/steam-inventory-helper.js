@@ -1,17 +1,18 @@
-/* Naviris addon: Valve Rat Tool v1.1.0
+/* Naviris addon: Valve Rat Tool v1.3.0
    Se inyecta en steamcommunity.com. Funciones al estilo Steam Inventory Helper:
    - Precio de Steam bajo cada objeto (moneda de tu cartera, caché 24 h)
-   - MULTI-MERCADO (CS2): compara con Buff163, Skinport y CSFloat vía el
-     agregado público prices.csgotrader.app (precios en USD, refresco diario)
-   - Valor total del inventario visible con selector de mercado
+   - Precio de mercado real de Skinport (CS2) vía su API pública (USD, caché 1 h)
+   - Valor total del inventario visible con selector de mercado (Steam/Skinport)
    - Venta rápida al precio actual del mercado de Steam
    - Ofertas de intercambio: suma el valor de cada lado (en el mercado elegido)
-   Respeta el límite de Steam (~20 consultas/min) con una cola. */
+   Respeta el límite de Steam (~20 consultas/min) con una cola.
+   Nota: la comparativa multi-mercado (Buff163/CSFloat…) que ofrece SIH usa su
+   backend propio; aquí se usa la API pública de Skinport, un mercado real de
+   referencia. El agregado de csgotrader que usábamos dejó de estar disponible. */
 (function () {
   if (window.__navSIH) return; window.__navSIH = 1;
 
   const CCY = (window.g_rgWalletInfo && g_rgWalletInfo.wallet_currency) || 1;
-  const AGG_URL = 'https://prices.csgotrader.app/latest/prices_v6.json';
 
   /* ---------- Cola de precios de Steam con caché ---------- */
   let cache = {};
@@ -55,33 +56,39 @@
   const symbol = (s) => (String(s).match(/[^\d\s.,-]+/) || [''])[0];
   const num = (v) => (typeof v === 'number' && isFinite(v) ? v : 0);
 
-  /* ---------- Agregado multi-mercado (CS2, USD) ---------- */
-  let agg = null, aggLoading = null;
+  /* ---------- Precios de mercado real: Skinport API (CS2, USD) ----------
+     El agregado de csgotrader (prices_v6) dejó de servirse; Skinport tiene API
+     pública y fiable (min_price = venta más barata). Naviris abre CORS para
+     api.skinport.com. Se cachea 1 h (Skinport pide no consultarla más seguido). */
+  const SKINPORT_URL = 'https://api.skinport.com/v1/items?app_id=730&currency=USD';
+  let agg = null, aggLoading = null; // agg: Map hashName -> { skinport:precioUSD }
   function loadAgg() {
     if (agg) return Promise.resolve();
     if (aggLoading) return aggLoading;
     aggLoading = (async () => {
       try {
-        const c = await caches.open('navsih-agg');
-        let res = await c.match(AGG_URL);
-        const stale = res && (Date.now() - new Date(res.headers.get('date') || 0).getTime() > 864e5);
+        const c = await caches.open('navsih-skinport');
+        let res = await c.match(SKINPORT_URL);
+        const stale = res && (Date.now() - new Date(res.headers.get('date') || 0).getTime() > 36e5);
         if (!res || stale) {
-          const fresh = await fetch(AGG_URL); // Naviris abre CORS para este dominio
-          if (fresh && fresh.ok) { try { await c.put(AGG_URL, fresh.clone()); } catch (e) {} res = fresh; }
+          const fresh = await fetch(SKINPORT_URL);
+          if (fresh && fresh.ok) { try { await c.put(SKINPORT_URL, fresh.clone()); } catch (e) {} res = fresh; }
         }
-        if (res) agg = await res.json();
+        if (res) {
+          const arr = await res.json();
+          agg = new Map();
+          for (const it of arr) {
+            const p = num(it.min_price != null ? it.min_price : it.suggested_price);
+            if (it.market_hash_name && p > 0) agg.set(it.market_hash_name, { skinport: p });
+          }
+        }
       } catch (e) { /* seguimos solo con Steam */ }
     })();
     return aggLoading;
   }
-  // [clave, etiqueta, extractor de precio USD]
-  const MARKETS = [
-    ['buff163', 'Buff163', (e) => num(e.buff163 && e.buff163.starting_at && e.buff163.starting_at.price)],
-    ['skinport', 'Skinport', (e) => num(e.skinport && (e.skinport.starting_at != null ? e.skinport.starting_at : e.skinport.suggested_price))],
-    ['csfloat', 'CSFloat', (e) => num(e.csfloat && (typeof e.csfloat === 'number' ? e.csfloat : e.csfloat.price))]
-  ];
+  const MARKETS = [['skinport', 'Skinport', (e) => num(e.skinport)]];
   function marketPrices(hashName) {
-    const e = agg && agg[hashName];
+    const e = agg && agg.get ? agg.get(hashName) : null;
     if (!e) return null;
     const out = {};
     for (const [k, , get] of MARKETS) { const v = get(e); if (v > 0) out[k] = v; }
