@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -38,7 +38,9 @@ const DEFAULT_SETTINGS = {
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
-  permissions: {}           // decisiones de permisos por sitio: "origin|tipo" -> allow|block
+  permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
+  hubTransparent: false,    // fondo acrílico que deja ver el escritorio (se aplica al crear la ventana)
+  addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };
 
 // Registra un autenticador virtual (vía CDP interno) para que las peticiones
@@ -361,7 +363,10 @@ function ytDownload({ url, mode, quality }) {
 function createWindow(isPrivate = false) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 560,
-    frame: false, show: false, backgroundColor: '#0a0a0c',
+    frame: false, show: false,
+    // El acrílico solo funciona de forma fiable si la ventana ya nace con él
+    backgroundColor: settings.hubTransparent ? '#00000000' : '#0a0a0c',
+    backgroundMaterial: settings.hubTransparent ? 'acrylic' : 'none',
     title: isPrivate ? 'Naviris — Privado' : 'Naviris',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -408,6 +413,13 @@ app.on('web-contents-created', (_event, contents) => {
       if (settings.adblockEnabled && /(^|\.)twitch\.tv$/.test(host)) {
         contents.executeJavaScript(TWITCH_ADHIDE, true).catch(() => {});
       }
+      // Addons de contenido: se inyectan en los sitios que declaran en "matches"
+      for (const [aid, meta] of Object.entries(settings.addons || {})) {
+        if (!meta.enabled || meta.kind !== 'content' || !addonCode[aid]) continue;
+        if ((meta.matches || []).some((m) => host === m || host.endsWith('.' + m))) {
+          contents.executeJavaScript(addonCode[aid], true).catch(() => {});
+        }
+      }
       // Twitch: el auto-reclamo vive ahora en webview-preload.js (puede avisar a la UI)
     });
   }
@@ -424,8 +436,9 @@ ipcMain.on('win:new-private', () => createWindow(true));
 // Se activa solo cuando el usuario lo elige, así el rendimiento por defecto no cambia.
 ipcMain.on('win:transparent', (e, on) => {
   const w = winOf(e); if (!w) return;
-  try { w.setBackgroundColor(on ? '#00000000' : '#0a0a0c'); } catch { /* nada */ }
+  settings.hubTransparent = !!on; saveSettings(settings);
   try { w.setBackgroundMaterial(on ? 'acrylic' : 'none'); } catch { /* nada */ }
+  try { w.setBackgroundColor(on ? '#00000000' : '#0a0a0c'); } catch { /* nada */ }
 });
 
 ipcMain.handle('settings:get', () => settings);
@@ -646,6 +659,97 @@ ipcMain.handle('favicon:fetch', async (_e, pageUrl) => {
     try { return await tryFetch(`https://${host}/favicon.ico`); }
     catch { return null; }
   }
+});
+
+// ---------- Addons (catálogo remoto en naviris.site, independiente de las releases) ----------
+const ADDONS_BASE = 'https://naviris.site/addons/';
+const addonsDir = () => path.join(app.getPath('userData'), 'addons');
+const addonFile = (id) => path.join(addonsDir(), id + '.js');
+let addonCode = {}; // id -> código en memoria (addons de contenido activados)
+
+function loadAddonCode() {
+  addonCode = {};
+  for (const [id, meta] of Object.entries(settings.addons || {})) {
+    if (!meta.enabled) continue;
+    try { addonCode[id] = fs.readFileSync(addonFile(id), 'utf8'); } catch { /* archivo perdido: se reinstala desde la página */ }
+  }
+}
+loadAddonCode();
+
+function fetchText(url) {
+  return new Promise((resolve, reject) => {
+    const req = net.request(url);
+    let data = '';
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+ipcMain.handle('addons:catalog', async () => {
+  try {
+    const raw = await fetchText(ADDONS_BASE + 'catalog.json?t=' + Date.now());
+    const cat = JSON.parse(raw);
+    return { ok: true, addons: Array.isArray(cat.addons) ? cat.addons : [] };
+  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+});
+
+ipcMain.handle('addons:list', () => settings.addons || {});
+
+ipcMain.handle('addons:install', async (_e, meta) => {
+  try {
+    if (!meta || !/^[a-z0-9-]{1,60}$/.test(meta.id || '')) throw new Error('Addon inválido');
+    const entry = String(meta.entry || '');
+    if (!entry.startsWith(ADDONS_BASE)) throw new Error('Origen no permitido');
+    const code = await fetchText(entry + '?t=' + Date.now());
+    fs.mkdirSync(addonsDir(), { recursive: true });
+    fs.writeFileSync(addonFile(meta.id), code, 'utf8');
+    settings.addons = {
+      ...(settings.addons || {}),
+      [meta.id]: {
+        id: meta.id, name: meta.name || meta.id, version: meta.version || '0',
+        description: meta.description || '', kind: meta.kind === 'tool' ? 'tool' : 'content',
+        matches: Array.isArray(meta.matches) ? meta.matches : [], icon: meta.icon || 'puzzle-piece',
+        enabled: true
+      }
+    };
+    saveSettings(settings); loadAddonCode();
+    return { ok: true };
+  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+});
+
+ipcMain.handle('addons:uninstall', (_e, id) => {
+  try { fs.rmSync(addonFile(id), { force: true }); } catch { /* nada */ }
+  const rest = { ...(settings.addons || {}) }; delete rest[id];
+  settings.addons = rest; saveSettings(settings); loadAddonCode();
+  return { ok: true };
+});
+
+ipcMain.handle('addons:toggle', (_e, { id, on }) => {
+  if (settings.addons && settings.addons[id]) { settings.addons[id].enabled = !!on; saveSettings(settings); loadAddonCode(); }
+  return settings.addons || {};
+});
+
+ipcMain.handle('addons:code', (_e, id) => {
+  if (!settings.addons || !settings.addons[id] || !settings.addons[id].enabled) return null;
+  try { return fs.readFileSync(addonFile(id), 'utf8'); } catch { return null; }
+});
+
+// Guardado de imágenes generado por addons (p. ej. capturas largas)
+ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
+  try {
+    const r = await dialog.showSaveDialog(winOf(e), {
+      defaultPath: path.join(app.getPath('downloads'), suggestedName || 'captura.png'),
+      filters: [{ name: 'Imagen PNG', extensions: ['png'] }]
+    });
+    if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(r.filePath, Buffer.from(String(dataUrl).split(',')[1], 'base64'));
+    return { ok: true, path: r.filePath };
+  } catch (err) { return { ok: false, message: String(err.message || err) }; }
 });
 
 // ---------- Actualización automática (GitHub Releases) ----------

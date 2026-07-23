@@ -1,8 +1,8 @@
 {
   "name": "naviris-browser",
   "productName": "Naviris",
-  "version": "2.0.0",
-  "description": "Naviris — navegador ligero de Iris Studio. Motor Chromium, bajo consumo y aceleración por GPU.",
+  "version": "2.1.0",
+  "description": "Naviris",
   "author": "Iris Studio",
   "license": "MIT",
   "main": "src/main.js",

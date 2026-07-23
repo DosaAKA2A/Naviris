@@ -518,7 +518,7 @@ button { font-family: inherit; }
 .hub-fab:hover { border-color: #47484f; }
 .hub-fab.on { background: var(--accent); color: #121215; border-color: var(--accent); }
 .hub-fab svg { width: 15px; height: 15px; }
-.hub-panel { position: absolute; right: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: 0 16px 44px rgba(0,0,0,.6); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; max-height: 70vh; overflow-y: auto; }
+.hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: 0 16px 44px rgba(0,0,0,.6); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; max-height: 70vh; overflow-y: auto; }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #6a6c73; margin-bottom: 10px; }
 #palette-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pal-item { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .12s, background .12s; }
@@ -606,3 +606,30 @@ button { font-family: inherit; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } #hub.editing .dial { animation: none; } }
+
+/* ===== Addons ===== */
+.adp-sub { color: var(--muted, #8b8d94); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
+.adp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.adp-loading, .adp-error { color: var(--muted, #8b8d94); font-size: 13px; padding: 24px 0; }
+.adp-card { background: var(--bg-3, #17171b); border: 1px solid var(--line, #232327); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.adp-card .adp-top { display: flex; align-items: center; gap: 10px; }
+.adp-card .adp-ico { width: 34px; height: 34px; border-radius: 9px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; flex: none; }
+.adp-card .adp-ico svg { width: 18px; height: 18px; }
+.adp-card h3 { font-size: 14px; margin: 0; }
+.adp-card .adp-ver { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted, #8b8d94); }
+.adp-card p { margin: 0; font-size: 12.5px; color: var(--muted, #8b8d94); line-height: 1.5; flex: 1; }
+.adp-card .adp-actions { display: flex; gap: 8px; align-items: center; }
+.adp-badge { font-size: 10.5px; font-family: var(--mono, ui-monospace, monospace); letter-spacing: .4px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line, #232327); color: var(--muted, #8b8d94); }
+.adp-badge.on { color: #9ee2b8; border-color: #2c4636; }
+.adp-btn { border: 1px solid #2c2c32; background: rgba(255,255,255,.05); color: var(--text, #ececef); font-size: 12px; padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+.adp-btn:hover { border-color: #47484f; }
+.adp-btn.primary { background: var(--accent, #e8e9ec); color: #121215; border-color: var(--accent, #e8e9ec); font-weight: 600; }
+.adp-btn.danger:hover { border-color: #7a3040; color: #f2a9b4; }
+
+/* Botones de herramientas registrados por addons (navbar) */
+#addon-tools { display: flex; align-items: center; gap: 2px; }
+#addon-tools:empty { display: none; }
+#addon-tools button { border: none; background: none; color: var(--muted, #9a9ca3); width: 34px; height: 34px; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#addon-tools button:hover { background: rgba(255,255,255,.07); color: var(--text, #ececef); }
+#addon-tools button svg { width: 17px; height: 17px; }
+#addon-tools button.busy { color: #9ee2b8; pointer-events: none; }

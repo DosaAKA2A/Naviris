@@ -172,7 +172,7 @@ function attachWebview(tab, url) {
 function activateTab(id) {
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
   if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; }
-  hideBookmarkPage();
+  hideBookmarkPage(); hideAddonsPage();
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => t.webview?.classList.toggle('active', t.id === id && t.kind === 'web'));
   if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
@@ -254,7 +254,7 @@ function toggleMute(tab) {
   renderTabs();
 }
 function navigateActive(input) {
-  const url = toUrl(input); if (!url) return; hideBookmarkPage();
+  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage();
   const tab = activeTab() || createTab();
   if (tab.kind === 'hub') { attachWebview(tab, url); tab.title = 'Cargando…'; activateTab(tab.id); } else tab.webview.src = url;
 }
@@ -364,7 +364,7 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
 function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
@@ -606,7 +606,7 @@ function applyBackground(v) {
   const a = store.get('cobalt.hubAlpha', 35);
   els.hubAlpha.value = a; document.documentElement.style.setProperty('--hub-alpha', (a / 100).toFixed(2));
   els.hubAlpha.addEventListener('input', () => { document.documentElement.style.setProperty('--hub-alpha', (els.hubAlpha.value / 100).toFixed(2)); store.set('cobalt.hubAlpha', +els.hubAlpha.value); });
-  els.bgDesktopBtn.addEventListener('click', () => applyBackground('transparent'));
+  els.bgDesktopBtn.addEventListener('click', () => { applyBackground('transparent'); toast('Fondo transparente activado — si no se ve el escritorio, reinicia Naviris'); });
 })();
 function renderBgPresets() {
   els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
@@ -1199,6 +1199,115 @@ async function showPermManager() {
 }
 els.permModalClose.addEventListener('click', () => els.permModal.classList.add('hidden'));
 els.permClearAll.addEventListener('click', async () => { await window.cobalt.permClear(); showPermManager(); toast('Permisos borrados'); });
+
+/* ===== Addons (catálogo remoto: naviris.site/addons) ===== */
+const adEls = {
+  page: document.getElementById('addons-page'),
+  list: document.getElementById('addons-list'),
+  refresh: document.getElementById('addons-refresh'),
+  hubBtn: document.getElementById('hub-addons'),
+  tools: document.getElementById('addon-tools')
+};
+function showAddonsPage() {
+  tabs.forEach((t) => t.webview?.classList.remove('active'));
+  els.hub.classList.remove('active'); hideBookmarkPage();
+  adEls.page.classList.remove('hidden'); adEls.page.classList.add('active');
+  renderAddons();
+}
+function hideAddonsPage() { adEls.page.classList.remove('active'); adEls.page.classList.add('hidden'); }
+adEls.hubBtn.addEventListener('click', showAddonsPage);
+adEls.refresh.addEventListener('click', renderAddons);
+
+async function renderAddons() {
+  adEls.list.innerHTML = '<div class="adp-loading">Cargando catálogo…</div>';
+  const [cat, installed] = await Promise.all([window.cobalt.addonsCatalog(), window.cobalt.addonsList()]);
+  const remote = cat.ok ? cat.addons : [];
+  const byId = new Map(remote.map((a) => [a.id, a]));
+  for (const id of Object.keys(installed)) if (!byId.has(id)) byId.set(id, installed[id]);
+  adEls.list.innerHTML = '';
+  if (!byId.size) {
+    adEls.list.innerHTML = '<div class="adp-error">' + (cat.ok ? 'El catálogo está vacío por ahora.' : 'No se pudo cargar el catálogo (' + (cat.message || 'sin conexión') + ').') + '</div>';
+    return;
+  }
+  for (const meta of byId.values()) {
+    const inst = installed[meta.id];
+    const inCatalog = remote.some((a) => a.id === meta.id);
+    const card = document.createElement('div'); card.className = 'adp-card';
+    const top = document.createElement('div'); top.className = 'adp-top';
+    top.innerHTML = '<span class="adp-ico">' + window.icon(meta.icon || 'puzzle-piece') + '</span>';
+    const tt = document.createElement('div');
+    tt.innerHTML = '<h3></h3><span class="adp-ver"></span>';
+    tt.querySelector('h3').textContent = meta.name || meta.id;
+    tt.querySelector('.adp-ver').textContent = 'v' + (meta.version || '?') + (meta.kind === 'tool' ? ' · herramienta' : ' · para sitios');
+    top.appendChild(tt);
+    const badge = document.createElement('span'); badge.className = 'adp-badge' + (inst?.enabled ? ' on' : '');
+    badge.textContent = inst ? (inst.enabled ? 'ACTIVO' : 'PAUSADO') : 'DISPONIBLE';
+    badge.style.marginLeft = 'auto';
+    top.appendChild(badge);
+    const desc = document.createElement('p'); desc.textContent = meta.description || '';
+    const acts = document.createElement('div'); acts.className = 'adp-actions';
+    const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'adp-btn' + (cls ? ' ' + cls : ''); b.textContent = label; b.addEventListener('click', fn); acts.appendChild(b); return b; };
+    if (!inst) {
+      btn('Instalar', 'primary', async (ev) => {
+        ev.target.textContent = 'Instalando…'; ev.target.disabled = true;
+        const r = await window.cobalt.addonsInstall(meta);
+        toast(r.ok ? 'Addon instalado: ' + meta.name + (meta.kind === 'tool' ? '' : ' (activo al recargar los sitios)') : 'Error: ' + r.message);
+        if (r.ok) loadToolAddons();
+        renderAddons();
+      });
+    } else {
+      if (inCatalog && meta.version && inst.version !== meta.version) {
+        btn('Actualizar a v' + meta.version, 'primary', async () => {
+          const r = await window.cobalt.addonsInstall(meta);
+          toast(r.ok ? 'Addon actualizado' : 'Error: ' + r.message);
+          renderAddons();
+        });
+      }
+      btn(inst.enabled ? 'Pausar' : 'Activar', '', async () => {
+        await window.cobalt.addonsToggle(meta.id, !inst.enabled);
+        if (inst.kind === 'tool') loadToolAddons();
+        renderAddons();
+      });
+      btn('Quitar', 'danger', async () => {
+        await window.cobalt.addonsUninstall(meta.id);
+        naviris.unregisterTool(meta.id); loadedTools.delete(meta.id);
+        toast('Addon eliminado'); renderAddons();
+      });
+    }
+    card.append(top, desc, acts);
+    adEls.list.appendChild(card);
+  }
+}
+
+// API mínima que Naviris ofrece a los addons de tipo herramienta.
+// Los addons viven en naviris.site: se actualizan sin publicar una release.
+const naviris = {
+  toast,
+  activeWebview: () => { const t = activeTab(); return t && t.kind === 'web' && !t.asleep ? t.webview : null; },
+  savePng: (dataUrl, name) => window.cobalt.savePng(dataUrl, name),
+  registerTool({ id, label, icon, onClick }) {
+    if (document.getElementById('adt-' + id)) return;
+    const b = document.createElement('button');
+    b.id = 'adt-' + id; b.title = label; b.innerHTML = window.icon(icon || 'puzzle-piece');
+    b.addEventListener('click', () => onClick(b));
+    adEls.tools.appendChild(b);
+  },
+  unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); }
+};
+const loadedTools = new Set();
+async function loadToolAddons() {
+  const installed = await window.cobalt.addonsList();
+  for (const [id, meta] of Object.entries(installed)) {
+    if (meta.kind !== 'tool' || !meta.enabled || loadedTools.has(id)) continue;
+    const code = await window.cobalt.addonsCode(id);
+    if (!code) continue;
+    try { new Function('naviris', code)(naviris); loadedTools.add(id); } catch (e) { console.error('Addon roto:', id, e); }
+  }
+  for (const id of [...loadedTools]) {
+    if (!installed[id] || !installed[id].enabled) { naviris.unregisterTool(id); loadedTools.delete(id); }
+  }
+}
+loadToolAddons();
 
 /* Actualización */
 const updStatus = $('#upd-status'), updBtn = $('#upd-btn'), updBar = $('#upd-bar');

@@ -80,6 +80,7 @@
                  placeholder="Busca en Google o escribe una dirección" />
           <div id="suggest" class="hidden"></div>
         </div>
+        <div id="addon-tools"></div>
         <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-check"></button>
         <button id="nav-star" title="Añadir a marcadores" data-ico="star"></button>
         <button id="nav-menu" title="Menú" data-ico="ellipsis-vertical"></button>
@@ -116,6 +117,7 @@
           <div class="hub-actions">
             <button id="hub-edit" class="hub-fab" title="Editar hub"><span data-ico="squares-plus"></span><span class="lbl">Editar</span></button>
             <button id="hub-customize" class="hub-fab" title="Cambiar fondo"><span data-ico="photo"></span></button>
+            <button id="hub-addons" class="hub-fab" title="Addons: extensiones instalables"><span data-ico="puzzle-piece"></span><span class="lbl">Addons</span></button>
           </div>
           <div id="hub-version" title="Versión de Naviris">Naviris</div>
 
@@ -150,6 +152,20 @@
               </div>
             </div>
             <div id="bm-tree"></div>
+          </div>
+        </section>
+
+        <!-- Página de Addons (catálogo remoto: se actualiza sin actualizar Naviris) -->
+        <section id="addons-page" class="overlay-page hidden">
+          <div class="bmp-inner">
+            <div class="bmp-head">
+              <h2><span data-ico="puzzle-piece"></span> Addons</h2>
+              <div class="bmp-tools">
+                <button id="addons-refresh" class="ghost-btn"><span data-ico="arrow-path"></span> Actualizar catálogo</button>
+              </div>
+            </div>
+            <p class="adp-sub">Extensiones opcionales de Naviris. No vienen instaladas: tú eliges cuáles añadir, y el catálogo crece sin necesidad de actualizar el navegador.</p>
+            <div id="addons-list" class="adp-list"><div class="adp-loading">Cargando catálogo…</div></div>
           </div>
         </section>
       </main>

@@ -50,6 +50,14 @@ contextBridge.exposeInMainWorld('cobalt', {
   pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
   pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),
 
+  addonsCatalog: () => ipcRenderer.invoke('addons:catalog'),
+  addonsList: () => ipcRenderer.invoke('addons:list'),
+  addonsInstall: (meta) => ipcRenderer.invoke('addons:install', meta),
+  addonsUninstall: (id) => ipcRenderer.invoke('addons:uninstall', id),
+  addonsToggle: (id, on) => ipcRenderer.invoke('addons:toggle', { id, on }),
+  addonsCode: (id) => ipcRenderer.invoke('addons:code', id),
+  savePng: (dataUrl, suggestedName) => ipcRenderer.invoke('file:save-png', { dataUrl, suggestedName }),
+
   onPermAsk: (cb) => ipcRenderer.on('perm:ask', (_e, req) => cb(req)),
   permRespond: (id, decision, remember) => ipcRenderer.send('perm:respond', { id, decision, remember }),
   permList: () => ipcRenderer.invoke('perm:list'),
