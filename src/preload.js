@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   pwAdd: (site, username, password) => ipcRenderer.invoke('pw:add', { site, username, password }),
   pwForHost: (host) => ipcRenderer.invoke('pw:for-host', host),
   pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
+  pwImportCsv: () => ipcRenderer.invoke('pw:import-csv'),
   pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),
 
   addonsCatalog: () => ipcRenderer.invoke('addons:catalog'),

@@ -22,7 +22,7 @@ const els = {};
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
-  'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-cancel',
+  'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
@@ -185,7 +185,14 @@ function activateTab(id) {
   if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; }
   hideBookmarkPage(); hideAddonsPage();
   els.hub.classList.toggle('active', tab.kind === 'hub');
-  tabs.forEach((t) => t.webview?.classList.toggle('active', t.id === id && t.kind === 'web'));
+  tabs.forEach((t) => {
+    if (!t.webview || t.kind !== 'web') return;
+    const active = t.id === id;
+    t.webview.classList.toggle('active', active);
+    // Las pestañas de AutoLoot inactivas quedan "vivas" (renderizadas fuera de
+    // pantalla) para que sigan acumulando tiempo de drops
+    t.webview.classList.toggle('loot-live', !active && !!t.autoLoot);
+  });
   if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
   // Al elegir una pestaña que NO es de AutoLoot, el grupo se pliega de nuevo
   if (!tab.autoLoot) lootExpanded = false;
@@ -805,6 +812,12 @@ els.sbPasswords.addEventListener('click', async () => {
 });
 $('#pw-close').addEventListener('click', () => togglePwPanel(false));
 els.pwAddbtn.addEventListener('click', () => { els.pwForm.classList.toggle('hidden'); els.pwSite.value = ''; els.pwUser.value = ''; els.pwPass.value = ''; els.pwSite.focus(); });
+els.pwImport.addEventListener('click', async () => {
+  toast('Elige el CSV exportado desde tu navegador (Configuración → Contraseñas → Exportar)');
+  const r = await window.cobalt.pwImportCsv();
+  if (r.ok) { renderPasswords(); toast(`Importadas: ${r.added} nuevas, ${r.updated} actualizadas`); }
+  else if (!r.canceled) toast('No se pudo importar: ' + (r.error || 'archivo no válido'));
+});
 els.pwCancel.addEventListener('click', () => els.pwForm.classList.add('hidden'));
 els.pwForm.addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -85,6 +85,26 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       });
     } catch (e) { /* nada */ }
   }
+  // Engaña a la API de visibilidad: Twitch solo cuenta el TIEMPO de visualización
+  // de los drops si cree que la pestaña está visible. En segundo plano dejaría de
+  // avanzar el progreso (los puntos sí caían porque los reclamamos nosotros, pero
+  // los drops necesitan ese tiempo). Esto lo mantiene contando siempre.
+  let visSpoofed = false;
+  function spoofVisible() {
+    if (visSpoofed) return; visSpoofed = true;
+    try {
+      Object.defineProperty(document, 'hidden', { get: function () { return false; }, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { get: function () { return 'visible'; }, configurable: true });
+      Object.defineProperty(document, 'webkitHidden', { get: function () { return false; }, configurable: true });
+      Object.defineProperty(document, 'webkitVisibilityState', { get: function () { return 'visible'; }, configurable: true });
+      var block = function (e) { e.stopImmediatePropagation(); };
+      document.addEventListener('visibilitychange', block, true);
+      window.addEventListener('visibilitychange', block, true);
+      document.addEventListener('webkitvisibilitychange', block, true);
+      window.addEventListener('webkitvisibilitychange', block, true);
+      document.dispatchEvent(new Event('visibilitychange')); // notifica el nuevo estado "visible"
+    } catch (e) { /* nada */ }
+  }
   function setQuality(q) { try { localStorage.setItem('video-quality', JSON.stringify({ default: q })); } catch (e) { /* nada */ } }
   // Baja ESTA pestaña a la mínima y, tras cargar el reproductor, restaura el valor
   // global a "auto" para que las NUEVAS pestañas de Twitch NO hereden la baja resolución.
@@ -93,6 +113,7 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   function tick() { clickChest(); claimDrops(); keepAlive(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
     if (opt && opt.on) {
+      spoofVisible(); // sin esto, los drops no acumulan tiempo en segundo plano
       if (opt.lowRes) lowResThisTabOnly();
       if (!timer) {
         ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
