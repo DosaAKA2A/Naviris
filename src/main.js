@@ -108,6 +108,7 @@ const DEFAULT_SETTINGS = {
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
+  restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };

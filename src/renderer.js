@@ -17,7 +17,7 @@ const els = {};
   'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'nav-home', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
-  'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
+  'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -143,7 +143,14 @@ function recordHistory(url, title) {
 /* ============ Pestañas ============ */
 function createTab(url = null, activate = true) {
   const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now() };
-  tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); return tab;
+  tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
+}
+// Guarda las URLs abiertas para restaurarlas al reabrir (si el ajuste está activo).
+// No aplica en ventana privada. Se llama al crear/cerrar/navegar pestañas.
+function saveSession() {
+  if (IS_PRIVATE) return;
+  const urls = tabs.filter((t) => t.kind === 'web' && t.url && /^https?:/.test(t.url)).map((t) => t.sleptUrl || t.url);
+  store.set('cobalt.session', urls);
 }
 let mediaTimer = null;
 function attachWebview(tab, url) {
@@ -167,6 +174,7 @@ function attachWebview(tab, url) {
     // El botón AutoLoot de la topbar se recalcula en CADA navegación (antes solo
     // al cambiar de pestaña: era el bug de "abrí Twitch y no salía")
     if (tab.id === activeId) { syncNavUI(); updateLootUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
+    saveSession();
   };
   wv.addEventListener('page-title-updated', (e) => { tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
   wv.addEventListener('did-navigate', onNav);
@@ -213,6 +221,7 @@ function closeTab(id) {
   tabs[idx].webview?.remove(); tabs.splice(idx, 1);
   if (!tabs.length) { createTab(); return; }
   if (activeId === id) activateTab(tabs[Math.max(0, idx - 1)].id); else renderTabs();
+  saveSession();
 }
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
@@ -1069,6 +1078,7 @@ els.menuPop.addEventListener('click', (e) => {
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
 els.optXsensitive.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.optXsensitive.checked }); els.ratXcheck.checked = els.optXsensitive.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); });
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
+els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
@@ -1357,7 +1367,15 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
-  renderSidebarSites(); renderBookmarksBar(); renderHub(); createTab();
+  els.optRestore.checked = settings.restoreSession !== false;
+  renderSidebarSites(); renderBookmarksBar(); renderHub();
+  // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
+  const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
+  if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
+    session.forEach((u, i) => createTab(u, i === 0));
+  } else {
+    createTab();
+  }
   setTimeout(() => { els.splash.classList.add('gone'); if (els.hub.classList.contains('active')) focusHubSearch(); }, 1800);
 })();
 
