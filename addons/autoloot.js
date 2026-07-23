@@ -1,4 +1,4 @@
-/* Naviris addon oficial: Rat Loot v1.2.0
+/* Naviris addon oficial: Rat Loot v1.2.1
    Sesiones de recolección de Twitch: Activar (silencia, resolución mínima solo
    en esa pestaña, reclama puntos y drops, agrupada a la izquierda), lista de
    sesiones activas y sección de historial del loot obtenido.
@@ -106,7 +106,19 @@
   function openPanel() {
     if (panel) { closePanel(); return; }
     panel = document.createElement('aside');
-    panel.className = 'side-panel'; // mismo estilo que los paneles nativos de Naviris
+    // Panel propio anclado a la IZQUIERDA (Rat Loot se abre desde el sidebar
+    // izquierdo). Arranca tras el sidebar y baja desde la barra de navegación.
+    const sidebar = document.getElementById('sidebar');
+    const leftPx = sidebar ? Math.round(sidebar.getBoundingClientRect().right) : 48;
+    const topPx = Math.round(document.getElementById('navbar')?.getBoundingClientRect().bottom || document.getElementById('addon-tools')?.getBoundingClientRect().top || 86);
+    panel.style.cssText = 'position:fixed;left:' + leftPx + 'px;top:' + topPx + 'px;bottom:0;width:340px;z-index:400;' +
+      'background:var(--bg-2,#0e0e12);border-right:1px solid var(--line,#232327);display:flex;flex-direction:column;' +
+      'box-shadow:18px 0 40px rgba(0,0,0,.35);animation:nvl-in .2s cubic-bezier(.2,.8,.3,1) both;';
+    if (!document.getElementById('nvl-anim')) {
+      const st = document.createElement('style'); st.id = 'nvl-anim';
+      st.textContent = '@keyframes nvl-in{from{transform:translateX(-30px);opacity:0}to{transform:none;opacity:1}}';
+      document.head.appendChild(st);
+    }
     document.body.appendChild(panel);
     const b = document.getElementById('adt-autoloot');
     if (b) b.classList.add('open');
