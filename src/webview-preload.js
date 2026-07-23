@@ -58,9 +58,13 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   function clickChest() {
     try {
       if (Date.now() - lastPoints < 5000) return; // evita doble conteo del mismo cofre
-      var icon = document.querySelector('.claimable-bonus__icon');
-      var btn = icon && icon.closest('button');
-      if (!btn) { var sum = document.querySelector('[data-test-selector="community-points-summary"]'); if (sum && sum.querySelector('.claimable-bonus__icon')) btn = sum.querySelector('button'); }
+      // Selectores en orden de robustez. El del contenedor de resumen es
+      // idioma-agnóstico (el cofre es el 2º hijo) y es el más fiable.
+      var sum = document.querySelector('.community-points-summary');
+      var btn = (sum && (sum.querySelector(':scope > *:nth-child(2) button')
+                      || sum.querySelector('button[aria-label="Claim Bonus"]')))
+              || (document.querySelector('.claimable-bonus__icon') || {}).closest
+                 && document.querySelector('.claimable-bonus__icon').closest('button');
       if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); }
     } catch (e) { /* nada */ }
   }

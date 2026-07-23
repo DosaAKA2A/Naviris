@@ -45,7 +45,9 @@ button { font-family: inherit; }
 #private-badge svg { width: 11px; height: 11px; }
 #tabstrip { display: flex; align-items: center; gap: 4px; max-width: 58vw; overflow-x: auto; scrollbar-width: none; height: 100%; }
 #tabstrip::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 130px; max-width: 210px; padding: 0 8px 0 10px; border-radius: 8px; background: transparent; color: #77797f; font-size: 12.5px; cursor: pointer; flex-shrink: 0; transition: background .16s ease, color .16s ease; }
+.tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 44px; max-width: 210px; padding: 0 8px 0 10px; border-radius: 8px; background: transparent; color: #77797f; font-size: 12.5px; cursor: pointer; flex: 0 1 200px; transition: background .16s ease, color .16s ease; }
+.tab.dragging { opacity: .5; }
+.tab.drag-over { box-shadow: inset 2px 0 0 var(--violet, #b98cff); }
 .tab:hover:not(.active) { background: #121215; color: #b4b6bd; }
 .tab.active { background: #1b1b1f; color: var(--text); }
 .tab.active:hover { background: #1e1e23; }

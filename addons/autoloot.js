@@ -110,10 +110,13 @@
     // izquierdo). Arranca tras el sidebar y baja desde la barra de navegación.
     const sidebar = document.getElementById('sidebar');
     const leftPx = sidebar ? Math.round(sidebar.getBoundingClientRect().right) : 48;
-    const topPx = Math.round(document.getElementById('navbar')?.getBoundingClientRect().bottom || document.getElementById('addon-tools')?.getBoundingClientRect().top || 86);
-    panel.style.cssText = 'position:fixed;left:' + leftPx + 'px;top:' + topPx + 'px;bottom:0;width:340px;z-index:400;' +
-      'background:var(--bg-2,#0e0e12);border-right:1px solid var(--line,#232327);display:flex;flex-direction:column;' +
-      'box-shadow:18px 0 40px rgba(0,0,0,.35);animation:nvl-in .2s cubic-bezier(.2,.8,.3,1) both;';
+    const topPx = Math.round(document.getElementById('addon-tools')?.getBoundingClientRect().top
+      || document.getElementById('navbar')?.getBoundingClientRect().bottom || 90) - 4;
+    // Popover compacto anclado junto al botón (no un panel de altura completa)
+    panel.style.cssText = 'position:fixed;left:' + (leftPx + 8) + 'px;top:' + Math.max(48, Math.min(topPx, innerHeight - 420)) + 'px;' +
+      'width:290px;max-height:420px;z-index:400;border-radius:13px;overflow:hidden;' +
+      'background:var(--bg-2,#0e0e12);border:1px solid var(--line2,#2c2c32);display:flex;flex-direction:column;' +
+      'box-shadow:0 16px 44px rgba(0,0,0,.55);animation:nvl-in .18s cubic-bezier(.2,.8,.3,1) both;';
     if (!document.getElementById('nvl-anim')) {
       const st = document.createElement('style'); st.id = 'nvl-anim';
       st.textContent = '@keyframes nvl-in{from{transform:translateX(-30px);opacity:0}to{transform:none;opacity:1}}';
