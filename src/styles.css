@@ -632,9 +632,11 @@ button { font-family: inherit; }
   background: linear-gradient(rgba(16,14,22,.93), rgba(16,14,22,.93)) padding-box,
               linear-gradient(120deg,#b9aae6,#9dc3e6,#a4d9c2,#e6d6a4,#e6a9b4,#b9aae6) border-box;
   background-size: auto, 300% 100%;
-  animation: addons-flow 7s linear infinite;
   box-shadow: 0 0 16px rgba(185,170,230,.22);
   padding: 9px 16px; font-weight: 600; letter-spacing: .3px; }
+/* El gradiente solo se anima al pasar el ratón: una animación infinita
+   mantiene el compositor de la GPU despierto y dispara su memoria */
+#hub-addons:hover { animation: addons-flow 2.5s linear infinite; }
 #hub-addons > span { transform: skewX(10deg); display: inline-flex; align-items: center; }
 #hub-addons svg { width: 16px; height: 16px; color: #cdbdf1; }
 #hub-addons:hover { box-shadow: 0 0 28px rgba(185,170,230,.5); border-color: transparent; color: #fff; }

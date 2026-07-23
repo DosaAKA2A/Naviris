@@ -75,7 +75,9 @@ const YT_ADSKIP = `(function(){
     }catch(e){}
   }
   setInterval(skip,300);
-  try{ new MutationObserver(skip).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  // Observer con freno: YouTube muta el DOM sin parar y reaccionar a cada
+  // cambio disparaba CPU/memoria del renderer. El interval ya cubre el resto.
+  try{ new MutationObserver(function(){ if(window.__cbYTd)return; window.__cbYTd=1; setTimeout(function(){ window.__cbYTd=0; skip(); },500); }).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
 const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,.ytp-ad-module,.video-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
 // Revela contenido sensible en X/Twitter
@@ -129,7 +131,8 @@ if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', '9
 //  de sitios. El ahorro de memoria lo cubre el sueño de pestañas.)
 // HttpsUpgrades: sube automáticamente las navegaciones http:// a https:// con
 //  reintento si el sitio no soporta https. Aislamiento estricto de sitios activo por defecto.
-app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades');
+// MemoryPurgeOnFreeze: purga la memoria de renderers congelados (menos RAM retenida)
+app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades,MemoryPurgeOnFreeze');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 // ---------- Bloqueador de anuncios ----------
