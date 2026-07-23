@@ -2,8 +2,8 @@
   "addons": [
     {
       "id": "steam-inventory-helper",
-      "name": "Inventory Helper para Steam",
-      "version": "1.0.0",
+      "name": "Valve Rat Tool",
+      "version": "1.0.1",
       "kind": "content",
       "icon": "puzzle-piece",
       "matches": ["steamcommunity.com"],
