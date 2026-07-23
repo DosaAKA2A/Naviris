@@ -3,20 +3,20 @@
     {
       "id": "steam-inventory-helper",
       "name": "Valve Rat Tool",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "kind": "content",
       "icon": "puzzle-piece",
       "matches": ["steamcommunity.com"],
-      "description": "Precios del mercado en tu inventario de Steam, valor total del inventario, venta rápida al precio actual y suma del valor de cada lado en las ofertas de intercambio.",
+      "description": "Precios en tu inventario de Steam con comparativa multi-mercado (Buff163, Skinport, CSFloat) para CS2, valor total con selector de mercado, venta rápida y suma del valor por lado en las ofertas de intercambio.",
       "entry": "https://naviris.site/addons/steam-inventory-helper.js"
     },
     {
       "id": "long-screenshot",
       "name": "Captura larga",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "tool",
       "icon": "camera",
-      "description": "Fotografía la página completa: hace scroll automático, captura cada tramo y lo une todo en una sola imagen PNG que eliges dónde guardar.",
+      "description": "Captura la página eligiendo cuánto: lo visible, 2 o 4 pantallas, la página completa o un número a medida. Une los tramos en un solo PNG.",
       "entry": "https://naviris.site/addons/long-screenshot.js"
     }
   ]

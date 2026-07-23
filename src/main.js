@@ -237,6 +237,18 @@ function setupSession(ses) {
     callback({});
   });
 
+  // Abre CORS SOLO para las APIs públicas de precios que usan los addons
+  // (p. ej. Valve Rat Tool compara mercados desde páginas de Steam)
+  const CORS_OPEN = ['prices.csgotrader.app', 'api.skinport.com', 'api.dmarket.com'];
+  ses.webRequest.onHeadersReceived({ urls: CORS_OPEN.map((h) => 'https://' + h + '/*') }, (details, cb) => {
+    const headers = { ...details.responseHeaders };
+    for (const k of Object.keys(headers)) if (/^access-control-allow-(origin|methods|headers)$/i.test(k)) delete headers[k];
+    headers['Access-Control-Allow-Origin'] = ['*'];
+    headers['Access-Control-Allow-Methods'] = ['GET, OPTIONS'];
+    headers['Access-Control-Allow-Headers'] = ['*'];
+    cb({ responseHeaders: headers });
+  });
+
   ses.on('will-download', (_e, item) => registerDownloadItem(item));
   setupPermissions(ses);
 }
