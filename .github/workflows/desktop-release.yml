@@ -25,9 +25,6 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Descargar yt-dlp y ffmpeg
-        run: npm run fetch-bin
-
       - name: Compilar y publicar release
         run: npm run release
         env:

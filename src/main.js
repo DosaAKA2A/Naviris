@@ -18,14 +18,83 @@ try {
 } catch (e) { console.log('[Naviris] No se pudo migrar el perfil:', e.message); }
 
 // ---------- Rutas de binarios (yt-dlp / ffmpeg) ----------
+// Desde v2.2.3 los binarios NO van en el instalador (~100 MB menos): se
+// descargan a userData/bin la primera vez que se usa el Rat Tool. Las
+// instalaciones antiguas que ya los traían en resources/bin los siguen usando.
 function binDir() {
-  // Empaquetado: resources/bin (via extraResources). Desarrollo: ./resources/bin
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'bin')
-    : path.join(__dirname, '..', 'resources', 'bin');
+  if (!app.isPackaged) return path.join(__dirname, '..', 'resources', 'bin');
+  const legacy = path.join(process.resourcesPath, 'bin');
+  if (fs.existsSync(path.join(legacy, 'yt-dlp.exe'))) return legacy;
+  return path.join(app.getPath('userData'), 'bin');
 }
 const ytDlpPath = () => path.join(binDir(), 'yt-dlp.exe');
 const ffmpegPath = () => path.join(binDir(), 'ffmpeg.exe');
+
+const BIN_YTDLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+const BIN_FFMPEG_URL = 'https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip';
+
+function downloadTo(url, dest, onProgress) {
+  return new Promise((resolve, reject) => {
+    const req = net.request(url);
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+      const total = parseInt(res.headers['content-length'] || '0', 10);
+      let got = 0;
+      const file = fs.createWriteStream(dest);
+      res.on('data', (c) => { got += c.length; file.write(c); if (total && onProgress) onProgress(got / total); });
+      res.on('end', () => file.end(() => resolve()));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+let binsPromise = null;
+function ensureBins() {
+  const missing = ['yt-dlp.exe', 'ffmpeg.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
+  if (!missing.length) return Promise.resolve(true);
+  if (binsPromise) return binsPromise;
+  binsPromise = (async () => {
+    const dir = binDir();
+    fs.mkdirSync(dir, { recursive: true });
+    // Aparece como una descarga normal en el panel, con su progreso
+    const meta = { id: 'naviris-bins', name: 'Motor de descargas de Naviris (solo la primera vez)', percent: 0, state: 'progressing', kind: 'video' };
+    broadcast('download:new', meta);
+    try {
+      if (missing.includes('yt-dlp.exe')) {
+        await downloadTo(BIN_YTDLP_URL, path.join(dir, 'yt-dlp.exe'), (p) => { meta.percent = Math.round(p * 25); broadcast('download:update', meta); });
+      }
+      if (missing.includes('ffmpeg.exe')) {
+        const zip = path.join(dir, 'ffmpeg.zip');
+        await downloadTo(BIN_FFMPEG_URL, zip, (p) => { meta.percent = 25 + Math.round(p * 70); broadcast('download:update', meta); });
+        const tmp = path.join(dir, '_ff');
+        require('child_process').execSync(`powershell -NoProfile -Command "Expand-Archive -Force '${zip}' '${tmp}'"`, { windowsHide: true });
+        const findFf = (d) => {
+          for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+            const fp = path.join(d, f.name);
+            if (f.isDirectory()) { const r = findFf(fp); if (r) return r; }
+            else if (f.name === 'ffmpeg.exe') return fp;
+          }
+          return null;
+        };
+        const found = findFf(tmp);
+        if (!found) throw new Error('ffmpeg no encontrado en el zip');
+        fs.copyFileSync(found, path.join(dir, 'ffmpeg.exe'));
+        fs.rmSync(tmp, { recursive: true, force: true });
+        fs.rmSync(zip, { force: true });
+      }
+      meta.percent = 100; meta.state = 'completed'; broadcast('download:update', meta);
+      return true;
+    } catch (e) {
+      meta.state = 'failed'; meta.error = 'No se pudo preparar el motor de descargas: ' + e.message;
+      broadcast('download:update', meta);
+      binsPromise = null; // permite reintentar
+      return false;
+    }
+  })();
+  return binsPromise;
+}
 
 // ---------- Ajustes persistentes ----------
 const settingsPath = () => path.join(app.getPath('userData'), 'cobalt-settings.json');
@@ -548,8 +617,10 @@ ipcMain.on('download:url', (_e, { url, isPrivate }) => {
   if (!/^https?:/.test(url)) return;
   session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(url);
 });
-ipcMain.handle('yt:download', (_e, opts) => ytDownload(opts));
-ipcMain.handle('yt:available', () => fs.existsSync(ytDlpPath()) && fs.existsSync(ffmpegPath()));
+ipcMain.handle('yt:download', async (_e, opts) => { await ensureBins(); return ytDownload(opts); });
+// Siempre disponible: si faltan los binarios se descargan solos al abrir el
+// Rat Tool (ensureBins muestra el progreso en el panel de descargas)
+ipcMain.handle('yt:available', () => { ensureBins(); return true; });
 
 // ---------- Importar marcadores de otros navegadores ----------
 // Chromium guarda un JSON "Bookmarks"; Firefox comprime su backup en .jsonlz4 (LZ4 + cabecera Mozilla).
