@@ -27,7 +27,7 @@ const els = {};
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-twitch', 'rat-headsub', 'rt-autoloot', 'rt-mute', 'rt-ratloot',
+  'rat-normal', 'rat-headsub', 'rt-autoloot', 'rt-mute', 'rt-ratloot', 'nav-loot', 'loot-pop', 'loot-status',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
@@ -153,9 +153,21 @@ function attachWebview(tab, url) {
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   const onNav = (e) => {
     tab.url = e.url; getTile(e.url).then((t) => { tab.favicon = t?.icon || null; renderTabs(); });
-    // Al salir de Twitch, apaga el AutoLoot de esta pestaña
-    if (tab.autoLoot && !/(^|\.)twitch\.tv$/.test(hostOf(e.url))) { tab.autoLoot = false; tab.ratLoot = false; tab.twitchClaims = 0; }
-    if (tab.id === activeId) { syncNavUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
+    if (tab.autoLoot) {
+      const h = hostOf(e.url);
+      // Solo se apaga al ir a OTRO sitio real: las URLs intermedias (about:blank,
+      // redirecciones vacías) no cuentan como "salir de Twitch"
+      if (/^https?:/i.test(e.url) && h && !/(^|\.)twitch\.tv$/.test(h)) {
+        tab.autoLoot = false; tab.ratLoot = false; tab.twitchClaims = 0; renderTabs();
+      } else {
+        // Navegación dentro de Twitch (SPA: buscar → entrar a un canal):
+        // reengancha el recolector en la página nueva
+        try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: !!tab.ratLoot }); } catch { /* nada */ }
+      }
+    }
+    // El botón AutoLoot de la topbar se recalcula en CADA navegación (antes solo
+    // al cambiar de pestaña: era el bug de "abrí Twitch y no salía")
+    if (tab.id === activeId) { syncNavUI(); updateLootUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
   };
   wv.addEventListener('page-title-updated', (e) => { tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
   wv.addEventListener('did-navigate', onNav);
@@ -178,7 +190,7 @@ function activateTab(id) {
   if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
   // Al elegir una pestaña que NO es de AutoLoot, el grupo se pliega de nuevo
   if (!tab.autoLoot) lootExpanded = false;
-  renderTabs(); syncNavUI(); applyResponsive(); updateRatMode();
+  renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
 }
 function focusHubSearch() {
@@ -859,25 +871,40 @@ function resolveMediaUrl() {
   if (playing) { let el = playing; for (let i = 0; i < 10 && el; i++, el = el.parentElement) { const a = el.querySelector && el.querySelector('a[href*="/video/"], a[href*="/status/"]'); if (a && ok(a.href)) return a.href; } }
   return location.href;
 }
-// ¿La pestaña activa es Twitch? (define si el Rat Tool entra en modo AutoLoot)
+// ¿La pestaña activa es Twitch? (define si aparece el botón AutoLoot de la topbar)
 function activeIsTwitch() { const t = activeTab(); return t?.kind === 'web' && /(^|\.)twitch\.tv$/.test(hostOf(t.url)); }
-// Marca visualmente el botón Rat Tool cuando la pestaña activa es de Twitch
-function updateRatMode() { els.sbRat.classList.toggle('twitch-mode', activeIsTwitch()); }
+// AutoLoot es una herramienta independiente del Rat Tool: su botón vive en la
+// topbar y solo aparece cuando la pestaña activa es Twitch. Se recalcula al
+// navegar y al cambiar de pestaña.
+function updateLootUI() {
+  const twitch = activeIsTwitch();
+  const tab = activeTab();
+  els.navLoot.classList.toggle('hidden', !twitch);
+  els.navLoot.classList.toggle('on', !!(twitch && tab?.autoLoot));
+  if (!twitch) { els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); }
+}
+function refreshLootPop() {
+  const tab = activeTab();
+  els.rtAutoloot.checked = !!tab?.autoLoot;
+  els.rtMute.checked = !!tab?.muted;
+  els.lootStatus.textContent = tab?.autoLoot
+    ? ('Recolectando en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamado(s)` : '') + (tab.ratLoot ? ' · resolución mínima' : ''))
+    : 'Silencia, baja la resolución solo aquí y agrupa la pestaña a la izquierda mientras recolecta.';
+}
+els.navLoot.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = els.lootPop.classList.contains('hidden');
+  els.lootPop.classList.toggle('hidden', !open);
+  els.navLoot.classList.toggle('open', open);
+  if (open) refreshLootPop();
+});
 
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
   const open = els.ratPop.classList.contains('hidden'); els.ratPop.classList.toggle('hidden'); els.sbRat.classList.toggle('open', open);
   if (!open) return;
   const tab = activeTab();
-  const twitch = activeIsTwitch();
-  els.ratNormal.classList.toggle('hidden', twitch);
-  els.ratTwitch.classList.toggle('hidden', !twitch);
-  els.ratHeadsub.textContent = twitch ? 'AutoLoot de Twitch' : 'Descargar vídeo o audio';
-  if (twitch) {
-    els.rtAutoloot.checked = !!tab.autoLoot;
-    els.rtMute.checked = !!tab.muted;
-    return;
-  }
+  els.ratHeadsub.textContent = 'Descargar vídeo o audio';
   let url = tab?.kind === 'web' ? tab.url : '';
   // 1º: el vídeo de la PÁGINA ACTUAL (así, al pasar de TikTok a YouTube, detecta YouTube)
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
@@ -898,7 +925,7 @@ function setAutoLoot(tab, on) {
   tab.autoLoot = !!on;
   if (!on) { tab.ratLoot = false; tab.twitchClaims = 0; }
   try { tab.webview?.send('cobalt-autoloot', { on: !!on, lowRes: !!tab.ratLoot }); } catch { /* nada */ }
-  renderTabs(); updateRatMode();
+  renderTabs(); updateLootUI();
 }
 function ratLoot(tab) {
   if (!tab || tab.kind !== 'web') return;
@@ -906,12 +933,12 @@ function ratLoot(tab) {
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
   try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: true }); } catch { /* nada */ }
   setTimeout(() => { try { tab.webview?.reload(); } catch { /* nada */ } }, 450); // recarga para aplicar la resolución mínima
-  renderTabs(); updateRatMode();
-  toast('Rat Loot: silenciado, resolución mínima y AutoLoot en segundo plano');
+  renderTabs(); updateLootUI();
+  toast('Modo Loot: silenciado, resolución mínima y pestaña agrupada a la izquierda');
 }
-els.rtAutoloot.addEventListener('change', () => { setAutoLoot(activeTab(), els.rtAutoloot.checked); toast(els.rtAutoloot.checked ? 'AutoLoot activado en este canal' : 'AutoLoot desactivado'); });
+els.rtAutoloot.addEventListener('change', () => { setAutoLoot(activeTab(), els.rtAutoloot.checked); refreshLootPop(); toast(els.rtAutoloot.checked ? 'AutoLoot activado en este canal' : 'AutoLoot desactivado'); });
 els.rtMute.addEventListener('change', () => { const t = activeTab(); if (t) { t.muted = els.rtMute.checked; try { t.webview?.setAudioMuted(t.muted); } catch {} renderTabs(); } });
-els.rtRatloot.addEventListener('click', () => { ratLoot(activeTab()); els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); });
+els.rtRatloot.addEventListener('click', () => { ratLoot(activeTab()); els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); });
 function updateRatPlat() {
   const url = els.ratUrl.value.trim(); const p = platOf(url);
   const tab = activeTab(); const onSite = tab?.kind === 'web' && p && hostOf(tab.url) === hostOf(url);
@@ -1064,6 +1091,7 @@ document.addEventListener('click', (e) => {
   if (!els.resPop.contains(e.target) && !els.sbRes.contains(e.target)) { els.resPop.classList.add('hidden'); els.sbRes.classList.toggle('open', !!resMode); }
   if (!els.ratPop.contains(e.target) && !els.sbRat.contains(e.target)) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
   if (!els.shieldPop.contains(e.target) && !els.navShield.contains(e.target)) { els.shieldPop.classList.add('hidden'); els.navShield.classList.remove('open'); clearInterval(adblockPoll); adblockPoll = null; }
+  if (!els.lootPop.contains(e.target) && !els.navLoot.contains(e.target)) { els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); }
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
 });
 els.menuPop.addEventListener('click', (e) => {
@@ -1102,6 +1130,7 @@ async function onWebviewMessage(wv, e) {
     const channel = hostOf(tab.url).replace(/^www\./, '') + (seg ? '/' + seg.split(/[/?#]/)[0] : '');
     if (data.type === 'claim') {
       tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); renderTabs();
+      if (!els.lootPop.classList.contains('hidden')) refreshLootPop();
       recordLoot(data.kind, channel);
       toast(data.kind === 'drop' ? 'Drop de Twitch reclamado' : `Punto de Twitch reclamado (${tab.twitchClaims})`);
     }

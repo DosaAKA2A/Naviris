@@ -81,6 +81,7 @@
                  placeholder="Busca en Google o escribe una dirección" />
           <div id="suggest" class="hidden"></div>
         </div>
+        <button id="nav-loot" class="hidden" title="AutoLoot — reclama puntos y drops de este canal" data-ico="gift"></button>
         <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-check"></button>
         <button id="nav-star" title="Añadir a marcadores" data-ico="star"></button>
         <button id="nav-menu" title="Menú" data-ico="ellipsis-vertical"></button>
@@ -187,6 +188,15 @@
     <button data-action="about">Acerca de Naviris</button>
   </div>
 
+  <!-- ===== AutoLoot (herramienta independiente, aparece solo en Twitch) ===== -->
+  <div id="loot-pop" class="hidden">
+    <div class="sp-head"><span class="sp-title">AutoLoot de Twitch</span></div>
+    <label class="rat-tw-row"><span><b>Auto Loot</b><small>Reclama puntos y drops de este canal</small></span><span class="switch"><input type="checkbox" id="rt-autoloot" /><span class="slider"></span></span></label>
+    <label class="rat-tw-row"><span><b>Silenciar vídeo</b><small>Silencia esta pestaña (puedes seguir viéndolo)</small></span><span class="switch"><input type="checkbox" id="rt-mute" /><span class="slider"></span></span></label>
+    <button id="rt-ratloot" class="rat-loot-btn"><span data-ico="gift"></span> Modo Loot completo</button>
+    <div class="sp-count" id="loot-status">Silencia, baja la resolución solo aquí y agrupa la pestaña a la izquierda mientras recolecta.</div>
+  </div>
+
   <!-- ===== Bloqueador ===== -->
   <div id="shield-pop" class="hidden">
     <div class="sp-head"><span class="sp-title">Bloqueador de anuncios</span><label class="switch"><input type="checkbox" id="adblock-toggle" /><span class="slider"></span></label></div>
@@ -222,12 +232,6 @@
     </div>
 
     <!-- Modo Twitch: AutoLoot -->
-    <div id="rat-twitch" class="hidden">
-      <label class="rat-tw-row"><span><b>Auto Loot</b><small>Reclama puntos y drops de este canal</small></span><span class="switch"><input type="checkbox" id="rt-autoloot" /><span class="slider"></span></span></label>
-      <label class="rat-tw-row"><span><b>Silenciar vídeo</b><small>Silencia esta pestaña (puedes seguir viéndolo)</small></span><span class="switch"><input type="checkbox" id="rt-mute" /><span class="slider"></span></span></label>
-      <button id="rt-ratloot" class="rat-loot-btn"><span data-ico="gift"></span> Rat Loot</button>
-      <div class="rat-note">Rat Loot silencia el stream, baja la resolución al mínimo y activa Auto Loot en segundo plano, agrupando la pestaña con las demás.</div>
-    </div>
   </div>
 
   <!-- ===== Panel recursos gráficos ===== -->
