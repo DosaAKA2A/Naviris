@@ -18,7 +18,7 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
-  'sb-loot', 'loot-panel', 'loot-list', 'loot-close', 'loot-clear', 'bg-desktop-btn', 'hub-alpha', 'hub-alpha-row',
+  'sb-loot', 'loot-panel', 'loot-list', 'loot-close', 'loot-clear',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -587,27 +587,12 @@ const BACKGROUNDS = [
   'radial-gradient(120% 80% at 50% -10%, #1c2740 0%, #0b0e15 62%)',    // Acero
   'linear-gradient(135deg, #2a1030 0%, #100a1e 45%, #0a0a0d 100%)'     // Aurora
 ];
-// Activa/desactiva el fondo translúcido que deja ver el escritorio (acrílico Win11)
-function setHubTransparent(on) {
-  document.documentElement.classList.toggle('hub-transparent', on);
-  els.hubAlphaRow.classList.toggle('hidden', !on);
-  els.bgDesktopBtn.classList.toggle('sel', on);
-  try { window.cobalt.setTransparent(on); } catch { /* nada */ }
-}
 function applyBackground(v) {
-  const transparent = v === 'transparent';
-  setHubTransparent(transparent);
-  if (!transparent) els.hub.style.setProperty('--hub-bg', v);
+  if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
+  els.hub.style.setProperty('--hub-bg', v);
   store.set('cobalt.hubBg', v);
-  document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v && !transparent));
+  document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v));
 }
-// Opacidad del tinte sobre el escritorio
-(function initHubAlpha() {
-  const a = store.get('cobalt.hubAlpha', 35);
-  els.hubAlpha.value = a; document.documentElement.style.setProperty('--hub-alpha', (a / 100).toFixed(2));
-  els.hubAlpha.addEventListener('input', () => { document.documentElement.style.setProperty('--hub-alpha', (els.hubAlpha.value / 100).toFixed(2)); store.set('cobalt.hubAlpha', +els.hubAlpha.value); });
-  els.bgDesktopBtn.addEventListener('click', () => { applyBackground('transparent'); toast('Fondo transparente activado — si no se ve el escritorio, reinicia Naviris'); });
-})();
 function renderBgPresets() {
   els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
   for (const bg of BACKGROUNDS) { const th = document.createElement('div'); th.className = 'bg-thumb' + (bg === saved ? ' sel' : ''); th.style.background = bg; th.dataset.bg = bg; th.addEventListener('click', () => applyBackground(bg)); els.bgPresets.appendChild(th); }

@@ -6,7 +6,6 @@ contextBridge.exposeInMainWorld('cobalt', {
   close: () => ipcRenderer.send('win:close'),
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
   onMaximized: (cb) => ipcRenderer.on('win:maximized', (_e, v) => cb(v)),
-  setTransparent: (on) => ipcRenderer.send('win:transparent', on),
 
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
