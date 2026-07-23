@@ -77,31 +77,6 @@ const X_REVEAL = `(function(){
   setInterval(reveal,700);
   try{ new MutationObserver(reveal).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
-// Twitch: reclama automáticamente los puntos del canal (cofre) y drops/recompensas,
-// para poder dejar un stream de fondo sin perderlos. Sin extensiones.
-const TWITCH_CLAIM = `(function(){
-  if(window.__cobaltTw)return; window.__cobaltTw=1;
-  function clickChest(){
-    try{
-      var icon=document.querySelector('.claimable-bonus__icon');
-      if(icon){ var b=icon.closest('button'); if(b){ b.click(); return true; } }
-      var sum=document.querySelector('[data-test-selector="community-points-summary"]');
-      if(sum && sum.querySelector('.claimable-bonus__icon')){ var sb=sum.querySelector('button'); if(sb){ sb.click(); return true; } }
-    }catch(e){}
-    return false;
-  }
-  function claimDrops(){
-    try{
-      document.querySelectorAll('button, a[role="button"]').forEach(function(el){
-        if(el.offsetParent===null) return;
-        var t=(el.textContent||'').trim().toLowerCase();
-        if(/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) el.click();
-      });
-    }catch(e){}
-  }
-  setInterval(function(){ clickChest(); claimDrops(); }, 12000);
-  try{ new MutationObserver(clickChest).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
-})();`;
 
 function loadSettings() {
   try {
@@ -407,9 +382,7 @@ app.on('web-contents-created', (_event, contents) => {
       if (settings.xRevealSensitive && /(^|\.)(twitter\.com|x\.com)$/.test(host)) {
         contents.executeJavaScript(X_REVEAL, true).catch(() => {});
       }
-      if (settings.twitchAutoClaim && /(^|\.)twitch\.tv$/.test(host)) {
-        contents.executeJavaScript(TWITCH_CLAIM, true).catch(() => {});
-      }
+      // Twitch: el auto-reclamo vive ahora en webview-preload.js (puede avisar a la UI)
     });
   }
 });
@@ -510,6 +483,7 @@ ipcMain.on('download:url', (_e, { url, isPrivate }) => {
   if (!/^https?:/.test(url)) return;
   session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(url);
 });
+ipcMain.handle('tw:enabled', () => !!settings.twitchAutoClaim);
 ipcMain.handle('yt:download', (_e, opts) => ytDownload(opts));
 ipcMain.handle('yt:available', () => fs.existsSync(ytDlpPath()) && fs.existsSync(ffmpegPath()));
 

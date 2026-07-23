@@ -59,6 +59,10 @@ button { font-family: inherit; }
 .tab .t-close { border: none; background: transparent; color: transparent; cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .tab:hover .t-close, .tab.active .t-close { color: var(--text-dim); }
 .tab .t-close:hover { background: #2a2a30; color: var(--text); }
+/* Indicador de auto-reclamo de Twitch activo */
+.tab .t-claim { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; color: #b98cff; animation: claim-pulse 2s ease-in-out infinite; }
+.tab .t-claim svg { width: 13px; height: 13px; }
+@keyframes claim-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 /* Botón de silencio de pestaña */
 .tab .t-mute { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .tab .t-mute svg { width: 13px; height: 13px; }

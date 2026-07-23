@@ -155,6 +155,8 @@ function attachWebview(tab, url) {
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   const onNav = (e) => {
     tab.url = e.url; getTile(e.url).then((t) => { tab.favicon = t?.icon || null; renderTabs(); });
+    // Al salir de Twitch, apaga el indicador de auto-reclamo
+    if (tab.twitchClaim && !/(^|\.)twitch\.tv$/.test(hostOf(e.url))) { tab.twitchClaim = false; tab.twitchClaims = 0; }
     if (tab.id === activeId) { syncNavUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
   };
   wv.addEventListener('page-title-updated', (e) => { tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
@@ -209,6 +211,13 @@ function renderTabs() {
       el.appendChild(fav);
     }
     el.append(zzz, title);
+    // Indicador de auto-reclamo de Twitch activo (icono de rata que "vigila")
+    if (tab.kind === 'web' && tab.twitchClaim) {
+      const cl = document.createElement('span'); cl.className = 't-claim';
+      cl.title = 'Auto-reclamo de Twitch activo' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '');
+      cl.innerHTML = window.icon('rat');
+      el.appendChild(cl);
+    }
     // Botón de silencio: aparece si la pestaña suena o está silenciada
     if (tab.kind === 'web' && (tab.audible || tab.muted)) {
       const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
@@ -991,8 +1000,15 @@ function showPwBar(html, yesLabel, onYes) {
   els.pwBar.classList.remove('hidden');
 }
 async function onWebviewMessage(wv, e) {
-  if (activeTab()?.webview !== wv) return; // solo la pestaña activa
   const data = (e.args && e.args[0]) || {};
+  // Twitch: se atiende aunque la pestaña esté en segundo plano (ahí es donde se deja el stream)
+  if (e.channel === 'cobalt-twitch') {
+    const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
+    if (data.type === 'active') { tab.twitchClaim = true; renderTabs(); }
+    else if (data.type === 'claim') { tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); tab.twitchClaim = true; renderTabs(); toast(data.kind === 'drop' ? '🐀 Drop de Twitch reclamado' : `🐀 Punto de Twitch reclamado (${tab.twitchClaims})`); }
+    return;
+  }
+  if (activeTab()?.webview !== wv) return; // el resto (contraseñas) solo en la pestaña activa
   if (e.channel === 'cobalt-capture') {
     if (IS_PRIVATE) return; // en ventana privada no se guardan contraseñas
     const { url, username, password } = data;

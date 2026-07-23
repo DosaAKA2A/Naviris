@@ -52,6 +52,40 @@ try {
   setTimeout(() => obs.disconnect(), 8000);
 } catch (e) { /* nada */ }
 
+// --- Twitch: auto-reclamo de puntos y drops, con retroalimentación a la interfaz ---
+if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
+  ipcRenderer.invoke('tw:enabled').then((on) => {
+    if (!on) return;
+    let claims = 0, lastPoints = 0;
+    ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
+    function clickChest() {
+      try {
+        if (Date.now() - lastPoints < 5000) return false; // evita doble conteo del mismo cofre
+        var icon = document.querySelector('.claimable-bonus__icon');
+        var btn = icon && icon.closest('button');
+        if (!btn) {
+          var sum = document.querySelector('[data-test-selector="community-points-summary"]');
+          if (sum && sum.querySelector('.claimable-bonus__icon')) btn = sum.querySelector('button');
+        }
+        if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); return true; }
+      } catch (e) { /* nada */ }
+      return false;
+    }
+    function claimDrops() {
+      try {
+        document.querySelectorAll('button, a[role="button"]').forEach(function (el) {
+          if (el.offsetParent === null) return;
+          var t = (el.textContent || '').trim().toLowerCase();
+          if (/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) { el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
+        });
+      } catch (e) { /* nada */ }
+    }
+    setInterval(function () { clickChest(); claimDrops(); }, 12000);
+    let moTimer = null;
+    try { new MutationObserver(function () { if (moTimer) return; moTimer = setTimeout(function () { moTimer = null; clickChest(); }, 1500); }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* nada */ }
+  }).catch(function () { /* nada */ });
+}
+
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
 ipcRenderer.on('cobalt-fill', (_e, cred) => {
   const l = findLogin();
