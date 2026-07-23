@@ -642,3 +642,8 @@ button { font-family: inherit; }
 #hub-addons:hover { box-shadow: 0 0 28px rgba(185,170,230,.5); border-color: transparent; color: #fff; }
 #hub-addons:hover svg { color: #fff; }
 @keyframes addons-flow { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }
+
+/* El logo "vive" al tocarlo: rotación de tono por CSS (las animaciones SMIL
+   del gradiente fugaban memoria en Electron 33; ver icons.js) */
+.iris-wrap:hover .iris-logo, #splash .iris-logo { animation: iris-hue 5s linear infinite; }
+@keyframes iris-hue { to { filter: hue-rotate(360deg); } }

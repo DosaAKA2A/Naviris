@@ -1347,3 +1347,4 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   renderSidebarSites(); renderBookmarksBar(); renderHub(); createTab();
   setTimeout(() => { els.splash.classList.add('gone'); if (els.hub.classList.contains('active')) focusHubSearch(); }, 1800);
 })();
+
