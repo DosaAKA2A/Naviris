@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Naviris — Navegador ligero de Iris Studio</title>
-  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga vídeo y audio con Rat Tool, reclama puntos y drops de Twitch con AutoLoot, gestor de contraseñas con Windows Hello, bloqueador de anuncios y bajo consumo. Gratis y de código abierto." />
+  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga vídeo y audio con Rat Tool, bloqueador con el motor de Brave, gestor de contraseñas con Windows Hello, addons instalables y bajo consumo. Gratis y de código abierto." />
   <meta property="og:title" content="Naviris — Navegador ligero de Iris Studio" />
   <meta property="og:description" content="Las herramientas que normalmente son extensiones, aquí vienen dentro. Rat Tool, AutoLoot para Twitch, gestor de contraseñas y más." />
   <meta property="og:type" content="website" />
@@ -219,7 +219,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">Iris Studio · Navegador</span></div>
         <h1>Navega ligero.<br>Descarga y reclama todo.</h1>
-        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja vídeo y audio, reclama puntos y drops de Twitch en segundo plano, guarda tus contraseñas y consume la mitad de RAM.</p>
+        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja vídeo y audio, bloquea anuncios con el motor de Brave, guarda tus contraseñas y amplíalo con Addons opcionales. Ligero de instalar y de memoria.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -229,8 +229,8 @@
         </div>
         <div class="dl-meta"><b id="ver-hero">Última versión</b> · Windows 10/11 · 64 bits · Gratis</div>
         <div class="stats">
-          <div class="stat"><div class="n">~900 MB</div><div class="l">RAM típica</div></div>
-          <div class="stat"><div class="n">0</div><div class="l">Extensiones necesarias</div></div>
+          <div class="stat"><div class="n">~73 MB</div><div class="l">Instalador</div></div>
+          <div class="stat"><div class="n">Brave</div><div class="l">Motor del adblock</div></div>
           <div class="stat"><div class="n">MIT</div><div class="l">Código abierto</div></div>
         </div>
       </div>
@@ -268,13 +268,13 @@
       <div class="wrap">
         <div class="spot">
           <div class="spot-txt">
-            <div class="tag"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block"></span>Exclusivo de Naviris</div>
+            <div class="tag"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block"></span>Addon oficial</div>
             <h3>AutoLoot: deja Twitch de fondo y no pierdas un solo drop.</h3>
-            <p>Activa AutoLoot en cualquier canal y Naviris reclama por ti los puntos del canal y los drops, incluso con la pestaña en segundo plano. Mantiene el stream vivo cerrando el aviso de "¿sigues ahí?" y nunca duerme esas pestañas.</p>
+            <p>Instala el addon AutoLoot y pulsa <b>Rat Loot</b> en cualquier canal: Naviris lo silencia, baja la resolución solo en esa pestaña y la agrupa a la izquierda mientras reclama por ti puntos y drops en segundo plano. Mantiene el stream vivo cerrando el aviso de "¿sigues ahí?" y nunca duerme esas pestañas.</p>
             <ul>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Multicanal, sin estorbar.</b> Los canales en AutoLoot se colapsan en una sola pestaña de grupo que se despliega cuando la necesitas.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Rat Loot.</b> Un clic: silencia el stream, baja la resolución al mínimo y activa AutoLoot en segundo plano para gastar mínimos recursos.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Panel de Loot.</b> Un registro con todo lo reclamado —puntos y drops— con canal y fecha.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sesión Rat Loot.</b> Un clic: silencio, resolución mínima por pestaña y reclamo automático, gastando recursos mínimos.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Agrupado a la izquierda.</b> Las sesiones se colapsan como primera pestaña del grupo y se despliegan cuando las necesitas.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Registro del loot.</b> Todo lo reclamado —puntos y drops— con canal y fecha, dentro del propio addon.</span></li>
             </ul>
           </div>
           <div class="visual">
@@ -339,9 +339,9 @@
           </div>
           <div class="card hl">
             <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18.75a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H3.375A.75.75 0 0 0 2.625 9v1.5c0 .414.336.75.75.75Z"/></svg></div>
-            <div class="tagline">Exclusivo</div>
+            <div class="tagline">Addon oficial</div>
             <h3>AutoLoot para Twitch</h3>
-            <p>Reclama puntos y drops en segundo plano, agrupa los canales en una sola pestaña y registra todo en el panel de Loot. Con Rat Loot para gastar mínimos recursos.</p>
+            <p>Addon instalable: Rat Loot silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupado a la izquierda. Con registro del loot obtenido.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -350,8 +350,14 @@
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h3>Bloqueador de anuncios</h3>
-            <p>Bloqueo real con un saltador de anuncios de YouTube que cierra el aviso anti-adblock y no rompe la reproducción. Permite anuncios por dominio.</p>
+            <h3>Bloqueador con el motor de Brave</h3>
+            <p>El mismo motor y las mismas listas de filtros que Brave, actualizándose solas. Incluye un saltador de anuncios de YouTube que cierra el aviso anti-adblock sin romper la reproducción. Permite anuncios por dominio.</p>
+          </div>
+          <div class="card hl">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959a.64.64 0 0 1-.657.643 48.4 48.4 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401.31 0 .555.26.532.57a48.04 48.04 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875s2.25.84 2.25 1.875c0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959 0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401a.656.656 0 0 0 .658-.663 48.42 48.42 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+            <div class="tagline">Ampliable</div>
+            <h3>Addons</h3>
+            <p>Un catálogo de extensiones propias que instalas a mano solo si las quieres. Crece sin actualizar el navegador. Ya disponibles: AutoLoot, Valve Rat Tool (precios de mercado en Steam) y Captura larga de página.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3.75 9.75h16.5M8.25 9.75V21M3.75 6.108V18a2.25 2.25 0 0 0 2.25 2.25h12a2.25 2.25 0 0 0 2.25-2.25V6.108M3.75 6.108A2.25 2.25 0 0 1 6 3.858h12a2.25 2.25 0 0 1 2.25 2.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -361,7 +367,7 @@
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
             <h3>Hub personalizable</h3>
-            <p>Un inicio con widgets (reloj, buscador, accesos, clima, notas) y fondos a tu gusto — incluido uno transparente que deja ver tu escritorio.</p>
+            <p>Un inicio con widgets (reloj, buscador, accesos, clima, notas) y fondos a tu gusto, con tu propia imagen si quieres.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
@@ -401,7 +407,7 @@
           </div>
           <div class="reqs">
             <span><b>Versión:</b> <span id="ver-main">—</span></span>
-            <span><b>Tamaño:</b> <span id="size-main">~117 MB</span></span>
+            <span><b>Tamaño:</b> <span id="size-main">~73 MB</span></span>
             <span><b>SO:</b> Windows 10 / 11 (64 bits)</span>
             <span><b>Licencia:</b> MIT</span>
           </div>
