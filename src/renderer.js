@@ -898,8 +898,9 @@ function ratLoot(tab) {
   if (!tab || tab.kind !== 'web') return;
   tab.ratLoot = true; tab.autoLoot = true;
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
+  // La calidad ahora baja desde el menú del reproductor (en caliente), así que
+  // ya no hace falta recargar la pestaña ni reiniciar el stream.
   try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: true }); } catch { /* nada */ }
-  setTimeout(() => { try { tab.webview?.reload(); } catch { /* nada */ } }, 450); // recarga para aplicar la resolución mínima
   renderTabs(); updateLootUI();
   toast('Modo Loot: silenciado, resolución mínima y pestaña agrupada a la izquierda');
 }

@@ -105,10 +105,34 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       document.dispatchEvent(new Event('visibilitychange')); // notifica el nuevo estado "visible"
     } catch (e) { /* nada */ }
   }
-  function setQuality(q) { try { localStorage.setItem('video-quality', JSON.stringify({ default: q })); } catch (e) { /* nada */ } }
-  // Baja ESTA pestaña a la mínima y, tras cargar el reproductor, restaura el valor
-  // global a "auto" para que las NUEVAS pestañas de Twitch NO hereden la baja resolución.
-  function lowResThisTabOnly() { setQuality('160p30'); setTimeout(function () { setQuality('auto'); }, 4000); }
+  // Baja la calidad desde el MENÚ del propio reproductor de Twitch. Es fiable
+  // (el truco de localStorage solo se leía al arrancar el player y a veces no
+  // llegaba a tiempo) y aplica solo a ESTA pestaña, sin afectar a las demás.
+  function pickLowestQuality() {
+    try {
+      var gear = document.querySelector('[data-a-target="player-settings-button"]');
+      if (!gear) return false;
+      gear.click();
+      var qItem = document.querySelector('[data-a-target="player-settings-menu-item-quality"]');
+      if (!qItem) { gear.click(); return false; }
+      qItem.click();
+      // La lista es Auto, 1080p, 720p… la última opción es la más baja
+      var opts = document.querySelectorAll('[data-a-target="player-settings-submenu-quality-option"]');
+      if (!opts.length) { gear.click(); return false; }
+      var last = opts[opts.length - 1];
+      var clickable = last.querySelector('input[type="radio"]') || last.querySelector('label') || last;
+      clickable.click();
+      return true;
+    } catch (e) { return false; }
+  }
+  // Reintenta hasta que el reproductor exista y acepte la calidad baja
+  function lowResThisTabOnly() {
+    try { localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' })); } catch (e) { /* respaldo para la carga */ }
+    var tries = 0;
+    var t = setInterval(function () {
+      if (pickLowestQuality() || ++tries > 40) clearInterval(t); // hasta ~40s
+    }, 1000);
+  }
   let obs = null;
   function tick() { clickChest(); claimDrops(); keepAlive(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
