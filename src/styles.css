@@ -95,10 +95,6 @@ button { font-family: inherit; }
 .wp-custom.sel { border-style: solid; border-color: #9170d6; color: var(--text); }
 
 /* Fondo del hub transparente: deja ver el escritorio (acrílico de Windows) */
-.hub-transparent, .hub-transparent body { background: transparent !important; }
-.hub-transparent #content { background: transparent !important; }
-.hub-transparent #hub { background: transparent !important; }
-.hub-transparent #hub::before { background: rgba(16,16,20, var(--hub-alpha, .35)) !important; }
 /* Botón de silencio de pestaña */
 .tab .t-mute { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .tab .t-mute svg { width: 13px; height: 13px; }
@@ -633,3 +629,17 @@ button { font-family: inherit; }
 #addon-tools button:hover { background: rgba(255,255,255,.07); color: var(--text, #ececef); }
 #addon-tools button svg { width: 17px; height: 17px; }
 #addon-tools button.busy { color: #9ee2b8; pointer-events: none; }
+
+/* Botón Addons del hub: placa inclinada con borde de gradiente animado */
+#hub-addons { position: relative; transform: skewX(-10deg); border: 1px solid transparent; border-radius: 10px;
+  background: linear-gradient(rgba(16,14,22,.93), rgba(16,14,22,.93)) padding-box,
+              linear-gradient(120deg,#b9aae6,#9dc3e6,#a4d9c2,#e6d6a4,#e6a9b4,#b9aae6) border-box;
+  background-size: auto, 300% 100%;
+  animation: addons-flow 7s linear infinite;
+  box-shadow: 0 0 16px rgba(185,170,230,.22);
+  padding: 9px 16px; font-weight: 600; letter-spacing: .3px; }
+#hub-addons > span { transform: skewX(10deg); display: inline-flex; align-items: center; }
+#hub-addons svg { width: 16px; height: 16px; color: #cdbdf1; }
+#hub-addons:hover { box-shadow: 0 0 28px rgba(185,170,230,.5); border-color: transparent; color: #fff; }
+#hub-addons:hover svg { color: #fff; }
+@keyframes addons-flow { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }

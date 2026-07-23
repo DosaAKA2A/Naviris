@@ -32,3 +32,47 @@ jobs:
         run: npm run release
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # La release creada arriba con el token del workflow NO dispara otros workflows
+  # (protección de GitHub), así que el APK se adjunta aquí como segundo job.
+  apk:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar firma (si hay secretos configurados)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            mkdir -p "$HOME/.android-keys"
+            echo "$KS_B64" | tr -d ' \t\r\n' | base64 -d > "$HOME/.android-keys/cobalt-release.jks"
+            {
+              echo "storeFile=$HOME/.android-keys/cobalt-release.jks"
+              echo "storePassword=$KS_PASS"
+              echo "keyAlias=cobalt"
+              echo "keyPassword=$KS_PASS"
+            } > "$HOME/.android-keys/cobalt-release.properties"
+          fi
+
+      - name: Compilar APK
+        working-directory: mobile
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --console=plain
+
+      - name: Adjuntar APK a la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep -oP 'versionName "\K[^"]+' mobile/app/build.gradle)
+          APK=$(ls mobile/app/build/outputs/apk/release/app-release*.apk | head -1)
+          cp "$APK" "Naviris-$VER.apk"
+          gh release upload "${{ github.ref_name }}" "Naviris-$VER.apk" --clobber

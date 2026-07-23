@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
+const braveAdblock = require('./adblock');
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
@@ -39,7 +40,6 @@ const DEFAULT_SETTINGS = {
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
-  hubTransparent: false,    // fondo acrílico que deja ver el escritorio (se aplica al crear la ventana)
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };
 
@@ -220,6 +220,13 @@ function setupSession(ses) {
     const u = details.url;
     // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
     if (YT_AD_PATHS.some((p) => u.includes(p))) { blockedCount++; return callback({ cancel: true }); }
+    // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
+    // decide el fallback clásico por dominios.
+    const brave = braveAdblock.shouldBlock(details);
+    if (brave !== null) {
+      if (brave) { blockedCount++; return callback({ cancel: true }); }
+      return callback({});
+    }
     try {
       const host = new URL(u).hostname;
       if (AD_HOSTS.some((d) => hostMatches(host, d))) {
@@ -363,10 +370,7 @@ function ytDownload({ url, mode, quality }) {
 function createWindow(isPrivate = false) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 560,
-    frame: false, show: false,
-    // El acrílico solo funciona de forma fiable si la ventana ya nace con él
-    backgroundColor: settings.hubTransparent ? '#00000000' : '#0a0a0c',
-    backgroundMaterial: settings.hubTransparent ? 'acrylic' : 'none',
+    frame: false, show: false, backgroundColor: '#0a0a0c',
     title: isPrivate ? 'Naviris — Privado' : 'Naviris',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -403,6 +407,14 @@ app.on('web-contents-created', (_event, contents) => {
     contents.on('dom-ready', () => {
       let host = '';
       try { host = new URL(contents.getURL()).hostname; } catch { return; }
+      // Ocultado cosmético + scriptlets de las listas de Brave (como uBlock/Brave)
+      if (settings.adblockEnabled && !isWhitelisted(contents.getURL())) {
+        const cos = braveAdblock.cosmeticsFor(contents.getURL());
+        if (cos) {
+          if (cos.css) contents.insertCSS(cos.css).catch(() => {});
+          if (cos.script) contents.executeJavaScript(cos.script, true).catch(() => {});
+        }
+      }
       if (settings.adblockEnabled && /(^|\.)(youtube\.com|youtube-nocookie\.com)$/.test(host)) {
         contents.executeJavaScript(YT_ADSKIP, true).catch(() => {});
         contents.insertCSS(YT_ADCSS).catch(() => {});
@@ -432,14 +444,6 @@ ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
 ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
 ipcMain.on('win:close', (e) => winOf(e)?.close());
 ipcMain.on('win:new-private', () => createWindow(true));
-// Fondo translúcido (acrílico de Windows 11): revela el escritorio tras el hub.
-// Se activa solo cuando el usuario lo elige, así el rendimiento por defecto no cambia.
-ipcMain.on('win:transparent', (e, on) => {
-  const w = winOf(e); if (!w) return;
-  settings.hubTransparent = !!on; saveSettings(settings);
-  try { w.setBackgroundMaterial(on ? 'acrylic' : 'none'); } catch { /* nada */ }
-  try { w.setBackgroundColor(on ? '#00000000' : '#0a0a0c'); } catch { /* nada */ }
-});
 
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => { settings = { ...settings, ...patch }; saveSettings(settings); return settings; });
@@ -514,7 +518,7 @@ ipcMain.handle('pw:reveal', async (_e, id) => {
   catch { return { ok: false, error: 'no se pudo descifrar' }; }
 });
 
-ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount }));
+ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });
 ipcMain.handle('adblock:whitelist', (_e, { action, domain }) => {
   const d = String(domain || '').toLowerCase().replace(/^www\./, '');
@@ -775,6 +779,7 @@ nativeTheme.themeSource = 'dark';
 app.whenReady().then(() => {
   // Comprobación silenciosa al arrancar (solo en versión instalada)
   if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
+  braveAdblock.init();
   setupSession(session.fromPartition(PART_NORMAL));
   setupSession(session.fromPartition(PART_PRIVATE));
   createWindow();
