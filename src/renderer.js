@@ -18,7 +18,6 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-powersaver', 'opt-gpu',
-  'sb-loot', 'loot-panel', 'loot-list', 'loot-close', 'loot-clear',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -27,7 +26,7 @@ const els = {};
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-headsub', 'rt-autoloot', 'rt-mute', 'rt-ratloot', 'nav-loot', 'loot-pop', 'loot-status',
+  'rat-normal', 'rat-headsub',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
@@ -707,7 +706,7 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloads());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); }
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
@@ -715,32 +714,8 @@ function recordLoot(kind, channel) {
   loot.unshift({ t: Date.now(), kind: kind === 'drop' ? 'drop' : 'points', channel: channel || '' });
   if (loot.length > 500) loot = loot.slice(0, 500);
   store.set('cobalt.loot', loot);
-  if (!els.lootPanel.classList.contains('hidden')) renderLoot();
+  lootNotify();
 }
-function renderLoot() {
-  const pts = loot.filter((l) => l.kind === 'points').length, drops = loot.filter((l) => l.kind === 'drop').length;
-  els.lootList.innerHTML = '';
-  const sum = document.createElement('div'); sum.className = 'loot-sum';
-  sum.innerHTML = `<div class="loot-stat"><span class="ls-n">${pts}</span><span class="ls-l">Puntos</span></div><div class="loot-stat"><span class="ls-n">${drops}</span><span class="ls-l">Drops</span></div>`;
-  els.lootList.appendChild(sum);
-  if (!loot.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'Aún no se ha reclamado nada. Deja un canal de Twitch abierto con el auto-reclamo activo.'; els.lootList.appendChild(e); return; }
-  for (const l of loot.slice(0, 300)) {
-    const row = document.createElement('div'); row.className = 'loot-row';
-    const ic = document.createElement('span'); ic.className = 'loot-ic'; ic.innerHTML = window.icon(l.kind === 'drop' ? 'gift' : 'star');
-    const info = document.createElement('div'); info.className = 'loot-info';
-    const when = new Date(l.t).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    info.innerHTML = `<div class="loot-t">${l.kind === 'drop' ? 'Drop reclamado' : 'Punto del canal'}</div><div class="loot-u">${escapeHtml(l.channel || 'Twitch')} · ${when}</div>`;
-    row.append(ic, info); els.lootList.appendChild(row);
-  }
-}
-function toggleLoot(force) {
-  const open = force !== undefined ? force : els.lootPanel.classList.contains('hidden');
-  if (open) { closeRightPanels(); els.lootPanel.classList.remove('hidden'); els.sbLoot.classList.add('open'); renderLoot(); }
-  else { els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
-}
-els.sbLoot.addEventListener('click', () => toggleLoot());
-els.lootClose.addEventListener('click', () => toggleLoot(false));
-els.lootClear.addEventListener('click', () => { loot = []; store.set('cobalt.loot', loot); renderLoot(); toast('Registro de Loot vaciado'); });
 
 /* ============ Historial ============ */
 let histFilter = '';
@@ -873,31 +848,10 @@ function resolveMediaUrl() {
 }
 // ¿La pestaña activa es Twitch? (define si aparece el botón AutoLoot de la topbar)
 function activeIsTwitch() { const t = activeTab(); return t?.kind === 'web' && /(^|\.)twitch\.tv$/.test(hostOf(t.url)); }
-// AutoLoot es una herramienta independiente del Rat Tool: su botón vive en la
-// topbar y solo aparece cuando la pestaña activa es Twitch. Se recalcula al
-// navegar y al cambiar de pestaña.
-function updateLootUI() {
-  const twitch = activeIsTwitch();
-  const tab = activeTab();
-  els.navLoot.classList.toggle('hidden', !twitch);
-  els.navLoot.classList.toggle('on', !!(twitch && tab?.autoLoot));
-  if (!twitch) { els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); }
-}
-function refreshLootPop() {
-  const tab = activeTab();
-  els.rtAutoloot.checked = !!tab?.autoLoot;
-  els.rtMute.checked = !!tab?.muted;
-  els.lootStatus.textContent = tab?.autoLoot
-    ? ('Recolectando en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamado(s)` : '') + (tab.ratLoot ? ' · resolución mínima' : ''))
-    : 'Silencia, baja la resolución solo aquí y agrupa la pestaña a la izquierda mientras recolecta.';
-}
-els.navLoot.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const open = els.lootPop.classList.contains('hidden');
-  els.lootPop.classList.toggle('hidden', !open);
-  els.navLoot.classList.toggle('open', open);
-  if (open) refreshLootPop();
-});
+// AutoLoot vive ahora en el addon oficial "autoloot": el core solo mantiene la
+// fontanería (reclamador en webview-preload, agrupación de pestañas, estado por
+// pestaña) y avisa al addon de cada cambio vía naviris.loot.onChange.
+function updateLootUI() { lootNotify(); }
 
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
@@ -936,9 +890,6 @@ function ratLoot(tab) {
   renderTabs(); updateLootUI();
   toast('Modo Loot: silenciado, resolución mínima y pestaña agrupada a la izquierda');
 }
-els.rtAutoloot.addEventListener('change', () => { setAutoLoot(activeTab(), els.rtAutoloot.checked); refreshLootPop(); toast(els.rtAutoloot.checked ? 'AutoLoot activado en este canal' : 'AutoLoot desactivado'); });
-els.rtMute.addEventListener('change', () => { const t = activeTab(); if (t) { t.muted = els.rtMute.checked; try { t.webview?.setAudioMuted(t.muted); } catch {} renderTabs(); } });
-els.rtRatloot.addEventListener('click', () => { ratLoot(activeTab()); els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); });
 function updateRatPlat() {
   const url = els.ratUrl.value.trim(); const p = platOf(url);
   const tab = activeTab(); const onSite = tab?.kind === 'web' && p && hostOf(tab.url) === hostOf(url);
@@ -1091,7 +1042,6 @@ document.addEventListener('click', (e) => {
   if (!els.resPop.contains(e.target) && !els.sbRes.contains(e.target)) { els.resPop.classList.add('hidden'); els.sbRes.classList.toggle('open', !!resMode); }
   if (!els.ratPop.contains(e.target) && !els.sbRat.contains(e.target)) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
   if (!els.shieldPop.contains(e.target) && !els.navShield.contains(e.target)) { els.shieldPop.classList.add('hidden'); els.navShield.classList.remove('open'); clearInterval(adblockPoll); adblockPoll = null; }
-  if (!els.lootPop.contains(e.target) && !els.navLoot.contains(e.target)) { els.lootPop.classList.add('hidden'); els.navLoot.classList.remove('open'); }
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
 });
 els.menuPop.addEventListener('click', (e) => {
@@ -1130,7 +1080,6 @@ async function onWebviewMessage(wv, e) {
     const channel = hostOf(tab.url).replace(/^www\./, '') + (seg ? '/' + seg.split(/[/?#]/)[0] : '');
     if (data.type === 'claim') {
       tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); renderTabs();
-      if (!els.lootPop.classList.contains('hidden')) refreshLootPop();
       recordLoot(data.kind, channel);
       toast(data.kind === 'drop' ? 'Drop de Twitch reclamado' : `Punto de Twitch reclamado (${tab.twitchClaims})`);
     }
@@ -1308,6 +1257,27 @@ const naviris = {
   },
   unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); }
 };
+// --- API de loot para el addon oficial AutoLoot ---
+const lootListeners = new Set();
+function lootNotify() { for (const cb of lootListeners) { try { cb(lootSnapshot()); } catch { /* addon roto */ } } }
+function lootSnapshot() {
+  return {
+    activeIsTwitch: activeIsTwitch(),
+    sessions: tabs.filter((t) => t.autoLoot).map((t) => ({ id: t.id, title: t.title, url: t.url, claims: t.twitchClaims || 0 })),
+    log: loot.slice(0, 300)
+  };
+}
+naviris.loot = {
+  state: () => lootSnapshot(),
+  // La única acción: Rat Loot = silencio + resolución mínima (solo esa pestaña)
+  // + reclamo en segundo plano + pestaña agrupada la primera a la izquierda
+  ratLoot: () => { if (!activeIsTwitch()) return false; ratLoot(activeTab()); return true; },
+  stop: (id) => { const t = tabs.find((x) => x.id === id); if (t) setAutoLoot(t, false); },
+  focus: (id) => activateTab(id),
+  clearLog: () => { loot = []; store.set('cobalt.loot', loot); lootNotify(); },
+  onChange: (cb) => { lootListeners.add(cb); }
+};
+
 const loadedTools = new Set();
 async function loadToolAddons() {
   const installed = await window.cobalt.addonsList();

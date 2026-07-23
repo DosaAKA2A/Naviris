@@ -41,7 +41,6 @@
       <!-- Herramientas -->
       <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="rat"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
-      <button class="sb-btn" id="sb-loot" title="Loot — recompensas reclamadas" data-ico="gift"></button>
       <button class="sb-btn" id="sb-res" title="Escalado de resolución" data-ico="computer-desktop"></button>
       <div id="addon-tools"></div>
       <div class="sb-div"></div>
@@ -81,7 +80,6 @@
                  placeholder="Busca en Google o escribe una dirección" />
           <div id="suggest" class="hidden"></div>
         </div>
-        <button id="nav-loot" class="hidden" title="AutoLoot — reclama puntos y drops de este canal" data-ico="gift"></button>
         <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-check"></button>
         <button id="nav-star" title="Añadir a marcadores" data-ico="star"></button>
         <button id="nav-menu" title="Menú" data-ico="ellipsis-vertical"></button>
@@ -189,14 +187,6 @@
   </div>
 
   <!-- ===== AutoLoot (herramienta independiente, aparece solo en Twitch) ===== -->
-  <div id="loot-pop" class="hidden">
-    <div class="sp-head"><span class="sp-title">AutoLoot de Twitch</span></div>
-    <label class="rat-tw-row"><span><b>Auto Loot</b><small>Reclama puntos y drops de este canal</small></span><span class="switch"><input type="checkbox" id="rt-autoloot" /><span class="slider"></span></span></label>
-    <label class="rat-tw-row"><span><b>Silenciar vídeo</b><small>Silencia esta pestaña (puedes seguir viéndolo)</small></span><span class="switch"><input type="checkbox" id="rt-mute" /><span class="slider"></span></span></label>
-    <button id="rt-ratloot" class="rat-loot-btn"><span data-ico="gift"></span> Modo Loot completo</button>
-    <div class="sp-count" id="loot-status">Silencia, baja la resolución solo aquí y agrupa la pestaña a la izquierda mientras recolecta.</div>
-  </div>
-
   <!-- ===== Bloqueador ===== -->
   <div id="shield-pop" class="hidden">
     <div class="sp-head"><span class="sp-title">Bloqueador de anuncios</span><label class="switch"><input type="checkbox" id="adblock-toggle" /><span class="slider"></span></label></div>
@@ -271,11 +261,6 @@
   </aside>
 
   <!-- ===== Panel Loot (recompensas de auto-reclamo) ===== -->
-  <aside id="loot-panel" class="hidden side-panel">
-    <div class="mp-head"><span>Loot</span><span class="mp-tools"><button id="loot-clear" data-ico="trash" title="Vaciar registro"></button><button id="loot-close" data-ico="x-mark" title="Cerrar"></button></span></div>
-    <div class="dl-hint">Todo lo que el auto-reclamo de Twitch ha recogido: puntos del canal y drops.</div>
-    <div id="loot-list"></div>
-  </aside>
 
   <!-- ===== Modales ===== -->
   <div id="dial-modal" class="modal hidden"><div class="modal-card"><h3>Añadir acceso al hub</h3><input id="dial-name" type="text" placeholder="Nombre (ej. YouTube)" /><input id="dial-url" type="text" placeholder="https://..." /><div class="modal-actions"><button id="dial-cancel">Cancelar</button><button id="dial-save" class="primary">Añadir</button></div></div></div>
