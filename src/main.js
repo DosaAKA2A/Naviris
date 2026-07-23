@@ -593,6 +593,57 @@ ipcMain.handle('pw:add', (_e, { site, username, password }) => {
   return { ok: true, updated: !!existing };
 });
 ipcMain.handle('pw:delete', (_e, id) => { savePasswords(loadPasswords().filter((e) => e.id !== id)); return { ok: true }; });
+
+// Importa contraseñas desde el CSV que exportan Chrome/Brave/Opera/Edge
+// (Configuración → Contraseñas → Exportar). Es la vía universal: las versiones
+// recientes de Chromium cifran las contraseñas con "app-bound encryption" y no
+// se pueden leer directamente de su base de datos fuera del navegador.
+function parseCsv(text) {
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (field !== '' || row.length) { row.push(field); rows.push(row); row = []; field = ''; } if (c === '\r' && text[i + 1] === '\n') i++; }
+    else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+ipcMain.handle('pw:import-csv', async (e) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Cifrado no disponible' };
+  const r = await dialog.showOpenDialog(winOf(e), {
+    title: 'Importar contraseñas exportadas (CSV)',
+    filters: [{ name: 'CSV de contraseñas', extensions: ['csv'] }],
+    properties: ['openFile']
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  try {
+    const rows = parseCsv(fs.readFileSync(r.filePaths[0], 'utf8'));
+    if (!rows.length) return { ok: false, error: 'CSV vacío' };
+    // Cabecera de Chromium: name,url,username,password,note
+    const head = rows[0].map((h) => h.trim().toLowerCase());
+    const iUrl = head.indexOf('url'), iUser = head.indexOf('username'), iPass = head.indexOf('password');
+    if (iUrl < 0 || iPass < 0) return { ok: false, error: 'No parece un CSV de contraseñas de navegador' };
+    const list = loadPasswords();
+    let added = 0, updated = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const site = (rows[i][iUrl] || '').trim();
+      const password = rows[i][iPass] || '';
+      if (!site || !password) continue;
+      const user = (iUser >= 0 ? rows[i][iUser] : '') || '';
+      const enc = safeStorage.encryptString(String(password)).toString('base64');
+      const existing = list.find((x) => x.username === user && hostKey(x.site) === hostKey(site));
+      if (existing) { existing.enc = enc; updated++; }
+      else { list.push({ id: 'pw' + (++pwSeq), site, username: user, enc }); added++; }
+    }
+    savePasswords(list);
+    return { ok: true, added, updated };
+  } catch (err) { return { ok: false, error: String(err.message || err) }; }
+});
 ipcMain.handle('pw:reveal', async (_e, id) => {
   const entry = loadPasswords().find((e) => e.id === id);
   if (!entry) return { ok: false, error: 'no encontrada' };
@@ -624,18 +675,37 @@ ipcMain.handle('yt:available', () => { ensureBins(); return true; });
 
 // ---------- Importar marcadores de otros navegadores ----------
 // Chromium guarda un JSON "Bookmarks"; Firefox comprime su backup en .jsonlz4 (LZ4 + cabecera Mozilla).
+// Cada navegador Chromium tiene una carpeta "User Data" con perfiles (Default,
+// Profile 1…). Se busca el archivo (Bookmarks / Login Data) en cualquiera de ellos.
 const IMPORT_BROWSERS = {
-  chrome:  { label: 'Chrome',   type: 'chromium', base: 'LOCALAPPDATA', parts: ['Google', 'Chrome', 'User Data', 'Default', 'Bookmarks'] },
-  brave:   { label: 'Brave',    type: 'chromium', base: 'LOCALAPPDATA', parts: ['BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Bookmarks'] },
-  edge:    { label: 'Edge',     type: 'chromium', base: 'LOCALAPPDATA', parts: ['Microsoft', 'Edge', 'User Data', 'Default', 'Bookmarks'] },
-  operagx: { label: 'Opera GX', type: 'chromium', base: 'APPDATA', parts: ['Opera Software', 'Opera GX Stable', 'Bookmarks'] },
+  chrome:  { label: 'Chrome',   type: 'chromium', base: 'LOCALAPPDATA', userData: ['Google', 'Chrome', 'User Data'] },
+  brave:   { label: 'Brave',    type: 'chromium', base: 'LOCALAPPDATA', userData: ['BraveSoftware', 'Brave-Browser', 'User Data'] },
+  edge:    { label: 'Edge',     type: 'chromium', base: 'LOCALAPPDATA', userData: ['Microsoft', 'Edge', 'User Data'] },
+  opera:   { label: 'Opera',    type: 'chromium', base: 'APPDATA', userData: ['Opera Software', 'Opera Stable'], flat: true },
+  operagx: { label: 'Opera GX', type: 'chromium', base: 'APPDATA', userData: ['Opera Software', 'Opera GX Stable'], flat: true },
   firefox: { label: 'Firefox',  type: 'firefox' }
 };
+// Devuelve el primer perfil que contiene `file` (Default, Profile N, o la raíz
+// en Opera que no usa subcarpetas de perfil). null si el navegador no lo tiene.
+function chromiumFile(b, file) {
+  const root = process.env[b.base]; if (!root) return null;
+  const ud = path.join(root, ...b.userData);
+  if (!fs.existsSync(ud)) return null;
+  const candidates = b.flat ? [ud] : [];
+  if (!b.flat) {
+    try {
+      const profiles = ['Default', ...fs.readdirSync(ud).filter((d) => /^Profile /.test(d))];
+      for (const p of profiles) candidates.push(path.join(ud, p));
+    } catch { /* nada */ }
+    candidates.push(ud); // por si el archivo cuelga directo de User Data
+  }
+  for (const dir of candidates) { const f = path.join(dir, file); if (fs.existsSync(f)) return f; }
+  return null;
+}
 function importPath(b) {
   if (!b) return null;
   if (b.type === 'firefox') return firefoxLatestBackup();
-  const root = process.env[b.base]; if (!root) return null;
-  return path.join(root, ...b.parts);
+  return chromiumFile(b, 'Bookmarks');
 }
 // Descompresor LZ4 en bloque (sin dependencias) para leer los backups de Firefox
 function lz4DecompressBlock(input, outLen) {
