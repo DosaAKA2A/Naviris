@@ -64,12 +64,21 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); }
     } catch (e) { /* nada */ }
   }
+  // Visible según dimensiones (el toast de reclamo de drop es position:fixed y
+  // su offsetParent es null, por eso NO se puede filtrar por offsetParent).
+  function isVisible(el) { var r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4; }
   function claimDrops() {
     try {
-      document.querySelectorAll('button, a[role="button"]').forEach(function (el) {
-        if (el.offsetParent === null) return;
-        var t = (el.textContent || '').trim().toLowerCase();
-        if (/^(claim now|reclamar ahora|claim drop|claim|reclamar)$/.test(t)) { el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
+      var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
+      document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
+        if (!isVisible(el)) return;
+        var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        // Texto EXACTO (anclado) para no pulsar "claim your channel points" (los
+        // puntos los reclama clickChest) ni otros botones que contengan "claim".
+        if (RE.test(txt) || RE.test(aria)) {
+          el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims });
+        }
       });
     } catch (e) { /* nada */ }
   }
