@@ -40,6 +40,7 @@
       <div class="sb-spacer"></div>
       <!-- Herramientas -->
       <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="rat"></button>
+      <button class="sb-btn" id="sb-loot" title="AutoLoot — puntos y drops de Twitch" data-ico="gift"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
       <button class="sb-btn" id="sb-res" title="Escalado de resolución" data-ico="computer-desktop"></button>
       <div id="addon-tools"></div>
@@ -188,6 +189,19 @@
   </div>
 
   <!-- ===== AutoLoot (herramienta independiente, aparece solo en Twitch) ===== -->
+  <!-- ===== AutoLoot (panel del sidebar izquierdo) ===== -->
+  <aside id="loot-panel" class="hidden side-panel-left">
+    <div class="lp-head">
+      <span class="lp-title"><span data-ico="gift"></span> AutoLoot</span>
+      <button id="loot-close" class="lp-x" data-ico="x-mark" title="Cerrar"></button>
+    </div>
+    <div class="lp-tabs">
+      <button id="loot-tab-ses" class="lp-tab active">Sesiones</button>
+      <button id="loot-tab-hist" class="lp-tab">Historial</button>
+    </div>
+    <div id="loot-body" class="lp-body"></div>
+  </aside>
+
   <!-- ===== Bloqueador ===== -->
   <div id="shield-pop" class="hidden">
     <div class="sp-head"><span class="sp-title">Bloqueador de anuncios</span><label class="switch"><input type="checkbox" id="adblock-toggle" /><span class="slider"></span></label></div>

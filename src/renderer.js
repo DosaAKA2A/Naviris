@@ -21,6 +21,7 @@ const els = {};
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
@@ -740,7 +741,7 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloads());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
@@ -748,7 +749,7 @@ function recordLoot(kind, channel) {
   loot.unshift({ t: Date.now(), kind: kind === 'drop' ? 'drop' : 'points', channel: channel || '' });
   if (loot.length > 500) loot = loot.slice(0, 500);
   store.set('cobalt.loot', loot);
-  lootNotify();
+  updateLootUI();
 }
 
 /* ============ Historial ============ */
@@ -886,12 +887,75 @@ function resolveMediaUrl() {
   if (playing) { let el = playing; for (let i = 0; i < 10 && el; i++, el = el.parentElement) { const a = el.querySelector && el.querySelector('a[href*="/video/"], a[href*="/status/"]'); if (a && ok(a.href)) return a.href; } }
   return location.href;
 }
-// ¿La pestaña activa es Twitch? (define si aparece el botón AutoLoot de la topbar)
+// ¿La pestaña activa es Twitch?
 function activeIsTwitch() { const t = activeTab(); return t?.kind === 'web' && /(^|\.)twitch\.tv$/.test(hostOf(t.url)); }
-// AutoLoot vive ahora en el addon oficial "autoloot": el core solo mantiene la
-// fontanería (reclamador en webview-preload, agrupación de pestañas, estado por
-// pestaña) y avisa al addon de cada cambio vía naviris.loot.onChange.
-function updateLootUI() { lootNotify(); }
+
+/* ============ Panel de AutoLoot (integrado en el core) ============ */
+let lootView = 'ses'; // 'ses' | 'hist'
+// Ilumina el botón del sidebar cuando hay sesiones recolectando y refresca el
+// panel si está abierto.
+function updateLootUI() {
+  const active = tabs.some((t) => t.autoLoot);
+  els.sbLoot.classList.toggle('collecting', active);
+  if (!els.lootPanel.classList.contains('hidden')) renderLootPanel();
+}
+function toggleLootPanel(force) {
+  const open = force !== undefined ? force : els.lootPanel.classList.contains('hidden');
+  if (open) { closeRightPanels(); els.lootPanel.classList.remove('hidden'); els.sbLoot.classList.add('open'); renderLootPanel(); }
+  else { els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+}
+function renderLootPanel() {
+  els.lootTabSes.classList.toggle('active', lootView === 'ses');
+  els.lootTabHist.classList.toggle('active', lootView === 'hist');
+  const twitch = activeIsTwitch();
+  const sessions = tabs.filter((t) => t.autoLoot);
+  const body = els.lootBody; body.innerHTML = '';
+  if (lootView === 'ses') {
+    const go = document.createElement('button'); go.id = 'loot-go'; go.className = 'loot-go' + (twitch ? '' : ' off');
+    go.textContent = 'Activar'; go.disabled = !twitch;
+    go.addEventListener('click', () => { ratLoot(activeTab()); renderLootPanel(); });
+    body.appendChild(go);
+    const hint = document.createElement('div'); hint.className = 'loot-hint';
+    hint.textContent = twitch
+      ? 'Silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupada a la izquierda.'
+      : 'Abre un canal de Twitch para poder activar una sesión.';
+    body.appendChild(hint);
+    body.appendChild(lootLabel('SESIONES ACTIVAS', String(sessions.length)));
+    if (!sessions.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'No hay sesiones recolectando ahora mismo.'; body.appendChild(e); }
+    for (const s of sessions) {
+      const row = document.createElement('div'); row.className = 'loot-ses';
+      row.innerHTML = '<span class="ls-dot"></span><span class="ls-name"></span><span class="ls-n"></span>';
+      row.querySelector('.ls-name').textContent = s.title || s.url;
+      row.querySelector('.ls-n').textContent = s.twitchClaims || 0;
+      const go2 = document.createElement('button'); go2.className = 'ls-btn'; go2.textContent = 'ir'; go2.addEventListener('click', () => activateTab(s.id));
+      const stop = document.createElement('button'); stop.className = 'ls-btn stop'; stop.textContent = 'parar'; stop.addEventListener('click', () => { setAutoLoot(s, false); renderLootPanel(); });
+      row.append(go2, stop); body.appendChild(row);
+    }
+  } else {
+    const pts = loot.filter((l) => l.kind === 'points').length, drops = loot.filter((l) => l.kind === 'drop').length;
+    body.appendChild(lootLabel('LOOT OBTENIDO', pts + ' puntos · ' + drops + ' drops'));
+    if (!loot.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'Aún no se ha reclamado nada.'; body.appendChild(e); }
+    for (const l of loot.slice(0, 200)) {
+      const row = document.createElement('div'); row.className = 'loot-hrow';
+      const ic = document.createElement('span'); ic.className = 'lh-ic'; ic.innerHTML = window.icon(l.kind === 'drop' ? 'gift' : 'star');
+      const name = document.createElement('span'); name.className = 'lh-name'; name.textContent = l.channel || 'Twitch';
+      const when = document.createElement('span'); when.className = 'lh-when';
+      when.textContent = new Date(l.t).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      row.append(ic, name, when); body.appendChild(row);
+    }
+    if (loot.length) { const c = document.createElement('button'); c.className = 'loot-clear-btn'; c.textContent = 'Vaciar historial'; c.addEventListener('click', () => { loot = []; store.set('cobalt.loot', loot); renderLootPanel(); }); body.appendChild(c); }
+  }
+}
+function lootLabel(t, extra) {
+  const d = document.createElement('div'); d.className = 'loot-lbl';
+  d.innerHTML = '<span></span><span class="ll-x"></span>';
+  d.firstChild.textContent = t; d.querySelector('.ll-x').textContent = extra || '';
+  return d;
+}
+els.sbLoot.addEventListener('click', () => toggleLootPanel());
+els.lootClose.addEventListener('click', () => toggleLootPanel(false));
+els.lootTabSes.addEventListener('click', () => { lootView = 'ses'; renderLootPanel(); });
+els.lootTabHist.addEventListener('click', () => { lootView = 'hist'; renderLootPanel(); });
 
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
@@ -1083,6 +1147,7 @@ document.addEventListener('click', (e) => {
   if (!els.resPop.contains(e.target) && !els.sbRes.contains(e.target)) { els.resPop.classList.add('hidden'); els.sbRes.classList.toggle('open', !!resMode); }
   if (!els.ratPop.contains(e.target) && !els.sbRat.contains(e.target)) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
   if (!els.shieldPop.contains(e.target) && !els.navShield.contains(e.target)) { els.shieldPop.classList.add('hidden'); els.navShield.classList.remove('open'); clearInterval(adblockPoll); adblockPoll = null; }
+  if (!els.lootPanel.classList.contains('hidden') && !els.lootPanel.contains(e.target) && !els.sbLoot.contains(e.target)) toggleLootPanel(false);
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
 });
 els.menuPop.addEventListener('click', (e) => {
@@ -1299,30 +1364,13 @@ const naviris = {
   },
   unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); }
 };
-// --- API de loot para el addon oficial AutoLoot ---
-const lootListeners = new Set();
-function lootNotify() { for (const cb of lootListeners) { try { cb(lootSnapshot()); } catch { /* addon roto */ } } }
-function lootSnapshot() {
-  return {
-    activeIsTwitch: activeIsTwitch(),
-    sessions: tabs.filter((t) => t.autoLoot).map((t) => ({ id: t.id, title: t.title, url: t.url, claims: t.twitchClaims || 0 })),
-    log: loot.slice(0, 300)
-  };
-}
-naviris.loot = {
-  state: () => lootSnapshot(),
-  // La única acción: Rat Loot = silencio + resolución mínima (solo esa pestaña)
-  // + reclamo en segundo plano + pestaña agrupada la primera a la izquierda
-  ratLoot: () => { if (!activeIsTwitch()) return false; ratLoot(activeTab()); return true; },
-  stop: (id) => { const t = tabs.find((x) => x.id === id); if (t) setAutoLoot(t, false); },
-  focus: (id) => activateTab(id),
-  clearLog: () => { loot = []; store.set('cobalt.loot', loot); lootNotify(); },
-  onChange: (cb) => { lootListeners.add(cb); }
-};
 
 const loadedTools = new Set();
 async function loadToolAddons() {
   const installed = await window.cobalt.addonsList();
+  // Migración: AutoLoot dejó de ser addon (ahora vive en el core). Si alguien lo
+  // tenía instalado, se retira para no duplicar el botón.
+  if (installed.autoloot) { try { await window.cobalt.addonsUninstall('autoloot'); naviris.unregisterTool('autoloot'); delete installed.autoloot; } catch { /* nada */ } }
   for (const [id, meta] of Object.entries(installed)) {
     if (meta.kind !== 'tool' || !meta.enabled || loadedTools.has(id)) continue;
     const code = await window.cobalt.addonsCode(id);

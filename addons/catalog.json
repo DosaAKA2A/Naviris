@@ -1,13 +1,13 @@
 {
   "addons": [
     {
-      "id": "autoloot",
-      "name": "Rat Loot",
-      "version": "1.2.1",
+      "id": "sound-booster",
+      "name": "Sound Booster",
+      "version": "1.0.0",
       "kind": "tool",
-      "icon": "gift",
-      "description": "Sesiones de recolección de Twitch: Activar silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupada a la izquierda. Panel con sesiones activas e historial del loot obtenido. Requiere Naviris 2.3+.",
-      "entry": "https://naviris.site/addons/autoloot.js"
+      "icon": "speaker-wave",
+      "description": "Amplifica el volumen de la pestaña activa por encima del 100% (hasta 500%) con un deslizador y niveles rápidos. Útil para vídeos con audio bajo. Requiere Naviris 2.5+.",
+      "entry": "https://naviris.site/addons/sound-booster.js"
     },
     {
       "id": "steam-inventory-helper",
