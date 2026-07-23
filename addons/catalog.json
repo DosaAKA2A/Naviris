@@ -3,7 +3,7 @@
     {
       "id": "autoloot",
       "name": "AutoLoot para Twitch",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "tool",
       "icon": "gift",
       "description": "Rat Loot: deja canales de Twitch recolectando puntos y drops en segundo plano — silenciados, en resolución mínima (solo esa pestaña) y agrupados a la izquierda. Incluye el registro de todo el loot obtenido. Requiere Naviris 2.3+.",
@@ -15,7 +15,9 @@
       "version": "1.1.0",
       "kind": "content",
       "icon": "puzzle-piece",
-      "matches": ["steamcommunity.com"],
+      "matches": [
+        "steamcommunity.com"
+      ],
       "description": "Precios en tu inventario de Steam con comparativa multi-mercado (Buff163, Skinport, CSFloat) para CS2, valor total con selector de mercado, venta rápida y suma del valor por lado en las ofertas de intercambio.",
       "entry": "https://naviris.site/addons/steam-inventory-helper.js"
     },
