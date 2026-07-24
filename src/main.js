@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -985,7 +985,12 @@ ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 
 nativeTheme.themeSource = 'dark';
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Widevine (castlabs ECS): descargar/registrar el CDM antes de crear ventanas,
+  // para poder reproducir vídeo DRM (Crunchyroll, Netflix, etc.). Con Electron
+  // estándar `components` no existe; el guard evita romper ese caso.
+  try { if (components && components.whenReady) await components.whenReady(); }
+  catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
   // Comprobación silenciosa al arrancar (solo en versión instalada)
   if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
   braveAdblock.init();
