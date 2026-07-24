@@ -279,13 +279,17 @@ ipcRenderer.on('cobalt-fill', (_e, cred) => {
 (function () {
   function report() {
     try {
-      var v = document.documentElement.getAttribute('data-naviris-agent');
+      var de = document.documentElement;
+      var v = de ? de.getAttribute('data-naviris-agent') : null;
       var on = v != null && v !== '' && v !== '0' && v !== 'false';
       ipcRenderer.sendToHost('cobalt-agent', { on: on, label: on ? v : '' });
     } catch (e) { /* nada */ }
   }
   try {
-    new MutationObserver(report).observe(document.documentElement, { attributes: true, attributeFilter: ['data-naviris-agent'] });
+    // Observa 'document' (siempre existe en el preload) con subtree, para captar el
+    // atributo en <html> aunque documentElement todavía no exista al arrancar el
+    // preload. Observar directamente documentElement fallaba: era null en ese instante.
+    new MutationObserver(report).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-naviris-agent'] });
   } catch (e) { /* nada */ }
-  if (document.documentElement.hasAttribute('data-naviris-agent')) report();
+  if (document.documentElement && document.documentElement.hasAttribute('data-naviris-agent')) report();
 })();
