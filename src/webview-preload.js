@@ -139,10 +139,10 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   }
   // Detección: si hay drops pendientes, avisa al host para que abra el webview-claimer.
   function checkPendingDrops(force) {
-    if (!force && Date.now() - lastDropCheck < 60000) return; // no martillear el inventario
+    if (!force && Date.now() - lastDropCheck < 20000) return; // cada ~20s (antes 60s): recorta la espera del reclamo
     lastDropCheck = Date.now();
     fetchInventory().then(function (res) {
-      if (countClaimable(res) > 0 && Date.now() - lastPendingPing > 90000) {
+      if (countClaimable(res) > 0 && Date.now() - lastPendingPing > 30000) {
         lastPendingPing = Date.now();
         ipcRenderer.sendToHost('cobalt-twitch', { type: 'drops-pending' });
       }
@@ -224,7 +224,12 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   }
   // Reintenta hasta que el reproductor exista y acepte la calidad baja
   function lowResThisTabOnly() {
-    try { localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' })); } catch (e) { /* respaldo para la carga */ }
+    try {
+      localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' }));
+      // CLAVE: esta bandera de Twitch anulaba lo anterior forzando la calidad más alta.
+      // Sin ponerla en false, el reproductor ignoraba el 160p y se quedaba en 720p.
+      localStorage.setItem('video-quality-highest-available', 'false');
+    } catch (e) { /* respaldo para la carga */ }
     var tries = 0;
     var t = setInterval(function () {
       if (pickLowestQuality() || ++tries > 40) clearInterval(t); // hasta ~40s
