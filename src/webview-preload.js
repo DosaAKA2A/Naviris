@@ -219,45 +219,48 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       document.dispatchEvent(new Event('visibilitychange')); // notifica el nuevo estado "visible"
     } catch (e) { /* nada */ }
   }
-  // Baja la calidad desde el MENÚ del propio reproductor de Twitch. Es fiable
-  // (el truco de localStorage solo se leía al arrancar el player y a veces no
-  // llegaba a tiempo) y aplica solo a ESTA pestaña, sin afectar a las demás.
-  function pickLowestQuality() {
+  // Baja la calidad desde el MENÚ del reproductor de Twitch: cambio EN VIVO (sin
+  // recargar) y solo de ESTA pestaña. Asíncrono con esperas porque el menú de React
+  // tarda en pintarse tras abrirlo; si consultas al instante, no encuentra las opciones
+  // (ese era el fallo). Llama cb(true) si logró pulsar la opción más baja.
+  function applyLowQualityViaMenu(cb) {
     try {
       var gear = document.querySelector('[data-a-target="player-settings-button"]');
-      if (!gear) return false;
+      if (!gear) { cb(false); return; }
       gear.click();
-      var qItem = document.querySelector('[data-a-target="player-settings-menu-item-quality"]');
-      if (!qItem) { gear.click(); return false; }
-      qItem.click();
-      // La lista es Auto, 1080p, 720p… la última opción es la más baja
-      var opts = document.querySelectorAll('[data-a-target="player-settings-submenu-quality-option"]');
-      if (!opts.length) { gear.click(); return false; }
-      var last = opts[opts.length - 1];
-      var clickable = last.querySelector('input[type="radio"]') || last.querySelector('label') || last;
-      clickable.click();
-      return true;
-    } catch (e) { return false; }
+      setTimeout(function () {
+        var qItem = document.querySelector('[data-a-target="player-settings-menu-item-quality"]');
+        if (!qItem) { try { gear.click(); } catch (e) { /* nada */ } cb(false); return; }
+        qItem.click();
+        setTimeout(function () {
+          var opts = document.querySelectorAll('[data-a-target="player-settings-submenu-quality-option"]');
+          if (!opts.length) { try { gear.click(); } catch (e) { /* nada */ } cb(false); return; }
+          var last = opts[opts.length - 1]; // Auto, 1080p, 720p… → la última es la más baja (160p)
+          try { (last.querySelector('input[type="radio"]') || last.querySelector('label') || last).click(); cb(true); }
+          catch (e) { cb(false); }
+        }, 450);
+      }, 450);
+    } catch (e) { cb(false); }
   }
-  // Reintenta hasta que el reproductor exista y acepte la calidad baja
   var qualityHandled = false;
   function lowResThisTabOnly() {
-    try {
-      localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' }));
-      // CLAVE: esta bandera de Twitch anulaba lo anterior forzando la calidad más alta.
-      // Sin ponerla en false, el reproductor ignoraba el 160p y se quedaba en 720p.
-      localStorage.setItem('video-quality-highest-available', 'false');
-    } catch (e) { /* nada */ }
     if (qualityHandled) return; qualityHandled = true;
-    // El cambio por el MENÚ del player no es fiable (a veces no aplica en vivo). Con la
-    // calidad ya fijada en localStorage, si el player cargó en alta, recargamos UNA vez
-    // para que re-inicie a 160p. Tras la recarga ya arranca bajo, así que no se repite.
+    // Baja SOLO esta pestaña a 160p por el menú (en vivo, sin recargar). Seleccionar por
+    // menú escribe video-quality GLOBAL en localStorage; lo guardamos y lo restauramos al
+    // final para que las pestañas/streams NUEVOS sigan en Automática (no heredan el 160p).
+    var savedLS = null;
+    try { savedLS = localStorage.getItem('video-quality'); } catch (e) { /* nada */ }
+    function restoreLS() {
+      try { if (savedLS == null) localStorage.removeItem('video-quality'); else localStorage.setItem('video-quality', savedLS); } catch (e) { /* nada */ }
+    }
     var tries = 0;
-    var iv = setInterval(function () {
+    function attempt() {
       var v = document.querySelector('video');
-      if (v && v.videoHeight) { clearInterval(iv); if (v.videoHeight > 300) { try { location.reload(); } catch (e) { /* nada */ } } }
-      else if (++tries > 20) clearInterval(iv);
-    }, 1000);
+      if (v && v.videoHeight && v.videoHeight <= 200) { restoreLS(); return; } // confirmado bajo
+      if (++tries > 20) { restoreLS(); return; } // no se pudo: al menos no dejamos el LS sucio
+      applyLowQualityViaMenu(function () { setTimeout(attempt, 1800); }); // reintenta y re-verifica la altura
+    }
+    attempt();
   }
   let obs = null;
   function tick() { clickChest(); claimDrops(); checkPendingDrops(false); keepAlive(); }
