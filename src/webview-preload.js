@@ -3,6 +3,37 @@
 // Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
 const { ipcRenderer } = require('electron');
 
+// --- YouTube: bloqueo de anuncios a nivel del player, en document_start ---
+// El preload corre ANTES que los scripts de la página, así que inyectamos en el MUNDO
+// PRINCIPAL un script que vacía los campos de anuncio de la respuesta del player
+// (adPlacements/playerAds/adSlots) ANTES de que el player la lea. Interceptamos la
+// asignación de ytInitialPlayerResponse con un setter (primera carga) y hookeamos
+// JSON.parse y Response.json (navegación SPA). Nada de seek: no congela.
+if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
+  try {
+    var __yt = '(' + function () {
+      if (window.__navYT) return; window.__navYT = 1;
+      var AD = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adParams'];
+      function prune(o) {
+        try {
+          if (o && typeof o === 'object') {
+            var ts = [o]; if (o.playerResponse && typeof o.playerResponse === 'object') ts.push(o.playerResponse);
+            ts.forEach(function (t) { AD.forEach(function (k) { if (k in t) delete t[k]; }); });
+          }
+        } catch (e) {}
+        return o;
+      }
+      try { var _p = JSON.parse; JSON.parse = function () { return prune(_p.apply(this, arguments)); }; } catch (e) {}
+      try { var _j = Response.prototype.json; Response.prototype.json = function () { return _j.apply(this, arguments).then(prune); }; } catch (e) {}
+      try { var _v; Object.defineProperty(window, 'ytInitialPlayerResponse', { configurable: true, get: function () { return _v; }, set: function (n) { _v = prune(n); } }); } catch (e) {}
+    }.toString() + ')();';
+    var s = document.createElement('script');
+    s.textContent = __yt;
+    (document.documentElement || document.head || document).appendChild(s);
+    s.remove();
+  } catch (e) { /* nada */ }
+}
+
 function findLogin() {
   const pass = document.querySelector('input[type="password"]:not([disabled])');
   if (!pass) return null;

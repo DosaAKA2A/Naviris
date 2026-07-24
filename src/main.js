@@ -130,24 +130,36 @@ function suppressWebAuthn(contents) {
 }
 
 // ---------- Scripts inyectados en las páginas ----------
-// Salta anuncios de YouTube sin bloquear el vídeo (rápido, self-sostenido en SPA)
+// Bloqueo de anuncios de YouTube al estilo Brave/uBlock: NO se salta el anuncio en
+// el player (eso congelaba), sino que se VACÍAN los campos de anuncio de la respuesta
+// del player antes de que la lea (adPlacements/playerAds/adSlots). Se hookea JSON.parse
+// y Response.json para podar la respuesta inicial embebida y las de /youtubei/v1/player.
 const YT_ADSKIP = `(function(){
   if(window.__cobaltYT)return; window.__cobaltYT=1;
-  function skip(){
+  var AD_KEYS=['adPlacements','playerAds','adSlots','adBreakHeartbeatParams','adParams'];
+  function prune(o){
     try{
-      var p=document.querySelector('.html5-video-player');
-      var v=document.querySelector('video');
-      if(p&&p.classList.contains('ad-showing')&&v){ v.muted=true; if(isFinite(v.duration)&&v.duration>0){ try{v.currentTime=v.duration;}catch(e){} } }
+      if(!o||typeof o!=='object')return o;
+      var targets=[o]; if(o.playerResponse&&typeof o.playerResponse==='object')targets.push(o.playerResponse);
+      targets.forEach(function(t){ AD_KEYS.forEach(function(k){ if(k in t) delete t[k]; }); });
+    }catch(e){}
+    return o;
+  }
+  // 1) Poda la respuesta inicial embebida (primera carga)
+  try{ if(window.ytInitialPlayerResponse) prune(window.ytInitialPlayerResponse); }catch(e){}
+  // 2) Hook JSON.parse -> poda cualquier respuesta de player parseada por el sitio
+  try{ var _p=JSON.parse; JSON.parse=function(){ return prune(_p.apply(this,arguments)); }; }catch(e){}
+  // 3) Hook Response.json -> poda las respuestas fetch de /youtubei/v1/player (SPA)
+  try{ var _j=Response.prototype.json; Response.prototype.json=function(){ return _j.apply(this,arguments).then(function(o){ return prune(o); }); }; }catch(e){}
+  // 4) Respaldo suave (SIN seek): cierra el aviso anti-adblock y pulsa 'saltar' si aparece
+  function tidy(){
+    try{
       ['.ytp-ad-skip-button','.ytp-ad-skip-button-modern','.ytp-skip-ad-button','.ytp-ad-overlay-close-button'].forEach(function(s){ var b=document.querySelector(s); if(b) b.click(); });
-      // Cierra el aviso anti-adblock para que el vídeo siga reproduciéndose
       var enf=document.querySelector('ytd-enforcement-message-view-model');
-      if(enf){ var dlg=enf.closest('tp-yt-paper-dialog'); if(dlg) dlg.remove(); else enf.remove(); document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(function(b){ b.remove(); }); document.documentElement.style.overflow=''; if(v&&v.paused){ try{v.play();}catch(e){} } }
+      if(enf){ var dlg=enf.closest('tp-yt-paper-dialog'); if(dlg) dlg.remove(); else enf.remove(); document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(function(b){ b.remove(); }); document.documentElement.style.overflow=''; var v=document.querySelector('video'); if(v&&v.paused){ try{v.play();}catch(e){} } }
     }catch(e){}
   }
-  setInterval(skip,300);
-  // Observer con freno: YouTube muta el DOM sin parar y reaccionar a cada
-  // cambio disparaba CPU/memoria del renderer. El interval ya cubre el resto.
-  try{ new MutationObserver(function(){ if(window.__cbYTd)return; window.__cbYTd=1; setTimeout(function(){ window.__cbYTd=0; skip(); },500); }).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  setInterval(tidy,700);
 })();`;
 const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,.ytp-ad-module,.video-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
 // Revela contenido sensible en X/Twitter
@@ -326,10 +338,22 @@ function setupSession(ses) {
     callback({});
   });
 
-  // Abre CORS SOLO para las APIs públicas de precios que usan los addons
-  // (p. ej. Valve Rat Tool compara mercados desde páginas de Steam)
+  // Un solo onHeadersReceived (Electron solo admite uno por sesión): (a) relaja el CSP
+  // de YouTube para que el bloqueador de anuncios inyectado en document_start pueda
+  // correr, y (b) abre CORS para las APIs públicas de precios que usan los addons
+  // (p. ej. Valve Rat Tool compara mercados desde páginas de Steam).
   const CORS_OPEN = ['prices.csgotrader.app', 'api.skinport.com', 'api.dmarket.com'];
-  ses.webRequest.onHeadersReceived({ urls: CORS_OPEN.map((h) => 'https://' + h + '/*') }, (details, cb) => {
+  const HDR_URLS = [...CORS_OPEN.map((h) => 'https://' + h + '/*'), 'https://*.youtube.com/*', 'https://*.youtube-nocookie.com/*'];
+  ses.webRequest.onHeadersReceived({ urls: HDR_URLS }, (details, cb) => {
+    let host = ''; try { host = new URL(details.url).hostname; } catch { /* nada */ }
+    if (/(^|\.)youtube(-nocookie)?\.com$/.test(host)) {
+      if (settings.adblockEnabled && (details.resourceType === 'mainFrame' || details.resourceType === 'subFrame')) {
+        const headers = { ...details.responseHeaders };
+        for (const k of Object.keys(headers)) if (/^content-security-policy(-report-only)?$/i.test(k)) delete headers[k];
+        return cb({ responseHeaders: headers });
+      }
+      return cb({});
+    }
     const headers = { ...details.responseHeaders };
     for (const k of Object.keys(headers)) if (/^access-control-allow-(origin|methods|headers)$/i.test(k)) delete headers[k];
     headers['Access-Control-Allow-Origin'] = ['*'];
