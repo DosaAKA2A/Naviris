@@ -86,6 +86,86 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       });
     } catch (e) { /* nada */ }
   }
+  // --- Reclamo de drops por la API GraphQL de Twitch ---
+  // El botón de "reclamar drop" es un toast fugaz: si la pestaña no lo pilla en el
+  // acto, el drop solo queda en twitch.tv/drops/inventory y claimDrops() (arriba)
+  // nunca vuelve a verlo. Por eso los puntos caían y los drops no. Aquí barremos el
+  // inventario y reclamamos con dropInstanceID, funcione o no el toast y esté la
+  // pestaña en primer o segundo plano. Mismos hashes/cliente que TwitchDropsMiner.
+  var GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+  var GQL_HASH_INVENTORY = 'd86775d0ef16a63a33ad52e80eaff963b2d5b72fada7c991504a57496e1d8e4b';
+  var GQL_HASH_CLAIM = 'a455deea71bdc9015b78eb49f4acfbce8baa7ccbedd28e549bb025bd0f751930';
+  // Consulta cruda de respaldo: el hash del inventario cambia de vez en cuando; el
+  // de la mutación de reclamo lleva años estable, así que ese no necesita respaldo.
+  var GQL_INVENTORY_QUERY =
+    'query Inventory($fetchRewardCampaigns: Boolean = false) {' +
+    ' currentUser { inventory {' +
+    ' dropCampaignsInProgress { timeBasedDrops { id self { dropInstanceID isClaimed } } } } } }';
+  var lastDropSweep = 0;
+  // La cookie auth-token de Twitch es httpOnly: NO se puede leer con document.cookie
+  // (lo verifiqué en vivo). Por eso NO dependemos de leer el token; autenticamos con
+  // credentials:'include', que envía la cookie httpOnly de .twitch.tv automáticamente
+  // (el preload comparte la sesión de la pestaña). Si por lo que sea el token llegara
+  // a ser legible, lo añadimos como Authorization; si no, la cookie basta.
+  function twitchToken() {
+    try { var m = document.cookie.match(/(?:^|;\s*)auth-token=([a-z0-9]+)/i); return m ? m[1] : null; } catch (e) { return null; }
+  }
+  function gql(payload) {
+    var headers = { 'Client-Id': GQL_CLIENT_ID };
+    var tok = twitchToken();
+    if (tok) headers['Authorization'] = 'OAuth ' + tok;
+    return fetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
+      credentials: 'include',
+      headers: headers,
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); });
+  }
+  function fetchInventory() {
+    return gql({
+      operationName: 'Inventory',
+      variables: { fetchRewardCampaigns: true },
+      extensions: { persistedQuery: { version: 1, sha256Hash: GQL_HASH_INVENTORY } }
+    }).then(function (res) {
+      // Si el hash caducó, Twitch responde PersistedQueryNotFound: reintenta crudo.
+      var stale = res && res.errors && res.errors.some(function (e) {
+        return e && /PersistedQueryNotFound/i.test(e.message || '');
+      });
+      if (stale) {
+        return gql({ operationName: 'Inventory', variables: { fetchRewardCampaigns: true }, query: GQL_INVENTORY_QUERY });
+      }
+      return res;
+    });
+  }
+  function claimDrop(id) {
+    return gql({
+      operationName: 'DropsPage_ClaimDropRewards',
+      variables: { input: { dropInstanceID: id } },
+      extensions: { persistedQuery: { version: 1, sha256Hash: GQL_HASH_CLAIM } }
+    });
+  }
+  function sweepDrops(force) {
+    if (!force && Date.now() - lastDropSweep < 60000) return; // no martillear el inventario
+    lastDropSweep = Date.now();
+    fetchInventory().then(function (res) {
+      var inv = res && res.data && res.data.currentUser && res.data.currentUser.inventory;
+      var camps = (inv && inv.dropCampaignsInProgress) || [];
+      var ids = [];
+      camps.forEach(function (c) {
+        ((c && c.timeBasedDrops) || []).forEach(function (d) {
+          var s = d && d.self;
+          // dropInstanceID solo es no-nulo cuando el drop ya se ganó y espera reclamo
+          if (s && s.dropInstanceID && !s.isClaimed && ids.indexOf(s.dropInstanceID) === -1) ids.push(s.dropInstanceID);
+        });
+      });
+      ids.forEach(function (id) {
+        claimDrop(id).then(function (r) {
+          var ok = r && r.data && r.data.claimDropRewards && !((r.errors || []).length);
+          if (ok) { claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
+        }).catch(function () { /* red: se reintenta en el próximo barrido */ });
+      });
+    }).catch(function () { /* sin sesión de Twitch o red caída: el respaldo DOM sigue activo */ });
+  }
   // Mantiene el stream vivo en segundo plano: reanuda el vídeo y cierra el "¿sigues ahí?".
   function keepAlive() {
     try {
@@ -147,13 +227,14 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     }, 1000);
   }
   let obs = null;
-  function tick() { clickChest(); claimDrops(); keepAlive(); }
+  function tick() { clickChest(); claimDrops(); sweepDrops(false); keepAlive(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
     if (opt && opt.on) {
       spoofVisible(); // sin esto, los drops no acumulan tiempo en segundo plano
       if (opt.lowRes) lowResThisTabOnly();
       if (!timer) {
         ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
+        sweepDrops(true); // barrido inmediato: reclama lo que ya estuviera pendiente en el inventario
         tick();
         timer = setInterval(tick, 8000);
         // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
