@@ -1,5 +1,7 @@
-/* electron-builder afterPack: firma VMP de Widevine con castlabs EVS.
-   Un instalable sin esta firma NO reproduce DRM (Crunchyroll/Netflix dan KAT-6005).
+/* electron-builder afterSign: firma VMP de Widevine con castlabs EVS.
+   DEBE ir en afterSign (NO afterPack): el Authenticode (signtool) de electron-builder
+   modifica Naviris.exe y invalidaria una firma VMP hecha antes. VMP debe ser lo ULTIMO
+   que toca el exe. Un instalable sin esta firma NO reproduce DRM (Crunchyroll da KAT-6005).
    Requiere, en la máquina que hace el build: Python + `pip install castlabs-evs`
    y una sesión EVS ya autenticada (los tokens quedan cacheados tras el signup/reauth).
    La firma es LOCAL: no se exponen credenciales en CI.

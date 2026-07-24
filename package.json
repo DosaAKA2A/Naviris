@@ -24,7 +24,11 @@
   "build": {
     "appId": "com.estudiodeiris.cobalt",
     "productName": "Naviris",
-    "afterPack": "build/evs-sign.js",
+    "afterSign": "build/evs-sign.js",
+    "electronDownload": {
+      "mirror": "https://github.com/castlabs/electron-releases/releases/download/",
+      "customDir": "v{{ version }}"
+    },
     "directories": {
       "output": "dist"
     },
