@@ -214,6 +214,12 @@ if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', '9
 // MemoryPurgeOnFreeze: purga la memoria de renderers congelados (menos RAM retenida)
 app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades,MemoryPurgeOnFreeze');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+// AutoLoot: evita que Chromium suspenda el vídeo/temporizadores de pestañas en segundo
+// plano, para que el tiempo de drops siga contando aunque la pestaña no esté visible.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-background-media-suspend');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 // ---------- Bloqueador de anuncios ----------
 const AD_HOSTS = [
@@ -479,7 +485,7 @@ function createWindow(isPrivate = false) {
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
-    webPreferences.backgroundThrottling = true; // baja CPU/timers en pestañas de fondo
+    webPreferences.backgroundThrottling = false; // AutoLoot: NO frenar timers/vídeo en segundo plano (el tiempo de drops debe seguir contando)
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
   win.once('ready-to-show', () => win.show());
