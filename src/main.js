@@ -319,6 +319,14 @@ function setupSession(ses) {
       return callback({});
     }
     const u = details.url;
+    // No romper YouTube: sus recursos PROPIOS de reproducción/sesión NUNCA se bloquean
+    // (el vídeo de googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr,
+    // /youtubei/). Bloquearlos rompe la reproducción —sobre todo Shorts— y provoca
+    // cargas lentas por reintentos. Los anuncios de YouTube se quitan con el pruning del
+    // player (webview-preload.js), no bloqueando red. Verificado: era lo que rompía Shorts.
+    if (/\.googlevideo\.com\//i.test(u) || /(^|\.)youtube(-nocookie)?\.com\/(generate_204|api\/stats\/(qoe|watchtime|atr|playback)|youtubei\/)/i.test(u)) {
+      return callback({});
+    }
     // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
     if (YT_AD_PATHS.some((p) => u.includes(p))) { blockedCount++; return callback({ cancel: true }); }
     // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
