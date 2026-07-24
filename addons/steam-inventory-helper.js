@@ -1,4 +1,4 @@
-/* Naviris addon: Valve Rat Tool v1.4.0
+/* Naviris addon: Valve Rat Tool v1.5.0
    Se inyecta en steamcommunity.com. Funciones al estilo Steam Inventory Helper:
    - Precio de Steam bajo cada objeto (moneda de tu cartera, caché 24 h)
    - Precio de mercado real de Skinport (CS2) vía su API pública (USD, caché 1 h)
@@ -7,6 +7,10 @@
    - Ofertas de intercambio: suma el valor de cada lado (en el mercado elegido)
    - Barra de herramientas del inventario: buscar por nombre, ordenar la página
      (precio ↑/↓, nombre) y modo selección con suma del valor de lo seleccionado
+   - Venta masiva con el MISMO criterio que SIH: pone lo seleccionado a la venta al
+     precio más bajo del mercado (POST directo a market/sellitem/, neto del vendedor
+     calculado con los helpers de Steam sobre lowest_price, sin rebaja). Pide
+     confirmación antes de publicar.
    Respeta el límite de Steam (~20 consultas/min) con una cola; solo pide precio
    de los objetos de la página visible (no de las miles de páginas ocultas).
    Nota: la comparativa multi-mercado (Buff163/CSFloat…) que ofrece SIH usa su
@@ -121,6 +125,8 @@
     '.navsih-tbtn{background:#2a475e;color:#c7d5e0;border:none;border-radius:4px;font:600 12px Arial,sans-serif;padding:6px 12px;cursor:pointer}',
     '.navsih-tbtn:hover{background:#356089}',
     '.navsih-tbtn.on{background:#66c0f4;color:#0b1218}',
+    '.navsih-tbtn.sell{background:linear-gradient(to right,#75b022 5%,#588a1b 95%);color:#d2e885}',
+    '.navsih-tbtn.sell:hover{color:#fff}',
     '#navsih-selinfo{color:#c7d5e0;font:12px Arial,sans-serif}',
     '#navsih-selinfo b{color:#9ee2b8}',
     'body.navsih-selecting .inventory_page .item{cursor:pointer}',
@@ -156,6 +162,7 @@
 
   function tagItem(el, zone) {
     if (el.dataset.navsih) return;
+    const rgi = el.rgItem || (el.parentNode && el.parentNode.rgItem);
     const d = descOf(el);
     if (!d || !d.market_hash_name) return;
     el.dataset.navsih = '1';
@@ -163,7 +170,7 @@
     badge.className = 'navsih-price'; badge.textContent = '…';
     if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.appendChild(badge);
-    const entry = { el, d, badge, steamStr: null, zone };
+    const entry = { el, d, item: rgi, badge, steamStr: null, zone };
     items.push(entry);
     getPrice(d.appid, d.market_hash_name).then((p) => {
       if (p) { entry.steamStr = p; badge.firstChild.textContent = p; refreshTotal(); if (zone !== 'inv') tradeTotals(); }
@@ -258,6 +265,7 @@
   /* ---------- Herramientas de inventario: barra (buscar / ordenar / seleccionar) ---------- */
   const selected = new Set();
   let selectMode = false;
+  let selling = false;
   function priceOf(e) {
     if (market === 'steam') return e.steamStr ? money(e.steamStr) : -1;
     const mp = marketPrices(e.d.market_hash_name); return mp && mp[market] ? mp[market] : -1;
@@ -319,11 +327,89 @@
   function updateSelInfo() {
     const info = document.getElementById('navsih-selinfo'); if (!info) return;
     if (!selectMode) { info.textContent = ''; return; }
+    if (selling) return; // no repintar mientras se vende
     const s = sumFor([...selected]);
-    info.innerHTML = '<b>' + selected.size + '</b> sel. · <b>' + s.sum.toFixed(2) + ' ' + s.sym + '</b>';
+    const nMkt = [...selected].filter((e) => e.d && e.d.marketable).length;
+    info.innerHTML = '<b>' + selected.size + '</b> sel. · <b>' + s.sum.toFixed(2) + ' ' + s.sym + '</b>' +
+      (nMkt ? ' <button id="navsih-massell" class="navsih-tbtn sell" title="Pone a la venta cada objeto al precio mas bajo del mercado (criterio SIH)">Vender ' + nMkt + ' al mercado</button>' : '');
+    const mb = document.getElementById('navsih-massell');
+    if (mb) mb.onclick = massSell;
   }
+
+  /* Neto del vendedor a partir del precio del comprador (mismo algoritmo que SIH:
+     parte de lowest_price y descuenta las comisiones de Steam con sus propios helpers). */
+  function sellerFromBuyer(buyerCents) {
+    if (typeof GetItemPriceFromTotal !== 'function' || typeof GetTotalWithFees !== 'function') return -1;
+    const ppct = parseFloat(g_rgWalletInfo.wallet_publisher_fee_percent_default != null ? g_rgWalletInfo.wallet_publisher_fee_percent_default : 0.1);
+    const spct = parseFloat(g_rgWalletInfo.wallet_fee_percent != null ? g_rgWalletInfo.wallet_fee_percent : 0.05);
+    let target = buyerCents;
+    const minBuyer = GetTotalWithFees(g_rgWalletInfo.wallet_market_minimum, ppct, spct, g_rgWalletInfo);
+    if (target < minBuyer) target = buyerCents; // fastdelta = 0 (sin rebaja, como SIH por defecto)
+    let seller = 0, finalBuyer = 0, adj = target, i = 0;
+    while (i++ < 10000) {
+      seller = GetItemPriceFromTotal(adj, g_rgWalletInfo);
+      finalBuyer = GetTotalWithFees(seller, ppct, spct, g_rgWalletInfo);
+      if (finalBuyer <= target) break;
+      adj--;
+    }
+    return seller;
+  }
+
+  /* Publica UN objeto a la venta al precio mas bajo del mercado (POST directo a Steam,
+     idéntico a Steam Inventory Helper: precio = neto del vendedor sobre lowest_price). */
+  async function sellOne(entry) {
+    const it = entry.item, d = entry.d;
+    if (!it || !d || !d.marketable) return 'no-market';
+    const p = await getPrice(d.appid, d.market_hash_name);
+    if (!p) return 'sin-precio';
+    const buyerCents = Math.round(money(p) * 100);
+    if (!(buyerCents > 0)) return 'sin-precio';
+    const sellerCents = sellerFromBuyer(buyerCents);
+    if (!(sellerCents > 0)) return 'precio-min';
+    try {
+      const body = new URLSearchParams({
+        sessionid: window.g_sessionID, appid: it.appid, contextid: it.contextid,
+        assetid: it.assetid, amount: '1', price: String(sellerCents)
+      });
+      const r = await fetch('https://steamcommunity.com/market/sellitem/', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body
+      });
+      const j = await r.json().catch(() => null);
+      if (j && j.success) return 'ok';
+      entry.err = (j && j.message) || ('HTTP ' + r.status);
+      return 'fail';
+    } catch (e) { return 'error'; }
+  }
+
+  async function massSell() {
+    if (selling) return;
+    const list = [...selected].filter((e) => e.d && e.d.marketable && e.item);
+    if (!list.length) return;
+    const s = sumFor(list);
+    const msg = 'Se pondran a la venta ' + list.length + ' objeto(s) al PRECIO MAS BAJO del mercado de Steam ' +
+      '(el mismo criterio que Steam Inventory Helper).\n\nValor aproximado: ' + s.sum.toFixed(2) + ' ' + s.sym +
+      '. Steam descuenta su comision de tu parte; puede pedir confirmacion en la app movil.\n\n¿Continuar?';
+    if (!window.confirm(msg)) return;
+    selling = true;
+    const info = document.getElementById('navsih-selinfo');
+    let done = 0, fail = 0;
+    for (const entry of list) {
+      if (info) info.innerHTML = 'Publicando ' + (done + fail + 1) + '/' + list.length + '…';
+      let r;
+      try { r = await sellOne(entry); } catch (e) { r = 'error'; }
+      if (r === 'ok') { selected.delete(entry); if (entry.el) entry.el.classList.remove('navsih-sel'); done++; }
+      else fail++;
+      await new Promise((res) => setTimeout(res, 1200)); // ritmo suave para Steam
+    }
+    selling = false;
+    if (info) info.innerHTML = 'Listo: <b>' + done + '</b> a la venta' + (fail ? (' · ' + fail + ' sin publicar') : '');
+    refreshTotal();
+  }
+
   document.addEventListener('click', (ev) => {
-    if (!selectMode || !isInventory) return;
+    if (!selectMode || !isInventory || selling) return;
     const itemEl = ev.target.closest && ev.target.closest('.inventory_page .item, .inventory_ctn .item');
     if (!itemEl) return;
     const entry = items.find((i) => i.el === itemEl);
