@@ -102,11 +102,12 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     ' currentUser { inventory {' +
     ' dropCampaignsInProgress { timeBasedDrops { id self { dropInstanceID isClaimed } } } } } }';
   var lastDropSweep = 0;
-  // La cookie auth-token de Twitch es httpOnly: NO se puede leer con document.cookie
-  // (lo verifiqué en vivo). Por eso NO dependemos de leer el token; autenticamos con
-  // credentials:'include', que envía la cookie httpOnly de .twitch.tv automáticamente
-  // (el preload comparte la sesión de la pestaña). Si por lo que sea el token llegara
-  // a ser legible, lo añadimos como Authorization; si no, la cookie basta.
+  // Autenticación: con sesión iniciada, la cookie auth-token de Twitch SÍ es legible
+  // con document.cookie (verificado en vivo; sin sesión no existe, de ahí la confusión
+  // inicial). La mandamos como Authorization: OAuth, igual que TwitchDropsMiner. Además
+  // vamos con credentials:'include' para que el preload —mundo aislado que comparte la
+  // sesión de la pestaña— envíe también la cookie: así sigue funcionando aunque Twitch
+  // la vuelva httpOnly o el token no esté a mano en ese instante.
   function twitchToken() {
     try { var m = document.cookie.match(/(?:^|;\s*)auth-token=([a-z0-9]+)/i); return m ? m[1] : null; } catch (e) { return null; }
   }
