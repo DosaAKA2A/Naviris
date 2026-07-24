@@ -191,6 +191,16 @@ function saveSettings(s) {
 
 let settings = loadSettings();
 
+// Tras una ACTUALIZACIÓN (cambia la versión), forzamos el Modo agente a OFF. Motivo:
+// cuando la app se reinicia sola durante el update, el puerto CDP a veces no llega a
+// enlazarse (solapamiento con el proceso viejo que aún se cierra). Al obligar a
+// reactivarlo a mano se hace un reinicio LIMPIO, que sí abre el puerto de forma fiable.
+if (settings.appVersion !== app.getVersion()) {
+  if (settings.agentMode) settings.agentMode = false;
+  settings.appVersion = app.getVersion();
+  saveSettings(settings);
+}
+
 if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
 
 // ---------- Modo agente: Chrome DevTools Protocol en localhost ----------
