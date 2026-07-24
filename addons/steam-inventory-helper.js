@@ -1,11 +1,14 @@
-/* Naviris addon: Valve Rat Tool v1.3.0
+/* Naviris addon: Valve Rat Tool v1.4.0
    Se inyecta en steamcommunity.com. Funciones al estilo Steam Inventory Helper:
    - Precio de Steam bajo cada objeto (moneda de tu cartera, caché 24 h)
    - Precio de mercado real de Skinport (CS2) vía su API pública (USD, caché 1 h)
    - Valor total del inventario visible con selector de mercado (Steam/Skinport)
    - Venta rápida al precio actual del mercado de Steam
    - Ofertas de intercambio: suma el valor de cada lado (en el mercado elegido)
-   Respeta el límite de Steam (~20 consultas/min) con una cola.
+   - Barra de herramientas del inventario: buscar por nombre, ordenar la página
+     (precio ↑/↓, nombre) y modo selección con suma del valor de lo seleccionado
+   Respeta el límite de Steam (~20 consultas/min) con una cola; solo pide precio
+   de los objetos de la página visible (no de las miles de páginas ocultas).
    Nota: la comparativa multi-mercado (Buff163/CSFloat…) que ofrece SIH usa su
    backend propio; aquí se usa la API pública de Skinport, un mercado real de
    referencia. El agregado de csgotrader que usábamos dejó de estar disponible. */
@@ -111,7 +114,17 @@
     '.navsih-sell{display:block;margin:6px 0;padding:7px 12px;background:linear-gradient(to right,#75b022 5%,#588a1b 95%);',
     'color:#d2e885;border:none;border-radius:2px;font:600 12px Arial,sans-serif;cursor:pointer;width:100%}',
     '.navsih-sell:hover{color:#fff}.navsih-sell[disabled]{opacity:.6;cursor:default}',
-    '.navsih-side{margin:4px 0;padding:5px 8px;background:rgba(0,0,0,.35);border-radius:4px;color:#9ee2b8;font:600 11px Arial,sans-serif}'
+    '.navsih-side{margin:4px 0;padding:5px 8px;background:rgba(0,0,0,.35);border-radius:4px;color:#9ee2b8;font:600 11px Arial,sans-serif}',
+    '#navsih-bar{display:flex;gap:8px;align-items:center;margin:6px 0 12px;flex-wrap:wrap;width:100%;box-sizing:border-box}',
+    '#navsih-bar input,#navsih-bar select{background:#101822;color:#c7d5e0;border:1px solid #2a475e;border-radius:4px;font:12px Arial,sans-serif;padding:5px 8px}',
+    '#navsih-bar input{min-width:190px}',
+    '.navsih-tbtn{background:#2a475e;color:#c7d5e0;border:none;border-radius:4px;font:600 12px Arial,sans-serif;padding:6px 12px;cursor:pointer}',
+    '.navsih-tbtn:hover{background:#356089}',
+    '.navsih-tbtn.on{background:#66c0f4;color:#0b1218}',
+    '#navsih-selinfo{color:#c7d5e0;font:12px Arial,sans-serif}',
+    '#navsih-selinfo b{color:#9ee2b8}',
+    'body.navsih-selecting .inventory_page .item{cursor:pointer}',
+    '.item.navsih-sel{outline:2px solid #66c0f4!important;outline-offset:-2px;box-shadow:0 0 9px rgba(102,192,244,.75)}'
   ].join('');
   document.documentElement.appendChild(css);
 
@@ -185,7 +198,7 @@
     const opts = [['steam', 'Steam']].concat(MARKETS.map(([k, l]) => [k, l]))
       .map(([k, l]) => '<option value="' + k + '"' + (k === market ? ' selected' : '') + '>' + l + '</option>').join('');
     totalBox.innerHTML = 'Valor (visible): <b>' + sum.toFixed(2) + ' ' + sym + '</b><select id="navsih-mk">' + opts + '</select>' +
-      '<div class="sub">' + n + ' objeto(s) con precio' + (market !== 'steam' ? ' · USD · datos: csgotrader' : '') + ' · Valve Rat Tool</div>';
+      '<div class="sub">' + n + ' objeto(s) con precio' + (market !== 'steam' ? ' · USD · datos: Skinport' : '') + ' · Valve Rat Tool</div>';
     totalBox.querySelector('#navsih-mk').addEventListener('change', (e) => {
       market = e.target.value; localStorage.__navSIHmarket = market;
       if (market !== 'steam') loadAgg().then(() => { refreshTotal(); tradeTotals(); });
@@ -242,13 +255,94 @@
     });
   }
 
+  /* ---------- Herramientas de inventario: barra (buscar / ordenar / seleccionar) ---------- */
+  const selected = new Set();
+  let selectMode = false;
+  function priceOf(e) {
+    if (market === 'steam') return e.steamStr ? money(e.steamStr) : -1;
+    const mp = marketPrices(e.d.market_hash_name); return mp && mp[market] ? mp[market] : -1;
+  }
+  function visibleInv() { return items.filter((i) => i.zone === 'inv' && i.el.offsetParent !== null); }
+  function holderOf(e) { return (e.el.closest && e.el.closest('.itemHolder')) || e.el; }
+
+  let bar = null;
+  const vis = (e) => e && e.offsetParent !== null;
+  function buildToolbar() {
+    if (!isInventory) return;
+    if (bar && document.body.contains(bar)) return;
+    // Ancla: encima de la rejilla de inventario visible (fila a lo ancho).
+    let anchor = [...document.querySelectorAll('.inventory_ctn')].find(vis), after = false;
+    if (!anchor) { anchor = [...document.querySelectorAll('.filter_ctn')].find(vis); after = true; }
+    if (!anchor || !anchor.parentNode) return;
+    bar = document.createElement('div'); bar.id = 'navsih-bar';
+    bar.innerHTML =
+      '<input id="navsih-q" placeholder="Buscar por nombre…" spellcheck="false">' +
+      '<select id="navsih-sort" title="Ordena la página visible">' +
+        '<option value="">Ordenar…</option>' +
+        '<option value="pd">Precio ↓</option><option value="pa">Precio ↑</option>' +
+        '<option value="nz">Nombre A-Z</option>' +
+      '</select>' +
+      '<button id="navsih-sel" class="navsih-tbtn">Seleccionar</button>' +
+      '<span id="navsih-selinfo"></span>';
+    if (after) anchor.parentNode.insertBefore(bar, anchor.nextSibling);
+    else anchor.parentNode.insertBefore(bar, anchor);
+    bar.querySelector('#navsih-q').addEventListener('input', (e) => applyFilter(e.target.value));
+    bar.querySelector('#navsih-sort').addEventListener('change', (e) => applySort(e.target.value));
+    bar.querySelector('#navsih-sel').addEventListener('click', toggleSelect);
+  }
+  function applyFilter(text) {
+    const q = String(text || '').trim().toLowerCase();
+    visibleInv().forEach((e) => {
+      const name = String(e.d.market_hash_name || e.d.name || '').toLowerCase();
+      holderOf(e).style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+    });
+  }
+  function applySort(mode) {
+    if (!mode) return;
+    const list = visibleInv().map((e) => ({ e, h: holderOf(e) })).filter((x) => x.h && x.h.parentNode);
+    if (!list.length) return;
+    list.sort((a, b) => {
+      if (mode === 'nz') return String(a.e.d.market_hash_name || '').localeCompare(String(b.e.d.market_hash_name || ''));
+      const pa = priceOf(a.e), pb = priceOf(b.e);
+      return mode === 'pa' ? (pa - pb) : (pb - pa);
+    });
+    const parent = list[0].h.parentNode;
+    list.forEach((x) => parent.appendChild(x.h));
+  }
+  function toggleSelect() {
+    selectMode = !selectMode;
+    const b = document.getElementById('navsih-sel'); if (b) b.classList.toggle('on', selectMode);
+    document.body.classList.toggle('navsih-selecting', selectMode);
+    if (!selectMode) { selected.clear(); document.querySelectorAll('.item.navsih-sel').forEach((el) => el.classList.remove('navsih-sel')); }
+    updateSelInfo();
+  }
+  function updateSelInfo() {
+    const info = document.getElementById('navsih-selinfo'); if (!info) return;
+    if (!selectMode) { info.textContent = ''; return; }
+    const s = sumFor([...selected]);
+    info.innerHTML = '<b>' + selected.size + '</b> sel. · <b>' + s.sum.toFixed(2) + ' ' + s.sym + '</b>';
+  }
+  document.addEventListener('click', (ev) => {
+    if (!selectMode || !isInventory) return;
+    const itemEl = ev.target.closest && ev.target.closest('.inventory_page .item, .inventory_ctn .item');
+    if (!itemEl) return;
+    const entry = items.find((i) => i.el === itemEl);
+    if (!entry) return;
+    ev.stopPropagation(); ev.preventDefault();
+    if (selected.has(entry)) { selected.delete(entry); itemEl.classList.remove('navsih-sel'); }
+    else { selected.add(entry); itemEl.classList.add('navsih-sel'); }
+    updateSelInfo();
+  }, true);
+
   /* ---------- Observadores ---------- */
   function scan() {
-    document.querySelectorAll('.inventory_page .itemHolder .item, .inventory_ctn .itemHolder .item').forEach((el) => tagItem(el, 'inv'));
+    // Solo la página visible: evitar encolar miles de precios (límite de Steam).
+    [...document.querySelectorAll('.inventory_page .itemHolder .item, .inventory_ctn .itemHolder .item')]
+      .filter((el) => el.offsetParent !== null).forEach((el) => tagItem(el, 'inv'));
     const yours = document.getElementById('your_slots'), theirs = document.getElementById('their_slots');
     if (yours) yours.querySelectorAll('.item').forEach((el) => tagItem(el, 'yours'));
     if (theirs) theirs.querySelectorAll('.item').forEach((el) => tagItem(el, 'theirs'));
-    if (isInventory) addQuickSell();
+    if (isInventory) { addQuickSell(); buildToolbar(); }
     if (isTrade) tradeTotals();
   }
   new MutationObserver(() => { clearTimeout(window.__navSIHt); window.__navSIHt = setTimeout(scan, 300); })
