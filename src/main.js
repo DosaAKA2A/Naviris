@@ -958,6 +958,13 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
 // ---------- Actualización automática (GitHub Releases) ----------
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+// Canal DEV: las versiones con sufijo "-dev" (p. ej. 2.6.0-dev.1) siguen su PROPIO
+// canal (dev.yml) y solo reciben otras DEV. La versión estable (sin sufijo) sigue el
+// canal por defecto (latest.yml) y NUNCA recibe las DEV. Así conviven sin pisarse.
+if (/-dev/i.test(app.getVersion())) {
+  autoUpdater.channel = 'dev';
+  autoUpdater.allowPrerelease = true;
+}
 // Traduce cualquier error del updater a un mensaje CORTO y genérico. NUNCA expone rutas
 // locales, el nombre de usuario ni stack traces (electron-updater los vuelca crudos, y
 // eso filtraba datos como C:\Users\<usuario>\...). Solo se muestra este texto seguro.
