@@ -429,6 +429,15 @@ button { font-family: inherit; }
    (no display:none) para que Chrome no congele el conteo de tiempo de los drops.
    Tamaño reducido para que el coste sea mínimo (van en resolución baja). */
 #content webview.loot-live { display: flex; inset: auto; left: -100000px; top: 0; width: 960px; height: 540px; }
+/* Webview claimer oculto: renderizado (para que corra su JS) pero fuera de pantalla. */
+#content webview.agent-hidden { display: flex; inset: auto; left: -100000px; top: 0; width: 1000px; height: 640px; pointer-events: none; }
+/* Pestaña bajo control de un agente: marco ámbar en el webview activo (sin animación). */
+#content webview.agent-controlled.active { box-shadow: inset 0 0 0 3px #f59e0b; }
+/* Indicador global de Modo agente en la topbar. */
+#agent-badge { display: inline-flex; align-items: center; gap: 6px; margin: 0 8px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,.14); border: 1px solid rgba(245,158,11,.4); -webkit-app-region: no-drag; white-space: nowrap; }
+#agent-badge .ab-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; flex: 0 0 auto; }
+/* Punto ámbar en las pestañas que el agente está usando. */
+.tab .t-agent { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin: 0 4px; flex: 0 0 auto; }
 #content.res-mode { background: #0d0d0f; }
 #content.res-mode webview.active { inset: auto; left: 50%; top: 50%; border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px #26262b; background: #fff; }
 #res-label { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 11px; letter-spacing: .5px; color: #b4b6bd; background: rgba(10,10,12,.85); border: 1px solid #2b2b31; border-radius: 999px; padding: 4px 12px; pointer-events: none; font-variant-numeric: tabular-nums; }
