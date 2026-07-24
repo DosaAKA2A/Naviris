@@ -261,9 +261,6 @@ button { font-family: inherit; }
 .rat-tw-row span:first-child { display: flex; flex-direction: column; gap: 2px; }
 .rat-tw-row b { font-size: 13px; font-weight: 600; }
 .rat-tw-row small { font-size: 11px; color: var(--text-dim); }
-.rat-loot-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #8f6fd6; background: linear-gradient(135deg, rgba(145,112,214,.22), rgba(120,90,190,.12)); color: #d3c1ff; font-size: 13px; font-weight: 600; padding: 11px; border-radius: 10px; cursor: pointer; transition: background .14s, border-color .14s; }
-.rat-loot-btn svg { width: 15px; height: 15px; }
-.rat-loot-btn:hover { background: linear-gradient(135deg, rgba(145,112,214,.34), rgba(120,90,190,.2)); border-color: #a689e6; }
 /* Rat Tool detecta Twitch en la pestaña activa: acento sutil */
 .sb-btn.twitch-mode { color: #b98cff; }
 .sb-btn.twitch-mode::after { content: ""; position: absolute; top: 5px; right: 5px; width: 5px; height: 5px; border-radius: 50%; background: #b98cff; }
@@ -703,4 +700,13 @@ button { font-family: inherit; }
 .loot-hrow .lh-ic svg { width: 13px; height: 13px; color: var(--muted); }
 .loot-hrow .lh-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loot-hrow .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--dim, #5c5e64); }
+/* Historial agrupado por canal */
+.loot-hgroup { margin: 8px 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.loot-hgroup .lhg-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; background: var(--line, rgba(255,255,255,.03)); }
+.loot-hgroup .lhg-name { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-hgroup .lhg-sum { margin-left: auto; font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.loot-hgroup .lhg-drop { display: flex; align-items: center; gap: 9px; font-size: 11.5px; padding: 6px 10px; border-top: 1px solid var(--line); }
+.loot-hgroup .lhg-drop .lh-ic svg { width: 13px; height: 13px; color: var(--muted); }
+.loot-hgroup .lhg-drop .lh-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-hgroup .lhg-drop .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--dim, #5c5e64); }
 .loot-clear-btn { margin-top: 10px; border: 1px solid var(--line-2, #2c2c33); background: none; color: var(--muted); border-radius: 8px; padding: 6px 11px; font-size: 11px; cursor: pointer; }

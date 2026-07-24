@@ -65,7 +65,12 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
                       || sum.querySelector('button[aria-label="Claim Bonus"]')))
               || (document.querySelector('.claimable-bonus__icon') || {}).closest
                  && document.querySelector('.claimable-bonus__icon').closest('button');
-      if (btn) { btn.click(); lastPoints = Date.now(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims }); }
+      if (btn) {
+        btn.click(); lastPoints = Date.now(); claims++;
+        var bal = null; // saldo de puntos del canal, para el historial
+        try { var ps = document.querySelector('.community-points-summary'); if (ps) { var digs = (ps.textContent || '').replace(/[^\d]/g, ''); if (digs) bal = parseInt(digs, 10); } } catch (e) { /* nada */ }
+        ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims, balance: bal });
+      }
     } catch (e) { /* nada */ }
   }
   // Visible según dimensiones (el toast de reclamo de drop es position:fixed y
@@ -163,7 +168,19 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
           var r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
           var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
           var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          if (RE.test(txt) || RE.test(aria)) { el.__navClaimed = true; el.click(); clicked++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop' }); }
+          if (RE.test(txt) || RE.test(aria)) {
+            el.__navClaimed = true;
+            // Nombre de la recompensa: sube al contenedor-tarjeta y coge el texto más
+            // destacado (heading). Best-effort; se afina con la prueba en dev.
+            var name = '';
+            try {
+              var card = el.closest('.inventory-max-width, [data-test-selector*="DropsGrantedCard"], [class*="card" i]') || el.parentElement;
+              var h = card && (card.querySelector('h3, h4, p[class*="bold" i], strong') || card.querySelector('p'));
+              name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+            } catch (e) { /* nada */ }
+            el.click(); clicked++;
+            ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', name: name });
+          }
         });
       } catch (e) { /* nada */ }
       if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim-done', clicked: clicked }); }
