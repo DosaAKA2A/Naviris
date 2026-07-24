@@ -1179,6 +1179,22 @@ function showPwBar(html, yesLabel, onYes) {
   els.pwNo.onclick = hidePwBar;
   els.pwBar.classList.remove('hidden');
 }
+// Indicador de Modo agente: ÁMBAR = activo (puerto CDP abierto, sin agente conectado);
+// VERDE = un agente está conectado/actuando. El agente declara presencia llamando a
+// window.navirisAgentPing() (heartbeat) o controlando alguna pestaña. Si el heartbeat
+// deja de llegar (~15s), vuelve a ámbar sin necesidad de un intervalo perpetuo.
+let agentLastPing = 0, agentPingTimeout = null;
+window.navirisAgentPing = function () {
+  agentLastPing = Date.now(); refreshAgentBadge();
+  clearTimeout(agentPingTimeout); agentPingTimeout = setTimeout(refreshAgentBadge, 15500);
+};
+function refreshAgentBadge() {
+  const b = document.getElementById('agent-badge'); if (!b) return;
+  if (!settings.agentMode) { b.classList.add('hidden'); b.classList.remove('connected'); return; }
+  b.classList.remove('hidden');
+  const connected = (Date.now() - agentLastPing < 15000) || tabs.some((t) => t.agentControlled);
+  b.classList.toggle('connected', connected);
+}
 // Webview OCULTO que reclama los drops pendientes SIN tocar la pestaña que farmea:
 // carga /drops/inventory (misma sesión, PARTITION compartida), pulsa el botón real de
 // Twitch (que sí viaja con Client-Integrity) y se autodestruye. El farmeo no se corta.
@@ -1218,7 +1234,7 @@ async function onWebviewMessage(wv, e) {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
     tab.agentControlled = !!data.on;
     try { wv.classList.toggle('agent-controlled', !!data.on); } catch { /* nada */ }
-    renderTabs();
+    renderTabs(); refreshAgentBadge();
     return;
   }
   // Twitch: se atiende aunque la pestaña esté en segundo plano (ahí es donde se deja el stream)
@@ -1471,7 +1487,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
-  if (settings.agentMode) { const agb = document.getElementById('agent-badge'); if (agb) agb.classList.remove('hidden'); }
+  refreshAgentBadge();
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }

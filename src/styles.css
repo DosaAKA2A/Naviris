@@ -436,6 +436,9 @@ button { font-family: inherit; }
 /* Indicador global de Modo agente en la topbar. */
 #agent-badge { display: inline-flex; align-items: center; gap: 6px; margin: 0 8px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,.14); border: 1px solid rgba(245,158,11,.4); -webkit-app-region: no-drag; white-space: nowrap; }
 #agent-badge .ab-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; flex: 0 0 auto; }
+/* Verde cuando hay un agente conectado/actuando (ámbar = activo pero sin agente). */
+#agent-badge.connected { color: #22c55e; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.45); }
+#agent-badge.connected .ab-dot { background: #22c55e; }
 /* Punto ámbar en las pestañas que el agente está usando. */
 .tab .t-agent { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin: 0 4px; flex: 0 0 auto; }
 #content.res-mode { background: #0d0d0f; }
