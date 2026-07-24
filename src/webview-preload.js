@@ -240,16 +240,23 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     } catch (e) { return false; }
   }
   // Reintenta hasta que el reproductor exista y acepte la calidad baja
+  var qualityHandled = false;
   function lowResThisTabOnly() {
     try {
       localStorage.setItem('video-quality', JSON.stringify({ default: '160p30' }));
       // CLAVE: esta bandera de Twitch anulaba lo anterior forzando la calidad más alta.
       // Sin ponerla en false, el reproductor ignoraba el 160p y se quedaba en 720p.
       localStorage.setItem('video-quality-highest-available', 'false');
-    } catch (e) { /* respaldo para la carga */ }
+    } catch (e) { /* nada */ }
+    if (qualityHandled) return; qualityHandled = true;
+    // El cambio por el MENÚ del player no es fiable (a veces no aplica en vivo). Con la
+    // calidad ya fijada en localStorage, si el player cargó en alta, recargamos UNA vez
+    // para que re-inicie a 160p. Tras la recarga ya arranca bajo, así que no se repite.
     var tries = 0;
-    var t = setInterval(function () {
-      if (pickLowestQuality() || ++tries > 40) clearInterval(t); // hasta ~40s
+    var iv = setInterval(function () {
+      var v = document.querySelector('video');
+      if (v && v.videoHeight) { clearInterval(iv); if (v.videoHeight > 300) { try { location.reload(); } catch (e) { /* nada */ } } }
+      else if (++tries > 20) clearInterval(iv);
     }, 1000);
   }
   let obs = null;
