@@ -686,15 +686,15 @@ button { font-family: inherit; }
 .lp-body { flex: 1; overflow-y: auto; padding: 6px 14px 14px; }
 .loot-go { width: 100%; margin-top: 6px; padding: 11px; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; background: linear-gradient(120deg, #7b5cc4, #9147ff); color: #fff; }
 .loot-go.off { background: rgba(255,255,255,.05); color: var(--dim, #5c5e64); cursor: default; }
-.loot-hint { font-size: 11px; color: var(--dim, #5c5e64); margin: 8px 2px 0; line-height: 1.5; }
-.loot-lbl { display: flex; align-items: baseline; margin: 14px 2px 7px; font-family: var(--mono, ui-monospace, monospace); font-size: 9.5px; letter-spacing: 1.2px; color: var(--dim, #5c5e64); }
-.loot-lbl .ll-x { margin-left: auto; letter-spacing: .3px; }
-.loot-empty { font-size: 11.5px; color: var(--dim, #5c5e64); }
-.loot-ses { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; margin: 5px 0; }
-.loot-ses .ls-dot { width: 6px; height: 6px; border-radius: 50%; background: #9ee2b8; flex: none; }
-.loot-ses .ls-name { flex: 1; min-width: 0; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loot-ses .ls-n { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: #9ee2b8; }
-.ls-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 2px 4px; }
+.loot-hint { font-size: 12px; color: var(--muted); margin: 8px 2px 0; line-height: 1.55; }
+.loot-lbl { display: flex; align-items: baseline; margin: 16px 2px 8px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.loot-lbl .ll-x { margin-left: auto; letter-spacing: 0; font-weight: 600; }
+.loot-empty { font-size: 12.5px; color: var(--muted); padding: 4px 2px; }
+.loot-ses { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; }
+.loot-ses .ls-dot { width: 7px; height: 7px; border-radius: 50%; background: #9ee2b8; flex: none; }
+.loot-ses .ls-name { flex: 1; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-ses .ls-n { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; font-weight: 600; color: #9ee2b8; }
+.ls-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 3px 5px; }
 .ls-btn.stop { color: #e6a9b4; }
 .loot-hrow { display: flex; align-items: center; gap: 9px; font-size: 11.5px; padding: 6px 2px; border-bottom: 1px solid var(--line); }
 .loot-hrow .lh-ic svg { width: 13px; height: 13px; color: var(--muted); }
@@ -702,11 +702,11 @@ button { font-family: inherit; }
 .loot-hrow .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--dim, #5c5e64); }
 /* Historial agrupado por canal */
 .loot-hgroup { margin: 8px 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
-.loot-hgroup .lhg-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; background: var(--line, rgba(255,255,255,.03)); }
-.loot-hgroup .lhg-name { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loot-hgroup .lhg-sum { margin-left: auto; font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--muted); white-space: nowrap; }
-.loot-hgroup .lhg-drop { display: flex; align-items: center; gap: 9px; font-size: 11.5px; padding: 6px 10px; border-top: 1px solid var(--line); }
-.loot-hgroup .lhg-drop .lh-ic svg { width: 13px; height: 13px; color: var(--muted); }
+.loot-hgroup .lhg-head { display: flex; align-items: baseline; gap: 8px; padding: 9px 11px; background: var(--line, rgba(255,255,255,.03)); }
+.loot-hgroup .lhg-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-hgroup .lhg-sum { margin-left: auto; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.loot-hgroup .lhg-drop { display: flex; align-items: center; gap: 9px; font-size: 12.5px; padding: 7px 11px; border-top: 1px solid var(--line); }
+.loot-hgroup .lhg-drop .lh-ic svg { width: 14px; height: 14px; color: var(--muted); }
 .loot-hgroup .lhg-drop .lh-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loot-hgroup .lhg-drop .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--dim, #5c5e64); }
+.loot-hgroup .lhg-drop .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--muted); }
 .loot-clear-btn { margin-top: 10px; border: 1px solid var(--line-2, #2c2c33); background: none; color: var(--muted); border-radius: 8px; padding: 6px 11px; font-size: 11px; cursor: pointer; }
