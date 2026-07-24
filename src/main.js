@@ -130,28 +130,12 @@ function suppressWebAuthn(contents) {
 }
 
 // ---------- Scripts inyectados en las páginas ----------
-// Bloqueo de anuncios de YouTube al estilo Brave/uBlock: NO se salta el anuncio en
-// el player (eso congelaba), sino que se VACÍAN los campos de anuncio de la respuesta
-// del player antes de que la lea (adPlacements/playerAds/adSlots). Se hookea JSON.parse
-// y Response.json para podar la respuesta inicial embebida y las de /youtubei/v1/player.
+// El bloqueo de anuncios de YouTube (pruning de la respuesta del player) lo hace el
+// preload en document_start (webview-preload.js), que es lo robusto y a tiempo. Aquí,
+// en dom-ready, solo queda un RESPALDO DE UI ligero: cerrar el aviso anti-adblock y
+// pulsar 'saltar' si algún anuncio se colara. Sin hooks (los hacía el preload) ni seek.
 const YT_ADSKIP = `(function(){
-  if(window.__cobaltYT)return; window.__cobaltYT=1;
-  var AD_KEYS=['adPlacements','playerAds','adSlots','adBreakHeartbeatParams','adParams'];
-  function prune(o){
-    try{
-      if(!o||typeof o!=='object')return o;
-      var targets=[o]; if(o.playerResponse&&typeof o.playerResponse==='object')targets.push(o.playerResponse);
-      targets.forEach(function(t){ AD_KEYS.forEach(function(k){ if(k in t) delete t[k]; }); });
-    }catch(e){}
-    return o;
-  }
-  // 1) Poda la respuesta inicial embebida (primera carga)
-  try{ if(window.ytInitialPlayerResponse) prune(window.ytInitialPlayerResponse); }catch(e){}
-  // 2) Hook JSON.parse -> poda cualquier respuesta de player parseada por el sitio
-  try{ var _p=JSON.parse; JSON.parse=function(){ return prune(_p.apply(this,arguments)); }; }catch(e){}
-  // 3) Hook Response.json -> poda las respuestas fetch de /youtubei/v1/player (SPA)
-  try{ var _j=Response.prototype.json; Response.prototype.json=function(){ return _j.apply(this,arguments).then(function(o){ return prune(o); }); }; }catch(e){}
-  // 4) Respaldo suave (SIN seek): cierra el aviso anti-adblock y pulsa 'saltar' si aparece
+  if(window.__cobaltYTtidy)return; window.__cobaltYTtidy=1;
   function tidy(){
     try{
       ['.ytp-ad-skip-button','.ytp-ad-skip-button-modern','.ytp-skip-ad-button','.ytp-ad-overlay-close-button'].forEach(function(s){ var b=document.querySelector(s); if(b) b.click(); });

@@ -23,7 +23,9 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
         } catch (e) {}
         return o;
       }
-      try { var _p = JSON.parse; JSON.parse = function () { return prune(_p.apply(this, arguments)); }; } catch (e) {}
+      // Solo hookeamos Response.json (lo que usa YouTube para /youtubei/v1/player) y el
+      // setter de la respuesta inicial embebida. Nada de override global de JSON.parse:
+      // corría en CADA parseo (miles en YouTube) y era el mayor coste; estos dos bastan.
       try { var _j = Response.prototype.json; Response.prototype.json = function () { return _j.apply(this, arguments).then(prune); }; } catch (e) {}
       try { var _v; Object.defineProperty(window, 'ytInitialPlayerResponse', { configurable: true, get: function () { return _v; }, set: function (n) { _v = prune(n); } }); } catch (e) {}
     }.toString() + ')();';
