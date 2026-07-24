@@ -19,11 +19,12 @@
   },
   "devDependencies": {
     "electron": "github:castlabs/electron-releases#v42.5.2+wvcus",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.estudiodeiris.cobalt",
     "productName": "Naviris",
+    "afterPack": "build/evs-sign.js",
     "directories": {
       "output": "dist"
     },
