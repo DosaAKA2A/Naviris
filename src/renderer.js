@@ -165,11 +165,11 @@ function attachWebview(tab, url) {
       // Solo se apaga al ir a OTRO sitio real: las URLs intermedias (about:blank,
       // redirecciones vacías) no cuentan como "salir de Twitch"
       if (/^https?:/i.test(e.url) && h && !/(^|\.)twitch\.tv$/.test(h)) {
-        tab.autoLoot = false; tab.ratLoot = false; tab.twitchClaims = 0; renderTabs();
+        tab.autoLoot = false; tab.lowRes = false; tab.twitchClaims = 0; renderTabs();
       } else {
         // Navegación dentro de Twitch (SPA: buscar → entrar a un canal):
         // reengancha el recolector en la página nueva
-        try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: !!tab.ratLoot }); } catch { /* nada */ }
+        try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch { /* nada */ }
       }
     }
     // El botón AutoLoot de la topbar se recalcula en CADA navegación (antes solo
@@ -185,7 +185,7 @@ function attachWebview(tab, url) {
   wv.addEventListener('media-started-playing', () => { tab.audible = true; if (tab.muted) { try { wv.setAudioMuted(true); } catch {} } renderTabs(); });
   wv.addEventListener('media-paused', () => { tab.audible = false; renderTabs(); });
   // Reanuda el AutoLoot tras recargar/navegar dentro de Twitch
-  wv.addEventListener('dom-ready', () => { if (tab.autoLoot) { try { wv.send('cobalt-autoloot', { on: true, lowRes: !!tab.ratLoot }); } catch {} } });
+  wv.addEventListener('dom-ready', () => { if (tab.autoLoot) { try { wv.send('cobalt-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch {} } });
   wv.addEventListener('ipc-message', (e) => onWebviewMessage(wv, e));
   els.content.appendChild(wv);
 }
@@ -746,8 +746,9 @@ function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedi
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
-function recordLoot(kind, channel) {
-  loot.unshift({ t: Date.now(), kind: kind === 'drop' ? 'drop' : 'points', channel: channel || '' });
+function recordLoot(kind, channel, info) {
+  info = info || {};
+  loot.unshift({ t: Date.now(), kind: kind === 'drop' ? 'drop' : 'points', channel: channel || '', name: info.name || '', balance: (typeof info.balance === 'number' ? info.balance : null) });
   if (loot.length > 500) loot = loot.slice(0, 500);
   store.set('cobalt.loot', loot);
   updateLootUI();
@@ -914,7 +915,7 @@ function renderLootPanel() {
   if (lootView === 'ses') {
     const go = document.createElement('button'); go.id = 'loot-go'; go.className = 'loot-go' + (twitch ? '' : ' off');
     go.textContent = 'Activar'; go.disabled = !twitch;
-    go.addEventListener('click', () => { ratLoot(activeTab()); renderLootPanel(); });
+    go.addEventListener('click', () => { activateAutoLoot(activeTab()); renderLootPanel(); });
     body.appendChild(go);
     const hint = document.createElement('div'); hint.className = 'loot-hint';
     hint.textContent = twitch
@@ -934,15 +935,32 @@ function renderLootPanel() {
     }
   } else {
     const pts = loot.filter((l) => l.kind === 'points').length, drops = loot.filter((l) => l.kind === 'drop').length;
-    body.appendChild(lootLabel('LOOT OBTENIDO', pts + ' puntos · ' + drops + ' drops'));
+    body.appendChild(lootLabel('LOOT OBTENIDO', pts + ' cofres · ' + drops + ' drops'));
     if (!loot.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'Aún no se ha reclamado nada.'; body.appendChild(e); }
-    for (const l of loot.slice(0, 200)) {
-      const row = document.createElement('div'); row.className = 'loot-hrow';
-      const ic = document.createElement('span'); ic.className = 'lh-ic'; ic.innerHTML = window.icon(l.kind === 'drop' ? 'gift' : 'star');
-      const name = document.createElement('span'); name.className = 'lh-name'; name.textContent = l.channel || 'Twitch';
-      const when = document.createElement('span'); when.className = 'lh-when';
-      when.textContent = new Date(l.t).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-      row.append(ic, name, when); body.appendChild(row);
+    // Agrupado por canal: nº de cofres de puntos + saldo, y los drops con su nombre.
+    const groups = new Map();
+    for (const l of loot) { const k = (l.channel || 'Twitch').replace(/^www\./, ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(l); }
+    const order = [...groups.entries()].sort((a, b) => b[1][0].t - a[1][0].t);
+    for (const [chan, items] of order) {
+      const ptsItems = items.filter((x) => x.kind === 'points');
+      const dropItems = items.filter((x) => x.kind === 'drop');
+      const bals = ptsItems.map((x) => x.balance).filter((x) => typeof x === 'number');
+      const bal = bals.length ? Math.max(...bals) : null;
+      const card = document.createElement('div'); card.className = 'loot-hgroup';
+      const head = document.createElement('div'); head.className = 'lhg-head';
+      const nm = document.createElement('span'); nm.className = 'lhg-name'; nm.textContent = chan;
+      const sum = document.createElement('span'); sum.className = 'lhg-sum';
+      sum.textContent = `${ptsItems.length} cofres` + (bal != null ? ` · ${bal.toLocaleString('es')} pts` : '') + (dropItems.length ? ` · ${dropItems.length} drops` : '');
+      head.append(nm, sum); card.appendChild(head);
+      for (const d of dropItems.slice(0, 40)) {
+        const row = document.createElement('div'); row.className = 'lhg-drop';
+        const ic = document.createElement('span'); ic.className = 'lh-ic'; ic.innerHTML = window.icon('gift');
+        const dn = document.createElement('span'); dn.className = 'lh-name'; dn.textContent = d.name || 'Drop reclamado';
+        const when = document.createElement('span'); when.className = 'lh-when';
+        when.textContent = new Date(d.t).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        row.append(ic, dn, when); card.appendChild(row);
+      }
+      body.appendChild(card);
     }
     if (loot.length) { const c = document.createElement('button'); c.className = 'loot-clear-btn'; c.textContent = 'Vaciar historial'; c.addEventListener('click', () => { loot = []; store.set('cobalt.loot', loot); renderLootPanel(); }); body.appendChild(c); }
   }
@@ -978,17 +996,17 @@ els.sbRat.addEventListener('click', async (e) => {
   els.ratNote.textContent = ok ? 'Se guarda en Descargas. En TikTok abre un vídeo concreto; se baja sin marca de agua.' : 'Faltan yt-dlp/ffmpeg en resources/bin.';
 });
 
-/* ============ AutoLoot / Rat Loot (por pestaña) ============ */
+/* ============ AutoLoot (por pestaña) ============ */
 function setAutoLoot(tab, on) {
   if (!tab || tab.kind !== 'web') return;
   tab.autoLoot = !!on;
-  if (!on) { tab.ratLoot = false; tab.twitchClaims = 0; }
-  try { tab.webview?.send('cobalt-autoloot', { on: !!on, lowRes: !!tab.ratLoot }); } catch { /* nada */ }
+  if (!on) { tab.lowRes = false; tab.twitchClaims = 0; }
+  try { tab.webview?.send('cobalt-autoloot', { on: !!on, lowRes: !!tab.lowRes }); } catch { /* nada */ }
   renderTabs(); updateLootUI();
 }
-function ratLoot(tab) {
+function activateAutoLoot(tab) {
   if (!tab || tab.kind !== 'web') return;
-  tab.ratLoot = true; tab.autoLoot = true;
+  tab.lowRes = true; tab.autoLoot = true;
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
   // La calidad ahora baja desde el menú del reproductor (en caliente), así que
   // ya no hace falta recargar la pestaña ni reiniciar el stream.
@@ -1218,8 +1236,8 @@ function ensureDropClaimer(sourceTab) {
     const d = (ev.args && ev.args[0]) || {};
     if (d.type === 'claim' && d.kind === 'drop') {
       if (sourceTab) { sourceTab.twitchClaims = (sourceTab.twitchClaims || 0) + 1; renderTabs(); }
-      recordLoot('drop', 'twitch.tv/drops');
-      toast('Drop de Twitch reclamado');
+      recordLoot('drop', (sourceTab && sourceTab.url && sourceTab.url.split('twitch.tv/')[1] ? 'twitch.tv/' + sourceTab.url.split('twitch.tv/')[1].split(/[/?#]/)[0] : 'twitch.tv/drops'), { name: d.name });
+      toast(d.name ? ('Drop reclamado: ' + d.name) : 'Drop de Twitch reclamado');
     } else if (d.type === 'claim-done') {
       cleanup();
     }
@@ -1246,7 +1264,7 @@ async function onWebviewMessage(wv, e) {
     if (data.type === 'drops-pending') { ensureDropClaimer(tab); return; }
     if (data.type === 'claim') {
       tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); renderTabs();
-      recordLoot(data.kind, channel);
+      recordLoot(data.kind, channel, { name: data.name, balance: data.balance });
       toast(data.kind === 'drop' ? 'Drop de Twitch reclamado' : `Punto de Twitch reclamado (${tab.twitchClaims})`);
     }
     return;
