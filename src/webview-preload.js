@@ -86,29 +86,25 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       });
     } catch (e) { /* nada */ }
   }
-  // --- Reclamo de drops por la API GraphQL de Twitch ---
-  // El botón de "reclamar drop" es un toast fugaz: si la pestaña no lo pilla en el
-  // acto, el drop solo queda en twitch.tv/drops/inventory y claimDrops() (arriba)
-  // nunca vuelve a verlo. Por eso los puntos caían y los drops no. Aquí barremos el
-  // inventario y reclamamos con dropInstanceID, funcione o no el toast y esté la
-  // pestaña en primer o segundo plano. Mismos hashes/cliente que TwitchDropsMiner.
+  // --- Detección de drops pendientes por la API de inventario de Twitch ---
+  // OJO: el reclamo DIRECTO por GraphQL lo rechaza Twitch con "failed integrity check"
+  // (la mutación exige la cabecera Client-Integrity que genera su script anti-bot Kasada
+  // y una llamada cruda no puede producir). Verificado en vivo. Por eso aquí SOLO
+  // detectamos si hay algún drop ganado sin reclamar (la LECTURA sí pasa sin integrity)
+  // y avisamos al host. El reclamo real lo hace un webview OCULTO que carga
+  // /drops/inventory y pulsa el botón propio de Twitch (ese sí viaja con integrity).
   var GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
   var GQL_HASH_INVENTORY = 'd86775d0ef16a63a33ad52e80eaff963b2d5b72fada7c991504a57496e1d8e4b';
-  var GQL_HASH_CLAIM = 'a455deea71bdc9015b78eb49f4acfbce8baa7ccbedd28e549bb025bd0f751930';
-  // Consulta cruda de respaldo: el hash del inventario cambia de vez en cuando; el
-  // de la mutación de reclamo lleva años estable, así que ese no necesita respaldo.
+  // Consulta cruda de respaldo por si el hash del inventario caduca.
   var GQL_INVENTORY_QUERY =
     'query Inventory($fetchRewardCampaigns: Boolean = false) {' +
     ' currentUser { inventory {' +
     ' dropCampaignsInProgress { timeBasedDrops { id self { dropInstanceID isClaimed } } } } } }';
-  var lastDropSweep = 0;
-  // Autenticación: con sesión iniciada, la cookie auth-token de Twitch se lee con
-  // document.cookie y la mandamos como cabecera Authorization: OAuth (igual que
-  // TwitchDropsMiner). CLAVE: NADA de credentials:'include'. gql.twitch.tv responde
-  // Access-Control-Allow-Origin:*, y el navegador prohíbe el comodín '*' en peticiones
-  // con credenciales, así que credentials:'include' rompe la llamada por CORS (lo
-  // verifiqué en la consola real). El token en la cabecera autentica y no dispara ese
-  // conflicto. Sin token (sin sesión) no hay nada que reclamar, así que ni lo intentamos.
+  var lastDropCheck = 0, lastPendingPing = 0;
+  // Con sesión iniciada, la cookie auth-token se lee con document.cookie y se manda como
+  // Authorization: OAuth. NADA de credentials:'include' (gql responde ACAO:* y el
+  // navegador prohíbe el comodín con credenciales -> rompe por CORS). Sin token no hay
+  // sesión, así que no hay nada que mirar.
   function twitchToken() {
     try { var m = document.cookie.match(/(?:^|;\s*)auth-token=([a-z0-9]+)/i); return m ? m[1] : null; } catch (e) { return null; }
   }
@@ -127,45 +123,53 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       variables: { fetchRewardCampaigns: true },
       extensions: { persistedQuery: { version: 1, sha256Hash: GQL_HASH_INVENTORY } }
     }).then(function (res) {
-      // Si el hash caducó, Twitch responde PersistedQueryNotFound: reintenta crudo.
-      var stale = res && res.errors && res.errors.some(function (e) {
-        return e && /PersistedQueryNotFound/i.test(e.message || '');
-      });
-      if (stale) {
-        return gql({ operationName: 'Inventory', variables: { fetchRewardCampaigns: true }, query: GQL_INVENTORY_QUERY });
-      }
+      var stale = res && res.errors && res.errors.some(function (e) { return e && /PersistedQueryNotFound/i.test(e.message || ''); });
+      if (stale) return gql({ operationName: 'Inventory', variables: { fetchRewardCampaigns: true }, query: GQL_INVENTORY_QUERY });
       return res;
     });
   }
-  function claimDrop(id) {
-    return gql({
-      operationName: 'DropsPage_ClaimDropRewards',
-      variables: { input: { dropInstanceID: id } },
-      extensions: { persistedQuery: { version: 1, sha256Hash: GQL_HASH_CLAIM } }
-    });
+  function countClaimable(res) {
+    var inv = res && res.data && res.data.currentUser && res.data.currentUser.inventory;
+    var camps = (inv && inv.dropCampaignsInProgress) || [];
+    var n = 0;
+    camps.forEach(function (c) { ((c && c.timeBasedDrops) || []).forEach(function (d) {
+      var s = d && d.self; if (s && s.dropInstanceID && !s.isClaimed) n++;
+    }); });
+    return n;
   }
-  function sweepDrops(force) {
-    if (!force && Date.now() - lastDropSweep < 60000) return; // no martillear el inventario
-    lastDropSweep = Date.now();
+  // Detección: si hay drops pendientes, avisa al host para que abra el webview-claimer.
+  function checkPendingDrops(force) {
+    if (!force && Date.now() - lastDropCheck < 60000) return; // no martillear el inventario
+    lastDropCheck = Date.now();
     fetchInventory().then(function (res) {
-      var inv = res && res.data && res.data.currentUser && res.data.currentUser.inventory;
-      var camps = (inv && inv.dropCampaignsInProgress) || [];
-      var ids = [];
-      camps.forEach(function (c) {
-        ((c && c.timeBasedDrops) || []).forEach(function (d) {
-          var s = d && d.self;
-          // dropInstanceID solo es no-nulo cuando el drop ya se ganó y espera reclamo
-          if (s && s.dropInstanceID && !s.isClaimed && ids.indexOf(s.dropInstanceID) === -1) ids.push(s.dropInstanceID);
-        });
-      });
-      ids.forEach(function (id) {
-        claimDrop(id).then(function (r) {
-          var ok = r && r.data && r.data.claimDropRewards && !((r.errors || []).length);
-          if (ok) { claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims }); }
-        }).catch(function () { /* red: se reintenta en el próximo barrido */ });
-      });
-    }).catch(function () { /* sin sesión de Twitch o red caída: el respaldo DOM sigue activo */ });
+      if (countClaimable(res) > 0 && Date.now() - lastPendingPing > 90000) {
+        lastPendingPing = Date.now();
+        ipcRenderer.sendToHost('cobalt-twitch', { type: 'drops-pending' });
+      }
+    }).catch(function () { /* sin sesión o red caída: nada */ });
   }
+  // Rol "claimer": en /drops/inventory pulsa los botones "Reclamar/Claim" reales de la
+  // página (van por la maquinaria de Twitch, que sí firma con Client-Integrity). Lo
+  // dispara el host con 'cobalt-claim-inventory' sobre el webview oculto.
+  var claimerRan = false;
+  function runInventoryClaimer() {
+    if (claimerRan) return; claimerRan = true;
+    var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
+    var tries = 0, clicked = 0;
+    var iv = setInterval(function () {
+      try {
+        document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
+          if (el.__navClaimed) return;
+          var r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
+          var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          if (RE.test(txt) || RE.test(aria)) { el.__navClaimed = true; el.click(); clicked++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop' }); }
+        });
+      } catch (e) { /* nada */ }
+      if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim-done', clicked: clicked }); }
+    }, 1500); // ~12s: la SPA de inventario tarda en pintar los botones
+  }
+  ipcRenderer.on('cobalt-claim-inventory', function () { runInventoryClaimer(); });
   // Mantiene el stream vivo en segundo plano: reanuda el vídeo y cierra el "¿sigues ahí?".
   function keepAlive() {
     try {
@@ -227,14 +231,14 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     }, 1000);
   }
   let obs = null;
-  function tick() { clickChest(); claimDrops(); sweepDrops(false); keepAlive(); }
+  function tick() { clickChest(); claimDrops(); checkPendingDrops(false); keepAlive(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
     if (opt && opt.on) {
       spoofVisible(); // sin esto, los drops no acumulan tiempo en segundo plano
       if (opt.lowRes) lowResThisTabOnly();
       if (!timer) {
         ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
-        sweepDrops(true); // barrido inmediato: reclama lo que ya estuviera pendiente en el inventario
+        checkPendingDrops(true); // comprobación inmediata: si ya hay drops pendientes, dispara el claimer
         tick();
         timer = setInterval(tick, 8000);
         // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
@@ -266,3 +270,22 @@ ipcRenderer.on('cobalt-fill', (_e, cred) => {
   if (cred.username && l.user) set(l.user, cred.username);
   set(l.pass, cred.password);
 });
+
+// --- Señal de "pestaña controlada por un agente" (indicador tipo Chrome) ---
+// Un agente externo (p. ej. Claude por CDP) marca la pestaña que usa poniendo el
+// atributo data-naviris-agent en <html>. El preload lo relee (corre en mundo aislado,
+// pero el DOM se comparte entre mundos) y avisa a la interfaz para pintar el distintivo.
+// Al quitar el atributo, se apaga. Así el usuario ve SIEMPRE qué pestañas mueve el agente.
+(function () {
+  function report() {
+    try {
+      var v = document.documentElement.getAttribute('data-naviris-agent');
+      var on = v != null && v !== '' && v !== '0' && v !== 'false';
+      ipcRenderer.sendToHost('cobalt-agent', { on: on, label: on ? v : '' });
+    } catch (e) { /* nada */ }
+  }
+  try {
+    new MutationObserver(report).observe(document.documentElement, { attributes: true, attributeFilter: ['data-naviris-agent'] });
+  } catch (e) { /* nada */ }
+  if (document.documentElement.hasAttribute('data-naviris-agent')) report();
+})();

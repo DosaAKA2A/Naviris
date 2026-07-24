@@ -238,6 +238,7 @@ function makeTabEl(tab, mini) {
     el.appendChild(fav);
   }
   el.append(zzz, title);
+  if (tab.agentControlled) { const ag = document.createElement('span'); ag.className = 't-agent'; ag.title = 'Un agente (CDP) está controlando esta pestaña'; el.appendChild(ag); }
   // Botón de silencio: aparece si la pestaña suena o está silenciada
   if (tab.kind === 'web' && (tab.audible || tab.muted)) {
     const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
@@ -1178,13 +1179,55 @@ function showPwBar(html, yesLabel, onYes) {
   els.pwNo.onclick = hidePwBar;
   els.pwBar.classList.remove('hidden');
 }
+// Webview OCULTO que reclama los drops pendientes SIN tocar la pestaña que farmea:
+// carga /drops/inventory (misma sesión, PARTITION compartida), pulsa el botón real de
+// Twitch (que sí viaja con Client-Integrity) y se autodestruye. El farmeo no se corta.
+let dropClaimer = null;
+function ensureDropClaimer(sourceTab) {
+  if (dropClaimer) return; // ya hay uno trabajando
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', PARTITION);
+  wv.setAttribute('allowpopups', '');
+  wv.classList.add('agent-hidden'); // renderizado pero fuera de pantalla: invisible al usuario
+  wv.src = 'https://www.twitch.tv/drops/inventory';
+  const cleanup = () => {
+    if (!dropClaimer) return;
+    try { clearTimeout(dropClaimer.timer); } catch { /* nada */ }
+    try { wv.remove(); } catch { /* nada */ }
+    dropClaimer = null;
+  };
+  wv.addEventListener('dom-ready', () => { try { wv.send('cobalt-claim-inventory'); } catch { /* nada */ } });
+  wv.addEventListener('ipc-message', (ev) => {
+    if (ev.channel !== 'cobalt-twitch') return;
+    const d = (ev.args && ev.args[0]) || {};
+    if (d.type === 'claim' && d.kind === 'drop') {
+      if (sourceTab) { sourceTab.twitchClaims = (sourceTab.twitchClaims || 0) + 1; renderTabs(); }
+      recordLoot('drop', 'twitch.tv/drops');
+      toast('Drop de Twitch reclamado');
+    } else if (d.type === 'claim-done') {
+      cleanup();
+    }
+  });
+  els.content.appendChild(wv);
+  dropClaimer = { wv, timer: setTimeout(cleanup, 45000) }; // salvavidas si algo falla
+}
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
+  if (e.channel === 'cobalt-agent') {
+    const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
+    tab.agentControlled = !!data.on;
+    try { wv.classList.toggle('agent-controlled', !!data.on); } catch { /* nada */ }
+    renderTabs();
+    return;
+  }
   // Twitch: se atiende aunque la pestaña esté en segundo plano (ahí es donde se deja el stream)
   if (e.channel === 'cobalt-twitch') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
     const seg = tab.url.split('twitch.tv/')[1];
     const channel = hostOf(tab.url).replace(/^www\./, '') + (seg ? '/' + seg.split(/[/?#]/)[0] : '');
+    // Hay drops ganados sin reclamar: abre el webview oculto que los reclama sin cortar el farmeo.
+    if (data.type === 'drops-pending') { ensureDropClaimer(tab); return; }
     if (data.type === 'claim') {
       tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); renderTabs();
       recordLoot(data.kind, channel);
@@ -1427,6 +1470,8 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
 (async function init() {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
+  // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
+  if (settings.agentMode) { const agb = document.getElementById('agent-badge'); if (agb) agb.classList.remove('hidden'); }
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
