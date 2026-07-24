@@ -974,19 +974,29 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
 // ---------- Actualización automática (GitHub Releases) ----------
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+// Traduce cualquier error del updater a un mensaje CORTO y genérico. NUNCA expone rutas
+// locales, el nombre de usuario ni stack traces (electron-updater los vuelca crudos, y
+// eso filtraba datos como C:\Users\<usuario>\...). Solo se muestra este texto seguro.
+function friendlyUpdateError(err) {
+  const raw = String((err && err.message) || err || '');
+  if (/50\d|gateway|time-?out|etimedout|enotfound|econnreset|econnrefused|getaddrinfo|network|socket|dns/i.test(raw)) return 'No se pudo conectar con el servidor de actualizaciones. Reinténtalo más tarde.';
+  if (/404|cannot find|not found|artifact|latest\.yml/i.test(raw)) return 'La nueva versión aún se está publicando. Reinténtalo en unos minutos.';
+  if (/sha512|checksum|integrity|signature/i.test(raw)) return 'La descarga de la actualización no coincide. Reinténtalo.';
+  return 'No se pudo comprobar la actualización. Reinténtalo más tarde.';
+}
 autoUpdater.on('checking-for-update', () => broadcast('update:status', { state: 'checking' }));
 autoUpdater.on('update-available', (info) => broadcast('update:status', { state: 'available', version: info.version }));
 autoUpdater.on('update-not-available', (info) => broadcast('update:status', { state: 'latest', version: info.version }));
 autoUpdater.on('download-progress', (p) => broadcast('update:status', { state: 'downloading', percent: Math.round(p.percent) }));
 autoUpdater.on('update-downloaded', (info) => broadcast('update:status', { state: 'downloaded', version: info.version }));
-autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: String(err && err.message || err) }));
+autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: friendlyUpdateError(err) }));
 
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { state: 'dev' };
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
-  catch (e) { return { state: 'error', message: String(e.message || e) }; }
+  catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
-ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: String(e.message || e) }; } });
+ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
 ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 
 nativeTheme.themeSource = 'dark';
