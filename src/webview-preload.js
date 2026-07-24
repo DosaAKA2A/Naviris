@@ -102,23 +102,22 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     ' currentUser { inventory {' +
     ' dropCampaignsInProgress { timeBasedDrops { id self { dropInstanceID isClaimed } } } } } }';
   var lastDropSweep = 0;
-  // Autenticación: con sesión iniciada, la cookie auth-token de Twitch SÍ es legible
-  // con document.cookie (verificado en vivo; sin sesión no existe, de ahí la confusión
-  // inicial). La mandamos como Authorization: OAuth, igual que TwitchDropsMiner. Además
-  // vamos con credentials:'include' para que el preload —mundo aislado que comparte la
-  // sesión de la pestaña— envíe también la cookie: así sigue funcionando aunque Twitch
-  // la vuelva httpOnly o el token no esté a mano en ese instante.
+  // Autenticación: con sesión iniciada, la cookie auth-token de Twitch se lee con
+  // document.cookie y la mandamos como cabecera Authorization: OAuth (igual que
+  // TwitchDropsMiner). CLAVE: NADA de credentials:'include'. gql.twitch.tv responde
+  // Access-Control-Allow-Origin:*, y el navegador prohíbe el comodín '*' en peticiones
+  // con credenciales, así que credentials:'include' rompe la llamada por CORS (lo
+  // verifiqué en la consola real). El token en la cabecera autentica y no dispara ese
+  // conflicto. Sin token (sin sesión) no hay nada que reclamar, así que ni lo intentamos.
   function twitchToken() {
     try { var m = document.cookie.match(/(?:^|;\s*)auth-token=([a-z0-9]+)/i); return m ? m[1] : null; } catch (e) { return null; }
   }
   function gql(payload) {
-    var headers = { 'Client-Id': GQL_CLIENT_ID };
     var tok = twitchToken();
-    if (tok) headers['Authorization'] = 'OAuth ' + tok;
+    if (!tok) return Promise.reject(new Error('no-auth'));
     return fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
-      credentials: 'include',
-      headers: headers,
+      headers: { 'Client-Id': GQL_CLIENT_ID, 'Authorization': 'OAuth ' + tok },
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); });
   }
