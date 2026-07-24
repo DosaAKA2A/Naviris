@@ -165,7 +165,7 @@ function attachWebview(tab, url) {
       // Solo se apaga al ir a OTRO sitio real: las URLs intermedias (about:blank,
       // redirecciones vacías) no cuentan como "salir de Twitch"
       if (/^https?:/i.test(e.url) && h && !/(^|\.)twitch\.tv$/.test(h)) {
-        tab.autoLoot = false; tab.lowRes = false; tab.twitchClaims = 0; renderTabs();
+        tab.autoLoot = false; tab.lowRes = false; tab.twitchClaims = 0; delete tab.lootStart; renderTabs();
       } else {
         // Navegación dentro de Twitch (SPA: buscar → entrar a un canal):
         // reengancha el recolector en la página nueva
@@ -901,10 +901,27 @@ function updateLootUI() {
   els.sbLoot.classList.toggle('collecting', active);
   if (!els.lootPanel.classList.contains('hidden')) renderLootPanel();
 }
+let lootTimer = null;
+function fmtDur(ms) {
+  if (!ms || ms < 0) return '0s';
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h) return h + 'h ' + m + 'm';
+  if (m) return m + 'm';
+  return (s % 60) + 's';
+}
 function toggleLootPanel(force) {
   const open = force !== undefined ? force : els.lootPanel.classList.contains('hidden');
-  if (open) { closeRightPanels(); els.lootPanel.classList.remove('hidden'); els.sbLoot.classList.add('open'); renderLootPanel(); }
-  else { els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+  if (open) {
+    closeRightPanels(); els.lootPanel.classList.remove('hidden'); els.sbLoot.classList.add('open'); renderLootPanel();
+    // Mientras el panel esté abierto, refresca el temporizador de cada sesión.
+    if (!lootTimer) lootTimer = setInterval(() => {
+      if (els.lootPanel.classList.contains('hidden')) { clearInterval(lootTimer); lootTimer = null; return; }
+      if (lootView === 'ses') renderLootPanel();
+    }, 10000);
+  } else {
+    els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open');
+    if (lootTimer) { clearInterval(lootTimer); lootTimer = null; }
+  }
 }
 function renderLootPanel() {
   els.lootTabSes.classList.toggle('active', lootView === 'ses');
@@ -926,9 +943,14 @@ function renderLootPanel() {
     if (!sessions.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'No hay sesiones recolectando ahora mismo.'; body.appendChild(e); }
     for (const s of sessions) {
       const row = document.createElement('div'); row.className = 'loot-ses';
-      row.innerHTML = '<span class="ls-dot"></span><span class="ls-name"></span><span class="ls-n"></span>';
+      row.innerHTML = '<span class="ls-dot"></span><span class="ls-info"><span class="ls-name"></span><span class="ls-time"></span></span><span class="ls-n"></span>';
       row.querySelector('.ls-name').textContent = s.title || s.url;
-      row.querySelector('.ls-n').textContent = s.twitchClaims || 0;
+      const tspan = row.querySelector('.ls-time');
+      tspan.textContent = s.lootStart ? ('farmeando ' + fmtDur(Date.now() - s.lootStart)) : '';
+      tspan.title = 'Tiempo que AutoLoot lleva trabajando en este stream';
+      const nspan = row.querySelector('.ls-n');
+      nspan.textContent = s.twitchClaims || 0;
+      nspan.title = 'Reclamos (puntos + drops) en esta sesión';
       const go2 = document.createElement('button'); go2.className = 'ls-btn'; go2.textContent = 'ir'; go2.addEventListener('click', () => activateTab(s.id));
       const stop = document.createElement('button'); stop.className = 'ls-btn stop'; stop.textContent = 'parar'; stop.addEventListener('click', () => { setAutoLoot(s, false); renderLootPanel(); });
       row.append(go2, stop); body.appendChild(row);
@@ -1000,13 +1022,15 @@ els.sbRat.addEventListener('click', async (e) => {
 function setAutoLoot(tab, on) {
   if (!tab || tab.kind !== 'web') return;
   tab.autoLoot = !!on;
-  if (!on) { tab.lowRes = false; tab.twitchClaims = 0; }
+  if (on) { if (!tab.lootStart) tab.lootStart = Date.now(); } // marca de inicio para el temporizador
+  else { tab.lowRes = false; tab.twitchClaims = 0; delete tab.lootStart; }
   try { tab.webview?.send('cobalt-autoloot', { on: !!on, lowRes: !!tab.lowRes }); } catch { /* nada */ }
   renderTabs(); updateLootUI();
 }
 function activateAutoLoot(tab) {
   if (!tab || tab.kind !== 'web') return;
   tab.lowRes = true; tab.autoLoot = true;
+  if (!tab.lootStart) tab.lootStart = Date.now(); // inicio del temporizador de trabajo
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
   // La calidad ahora baja desde el menú del reproductor (en caliente), así que
   // ya no hace falta recargar la pestaña ni reiniciar el stream.

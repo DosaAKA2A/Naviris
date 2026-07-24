@@ -692,7 +692,9 @@ button { font-family: inherit; }
 .loot-empty { font-size: 12.5px; color: var(--muted); padding: 4px 2px; }
 .loot-ses { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; }
 .loot-ses .ls-dot { width: 7px; height: 7px; border-radius: 50%; background: #9ee2b8; flex: none; }
-.loot-ses .ls-name { flex: 1; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-ses .ls-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.loot-ses .ls-name { min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-ses .ls-time { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted); }
 .loot-ses .ls-n { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; font-weight: 600; color: #9ee2b8; }
 .ls-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 3px 5px; }
 .ls-btn.stop { color: #e6a9b4; }
