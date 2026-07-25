@@ -14,7 +14,7 @@
 (function () {
   if (window.__navParty) return; window.__navParty = 1;
 
-  var SERVER = localStorage.__navPartyServer || 'wss://party.naviris.site';
+  var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
   var DRIFT = 1.5;        // segundos de desvío tolerado antes de re-seek
   var BEAT_MS = 2000;     // cada cuánto late el anfitrión
   var ECHO_MS = 900;      // ventana para ignorar eventos provocados por aplicar un remoto
