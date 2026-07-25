@@ -320,6 +320,17 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   });
 }
 
+// --- Botones 4 y 5 del ratón dentro de la página ---
+// Con el foco en la web, el mouseup lo recibe la página y la interfaz nunca se
+// entera: por eso "atrás/adelante" del ratón no respondían navegando.
+window.addEventListener('mouseup', function (e) {
+  if (e.button === 3 || e.button === 4) {
+    e.preventDefault();
+    try { ipcRenderer.sendToHost('cobalt-mouse-nav', e.button === 3 ? 'back' : 'forward'); } catch (err) { /* nada */ }
+  }
+}, true);
+window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true);
+
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
 ipcRenderer.on('cobalt-fill', (_e, cred) => {
   const l = findLogin();

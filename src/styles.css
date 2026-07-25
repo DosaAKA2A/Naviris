@@ -115,10 +115,14 @@ button { font-family: inherit; }
 .ctx-sep { height: 1px; background: var(--line); margin: 4px 6px; }
 #newtab-btn { width: 26px; height: 26px; margin: 0 6px; border: none; border-radius: 7px; background: transparent; color: var(--text-dim); cursor: pointer; transition: background .12s, color .12s; }
 #newtab-btn:hover { background: var(--bg-3); color: var(--text); }
+/* Controles de ventana al estilo de Windows 11: iconos nítidos, superficie
+   completa al pasar por encima y el de cerrar en rojo. */
 .win-controls { display: flex; height: 100%; }
-.win-controls button { width: 44px; height: 100%; border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: background .12s, color .12s; }
-.win-controls button:hover { background: var(--bg-3); color: var(--text); }
+.win-controls button { width: 46px; height: 100%; border: none; background: transparent; color: #c2c4cb; cursor: pointer; transition: background .12s ease, color .12s ease; }
+.win-controls button:hover { background: #26262e; color: #fff; }
+.win-controls button:active { background: #2e2e37; }
 #win-close:hover { background: var(--danger); color: #fff; }
+#win-close:active { background: #c93a3f; color: #fff; }
 
 /* Fila principal */
 #app-row { flex: 1; display: flex; min-height: 0; }
@@ -126,10 +130,14 @@ button { font-family: inherit; }
 
 /* Sidebar */
 #sidebar { width: var(--sidebar-w); background: var(--bg); border-right: 1px solid #151517; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; flex-shrink: 0; }
-.sb-btn { width: 34px; height: 34px; border: none; border-radius: 9px; background: transparent; color: #797b82; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
-.sb-btn:hover { background: #16161a; color: var(--text); }
-.sb-btn:active { background: #1b1b1f; }
-.sb-btn.open { background: #1b1b1f; color: var(--text); }
+/* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
+   panel abierto se marca con una pastilla clara + guía a la izquierda. */
+.sb-btn { width: 36px; height: 36px; border: none; border-radius: 10px; background: transparent; color: #9a9ca4; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .14s ease, color .14s ease, transform .09s ease; }
+.sb-btn svg { width: 17px; height: 17px; }
+.sb-btn:hover { background: #1c1c22; color: #fff; }
+.sb-btn:active { transform: scale(.94); }
+.sb-btn.open { background: #24242c; color: #fff; }
+.sb-btn.open::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--violet, #b98cff); }
 .sb-btn.accent { color: #b98266; }
 .sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: #1d1d21; margin: 4px 0; }
@@ -158,10 +166,14 @@ button { font-family: inherit; }
 
 /* Navbar */
 #navbar { height: var(--navbar-h); display: flex; align-items: center; gap: 3px; padding: 0 10px; background: var(--bg-2); border-bottom: 1px solid var(--line); flex-shrink: 0; }
-#navbar > button { width: 33px; height: 33px; border: none; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: pointer; transition: background .12s, color .12s, transform .1s; }
-#navbar > button:active:not(:disabled) { transform: scale(.92); }
-#navbar > button:hover:not(:disabled) { background: var(--bg-3); color: var(--text); }
-#navbar > button:disabled { opacity: .3; cursor: default; }
+/* Botones de la navbar: más presencia. Antes quedaban apagados (gris tenue sobre
+   fondo oscuro y sin forma propia); ahora tienen color legible en reposo, una
+   superficie definida al pasar por encima y un estado activo con marca. */
+#navbar > button { width: 34px; height: 34px; border: none; border-radius: 9px; background: transparent; color: #b9bbc4; cursor: pointer; transition: background .13s ease, color .13s ease, transform .09s ease; }
+#navbar > button svg { width: 17px; height: 17px; }
+#navbar > button:active:not(:disabled) { transform: scale(.93); }
+#navbar > button:hover:not(:disabled) { background: #202027; color: #fff; }
+#navbar > button:disabled { opacity: .28; cursor: default; }
 #nav-star.starred { color: var(--accent); }
 #nav-shield.off { color: #55565c; }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }

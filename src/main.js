@@ -517,9 +517,56 @@ function createWindow(isPrivate = false) {
   return win;
 }
 
+// Atajos con el foco DENTRO de la página: cuando el usuario ha hecho clic en la
+// web, las teclas van al webview y el listener del renderer no las ve nunca (de
+// ahí el "F5 funciona a veces sí y a veces no"). Aquí se interceptan antes de
+// que lleguen a la página y se reenvían a la interfaz.
+const ATAJOS_UI = [
+  { k: 'F5', mod: (i) => !i.control && !i.shift, cmd: 'reload' },
+  { k: 'F5', mod: (i) => i.shift || i.control, cmd: 'reload-hard' },
+  { k: 'r', mod: (i) => i.control && !i.shift, cmd: 'reload' },
+  { k: 'r', mod: (i) => i.control && i.shift, cmd: 'reload-hard' },
+  { k: 'F11', mod: () => true, cmd: 'fullscreen' },
+  { k: 'F6', mod: () => true, cmd: 'focus-url' },
+  { k: 'l', mod: (i) => i.control, cmd: 'focus-url' },
+  { k: 't', mod: (i) => i.control && !i.shift, cmd: 'new-tab' },
+  { k: 't', mod: (i) => i.control && i.shift, cmd: 'reopen-tab' },
+  { k: 'w', mod: (i) => i.control && !i.shift, cmd: 'close-tab' },
+  { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
+  { k: 'h', mod: (i) => i.control, cmd: 'history' },
+  { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },
+  { k: 'ArrowLeft', mod: (i) => i.alt, cmd: 'back' },
+  { k: 'ArrowRight', mod: (i) => i.alt, cmd: 'forward' },
+  { k: 'Tab', mod: (i) => i.control && !i.shift, cmd: 'next-tab' },
+  { k: 'Tab', mod: (i) => i.control && i.shift, cmd: 'prev-tab' },
+  { k: '+', mod: (i) => i.control, cmd: 'zoom-in' },
+  { k: '=', mod: (i) => i.control, cmd: 'zoom-in' },
+  { k: '-', mod: (i) => i.control, cmd: 'zoom-out' },
+  { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' }
+];
+function atajosDeWebview(contents) {
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const tecla = input.key;
+    for (const a of ATAJOS_UI) {
+      if (tecla !== a.k && tecla.toLowerCase() !== a.k.toLowerCase()) continue;
+      if (!a.mod(input)) continue;
+      event.preventDefault();
+      contents.hostWebContents?.send('ui:shortcut', a.cmd);
+      return;
+    }
+    // Ctrl+1..9 para saltar de pestaña
+    if (input.control && !input.shift && /^[1-9]$/.test(tecla)) {
+      event.preventDefault();
+      contents.hostWebContents?.send('ui:shortcut', 'tab-' + tecla);
+    }
+  });
+}
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
+    atajosDeWebview(contents);
     contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
         // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano

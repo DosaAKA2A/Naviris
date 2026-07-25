@@ -274,7 +274,19 @@ function reorderTab(fromId, toId) {
   tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
   renderTabs(); saveSession();
 }
-function renderTabs() {
+// Firma del estado visible de las pestañas: si no cambia, no se repinta. Antes
+// se recreaba la barra entera en CADA evento (título, favicon, media-started,
+// media-paused...), y en páginas con vídeo eso llegaba varias veces por segundo:
+// las pestañas parecían temblar porque el navegador rehacía el layout sin parar.
+function firmaTabs() {
+  return tabs.map((t) => [t.id, t.title, t.favicon || '', t.id === activeId, !!t.asleep,
+    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled].join('')).join('');
+}
+let ultimaFirmaTabs = null;
+function renderTabs(forzar) {
+  const f = firmaTabs();
+  if (!forzar && f === ultimaFirmaTabs) return;
+  ultimaFirmaTabs = f;
   // AutoClaim v2: un solo canal, sin grupo de pestañas acopladas; la pestaña
   // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
@@ -1372,6 +1384,12 @@ function ensureDropClaimer(sourceTab) {
 }
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Botones 4/5 del ratón pulsados DENTRO de la página
+  if (e.channel === 'cobalt-mouse-nav') {
+    const dir = (e.args && e.args[0]) || '';
+    if (dir === 'back') irAtras(); else if (dir === 'forward') irAdelante();
+    return;
+  }
   // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
   if (e.channel === 'cobalt-agent') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
@@ -1510,7 +1528,12 @@ async function renderAddons() {
     const tt = document.createElement('div');
     tt.innerHTML = '<h3></h3><span class="adp-ver"></span>';
     tt.querySelector('h3').textContent = meta.name || meta.id;
-    tt.querySelector('.adp-ver').textContent = 'v' + (meta.version || '?') + (meta.kind === 'tool' ? ' · herramienta' : ' · para sitios');
+    // Si lo tienes instalado en otra versión, se ve de un vistazo cuál corre
+    // ahora mismo y cuál hay disponible (antes solo salía la del catálogo).
+    const vTxt = inst && meta.version && inst.version !== meta.version
+      ? 'v' + inst.version + ' instalada · v' + meta.version + ' disponible'
+      : 'v' + ((inst && inst.version) || meta.version || '?');
+    tt.querySelector('.adp-ver').textContent = vTxt + (meta.kind === 'tool' ? ' · herramienta' : ' · para sitios');
     top.appendChild(tt);
     const badge = document.createElement('span'); badge.className = 'adp-badge' + (inst?.enabled ? ' on' : '');
     badge.textContent = inst ? (inst.enabled ? 'ACTIVO' : 'PAUSADO') : 'DISPONIBLE';
@@ -1529,9 +1552,23 @@ async function renderAddons() {
       });
     } else {
       if (inCatalog && meta.version && inst.version !== meta.version) {
-        btn('Actualizar a v' + meta.version, 'primary', async () => {
+        btn('Actualizar a v' + meta.version, 'primary', async (ev) => {
+          ev.target.textContent = 'Actualizando…'; ev.target.disabled = true;
           const r = await window.cobalt.addonsInstall(meta);
-          toast(r.ok ? 'Addon actualizado' : 'Error: ' + r.message);
+          if (!r.ok) { toast('Error: ' + r.message); renderAddons(); return; }
+          // Descargar el código nuevo NO basta: la herramienta vieja sigue
+          // corriendo en memoria (su botón, sus temporizadores). Se retira y se
+          // vuelve a cargar para que el usuario vea la versión nueva YA, sin
+          // reiniciar; antes había que reiniciar y nadie lo sabía.
+          if (meta.kind === 'tool') {
+            try { naviris.unregisterTool(meta.id); } catch { /* nada */ }
+            loadedTools.delete(meta.id);
+            await new Promise((res) => setTimeout(res, 2600)); // el addon se auto-limpia al ver su botón fuera
+            await loadToolAddons();
+            toast('Actualizado a v' + meta.version + ' y recargado');
+          } else {
+            toast('Actualizado a v' + meta.version + ' · recarga la página para aplicarlo');
+          }
           renderAddons();
         });
       }
@@ -1723,6 +1760,33 @@ window.addEventListener('keydown', (e) => {
   // --- Paneles ---
   if (soloCtrl && k === 'j') { e.preventDefault(); toggleDownloads(); return; }
   if (soloCtrl && k === 'h') { e.preventDefault(); toggleHistory(); return; }
+});
+// Los mismos atajos, pero llegados desde una página con el foco dentro (el main
+// los intercepta con before-input-event y los reenvía por IPC).
+window.cobalt.onShortcut((cmd) => {
+  const i = tabs.findIndex((t) => t.id === activeId);
+  if (cmd === 'reload') recargar(false);
+  else if (cmd === 'reload-hard') recargar(true);
+  else if (cmd === 'back') irAtras();
+  else if (cmd === 'forward') irAdelante();
+  else if (cmd === 'new-tab') createTab();
+  else if (cmd === 'close-tab') { if (activeId) closeTab(activeId); }
+  else if (cmd === 'reopen-tab') reabrirCerrada();
+  else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
+  else if (cmd === 'downloads') toggleDownloads();
+  else if (cmd === 'history') toggleHistory();
+  else if (cmd === 'bookmark') els.navStar.click();
+  else if (cmd === 'fullscreen') window.cobalt.toggleFullscreen();
+  else if (cmd === 'zoom-in') zoom(1);
+  else if (cmd === 'zoom-out') zoom(-1);
+  else if (cmd === 'zoom-reset') zoom(0);
+  else if (cmd === 'next-tab') { const n = tabs[(i + 1) % tabs.length]; if (n) activateTab(n.id); }
+  else if (cmd === 'prev-tab') { const n = tabs[(i + tabs.length - 1) % tabs.length]; if (n) activateTab(n.id); }
+  else if (cmd.startsWith('tab-')) {
+    const d = cmd.slice(4);
+    const n = d === '9' ? tabs[tabs.length - 1] : tabs[parseInt(d, 10) - 1];
+    if (n) activateTab(n.id);
+  }
 });
 // Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
 // el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
