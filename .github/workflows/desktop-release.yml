@@ -13,6 +13,10 @@ permissions:
 
 jobs:
   build:
+    # SOLO tags estables (vX.Y.Z). Los tags con sufijo (v2.6.0-dev.3…) se publican
+    # en local con firma VMP (EVS): si el CI corriera, publicaría un build SIN
+    # Widevine y machacaría los assets firmados (pasó el 2026-07-25).
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
