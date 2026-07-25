@@ -184,7 +184,6 @@
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme pestañas inactivas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
-    <label class="menu-toggle"><span>Actualizaciones dev<br /><small>Recibe versiones de prueba (canal dev)</small></span><input type="checkbox" id="opt-devupdates" /></label>
     <hr />
     <button data-action="update">Buscar actualizaciones</button>
     <button data-action="about">Acerca de Naviris</button>
@@ -289,7 +288,12 @@
   <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
 
   <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Naviris <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
-    <div class="upd-box"><div id="upd-status">Comprueba si hay una versión nueva.</div><div id="upd-bar" class="upd-bar hidden"><i></i></div></div>
+    <div class="upd-box"><div id="upd-status">Comprueba las versiones disponibles.</div>
+      <div id="upd-lines" class="upd-lines hidden">
+        <div class="upd-line"><div class="ul-info"><b>Naviris</b><span class="ul-sub">Estable</span></div><span class="ul-ver" id="upd-stable-ver"></span><button id="upd-stable-btn" class="ul-btn">Instalar</button></div>
+        <div class="upd-line"><div class="ul-info"><b>NavirisDev</b><span class="ul-sub">Desarrollo</span></div><span class="ul-ver" id="upd-dev-ver"></span><button id="upd-dev-btn" class="ul-btn">Instalar</button></div>
+      </div>
+      <div id="upd-bar" class="upd-bar hidden"><i></i></div></div>
     <div class="modal-actions"><button id="upd-btn" style="margin-right:auto">Buscar actualizaciones</button><button id="about-close" class="primary">Cerrar</button></div></div></div>
 
   <div id="toast" role="status"></div>

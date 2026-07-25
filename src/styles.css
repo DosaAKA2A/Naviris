@@ -602,6 +602,17 @@ button { font-family: inherit; }
 #upd-status.err { color: var(--danger); }
 .upd-bar { height: 4px; border-radius: 2px; background: #232329; overflow: hidden; margin-top: 8px; }
 .upd-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #9aa0ad, #e6e7ea); transition: width .2s; }
+/* Las dos líneas oficiales (Naviris estable / NavirisDev) con botón propio */
+.upd-lines { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.upd-line { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; }
+.upd-line .ul-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.upd-line .ul-info b { font-size: 13px; color: var(--text); }
+.upd-line .ul-sub { font-size: 10.5px; color: var(--text-dim); }
+.upd-line .ul-ver { margin-left: auto; font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.upd-line .ul-btn { border: none; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; background: rgba(255,255,255,.09); color: var(--text); flex: 0 0 auto; }
+.upd-line .ul-btn:hover { background: rgba(255,255,255,.15); }
+.upd-line .ul-btn:disabled { color: var(--text-dim); cursor: default; background: rgba(255,255,255,.04); }
+.upd-line .ul-btn.hidden { display: none; }
 #sidebar-config { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 .sc-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; }
 .sc-row:hover { background: var(--bg-2); }
