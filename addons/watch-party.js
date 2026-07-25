@@ -1,43 +1,26 @@
-/* Naviris addon: Watch Party v2.4.0
-   v2.4: el panel deja de repintarse entero cada 2 s (destruía los controles: el
-   chat no se vaciaba al enviar y los clics en "Salir" se perdían). Ahora la
-   estructura se construye al cambiar de modo y los datos se actualizan en su
-   sitio, con el chat pintado de forma incremental. Además: el botón conserva
-   SIEMPRE el color de la plataforma (con punto verde si hay sala) y el anfitrión
-   decide si solo él puede cambiar el vídeo o si puede cualquiera.
-*/
-/* Historial v2.3.0:
-   v2.3: además de Crunchyroll y Netflix, ahora también Disney+ y YouTube. En
-   YouTube se usa su API de reproductor (playVideo/pauseVideo/seekTo) porque el
-   <video> a secas se pelea con su controlador, y los anuncios se detectan para
-   no sincronizar con el tiempo del anuncio ni difundir sus play/pause.
-*/
-/* Historial v2.2.0:
-   v2.2: rediseño del panel (espaciados generosos, jerarquía por secciones) y
-   chat serio: nombres coloreados por autor, horas, agrupación de mensajes
-   consecutivos, avisos del sistema diferenciados y estado vacío.
-*/
-/* Historial:
-   Ver series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty pero
-   más simple y sin cuentas de terceros. NO transmite vídeo: cada quien reproduce
-   su propia copia con su propia cuenta; solo se sincronizan las señales de
-   control (play/pausa/seek) y un chat, vía el relay de Cloudflare.
+/* Naviris addon: Watch Party v2.4.1
+   Ver vídeo a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube.
+   NO transmite vídeo: cada quien reproduce su propia copia con su propia
+   cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
+   chat, vía el relay de Cloudflare.
 
-   v2: herramienta del sidebar (kind "tool", corre en el renderer). Botón junto a
-   Rat Tool/AutoLoot que se ilumina al reconocer el sitio de la pestaña activa
-   (rojo Netflix, naranja Crunchyroll; verde con sala activa) y panel lateral
-   izquierdo con sala, chat y estado. En la página solo se inyecta un agente
-   mínimo que controla el <video> y avisa de los eventos por console-message.
-
-   v2.1 (paridad con Teleparty): al unirse, el invitado NAVEGA SOLO al episodio
-   del anfitrión (el latido lleva la URL y se compara el id del capítulo); el
-   chat narra cada acción ("X ha dado play", "X ha saltado a 12:34", "X ha
-   pausado", "X ha salido"); y el anfitrión puede activar "Solo el anfitrión
-   controla" (los play/pausa de los invitados no se difunden y el latido los
-   revierte).
+   Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
+   El botón se ilumina con el color del sitio de la pestaña activa y abre un
+   panel lateral con sala, chat y estado. En la página solo se inyecta un
+   agente mínimo que controla el <video> y avisa de los eventos por
+   console-message. En YouTube se usa su API de reproductor
+   (playVideo/pauseVideo/seekTo) y los anuncios se detectan para no
+   sincronizar con el tiempo del anuncio.
 
    Anfitrión-autoritativo: quien crea la sala late con su tiempo cada 2 s; los
-   demás corrigen si se desvían más de 1,5 s.
+   demás corrigen si se desvían más de 1,5 s. Al unirse, el invitado navega
+   solo al episodio del anfitrión; el chat narra cada acción; y el anfitrión
+   decide quién controla la reproducción y quién puede cambiar el vídeo.
+
+   v2.4.1: icono de ojo propio en el sidebar (elegido para la línea visual).
+   v2.4: el panel deja de repintarse entero cada 2 s; estructura estable y
+   datos actualizados en su sitio, chat incremental, color de plataforma
+   permanente en el botón y control de cambio de vídeo para el anfitrión.
 */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
@@ -180,9 +163,11 @@
   document.body.appendChild(panel);
 
   // Iconos propios (Heroicons, stroke currentColor) para no depender del core
-  var ICON_USERS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>';
+  // Ojo de la línea visual de Naviris (relleno sólido, hereda currentColor).
+  // Va inline para que el addon funcione igual en versiones sin este icono.
+  var ICON_EYE = '<svg viewBox="0 0 16 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M0 8L3.07945 4.30466C4.29638 2.84434 6.09909 2 8 2C9.90091 2 11.7036 2.84434 12.9206 4.30466L16 8L12.9206 11.6953C11.7036 13.1557 9.90091 14 8 14C6.09909 14 4.29638 13.1557 3.07945 11.6953L0 8ZM8 11C9.65685 11 11 9.65685 11 8C11 6.34315 9.65685 5 8 5C6.34315 5 5 6.34315 5 8C5 9.65685 6.34315 11 8 11Z" fill="currentColor"/></svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6L18 18"/></svg>';
-  panel.querySelector('#nvp-ico').innerHTML = ICON_USERS;
+  panel.querySelector('#nvp-ico').innerHTML = ICON_EYE;
   panel.querySelector('#nvp-ico').style.cssText = 'display:inline-flex;width:15px;height:15px;color:var(--violet,#b98cff)';
   panel.querySelector('#nvp-close').innerHTML = ICON_X;
 
@@ -564,11 +549,11 @@
   naviris.registerTool({
     id: ID,
     label: 'Watch Party — ver a la vez con amigos',
-    icon: 'film',
+    icon: 'eye-fill',
     onClick: function () { togglePanel(); }
   });
   var btn = document.getElementById(BTN_ID);
-  if (btn) btn.innerHTML = ICON_USERS;
+  if (btn) btn.innerHTML = ICON_EYE;
 
   function glow() {
     var b = document.getElementById(BTN_ID); if (!b) return;
