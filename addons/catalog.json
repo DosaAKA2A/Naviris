@@ -12,7 +12,7 @@
     {
       "id": "twitch-kit",
       "name": "Twitch Kit",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "kind": "content",
       "icon": "gift",
       "matches": [
@@ -24,10 +24,10 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "kind": "tool",
       "icon": "film",
-      "description": "Ve series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (rojo Netflix, naranja Crunchyroll) y panel con salas por código: al unirte, tu pestaña salta sola al episodio del anfitrión, el chat narra cada acción (quién dio play, pausó o saltó y a qué minuto) y el anfitrión puede reservarse el control. No transmite vídeo; cada persona reproduce con su propia cuenta. Reproducir Crunchyroll requiere Naviris 2.6+ (canal dev).",
+      "description": "Ve vídeo a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (naranja Crunchyroll, rojo Netflix, azul Disney+, rojo YouTube) y panel con salas por código: al unirte, tu pestaña salta sola a lo que esté viendo el anfitrión, el chat narra cada acción (quién dio play, pausó o saltó y a qué minuto) y el anfitrión puede reservarse el control. En YouTube los anuncios no descuadran la sala. No transmite vídeo; cada persona reproduce con su propia cuenta. El vídeo con DRM (Crunchyroll, Netflix, Disney+) requiere Naviris 2.6 o superior.",
       "entry": "https://naviris.site/addons/watch-party.js"
     },
     {
