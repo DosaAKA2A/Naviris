@@ -10,6 +10,18 @@
       "entry": "https://naviris.site/addons/sound-booster.js"
     },
     {
+      "id": "twitch-kit",
+      "name": "Twitch Kit",
+      "version": "1.0.0",
+      "kind": "content",
+      "icon": "gift",
+      "matches": [
+        "twitch.tv"
+      ],
+      "description": "Mejoras para ver streams en Twitch, al estilo BetterTTV/7TV: hora y fondo alterno en el chat, resaltado de menciones y palabras clave con sonido y parpadeo del titulo, conservar mensajes borrados por mods, ocultar piezas de la interfaz (recomendados, stories, botones de bits/subs/Prime, leaderboard, hype train), clic en el video para pausar y salto automatico del aviso de contenido. Ajustes con el boton NK junto al chat.",
+      "entry": "https://naviris.site/addons/twitch-kit.js"
+    },
+    {
       "id": "watch-party",
       "name": "Watch Party",
       "version": "2.2.0",
