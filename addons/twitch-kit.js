@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.1.0
+/* Naviris addon: Twitch Kit v1.2.0
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -28,6 +28,7 @@
     keepDeleted: true,   // conservar mensajes borrados (atenuados)
     clickPause: true,    // clic en el vídeo = pausa/play
     skipWarnings: true,  // saltar el aviso de contenido
+    hidePlayerExt: false, // ocultar las extensiones superpuestas al vídeo
     hideRecommended: false,
     hideAlsoWatch: false,
     hideStories: false,
@@ -60,12 +61,21 @@
     r.push('#nk-btn.nk-chatrow{border:none;background:none;color:#b98cff;font-weight:800;font-size:11px;letter-spacing:.5px;cursor:pointer;padding:4px 6px;border-radius:6px}');
     r.push('#nk-btn.nk-chatrow:hover{background:rgba(185,140,255,.12)}');
     if (cfg.altBg) r.push('.chat-scrollable-area__message-container > div:nth-child(odd) .chat-line__message{background:rgba(255,255,255,.035)}');
-    if (cfg.hideRecommended) r.push('[aria-label*="ecomendad" i],[aria-label*="ecommended" i],.side-nav-section[aria-label="Para ti" i],.side-nav-section[aria-label="For You" i]{display:none!important}');
-    if (cfg.hideAlsoWatch) r.push('[aria-label*="ambién ven" i],[aria-label*="lso watch" i]{display:none!important}');
+    // Las secciones del sidebar se ocultan por su .side-nav-section (bloque
+    // entero: título + lista), no por el nodo del aria-label, que a veces es un hijo.
+    if (cfg.hideRecommended) r.push('.side-nav-section[aria-label*="ecomendad" i],.side-nav-section[aria-label*="ecommended" i],.side-nav-section[aria-label*="Para ti" i],.side-nav-section[aria-label*="For You" i],[aria-label*="ecomendad" i]:not(a):not(button){display:none!important}');
+    if (cfg.hideAlsoWatch) r.push('.side-nav-section[aria-label*="ambién ven" i],.side-nav-section[aria-label*="tambien ven" i],.side-nav-section[aria-label*="lso watch" i],[aria-label*="ambién ven" i]:not(a):not(button),[aria-label*="lso watch" i]:not(a):not(button){display:none!important}');
     if (cfg.hideStories) r.push('[class*="stories-tray" i],[data-a-target*="stories" i],[aria-label*="istorias" i],[aria-label*="tories" i]{display:none!important}');
     if (cfg.hideMonet) r.push('[data-a-target="bits-button"],[data-a-target="top-nav-get-bits-button"],[data-a-target="subscribe-button"],[data-a-target="gift-button"],[data-a-target="prime-offers-icon"],[data-test-selector="paid-pinned-chat-message-list"],[class*="paid-pinned" i],[class*="combos-button" i],[data-a-target="hype-chat-button"]{display:none!important}');
-    if (cfg.hideLeaderboard) r.push('[data-test-selector="channel-leaderboard-container"],[class*="channel-leaderboard" i]{display:none!important}');
-    if (cfg.hideCommunity) r.push('[class*="community-highlight" i],[data-test-selector="community-highlight-stack"]{display:none!important}');
+    // El leaderboard: contenedor completo + cualquier pieza suelta con su clase
+    if (cfg.hideLeaderboard) r.push('[data-test-selector="channel-leaderboard-container"],[class*="channel-leaderboard" i],[class*="leaderboard-header" i]{display:none!important}');
+    if (cfg.hideCommunity) r.push('[class*="community-highlight" i],[data-test-selector="community-highlight-stack"],[data-test-selector="hype-train-banner"],[class*="hype-train" i]{display:none!important}');
+    // Extensiones del canal superpuestas al vídeo (iframes de terceros)
+    if (cfg.hidePlayerExt) r.push('.extension-taskbar,.extension-view,[class*="extension-view" i],iframe.extension-view__iframe,[data-test-selector*="extension-view" i]{display:none!important}');
+    // CLAVE para "clic para pausar": esos iframes SE COMEN el clic (el evento va
+    // al documento del iframe y el nuestro nunca lo ve). Con la opción activa se
+    // vuelven transparentes al ratón, sin ocultarlos.
+    if (cfg.clickPause) r.push('.video-player__overlay iframe,.video-player__overlay .extension-view,.video-player__overlay [class*="extension-view" i]{pointer-events:none!important}');
     style.textContent = r.join('\n');
     if (!style.parentNode) (document.head || document.documentElement).appendChild(style);
   }
@@ -105,27 +115,54 @@
     return cfg.keywords.split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
   }
   function decorate(node) {
-    if (!node || node.nodeType !== 1 || node.__nk) return;
+    if (!node || node.nodeType !== 1) return;
     var msg = node.classList && node.classList.contains('chat-line__message') ? node : node.querySelector && node.querySelector('.chat-line__message');
-    if (!msg || msg.__nk) return;
+    if (!msg) return;
+    var nuevo = !msg.__nk;   // primera vez que vemos este mensaje
     msg.__nk = 1;
-    // hora
+    // Hora: se (re)pone siempre que falte. React puede rehacer la línea y
+    // llevarse el span, así que el barrido periódico lo restituye.
     if (cfg.tsChat && !msg.querySelector('.nk-time')) {
-      var t = document.createElement('span'); t.className = 'nk-time'; t.textContent = fmtClock(new Date());
+      if (!msg.__nkAt) msg.__nkAt = Date.now();   // hora de llegada, estable entre repintados
+      var t = document.createElement('span'); t.className = 'nk-time'; t.textContent = fmtClock(new Date(msg.__nkAt));
       msg.insertBefore(t, msg.firstChild);
     }
-    // texto para resaltados + copia para "recuperar borrados"
-    var text = (msg.textContent || '').toLowerCase();
-    msg.__nkText = msg.innerHTML;
-    var me = myLogin();
-    if (cfg.mentionHi && me && text.indexOf('@' + me) !== -1) {
-      msg.classList.add('nk-mention');
-      if (cfg.mentionSound) beep();
-      if (cfg.titleFlash) flashTitle('@' + me);
-    } else {
-      var kws = keywordList();
-      for (var i = 0; i < kws.length; i++) if (text.indexOf(kws[i]) !== -1) { msg.classList.add('nk-keyword'); break; }
+    // Copia para "recuperar borrados" (se guarda SIN nuestra hora, para no duplicarla)
+    if (!msg.__nkText) {
+      var clone = msg.cloneNode(true);
+      var ct = clone.querySelector('.nk-time'); if (ct) ct.remove();
+      msg.__nkText = clone.innerHTML;
     }
+    // Resaltados (solo la primera vez: el sonido/parpadeo no debe repetirse)
+    var text = (msg.textContent || '').toLowerCase();
+    var me = myLogin();
+    var esMencion = cfg.mentionHi && me && (text.indexOf('@' + me) !== -1);
+    if (esMencion) {
+      msg.classList.add('nk-mention');
+      if (nuevo && !esViejo(msg)) { if (cfg.mentionSound) beep(); if (cfg.titleFlash) flashTitle('@' + me); }
+    } else {
+      msg.classList.remove('nk-mention');
+      var kws = keywordList(), hit = false;
+      for (var i = 0; i < kws.length; i++) if (text.indexOf(kws[i]) !== -1) { hit = true; break; }
+      msg.classList.toggle('nk-keyword', hit);
+    }
+  }
+  // ¿es un mensaje del historial (ya estaba al cargar)? No debe sonar ni parpadear
+  var armadoEn = Date.now();
+  function esViejo(msg) { return Date.now() - armadoEn < 4000 || (msg.__nkAt && msg.__nkAt < armadoEn + 1500); }
+  // Barrido: procesa TODOS los mensajes presentes (incluido el historial que ya
+  // estaba al instalar/recargar) y repone lo que React se haya llevado.
+  function sweepChat() {
+    var all = document.querySelectorAll('.chat-line__message');
+    for (var i = 0; i < all.length; i++) decorate(all[i]);
+  }
+  // Re-aplica los cambios de ajustes sobre los mensajes ya visibles (incluye
+  // retirar la hora o los resaltados si se desactivan)
+  function refreshChat() {
+    var all = document.querySelectorAll('.chat-line__message'), i;
+    if (!cfg.tsChat) { var ts = document.querySelectorAll('.nk-time'); for (i = 0; i < ts.length; i++) ts[i].remove(); }
+    if (!cfg.mentionHi) { var ms = document.querySelectorAll('.nk-mention'); for (i = 0; i < ms.length; i++) ms[i].classList.remove('nk-mention'); }
+    for (i = 0; i < all.length; i++) decorate(all[i]);
   }
   // Borrados: Twitch marca la línea o sustituye el contenido; restauramos la copia
   function handleDeleted(msg) {
@@ -152,12 +189,19 @@
   }
 
   /* ---------- Player: clic para pausar + saltar avisos ---------- */
+  // OJO: la capa que cubre el vídeo en Twitch es un <button> ANÓNIMO (sin
+  // data-a-target ni aria-label). Excluir "cualquier button" dejaba la función
+  // inoperativa: hay que excluir solo los controles REALES identificables.
+  var CTRL = '[data-a-target],[aria-label],[role="slider"],[role="menu"],[role="menuitem"],a[href],input,' +
+    '.player-controls,[data-a-target="player-controls"],[class*="player-controls" i],[class*="player-button" i]';
+  var lastToggle = 0;
   document.addEventListener('click', function (e) {
     if (!cfg.clickPause || !e.target || !e.target.closest) return;
-    // Acepta el clic en cualquier capa del overlay del player, pero NUNCA sobre
-    // controles reales (botones, enlaces, sliders del player)
-    if (!e.target.closest('.video-player__overlay') && e.target.tagName !== 'VIDEO') return;
-    if (e.target.closest('button,a,input,[role="button"],[role="slider"],[data-a-target="player-controls"]')) return;
+    var enPlayer = e.target.tagName === 'VIDEO' || e.target.closest('.video-player__overlay, .video-ref, [data-a-target="video-player"]');
+    if (!enPlayer) return;
+    if (e.target.closest(CTRL)) return;                 // control real: no tocar
+    if (Date.now() - lastToggle < 350) return;          // anti-doble (Twitch tiene su propio handler)
+    lastToggle = Date.now();
     var v = document.querySelector('video'); if (!v) return;
     if (v.paused) v.play().catch(function () {}); else v.pause();
   }, true);
@@ -186,6 +230,7 @@
     ['hideCommunity', 'Ocultar avisos de comunidad (hype train...)'],
     ['sec', 'Player'],
     ['clickPause', 'Clic en el video para pausar/reproducir'],
+    ['hidePlayerExt', 'Ocultar extensiones superpuestas al video'],
     ['skipWarnings', 'Saltar el aviso de contenido para adultos']
   ];
   var modal = null;
@@ -217,14 +262,16 @@
         var inp = document.createElement('input');
         inp.placeholder = o[1]; inp.value = cfg[o[0]] || '';
         inp.style.cssText = 'width:100%;background:rgba(0,0,0,.3);color:#ececef;border:1px solid #2c2c33;border-radius:9px;padding:9px 11px;font-size:12.5px;outline:none;box-sizing:border-box';
-        inp.addEventListener('change', function () { cfg[o[0]] = inp.value; save(); applyCss(); });
+        inp.addEventListener('change', function () { cfg[o[0]] = inp.value; save(); applyCss(); refreshChat(); });
         wrap.appendChild(inp); modal.appendChild(wrap); return;
       }
       var row = document.createElement('label');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 2px;cursor:pointer;color:#c9ccd4';
       var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!cfg[o[0]];
       cb.style.cssText = 'accent-color:#b98cff';
-      cb.addEventListener('change', function () { cfg[o[0]] = cb.checked; save(); applyCss(); });
+      // Al cambiar un ajuste, se re-aplica el CSS y se re-barre el chat, para que
+      // el efecto se vea en los mensajes YA visibles y no solo en los siguientes.
+      cb.addEventListener('change', function () { cfg[o[0]] = cb.checked; save(); applyCss(); refreshChat(); });
       var sp = document.createElement('span'); sp.textContent = o[1];
       row.appendChild(cb); row.appendChild(sp); modal.appendChild(row);
     });
@@ -267,5 +314,8 @@
 
   /* ---------- Bucle de mantenimiento (SPA de Twitch): ligero, 2 s ---------- */
   applyCss();
-  setInterval(function () { armChat(); armButton(); skipWarning(); }, 2000);
+  // Barrido inmediato: al instalar o recargar, el chat ya trae historial; sin
+  // esto el usuario solo veía cambios en los mensajes nuevos (parecía roto).
+  armChat(); armButton(); sweepChat();
+  setInterval(function () { armChat(); armButton(); sweepChat(); skipWarning(); }, 2000);
 })();
