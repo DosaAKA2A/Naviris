@@ -384,6 +384,9 @@ function findBookmark(url) { return bookmarksFlat().find((b) => b.url === url); 
 function removeBookmark(url) { bookmarks = bookmarks.filter((it) => !(it.type === 'link' && it.url === url)); bookmarks.forEach((it) => { if (it.type === 'folder') it.children = it.children.filter((c) => c.url !== url); }); saveBm(); }
 function renderBookmarksBar() {
   els.bookmarksBar.innerHTML = '';
+  // Sin marcadores la barra no aporta nada: quitarla en vez de dejar una franja
+  // vacía de 32px bajo la navbar en todas las ventanas.
+  els.bookmarksBar.classList.toggle('empty', !bookmarks.length);
   for (const it of bookmarks) {
     if (it.type === 'folder') { const btn = document.createElement('button'); btn.className = 'bm-folder'; btn.innerHTML = window.icon('folder') + `<span>${escapeHtml(it.name)}</span>`; btn.addEventListener('click', (e) => { e.stopPropagation(); openFolderPop(it, btn); }); els.bookmarksBar.appendChild(btn); }
     else els.bookmarksBar.appendChild(makeBmChip(it));

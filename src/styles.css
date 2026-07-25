@@ -196,7 +196,7 @@ button { font-family: inherit; }
 /* Barra de marcadores */
 #bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 10px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-bottom: 1px solid var(--line); }
 #bookmarks-bar::-webkit-scrollbar { display: none; }
-#bookmarks-bar.hidden { display: none !important; }
+#bookmarks-bar.hidden, #bookmarks-bar.empty { display: none !important; }
 .bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: #c4c6cd; cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background .12s, color .12s; }
 .bookmark:hover, .bm-folder:hover { background: var(--bg-3); color: var(--text); }
 .bookmark img { width: 14px; height: 14px; border-radius: 3px; }
