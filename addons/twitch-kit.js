@@ -1,12 +1,12 @@
 /* Naviris addon: Twitch Kit v1.4.0
-   Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
-   kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
-   que los arreglos de selectores se despliegan por catálogo sin release.
+   Mejoras de Naviris para VER streams en Twitch.
+   kind "content" (matches twitch.tv): corre DENTRO de la página, así que los
+   arreglos de selectores se despliegan por catálogo sin release.
 
-   Funciones v1 (cada una con su toggle en el panel de ajustes):
-   - Chat: hora en cada mensaje; fondo alterno; resaltado de menciones y de
-     palabras clave propias con sonido y parpadeo del título; recuperar los
-     mensajes que borran los mods (se conservan atenuados).
+   Funciones (cada una con su toggle en el panel de ajustes):
+   - Chat: fondo alterno; resaltado de menciones y de palabras clave propias
+     con sonido y parpadeo del título; recuperar los mensajes que borran los
+     mods (se conservan atenuados).
    - UI de Twitch: ocultar por piezas (recomendados, "también ven", stories,
      botones de bits/sub/prime/hype, leaderboard, avisos de la comunidad).
    - Player: clic en el vídeo para pausar/reproducir; saltar el aviso de
@@ -53,7 +53,7 @@
     r.push('.nk-keyword{background:rgba(158,226,184,.12)!important;box-shadow:inset 3px 0 0 #9ee2b8}');
     r.push('.nk-deleted{opacity:.55}.nk-deleted .text-fragment{text-decoration:line-through}');
     r.push('.nk-deleted-tag{font-size:10px;color:#e6a9b4;margin-left:6px;font-style:italic}');
-    /* Botón del kit en el top-nav (como 7TV/BTTV) */
+    /* Botón del kit en el top-nav de Twitch */
     r.push('#nk-btn.nk-topnav{display:inline-flex;align-items:center;justify-content:center;align-self:center;height:30px;min-width:34px;padding:0 8px;margin:0 4px;border:none;border-radius:8px;background:rgba(185,140,255,.16);color:#c8a6ff;font-weight:800;font-size:12px;letter-spacing:.5px;cursor:pointer;transition:background .12s}');
     r.push('#nk-btn.nk-topnav:hover{background:rgba(185,140,255,.28);color:#fff}');
     r.push('#nk-btn.nk-chatrow{border:none;background:none;color:#b98cff;font-weight:800;font-size:11px;letter-spacing:.5px;cursor:pointer;padding:4px 6px;border-radius:6px}');
@@ -236,7 +236,7 @@
     modal = document.createElement('div');
     modal.id = 'nk-modal';
     // Anclado bajo el botón del top-nav (esquina superior derecha), como los
-    // paneles de 7TV/BTTV; si el botón está en la fila del chat, sube desde abajo.
+    // paneles de otras extensiones; si el botón está en la fila del chat, sube desde abajo.
     var atTop = !!document.querySelector('#nk-btn.nk-topnav');
     var pos = atTop ? 'top:52px;right:16px' : 'bottom:70px;right:352px';
     modal.style.cssText = 'position:fixed;' + pos + ';z-index:2147483000;width:310px;max-height:78vh;overflow:auto;background:#141419;color:#ececef;border:1px solid #2c2c33;border-radius:14px;box-shadow:0 18px 48px rgba(0,0,0,.6);font:13px/1.5 Inter,Arial,sans-serif;padding:16px 16px 18px';
@@ -288,9 +288,9 @@
     // quedaba para siempre abajo.
     if (ya && ya.classList.contains('nk-topnav')) return;
 
-    // PREFERIDO: la barra superior de Twitch, en el grupo de iconos de la derecha
-    // (notificaciones, whispers, Prime, bits), donde 7TV y BetterTTV ponen los
-    // suyos. Se ancla RELATIVO al botón de notificaciones (data-a-target estable):
+    // PREFERIDO: la barra superior de Twitch, en el grupo de iconos de la
+    // derecha (notificaciones, whispers, Prime, bits).
+    // Se ancla RELATIVO al botón de notificaciones (data-a-target estable):
     // se sube hasta el ancestro que comparte fila con Prime/bits/whispers y se
     // inserta el nuestro justo antes de ese "slot".
     var notif = document.querySelector('[data-a-target="notification-button"], button[aria-label*="otificac" i], button[aria-label*="otification" i]');

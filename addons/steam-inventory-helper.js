@@ -1,21 +1,18 @@
-/* Naviris addon: Valve Rat Tool v1.5.0
-   Se inyecta en steamcommunity.com. Funciones al estilo Steam Inventory Helper:
+/* Naviris addon: Valve Rat Tool v1.5.1
+   Se inyecta en steamcommunity.com.
    - Precio de Steam bajo cada objeto (moneda de tu cartera, caché 24 h)
-   - Precio de mercado real de Skinport (CS2) vía su API pública (USD, caché 1 h)
-   - Valor total del inventario visible con selector de mercado (Steam/Skinport)
+   - Precio de mercado alternativo (CS2) vía la API pública de Skinport (USD,
+     caché 1 h; su API pide atribución y no consultarla más de 1 vez/hora)
+   - Valor total del inventario visible con selector de mercado
    - Venta rápida al precio actual del mercado de Steam
    - Ofertas de intercambio: suma el valor de cada lado (en el mercado elegido)
    - Barra de herramientas del inventario: buscar por nombre, ordenar la página
      (precio ↑/↓, nombre) y modo selección con suma del valor de lo seleccionado
-   - Venta masiva con el MISMO criterio que SIH: pone lo seleccionado a la venta al
-     precio más bajo del mercado (POST directo a market/sellitem/, neto del vendedor
-     calculado con los helpers de Steam sobre lowest_price, sin rebaja). Pide
-     confirmación antes de publicar.
+   - Venta masiva: pone lo seleccionado a la venta al precio más bajo del mercado
+     (POST directo a market/sellitem/, neto del vendedor calculado con los
+     helpers de Steam sobre lowest_price, sin rebaja). Pide confirmación.
    Respeta el límite de Steam (~20 consultas/min) con una cola; solo pide precio
-   de los objetos de la página visible (no de las miles de páginas ocultas).
-   Nota: la comparativa multi-mercado (Buff163/CSFloat…) que ofrece SIH usa su
-   backend propio; aquí se usa la API pública de Skinport, un mercado real de
-   referencia. El agregado de csgotrader que usábamos dejó de estar disponible. */
+   de los objetos de la página visible (no de las miles de páginas ocultas). */
 (function () {
   if (window.__navSIH) return; window.__navSIH = 1;
 
@@ -331,20 +328,20 @@
     const s = sumFor([...selected]);
     const nMkt = [...selected].filter((e) => e.d && e.d.marketable).length;
     info.innerHTML = '<b>' + selected.size + '</b> sel. · <b>' + s.sum.toFixed(2) + ' ' + s.sym + '</b>' +
-      (nMkt ? ' <button id="navsih-massell" class="navsih-tbtn sell" title="Pone a la venta cada objeto al precio mas bajo del mercado (criterio SIH)">Vender ' + nMkt + ' al mercado</button>' : '');
+      (nMkt ? ' <button id="navsih-massell" class="navsih-tbtn sell" title="Pone a la venta cada objeto al precio mas bajo del mercado actual">Vender ' + nMkt + ' al mercado</button>' : '');
     const mb = document.getElementById('navsih-massell');
     if (mb) mb.onclick = massSell;
   }
 
-  /* Neto del vendedor a partir del precio del comprador (mismo algoritmo que SIH:
-     parte de lowest_price y descuenta las comisiones de Steam con sus propios helpers). */
+  /* Neto del vendedor a partir del precio del comprador: parte de lowest_price
+     y descuenta las comisiones de Steam con sus propios helpers. */
   function sellerFromBuyer(buyerCents) {
     if (typeof GetItemPriceFromTotal !== 'function' || typeof GetTotalWithFees !== 'function') return -1;
     const ppct = parseFloat(g_rgWalletInfo.wallet_publisher_fee_percent_default != null ? g_rgWalletInfo.wallet_publisher_fee_percent_default : 0.1);
     const spct = parseFloat(g_rgWalletInfo.wallet_fee_percent != null ? g_rgWalletInfo.wallet_fee_percent : 0.05);
     let target = buyerCents;
     const minBuyer = GetTotalWithFees(g_rgWalletInfo.wallet_market_minimum, ppct, spct, g_rgWalletInfo);
-    if (target < minBuyer) target = buyerCents; // fastdelta = 0 (sin rebaja, como SIH por defecto)
+    if (target < minBuyer) target = buyerCents; // sin rebaja sobre el precio actual
     let seller = 0, finalBuyer = 0, adj = target, i = 0;
     while (i++ < 10000) {
       seller = GetItemPriceFromTotal(adj, g_rgWalletInfo);
@@ -355,8 +352,8 @@
     return seller;
   }
 
-  /* Publica UN objeto a la venta al precio mas bajo del mercado (POST directo a Steam,
-     idéntico a Steam Inventory Helper: precio = neto del vendedor sobre lowest_price). */
+  /* Publica UN objeto a la venta al precio mas bajo del mercado (POST directo a
+     Steam: precio = neto del vendedor sobre lowest_price). */
   async function sellOne(entry) {
     const it = entry.item, d = entry.d;
     if (!it || !d || !d.marketable) return 'no-market';
@@ -388,8 +385,8 @@
     const list = [...selected].filter((e) => e.d && e.d.marketable && e.item);
     if (!list.length) return;
     const s = sumFor(list);
-    const msg = 'Se pondran a la venta ' + list.length + ' objeto(s) al PRECIO MAS BAJO del mercado de Steam ' +
-      '(el mismo criterio que Steam Inventory Helper).\n\nValor aproximado: ' + s.sum.toFixed(2) + ' ' + s.sym +
+    const msg = 'Se pondran a la venta ' + list.length + ' objeto(s) al PRECIO MAS BAJO del mercado de Steam.' +
+      '\n\nValor aproximado: ' + s.sum.toFixed(2) + ' ' + s.sym +
       '. Steam descuenta su comision de tu parte; puede pedir confirmacion en la app movil.\n\n¿Continuar?';
     if (!window.confirm(msg)) return;
     selling = true;

@@ -6,7 +6,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "icon": "speaker-wave",
-      "description": "Amplifica el volumen de la pestaña activa por encima del 100% (hasta 500%) con un deslizador y niveles rápidos. Útil para vídeos con audio bajo. Requiere Naviris 2.5+.",
+      "description": "Sube el volumen de la pestaña activa hasta el 500% cuando el audio original se queda corto: deslizador preciso, niveles rápidos de un toque y vuelta al 100% al instante. Ideal para vídeos y directos que suenan demasiado bajo. Requiere Naviris 2.5 o superior.",
       "entry": "https://naviris.site/addons/sound-booster.js"
     },
     {
@@ -18,28 +18,28 @@
       "matches": [
         "twitch.tv"
       ],
-      "description": "Mejoras para ver streams en Twitch, al estilo BetterTTV/7TV: hora y fondo alterno en el chat, resaltado de menciones y palabras clave con sonido y parpadeo del titulo, conservar mensajes borrados por mods, ocultar piezas de la interfaz (recomendados, stories, botones de bits/subs/Prime, leaderboard, hype train), clic en el video para pausar y salto automatico del aviso de contenido. Ajustes con el boton NK en la barra superior de Twitch (junto a notificaciones y Prime, donde 7TV/BetterTTV ponen los suyos).",
+      "description": "Mejora el chat y el reproductor de Twitch: resaltado de menciones y palabras clave con aviso sonoro, mensajes borrados que se conservan legibles, fondo alterno para seguir el chat sin perderse, clic en el vídeo para pausar y limpieza de las piezas de la interfaz que no usas. Todo se configura desde el botón NK en la propia barra de Twitch.",
       "entry": "https://naviris.site/addons/twitch-kit.js"
     },
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.4.0",
+      "version": "2.4.1",
       "kind": "tool",
-      "icon": "film",
-      "description": "Ve vídeo a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (naranja Crunchyroll, rojo Netflix, azul Disney+, rojo YouTube) y panel con salas por código: al unirte, tu pestaña salta sola a lo que esté viendo el anfitrión, el chat narra cada acción (quién dio play, pausó o saltó y a qué minuto) y el anfitrión puede reservarse el control. En YouTube los anuncios no descuadran la sala. No transmite vídeo; cada persona reproduce con su propia cuenta. El vídeo con DRM (Crunchyroll, Netflix, Disney+) requiere Naviris 2.6 o superior.",
+      "icon": "eye-fill",
+      "description": "Crea una sala, comparte el código y ved lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube. La reproducción se sincroniza sola con la del anfitrión, el chat narra cada acción y el anfitrión decide quién controla y quién puede cambiar el vídeo. Nadie transmite nada: cada persona reproduce con su propia cuenta. Requiere Naviris 2.6 o superior.",
       "entry": "https://naviris.site/addons/watch-party.js"
     },
     {
       "id": "steam-inventory-helper",
       "name": "Valve Rat Tool",
-      "version": "1.5.0",
+      "version": "1.5.1",
       "kind": "content",
-      "icon": "puzzle-piece",
+      "icon": "mouse",
       "matches": [
         "steamcommunity.com"
       ],
-      "description": "Precios en tu inventario de Steam y comparativa con el mercado real de Skinport (CS2): valor total con selector de mercado, venta rápida al precio actual y suma del valor por lado en las ofertas de intercambio. Incluye barra de herramientas (buscar por nombre, ordenar por precio/nombre y modo selección) y venta masiva al precio más bajo del mercado con el mismo criterio que Steam Inventory Helper.",
+      "description": "Tu inventario de Steam, valorado al instante: precio por objeto con selector de mercado, valor total del inventario, venta rápida o masiva al precio actual y suma del valor de cada lado en las ofertas de intercambio. Incluye búsqueda por nombre, orden por precio o nombre y modo selección para operar en lote.",
       "entry": "https://naviris.site/addons/steam-inventory-helper.js"
     },
     {
@@ -48,7 +48,7 @@
       "version": "1.1.0",
       "kind": "tool",
       "icon": "camera",
-      "description": "Captura la página eligiendo cuánto: lo visible, 2 o 4 pantallas, la página completa o un número a medida. Une los tramos en un solo PNG.",
+      "description": "Captura la página que estás viendo eligiendo cuánto abarcar: solo lo visible, dos o cuatro pantallas, la página completa o un número a tu medida. Une todos los tramos en un único PNG a resolución real, listo para guardar o compartir donde quieras.",
       "entry": "https://naviris.site/addons/long-screenshot.js"
     }
   ]
