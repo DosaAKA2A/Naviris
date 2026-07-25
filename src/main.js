@@ -977,9 +977,12 @@ let vpnState = { on: false, proxy: null, protocol: null, country: null, ip: null
 async function vpnApply(rules) {
   for (const part of VPN_PARTS) {
     const ses = session.fromPartition(part);
+    // Al apagar se vuelve a 'system', NO a 'direct': si el usuario tiene una VPN
+    // de escritorio (Urban VPN y similares dejan proxy de sistema), 'direct' la
+    // esquivaría y saldría por su IP real sin avisar. 'system' respeta el equipo.
     await ses.setProxy(rules
       ? { proxyRules: rules, proxyBypassRules: '<local>' }
-      : { mode: 'direct' });
+      : { mode: 'system' });
   }
 }
 // Prueba real del proxy: CONNECT y petición a un servicio de eco de IP. Devuelve
