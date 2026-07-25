@@ -203,8 +203,6 @@ function activateTab(id) {
     t.webview.classList.toggle('loot-live', !active && !!t.autoLoot);
   });
   if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
-  // Al elegir una pestaña que NO es de AutoLoot, el grupo se pliega de nuevo
-  if (!tab.autoLoot) lootExpanded = false;
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
 }
@@ -226,7 +224,8 @@ function closeTab(id) {
 }
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
-  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (mini ? ' mini loot-member' : ''); el.title = tab.url || 'Hub de Naviris';
+  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (mini ? ' mini loot-member' : '');
+  el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '') : (tab.url || 'Hub de Naviris');
   const zzz = document.createElement('span'); zzz.className = 't-zzz'; zzz.innerHTML = window.icon('moon');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
@@ -270,30 +269,11 @@ function reorderTab(fromId, toId) {
   tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
   renderTabs(); saveSession();
 }
-let lootExpanded = false;
 function renderTabs() {
+  // AutoClaim v2: un solo canal, sin grupo de pestañas acopladas; la pestaña
+  // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
-  const loots = tabs.filter((t) => t.autoLoot);
-  if (!loots.length) lootExpanded = false;
-  // El grupo AutoLoot siempre va primero, a la izquierda del resto de pestañas
-  if (loots.length) {
-    els.tabstrip.appendChild(makeLootGroupTab(loots));
-    if (lootExpanded) for (const lt of loots) els.tabstrip.appendChild(makeTabEl(lt, true));
-  }
-  for (const tab of tabs) {
-    if (tab.autoLoot) continue;
-    els.tabstrip.appendChild(makeTabEl(tab));
-  }
-}
-function makeLootGroupTab(list) {
-  const active = !lootExpanded && list.some((t) => t.id === activeId);
-  const claims = list.reduce((n, t) => n + (t.twitchClaims || 0), 0);
-  const el = document.createElement('div');
-  el.className = 'tab group-tab' + (active ? ' active' : '') + (lootExpanded ? ' open' : '');
-  el.title = `AutoLoot: ${list.length} canal(es)` + (claims ? ` · ${claims} reclamados` : '') + '. Clic para desplegar/plegar.';
-  el.innerHTML = `<span class="gt-ic">${window.icon('gift')}</span><span class="t-title">AutoLoot · ${list.length}</span><span class="gt-caret">${window.icon(lootExpanded ? 'chevron-right' : 'chevron-down')}</span>`;
-  el.addEventListener('click', (e) => { e.stopPropagation(); lootExpanded = !lootExpanded; renderTabs(); });
-  return el;
+  for (const tab of tabs) els.tabstrip.appendChild(makeTabEl(tab));
 }
 function toggleMute(tab) {
   tab.muted = !tab.muted;
@@ -927,33 +907,45 @@ function renderLootPanel() {
   els.lootTabSes.classList.toggle('active', lootView === 'ses');
   els.lootTabHist.classList.toggle('active', lootView === 'hist');
   const twitch = activeIsTwitch();
-  const sessions = tabs.filter((t) => t.autoLoot);
+  // AutoClaim v2: sesión ÚNICA (un solo canal a la vez)
+  const s = tabs.find((t) => t.autoLoot) || null;
+  const cur = activeTab();
   const body = els.lootBody; body.innerHTML = '';
   if (lootView === 'ses') {
-    const go = document.createElement('button'); go.id = 'loot-go'; go.className = 'loot-go' + (twitch ? '' : ' off');
-    go.textContent = 'Activar'; go.disabled = !twitch;
-    go.addEventListener('click', () => { activateAutoLoot(activeTab()); renderLootPanel(); });
-    body.appendChild(go);
-    const hint = document.createElement('div'); hint.className = 'loot-hint';
-    hint.textContent = twitch
-      ? 'Silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupada a la izquierda.'
-      : 'Abre un canal de Twitch para poder activar una sesión.';
-    body.appendChild(hint);
-    body.appendChild(lootLabel('SESIONES ACTIVAS', String(sessions.length)));
-    if (!sessions.length) { const e = document.createElement('div'); e.className = 'loot-empty'; e.textContent = 'No hay sesiones recolectando ahora mismo.'; body.appendChild(e); }
-    for (const s of sessions) {
+    if (!s) {
+      const go = document.createElement('button'); go.id = 'loot-go'; go.className = 'loot-go' + (twitch ? '' : ' off');
+      go.textContent = 'Activar en este canal'; go.disabled = !twitch;
+      go.addEventListener('click', () => { activateAutoLoot(activeTab()); renderLootPanel(); });
+      body.appendChild(go);
+      const hint = document.createElement('div'); hint.className = 'loot-hint';
+      hint.textContent = twitch
+        ? 'Silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano. Un canal a la vez.'
+        : 'Abre un canal de Twitch para poder activar el AutoClaim.';
+      body.appendChild(hint);
+    } else {
+      body.appendChild(lootLabel('CANAL EN FARMEO'));
       const row = document.createElement('div'); row.className = 'loot-ses';
       row.innerHTML = '<span class="ls-dot"></span><span class="ls-info"><span class="ls-name"></span><span class="ls-time"></span></span><span class="ls-n"></span>';
       row.querySelector('.ls-name').textContent = s.title || s.url;
       const tspan = row.querySelector('.ls-time');
       tspan.textContent = s.lootStart ? ('farmeando ' + fmtDur(Date.now() - s.lootStart)) : '';
-      tspan.title = 'Tiempo que AutoLoot lleva trabajando en este stream';
+      tspan.title = 'Tiempo que el AutoClaim lleva trabajando en este canal';
       const nspan = row.querySelector('.ls-n');
       nspan.textContent = s.twitchClaims || 0;
       nspan.title = 'Reclamos (puntos + drops) en esta sesión';
       const go2 = document.createElement('button'); go2.className = 'ls-btn'; go2.textContent = 'ir'; go2.addEventListener('click', () => activateTab(s.id));
-      const stop = document.createElement('button'); stop.className = 'ls-btn stop'; stop.textContent = 'parar'; stop.addEventListener('click', () => { setAutoLoot(s, false); renderLootPanel(); });
+      const stop = document.createElement('button'); stop.className = 'ls-btn stop'; stop.textContent = 'detener'; stop.addEventListener('click', () => { setAutoLoot(s, false); renderLootPanel(); });
       row.append(go2, stop); body.appendChild(row);
+      // Estás viendo OTRO canal de Twitch: ofrecer mover el farmeo aquí
+      if (twitch && cur && cur.id !== s.id) {
+        const sw = document.createElement('button'); sw.className = 'loot-go'; sw.style.marginTop = '10px';
+        sw.textContent = 'Cambiar el farmeo a este canal';
+        sw.addEventListener('click', () => { activateAutoLoot(cur); renderLootPanel(); });
+        body.appendChild(sw);
+      }
+      const hint2 = document.createElement('div'); hint2.className = 'loot-hint';
+      hint2.textContent = 'Solo se farmea un canal a la vez: activar en otro canal detiene este.';
+      body.appendChild(hint2);
     }
   } else {
     const pts = loot.filter((l) => l.kind === 'points').length, drops = loot.filter((l) => l.kind === 'drop').length;
@@ -1029,6 +1021,9 @@ function setAutoLoot(tab, on) {
 }
 function activateAutoLoot(tab) {
   if (!tab || tab.kind !== 'web') return;
+  // AutoClaim v2: UN solo canal a la vez (no se puede farmear dos, decisión de
+  // producto). Activar aquí apaga cualquier sesión anterior.
+  for (const t of tabs) if (t.autoLoot && t.id !== tab.id) setAutoLoot(t, false);
   tab.lowRes = true; tab.autoLoot = true;
   if (!tab.lootStart) tab.lootStart = Date.now(); // inicio del temporizador de trabajo
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
@@ -1036,7 +1031,7 @@ function activateAutoLoot(tab) {
   // ya no hace falta recargar la pestaña ni reiniciar el stream.
   try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: true }); } catch { /* nada */ }
   renderTabs(); updateLootUI();
-  toast('Modo Loot: silenciado, resolución mínima y pestaña agrupada a la izquierda');
+  toast('AutoClaim activo: canal silenciado y en resolución mínima');
 }
 function updateRatPlat() {
   const url = els.ratUrl.value.trim(); const p = platOf(url);

@@ -1,0 +1,13 @@
+name = "naviris-party"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[[durable_objects.bindings]]
+name = "PARTY"
+class_name = "PartyRoom"
+
+# new_sqlite_classes: los Durable Objects con almacenamiento SQLite son los
+# que entran en el plan gratuito de Workers.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PartyRoom"]
