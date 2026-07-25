@@ -1,4 +1,10 @@
-/* Naviris addon: Watch Party v2.2.0
+/* Naviris addon: Watch Party v2.3.0
+   v2.3: además de Crunchyroll y Netflix, ahora también Disney+ y YouTube. En
+   YouTube se usa su API de reproductor (playVideo/pauseVideo/seekTo) porque el
+   <video> a secas se pelea con su controlador, y los anuncios se detectan para
+   no sincronizar con el tiempo del anuncio ni difundir sus play/pause.
+*/
+/* Historial v2.2.0:
    v2.2: rediseño del panel (espaciados generosos, jerarquía por secciones) y
    chat serio: nombres coloreados por autor, horas, agrupación de mensajes
    consecutivos, avisos del sistema diferenciados y estado vacío.
@@ -35,13 +41,34 @@
   /* ---------- Agente que se inyecta en la página (mundo de la página) ---------- */
   var AGENT = '(function(){' +
     'if(window.__navPartyAgent)return;window.__navPartyAgent=1;var mute=0;' +
-    'function vid(){return document.querySelector("video")}' +
+    // YouTube tiene varios <video> (miniaturas, previsualizaciones): el bueno es
+    // el del reproductor principal. Se prefiere ese y se cae al primero que haya.
+    'function vid(){var v=document.querySelector("#movie_player video, .html5-video-player video");' +
+    'if(v)return v;var all=document.querySelectorAll("video");' +
+    'for(var i=0;i<all.length;i++){var r=all[i].getBoundingClientRect();if(r.width>200&&r.height>100)return all[i]}' +
+    'return all[0]||null}' +
     'var isNf=/netflix\\./.test(location.hostname),nfP=null;' +
+    'var isYt=/youtube\\.|youtu\\.be/.test(location.hostname);' +
+    // En YouTube manda la API del reproductor: play/pause/seek por el <video> a
+    // secas se pelean con su controlador y a veces no "prenden".
+    'function yt(){try{var p=document.getElementById("movie_player");return p&&p.playVideo?p:null}catch(e){return null}}' +
+    // Los anuncios de YouTube corren en el MISMO <video>: si sincronizas durante
+    // uno, el tiempo no es el del vídeo real. Se detecta y se ignora el latido.
+    'function ytAnuncio(){try{var p=document.querySelector(".html5-video-player");return !!(p&&p.classList.contains("ad-showing"))}catch(e){return false}}' +
     'function nf(){try{if(nfP)return nfP;var api=window.netflix&&netflix.appContext&&netflix.appContext.state.playerApp.getAPI().videoPlayer;if(!api)return null;var ids=api.getAllPlayerSessionIds()||[];var sid=null;for(var i=0;i<ids.length;i++)if(/watch/.test(ids[i]))sid=ids[i];sid=sid||ids[0];nfP=sid?api.getVideoPlayerBySessionId(sid):null;return nfP}catch(e){return null}}' +
-    'function doPlay(){if(isNf){var p=nf();if(p){try{p.play();return}catch(e){}}}var v=vid();if(v)v.play().catch(function(){})}' +
-    'function doPause(){if(isNf){var p=nf();if(p){try{p.pause();return}catch(e){}}}var v=vid();if(v)v.pause()}' +
-    'function doSeek(t){if(isNf){var p=nf();if(p){try{p.seek(Math.round(t*1000));return}catch(e){}}}var v=vid();if(v)v.currentTime=t}' +
-    'window.__navPartyState=function(){var v=vid();return{time:v?v.currentTime:0,paused:v?v.paused:true,has:!!v}};' +
+    'function doPlay(){if(isNf){var p=nf();if(p){try{p.play();return}catch(e){}}}' +
+    'if(isYt){var y=yt();if(y){try{y.playVideo();return}catch(e){}}}' +
+    'var v=vid();if(v)v.play().catch(function(){})}' +
+    'function doPause(){if(isNf){var p=nf();if(p){try{p.pause();return}catch(e){}}}' +
+    'if(isYt){var y=yt();if(y){try{y.pauseVideo();return}catch(e){}}}' +
+    'var v=vid();if(v)v.pause()}' +
+    'function doSeek(t){if(isNf){var p=nf();if(p){try{p.seek(Math.round(t*1000));return}catch(e){}}}' +
+    'if(isYt){var y=yt();if(y){try{y.seekTo(t,true);return}catch(e){}}}' +
+    'var v=vid();if(v)v.currentTime=t}' +
+    // has:false durante un anuncio de YouTube -> el resto de la sala no se
+    // sincroniza con el tiempo del anuncio ni se le corrige el suyo.
+    'window.__navPartyState=function(){var v=vid();var ad=isYt&&ytAnuncio();' +
+    'return{time:v?v.currentTime:0,paused:v?v.paused:true,has:!!v&&!ad,ad:!!ad}};' +
     'window.__navPartyApply=function(m){mute=Date.now()+' + ECHO_MS + ';var st=window.__navPartyState();' +
     'if(m.kind==="seek")doSeek(m.time);' +
     'else if(m.kind==="play"){if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + ')doSeek(m.time);doPlay()}' +
@@ -52,6 +79,7 @@
     'if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + '){mute=Date.now()+' + ECHO_MS + ';doSeek(m.time)}};' +
     'var wired=null,last={k:"",at:0};' +
     'function emit(kind){return function(){if(Date.now()<mute)return;' +
+    'if(isYt&&ytAnuncio())return;' + // los play/pause del anuncio no son tuyos: no difundir
     'var now=Date.now();if(last.k===kind&&now-last.at<1200)return;last={k:kind,at:now};' + // dedup de eventos repetidos (stalls del player)
     'console.log("NAVPARTY|"+JSON.stringify({kind:kind,time:(vid()||{currentTime:0}).currentTime}))}}' +
     // "seeking" y no "seeked": es inmediato (los saltos remotos caen SIEMPRE dentro
@@ -69,6 +97,8 @@
     /* Botón del sidebar: brillo ESTÁTICO por sitio reconocido (nada animado en reposo) */
     '#' + BTN_ID + '.nvp-netflix{color:#e50914;filter:drop-shadow(0 0 6px rgba(229,9,20,.65))}',
     '#' + BTN_ID + '.nvp-crunchy{color:#f47521;filter:drop-shadow(0 0 6px rgba(244,117,33,.65))}',
+    '#' + BTN_ID + '.nvp-disney{color:#3aa0ff;filter:drop-shadow(0 0 6px rgba(58,160,255,.65))}',
+    '#' + BTN_ID + '.nvp-youtube{color:#ff4444;filter:drop-shadow(0 0 6px rgba(255,68,68,.6))}',
     '#' + BTN_ID + '.nvp-live{color:#9ee2b8;filter:drop-shadow(0 0 6px rgba(158,226,184,.5))}',
     /* Panel más ancho y con aire */
     '#nvp-panel{width:340px;max-height:640px}',
@@ -149,10 +179,15 @@
   var party = null;      // { code, host, wv, ws, n, status, ok, msgs, name }
   var beatTimer = null;
 
+  var SITIOS = {
+    netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube'
+  };
   function siteOf(url) {
     var h = ''; try { h = new URL(url).hostname; } catch (e) { return null; }
     if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
+    if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
+    if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
@@ -163,6 +198,14 @@
     if (m) return 'cr:' + m[1].toUpperCase();
     m = /netflix\.com\/watch\/(\d+)/i.exec(url || '');
     if (m) return 'nf:' + m[1];
+    // Disney+: /video/<uuid> (y /play/<uuid> en algunos flujos)
+    m = /disneyplus\.com\/(?:[a-z-]+\/)?(?:video|play)\/([a-f0-9-]{8,})/i.exec(url || '');
+    if (m) return 'dp:' + m[1].toLowerCase();
+    // YouTube: watch?v=ID, youtu.be/ID, /live/ID, /embed/ID, /shorts/ID
+    m = /[?&]v=([\w-]{6,})/.exec(url || '');
+    if (m) return 'yt:' + m[1];
+    m = /(?:youtu\.be|youtube\.com\/(?:live|embed|shorts))\/([\w-]{6,})/i.exec(url || '');
+    if (m) return 'yt:' + m[1];
     return null;
   }
   function fmtT(s) {
@@ -309,12 +352,12 @@
     for (i = 0; i < ids.length; i++) { el = document.getElementById(ids[i]); if (el) keep[ids[i]] = { v: el.value, f: document.activeElement === el, s: el.selectionStart }; }
     body.innerHTML = '';
     var site = activeSite();
-    var siteName = site === 'netflix' ? 'Netflix' : site === 'crunchy' ? 'Crunchyroll' : null;
+    var siteName = SITIOS[site] || null;
     if (!party) {
       var hint = document.createElement('div'); hint.className = 'nvp-hint';
       hint.textContent = site
         ? 'Listo: la sala usará ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola al episodio del anfitrión.'
-        : 'Abre Netflix o Crunchyroll en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        : 'Abre Crunchyroll, Netflix, Disney+ o YouTube en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       body.appendChild(hint);
       var lblN = document.createElement('div'); lblN.className = 'nvp-lbl'; lblN.textContent = 'Tu nombre'; body.appendChild(lblN);
       var nameRow = document.createElement('div'); nameRow.className = 'nvp-row'; nameRow.style.marginTop = '0';
@@ -426,6 +469,8 @@
     b.classList.toggle('nvp-live', !!party);
     b.classList.toggle('nvp-netflix', !party && site === 'netflix');
     b.classList.toggle('nvp-crunchy', !party && site === 'crunchy');
+    b.classList.toggle('nvp-disney', !party && site === 'disney');
+    b.classList.toggle('nvp-youtube', !party && site === 'youtube');
   }
   // Sondeo ligero (2 s): la API de addons no expone eventos de navegación. Si el
   // addon se quita/pausa (botón fuera del DOM), se limpia todo solo.

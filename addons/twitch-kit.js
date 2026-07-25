@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.3.0
+/* Naviris addon: Twitch Kit v1.4.0
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -19,7 +19,6 @@
   var KEY = '__navTwitchKitCfg';
 
   var DEF = {
-    tsChat: true,        // hora en los mensajes
     altBg: false,        // fondo alterno en el chat
     mentionHi: true,     // resaltar menciones a ti
     mentionSound: true,  // sonido al mencionarte
@@ -50,7 +49,6 @@
   function applyCss() {
     var r = [];
     /* base del kit */
-    r.push('.nk-time{font-family:ui-monospace,monospace;font-size:10px;color:#9a9da6;opacity:.75;margin-right:5px;vertical-align:baseline}');
     r.push('.nk-mention{background:rgba(185,140,255,.14)!important;box-shadow:inset 3px 0 0 #b98cff}');
     r.push('.nk-keyword{background:rgba(158,226,184,.12)!important;box-shadow:inset 3px 0 0 #9ee2b8}');
     r.push('.nk-deleted{opacity:.55}.nk-deleted .text-fragment{text-decoration:line-through}');
@@ -110,7 +108,6 @@
   }
 
   /* ---------- Chat: observador de mensajes ---------- */
-  function fmtClock(d) { var m = String(d.getMinutes()); if (m.length < 2) m = '0' + m; return d.getHours() + ':' + m; }
   function keywordList() {
     return cfg.keywords.split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
   }
@@ -119,37 +116,16 @@
     var msg = node.classList && node.classList.contains('chat-line__message') ? node : node.querySelector && node.querySelector('.chat-line__message');
     if (!msg) return;
     var nuevo = !msg.__nk;   // primera vez que vemos este mensaje
-    // Los que ya estaban al arrancar son HISTORIAL: no sabemos su hora real, así
-    // que no se les inventa ninguna (mejor sin hora que con un dato falso). Al
-    // resto se les sella la hora de llegada SIEMPRE (aunque la opción esté
-    // apagada), para que al activarla luego ya tengan su marca correcta.
-    if (nuevo && Date.now() - armadoEn < 4000) msg.__nkHist = 1;
-    if (!msg.__nkAt && !msg.__nkHist) msg.__nkAt = Date.now();
     msg.__nk = 1;
-    // Hora: SOLO si Twitch no la pone ya. Twitch tiene su propio ajuste de marcas
-    // de tiempo (Configuración de chat -> Apariencia) y muchos usuarios lo tienen
-    // activo: duplicar la hora quedaría absurdo. Si aparece la nativa después,
-    // se retira la nuestra.
-    var nativo = msg.querySelector('.chat-line__timestamp');
-    var mio = msg.querySelector('.nk-time');
-    if (nativo && mio) { mio.remove(); mio = null; }
-    if (cfg.tsChat && !nativo && !mio && msg.__nkAt) {
-      var t = document.createElement('span'); t.className = 'nk-time'; t.textContent = fmtClock(new Date(msg.__nkAt));
-      msg.insertBefore(t, msg.firstChild);
-    }
-    // Copia para "recuperar borrados" (se guarda SIN nuestra hora, para no duplicarla)
-    if (!msg.__nkText) {
-      var clone = msg.cloneNode(true);
-      var ct = clone.querySelector('.nk-time'); if (ct) ct.remove();
-      msg.__nkText = clone.innerHTML;
-    }
+    // Copia para "recuperar borrados"
+    if (!msg.__nkText) msg.__nkText = msg.innerHTML;
     // Resaltados (solo la primera vez: el sonido/parpadeo no debe repetirse)
     var text = (msg.textContent || '').toLowerCase();
     var me = myLogin();
     var esMencion = cfg.mentionHi && me && (text.indexOf('@' + me) !== -1);
     if (esMencion) {
       msg.classList.add('nk-mention');
-      if (nuevo && !esViejo(msg)) { if (cfg.mentionSound) beep(); if (cfg.titleFlash) flashTitle('@' + me); }
+      if (nuevo && !esViejo()) { if (cfg.mentionSound) beep(); if (cfg.titleFlash) flashTitle('@' + me); }
     } else {
       msg.classList.remove('nk-mention');
       var kws = keywordList(), hit = false;
@@ -159,20 +135,24 @@
   }
   // ¿es un mensaje del historial (ya estaba al cargar)? No debe sonar ni parpadear
   var armadoEn = Date.now();
-  function esViejo(msg) { return Date.now() - armadoEn < 4000 || (msg.__nkAt && msg.__nkAt < armadoEn + 1500); }
+  function esViejo() { return Date.now() - armadoEn < 4000; }
   // Barrido: procesa TODOS los mensajes presentes (incluido el historial que ya
   // estaba al instalar/recargar) y repone lo que React se haya llevado.
   function sweepChat() {
     var all = document.querySelectorAll('.chat-line__message');
     for (var i = 0; i < all.length; i++) decorate(all[i]);
   }
-  // Re-aplica los cambios de ajustes sobre los mensajes ya visibles (incluye
-  // retirar la hora o los resaltados si se desactivan)
+  // Re-aplica los cambios de ajustes sobre los mensajes ya visibles
   function refreshChat() {
     var all = document.querySelectorAll('.chat-line__message'), i;
-    if (!cfg.tsChat) { var ts = document.querySelectorAll('.nk-time'); for (i = 0; i < ts.length; i++) ts[i].remove(); }
     if (!cfg.mentionHi) { var ms = document.querySelectorAll('.nk-mention'); for (i = 0; i < ms.length; i++) ms[i].classList.remove('nk-mention'); }
     for (i = 0; i < all.length; i++) decorate(all[i]);
+  }
+  // Limpieza de la función de hora, retirada en v1.4.0: si quedaban marcas de una
+  // versión anterior, se quitan (Twitch ya trae su propio ajuste de marcas de tiempo).
+  function limpiarHoras() {
+    var t = document.querySelectorAll('.nk-time');
+    for (var i = 0; i < t.length; i++) t[i].remove();
   }
   // Borrados: Twitch marca la línea o sustituye el contenido; restauramos la copia
   function handleDeleted(msg) {
@@ -232,7 +212,6 @@
   /* ---------- Panel de ajustes (botón NK junto al engranaje del chat) ---------- */
   var OPTS = [
     ['sec', 'Chat'],
-    ['tsChat', 'Hora en los mensajes (solo si Twitch no la pone)'],
     ['altBg', 'Fondo alterno en el chat'],
     ['mentionHi', 'Resaltar cuando te mencionan'],
     ['mentionSound', 'Sonido al mencionarte'],
@@ -344,6 +323,6 @@
   applyCss();
   // Barrido inmediato: al instalar o recargar, el chat ya trae historial; sin
   // esto el usuario solo veía cambios en los mensajes nuevos (parecía roto).
-  armChat(); armButton(); sweepChat();
+  armChat(); armButton(); sweepChat(); limpiarHoras();
   setInterval(function () { armChat(); armButton(); sweepChat(); skipWarning(); }, 2000);
 })();
