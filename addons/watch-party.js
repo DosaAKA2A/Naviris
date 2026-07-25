@@ -1,204 +1,305 @@
-/* Naviris addon: Watch Party v1.0.0
+/* Naviris addon: Watch Party v2.0.0
    Ver series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty pero
    más simple y sin cuentas de terceros. NO transmite vídeo: cada quien reproduce
-   su propia copia con su propia cuenta; el addon solo sincroniza las señales de
-   control (play/pausa/seek) y un chat, a través del servidor de watchparty/.
+   su propia copia con su propia cuenta; solo se sincronizan las señales de
+   control (play/pausa/seek) y un chat, vía el relay de Cloudflare.
 
-   Requiere que el servidor esté desplegado y su URL configurada abajo (SERVER) o
-   en localStorage.__navPartyServer. Reproducir Crunchyroll/Netflix requiere que
-   Naviris tenga Widevine (build castlabs ECS); el addon en sí no depende de ello.
+   v2: herramienta del sidebar (kind "tool", corre en el renderer). Botón junto a
+   Rat Tool/AutoLoot que se ilumina al reconocer el sitio de la pestaña activa
+   (rojo Netflix, naranja Crunchyroll; verde con sala activa) y panel lateral
+   izquierdo con sala, chat y estado. En la página solo se inyecta un agente
+   mínimo que controla el <video> y avisa de los eventos por console-message.
 
-   Anfitrión-autoritativo: quien crea la sala manda un latido con su tiempo cada
-   2 s; los demás corrigen si se desvían más de 1,5 s. Cualquiera puede dar
-   play/pausa/seek (se reenvía al resto). Se evita el eco al aplicar remotos. */
+   Anfitrión-autoritativo: quien crea la sala late con su tiempo cada 2 s; los
+   demás corrigen si se desvían más de 1,5 s. Cualquiera puede play/pausa/seek. */
 (function () {
-  if (window.__navParty) return; window.__navParty = 1;
-
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
-  var DRIFT = 1.5;        // segundos de desvío tolerado antes de re-seek
-  var BEAT_MS = 2000;     // cada cuánto late el anfitrión
-  var ECHO_MS = 900;      // ventana para ignorar eventos provocados por aplicar un remoto
+  var DRIFT = 1.5;      // segundos de desvío tolerado antes de re-seek
+  var ECHO_MS = 900;    // ventana ignorando eventos locales tras aplicar un remoto
+  var ID = 'watch-party';
+  var BTN_ID = 'adt-' + ID;
 
-  /* ---------- ¿Página de reproducción? ---------- */
-  var host = location.hostname;
-  var isNetflix = /netflix\./.test(host);
-  var isCrunchy = /crunchyroll\./.test(host);
-  if (!isNetflix && !isCrunchy) return;
+  /* ---------- Agente que se inyecta en la página (mundo de la página) ---------- */
+  var AGENT = '(function(){' +
+    'if(window.__navPartyAgent)return;window.__navPartyAgent=1;var mute=0;' +
+    'function vid(){return document.querySelector("video")}' +
+    'var isNf=/netflix\\./.test(location.hostname),nfP=null;' +
+    'function nf(){try{if(nfP)return nfP;var api=window.netflix&&netflix.appContext&&netflix.appContext.state.playerApp.getAPI().videoPlayer;if(!api)return null;var ids=api.getAllPlayerSessionIds()||[];var sid=null;for(var i=0;i<ids.length;i++)if(/watch/.test(ids[i]))sid=ids[i];sid=sid||ids[0];nfP=sid?api.getVideoPlayerBySessionId(sid):null;return nfP}catch(e){return null}}' +
+    'function doPlay(){if(isNf){var p=nf();if(p){try{p.play();return}catch(e){}}}var v=vid();if(v)v.play().catch(function(){})}' +
+    'function doPause(){if(isNf){var p=nf();if(p){try{p.pause();return}catch(e){}}}var v=vid();if(v)v.pause()}' +
+    'function doSeek(t){if(isNf){var p=nf();if(p){try{p.seek(Math.round(t*1000));return}catch(e){}}}var v=vid();if(v)v.currentTime=t}' +
+    'window.__navPartyState=function(){var v=vid();return{time:v?v.currentTime:0,paused:v?v.paused:true,has:!!v}};' +
+    'window.__navPartyApply=function(m){mute=Date.now()+' + ECHO_MS + ';var st=window.__navPartyState();' +
+    'if(m.kind==="seek")doSeek(m.time);' +
+    'else if(m.kind==="play"){if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + ')doSeek(m.time);doPlay()}' +
+    'else if(m.kind==="pause"){doPause();if(typeof m.time==="number")doSeek(m.time)}};' +
+    'window.__navPartyBeat=function(m){if(Date.now()<mute)return;var st=window.__navPartyState();if(!st.has)return;' +
+    'if(m.paused&&!st.paused){mute=Date.now()+' + ECHO_MS + ';doPause()}' +
+    'else if(!m.paused&&st.paused){mute=Date.now()+' + ECHO_MS + ';doPlay()}' +
+    'if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + '){mute=Date.now()+' + ECHO_MS + ';doSeek(m.time)}};' +
+    'var wired=null;' +
+    'function emit(kind){return function(){if(Date.now()<mute)return;console.log("NAVPARTY|"+JSON.stringify({kind:kind,time:(vid()||{currentTime:0}).currentTime}))}}' +
+    'function wire(){var v=vid();if(!v||v===wired)return;wired=v;v.addEventListener("play",emit("play"));v.addEventListener("pause",emit("pause"));v.addEventListener("seeked",emit("seek"))}' +
+    'var iv=setInterval(wire,1500);wire();' +
+    'window.__navPartyStop=function(){clearInterval(iv);wired=null;window.__navPartyAgent=0};' +
+    '})();';
 
-  /* ---------- Adaptador de vídeo ---------- */
-  function getVideo() { return document.querySelector('video'); }
-
-  var netflixPlayer = null;
-  function nfPlayer() {
-    try {
-      if (netflixPlayer) return netflixPlayer;
-      var api = window.netflix && netflix.appContext && netflix.appContext.state.playerApp.getAPI().videoPlayer;
-      if (!api) return null;
-      var ids = api.getAllPlayerSessionIds() || [];
-      var sid = ids.find(function (s) { return /watch/.test(s); }) || ids[0];
-      netflixPlayer = sid ? api.getVideoPlayerBySessionId(sid) : null;
-      return netflixPlayer;
-    } catch (e) { return null; }
-  }
-
-  var adapter = {
-    getTime: function () { var v = getVideo(); return v ? v.currentTime : 0; },
-    isPaused: function () { var v = getVideo(); return v ? v.paused : true; },
-    play: function () {
-      if (isNetflix) { var p = nfPlayer(); if (p) { try { p.play(); return; } catch (e) {} } }
-      var v = getVideo(); if (v) v.play().catch(function () {});
-    },
-    pause: function () {
-      if (isNetflix) { var p = nfPlayer(); if (p) { try { p.pause(); return; } catch (e) {} } }
-      var v = getVideo(); if (v) v.pause();
-    },
-    seek: function (t) {
-      if (isNetflix) { var p = nfPlayer(); if (p) { try { p.seek(Math.round(t * 1000)); return; } catch (e) {} } }
-      var v = getVideo(); if (v) v.currentTime = t;
-    }
-  };
-
-  /* ---------- Estado de sincronización ---------- */
-  var ws = null, room = null, isHost = false, name = 'Yo';
-  var applyingUntil = 0;           // hasta cuándo ignorar eventos locales (eco)
-  var beatTimer = null;
-  var suppressing = function () { return Date.now() < applyingUntil; };
-  var markApplying = function () { applyingUntil = Date.now() + ECHO_MS; };
-
-  function send(obj) { try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch (e) {} }
-
-  function applyRemoteEvent(m) {
-    markApplying();
-    if (m.kind === 'seek') adapter.seek(m.time);
-    else if (m.kind === 'play') { if (typeof m.time === 'number' && Math.abs(adapter.getTime() - m.time) > DRIFT) adapter.seek(m.time); adapter.play(); }
-    else if (m.kind === 'pause') { adapter.pause(); if (typeof m.time === 'number') adapter.seek(m.time); }
-  }
-
-  function applyBeat(m) {
-    if (suppressing()) return;
-    // Alinear estado de reproducción y corregir deriva.
-    if (m.paused && !adapter.isPaused()) { markApplying(); adapter.pause(); }
-    else if (!m.paused && adapter.isPaused()) { markApplying(); adapter.play(); }
-    if (typeof m.time === 'number' && Math.abs(adapter.getTime() - m.time) > DRIFT) { markApplying(); adapter.seek(m.time); }
-  }
-
-  /* ---------- Eventos locales del vídeo -> difundir ---------- */
-  var wired = null;
-  function wireVideo() {
-    var v = getVideo();
-    if (!v || v === wired) return;
-    wired = v;
-    var emit = function (kind) {
-      return function () {
-        if (!room || suppressing()) return;
-        send({ t: 'ev', kind: kind, time: adapter.getTime(), at: Date.now() });
-      };
-    };
-    v.addEventListener('play', emit('play'));
-    v.addEventListener('pause', emit('pause'));
-    v.addEventListener('seeked', emit('seek'));
-  }
-  setInterval(wireVideo, 1000); wireVideo();
-
-  /* ---------- Conexión / sala ---------- */
-  function connect(code, asHost) {
-    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
-    room = code; isHost = asHost;
-    setStatus('conectando…');
-    ws = new WebSocket(SERVER);
-    ws.onopen = function () { send({ t: 'join', room: code, name: name, host: asHost }); };
-    ws.onmessage = function (e) {
-      var m; try { m = JSON.parse(e.data); } catch (x) { return; }
-      if (m.t === 'joined') { setStatus('en la sala ' + m.room + (asHost ? ' (anfitrión)' : '') + ' · ' + m.n + ' viendo'); startBeat(); }
-      else if (m.t === 'peers') { setStatus('sala ' + room + (isHost ? ' (anfitrión)' : '') + ' · ' + m.n + ' viendo'); if (m.joined && m.who) log('· ' + m.who + ' se unió'); }
-      else if (m.t === 'ev') applyRemoteEvent(m);
-      else if (m.t === 'beat') { if (!isHost) applyBeat(m); }
-      else if (m.t === 'chat') log((m.from || '?') + ': ' + m.msg);
-      else if (m.t === 'error') setStatus('error: ' + m.msg);
-    };
-    ws.onclose = function () { setStatus('desconectado'); stopBeat(); };
-    ws.onerror = function () { setStatus('sin conexión al servidor'); };
-  }
-  function startBeat() {
-    stopBeat();
-    if (!isHost) return;
-    beatTimer = setInterval(function () { send({ t: 'beat', time: adapter.getTime(), paused: adapter.isPaused(), at: Date.now() }); }, BEAT_MS);
-  }
-  function stopBeat() { if (beatTimer) { clearInterval(beatTimer); beatTimer = null; } }
-  function leaveRoom() { stopBeat(); if (ws) { try { ws.close(); } catch (e) {} ws = null; } room = null; setStatus('fuera de la sala'); }
-
-  function randomCode() {
-    var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '';
-    for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
-    return s;
-  }
-
-  /* ---------- Panel (sin emojis, iconografía por texto) ---------- */
+  /* ---------- Estilos (reusa side-panel-left, lp- y loot- del core) ---------- */
   var css = document.createElement('style');
+  css.id = 'nvp-style';
   css.textContent = [
-    '#nav-party{position:fixed;left:14px;bottom:14px;z-index:2147483000;width:250px;background:#12141a;color:#e6e8ee;',
-    'border:1px solid #2a2f3a;border-radius:10px;font:13px/1.4 Arial,Helvetica,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.55);overflow:hidden}',
-    '#nav-party .hd{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:#171a22;cursor:default}',
-    '#nav-party .hd b{font-size:13px;letter-spacing:.2px}',
-    '#nav-party .hd .min{cursor:pointer;color:#9aa2b1;padding:0 4px}',
-    '#nav-party .bd{padding:10px 11px;display:flex;flex-direction:column;gap:8px}',
-    '#nav-party.min .bd{display:none}',
-    '#nav-party .st{font-size:11.5px;color:#9ee2b8;min-height:15px}',
-    '#nav-party .row{display:flex;gap:6px}',
-    '#nav-party button{flex:1;background:#2a3140;color:#e6e8ee;border:0;border-radius:6px;padding:7px 8px;font:600 12px Arial;cursor:pointer}',
-    '#nav-party button:hover{background:#354056}',
-    '#nav-party button.p{background:#e0563f;color:#fff}#nav-party button.p:hover{background:#f0664f}',
-    '#nav-party input{background:#0d0f14;color:#e6e8ee;border:1px solid #2a2f3a;border-radius:6px;padding:7px 8px;font:12px Arial;min-width:0}',
-    '#nav-party .log{height:96px;overflow:auto;background:#0d0f14;border:1px solid #22262f;border-radius:6px;padding:6px 7px;font-size:11.5px;color:#c3c8d2;display:none}',
-    '#nav-party .log.on{display:block}',
-    '#nav-party .log div{margin:1px 0;word-wrap:break-word}'
-  ].join('');
-  document.documentElement.appendChild(css);
+    /* Botón del sidebar: brillo ESTÁTICO por sitio reconocido (nada animado en reposo) */
+    '#' + BTN_ID + '.nvp-netflix{color:#e50914;filter:drop-shadow(0 0 6px rgba(229,9,20,.65))}',
+    '#' + BTN_ID + '.nvp-crunchy{color:#f47521;filter:drop-shadow(0 0 6px rgba(244,117,33,.65))}',
+    '#' + BTN_ID + '.nvp-live{color:#9ee2b8;filter:drop-shadow(0 0 6px rgba(158,226,184,.5))}',
+    '.nvp-row{display:flex;gap:6px;margin-top:8px}',
+    '.nvp-in{flex:1;min-width:0;background:rgba(0,0,0,.25);color:var(--text,#ececef);border:1px solid var(--line-2,#2c2c33);border-radius:9px;padding:9px 10px;font-size:12.5px;outline:none}',
+    '.nvp-in:focus{border-color:var(--muted,#8b8d94)}',
+    '.nvp-in::placeholder{color:var(--dim,#5c5e64)}',
+    '.nvp-in.code{text-transform:uppercase;font-family:var(--mono,ui-monospace,monospace);letter-spacing:2px}',
+    '.nvp-btn{border:none;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);flex:0 0 auto}',
+    '.nvp-btn:hover{background:rgba(255,255,255,.14)}',
+    '.nvp-btn:disabled{color:var(--dim,#5c5e64);cursor:default;background:rgba(255,255,255,.04)}',
+    '.nvp-code{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:8px;padding:13px 10px;border:1px dashed var(--line-2,#2c2c33);border-radius:12px;cursor:pointer}',
+    '.nvp-code:hover{background:rgba(255,255,255,.04)}',
+    '.nvp-code .c{font-family:var(--mono,ui-monospace,monospace);font-size:26px;font-weight:800;letter-spacing:8px;color:var(--text,#ececef);text-indent:8px}',
+    '.nvp-code .h{font-size:10.5px;color:var(--muted,#8b8d94)}',
+    '.nvp-status{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted,#8b8d94)}',
+    '.nvp-status .dot{width:7px;height:7px;border-radius:50%;background:#9ee2b8;flex:none}',
+    '.nvp-status.err .dot{background:#e6a9b4}',
+    '.nvp-watch{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line,#232327);border-radius:10px;margin-top:8px}',
+    '.nvp-watch .n{flex:1;min-width:0;font-size:12.5px;color:var(--text,#ececef);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.nvp-chat{height:150px;overflow-y:auto;margin-top:8px;border:1px solid var(--line,#232327);border-radius:10px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}',
+    '.nvp-chat .l{color:var(--text,#ececef);word-wrap:break-word}',
+    '.nvp-chat .l b{color:var(--violet,#b98cff);font-weight:600}',
+    '.nvp-chat .s{color:var(--muted,#8b8d94);font-size:11.5px}',
+    '.nvp-leave{width:100%;margin-top:10px;border:1px solid var(--line-2,#2c2c33);background:none;color:#e6a9b4;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer}',
+    '.nvp-leave:hover{background:rgba(230,169,180,.08)}'
+  ].join('\n');
+  document.head.appendChild(css);
 
-  var panel = document.createElement('div'); panel.id = 'nav-party';
+  /* ---------- Panel lateral (estructura del core: side-panel-left) ---------- */
+  var panel = document.createElement('aside');
+  panel.id = 'nvp-panel';
+  panel.className = 'side-panel-left hidden';
   panel.innerHTML =
-    '<div class="hd"><b>Watch Party</b><span class="min" title="Minimizar">—</span></div>' +
-    '<div class="bd">' +
-      '<div class="st">fuera de la sala</div>' +
-      '<div class="row"><button id="np-create">Crear sala</button></div>' +
-      '<div class="row"><input id="np-code" placeholder="código" maxlength="6"><button id="np-join" style="flex:0 0 auto">Unirse</button></div>' +
-      '<div class="log" id="np-log"></div>' +
-      '<div class="row" id="np-chatrow" style="display:none"><input id="np-chat" placeholder="escribe…"><button id="np-send" style="flex:0 0 auto">Enviar</button></div>' +
-      '<div class="row" id="np-leaverow" style="display:none"><button id="np-leave">Salir de la sala</button></div>' +
-    '</div>';
-  function mount() { if (!document.body) return setTimeout(mount, 200); document.body.appendChild(panel); }
-  mount();
+    '<div class="lp-head"><span class="lp-title"><span id="nvp-ico"></span> Watch Party</span>' +
+    '<button id="nvp-close" class="lp-x" title="Cerrar"></button></div>' +
+    '<div id="nvp-body" class="lp-body"></div>';
+  document.body.appendChild(panel);
 
-  var $ = function (id) { return panel.querySelector(id); };
-  function setStatus(s) { var el = $('.st'); if (el) el.textContent = s; }
-  function log(line) {
-    var el = $('#np-log'); if (!el) return; el.classList.add('on');
-    var d = document.createElement('div'); d.textContent = line; el.appendChild(d); el.scrollTop = el.scrollHeight;
+  // Iconos propios (Heroicons, stroke currentColor) para no depender del core
+  var ICON_USERS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>';
+  var ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6L18 18"/></svg>';
+  panel.querySelector('#nvp-ico').innerHTML = ICON_USERS;
+  panel.querySelector('#nvp-ico').style.cssText = 'display:inline-flex;width:15px;height:15px;color:var(--violet,#b98cff)';
+  panel.querySelector('#nvp-close').innerHTML = ICON_X;
+
+  /* ---------- Estado ---------- */
+  var party = null;      // { code, host, wv, ws, n, status, ok, msgs, name }
+  var beatTimer = null;
+
+  function siteOf(url) {
+    var h = ''; try { h = new URL(url).hostname; } catch (e) { return null; }
+    if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
+    if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
+    return null;
   }
-  function enterUI(code) {
-    $('#np-create').parentNode.style.display = 'none';
-    $('#np-code').parentNode.style.display = 'none';
-    $('#np-chatrow').style.display = 'flex';
-    $('#np-leaverow').style.display = 'flex';
-    $('#np-code').value = code;
+  function activeSite() {
+    var wv = naviris.activeWebview(); if (!wv) return null;
+    try { return siteOf(wv.getURL()); } catch (e) { return null; }
   }
-  function exitUI() {
-    $('#np-create').parentNode.style.display = 'flex';
-    $('#np-code').parentNode.style.display = 'flex';
-    $('#np-chatrow').style.display = 'none';
-    $('#np-leaverow').style.display = 'none';
+  function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
+  function logSys(text) { if (!party) return; party.msgs.push({ text: text, sys: true }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
+  function logChat(who, text) { if (!party) return; party.msgs.push({ who: who, text: text }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
+  function inject(wv) { try { wv.executeJavaScript(AGENT).catch(function () {}); } catch (e) { /* nada */ } }
+
+  function onConsole(e) {
+    if (!party || typeof e.message !== 'string' || e.message.indexOf('NAVPARTY|') !== 0) return;
+    var m; try { m = JSON.parse(e.message.slice(9)); } catch (x) { return; }
+    send({ t: 'ev', kind: m.kind, time: m.time, at: Date.now() });
+  }
+  function onRenav() { if (party) inject(party.wv); }
+  function onGone() { if (party) { leave(true); naviris.toast('Watch Party terminada: se cerró la pestaña'); } }
+
+  function applyRemote(m) {
+    if (!party) return;
+    try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
+  }
+  function applyBeat(m) {
+    if (!party) return;
+    try { party.wv.executeJavaScript('window.__navPartyBeat&&__navPartyBeat(' + JSON.stringify({ time: m.time, paused: !!m.paused }) + ')').catch(function () {}); } catch (e) { /* nada */ }
+  }
+  function beatStart() {
+    beatStop();
+    beatTimer = setInterval(function () {
+      if (!party) return;
+      try {
+        party.wv.executeJavaScript('window.__navPartyState?__navPartyState():null').then(function (st) {
+          if (st && st.has) send({ t: 'beat', time: st.time, paused: st.paused, at: Date.now() });
+        }).catch(function () {});
+      } catch (e) { /* nada */ }
+    }, 2000);
+  }
+  function beatStop() { if (beatTimer) { clearInterval(beatTimer); beatTimer = null; } }
+  function randomCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '', i; for (i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
+
+  function start(code, asHost) {
+    var wv = naviris.activeWebview();
+    if (!wv || !activeSite()) { naviris.toast('Abre el episodio en Netflix o Crunchyroll y vuelve a intentarlo'); return; }
+    leave(true);
+    var name = (localStorage.__navPartyName || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
+    party = { code: code, host: asHost, wv: wv, ws: null, n: 1, status: 'Conectando…', ok: false, msgs: [], name: name };
+    wv.addEventListener('console-message', onConsole);
+    wv.addEventListener('did-navigate', onRenav);
+    wv.addEventListener('did-navigate-in-page', onRenav);
+    wv.addEventListener('dom-ready', onRenav);
+    wv.addEventListener('destroyed', onGone);
+    inject(wv);
+    var ws = new WebSocket(SERVER); party.ws = ws;
+    ws.onopen = function () { send({ t: 'join', room: code, name: name, host: asHost }); };
+    ws.onmessage = function (ev) {
+      if (!party || party.ws !== ws) return;
+      var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
+      if (m.t === 'joined') { party.ok = true; party.n = m.n; party.status = 'En la sala'; logSys(asHost ? 'Sala creada. Toca el código para copiarlo y compártelo.' : 'Dentro. El anfitrión marca el ritmo.'); if (asHost) beatStart(); }
+      else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logSys(m.who + ' se ha unido'); }
+      else if (m.t === 'ev') applyRemote(m);
+      else if (m.t === 'beat') { if (!party.host) applyBeat(m); }
+      else if (m.t === 'chat') logChat(m.from || '?', String(m.msg || ''));
+      else if (m.t === 'error') party.status = 'Error: ' + m.msg;
+      render(); glow();
+    };
+    ws.onclose = function () { if (party && party.ws === ws) { party.ok = false; party.status = 'Desconectado'; beatStop(); render(); } };
+    ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = 'Sin conexión con el servidor'; render(); } };
+    render(); glow();
+  }
+  function leave(silent) {
+    if (!party) return;
+    beatStop();
+    var wv = party.wv;
+    try { wv.removeEventListener('console-message', onConsole); } catch (e) { /* nada */ }
+    try { wv.removeEventListener('did-navigate', onRenav); wv.removeEventListener('did-navigate-in-page', onRenav); wv.removeEventListener('dom-ready', onRenav); wv.removeEventListener('destroyed', onGone); } catch (e) { /* nada */ }
+    try { wv.executeJavaScript('window.__navPartyStop&&__navPartyStop()').catch(function () {}); } catch (e) { /* nada */ }
+    try { party.ws && party.ws.close(); } catch (e) { /* nada */ }
+    party = null;
+    if (!silent) naviris.toast('Has saltado de la sala');
+    render(); glow();
   }
 
-  $('.min').addEventListener('click', function () { panel.classList.toggle('min'); });
-  $('#np-create').addEventListener('click', function () { var code = randomCode(); connect(code, true); enterUI(code); log('· Sala creada: ' + code + ' (compártela)'); });
-  $('#np-join').addEventListener('click', function () {
-    var code = ($('#np-code').value || '').toUpperCase().trim(); if (!code) return;
-    connect(code, false); enterUI(code); log('· Uniéndote a ' + code + '…');
+  /* ---------- Render del panel ---------- */
+  var body = panel.querySelector('#nvp-body');
+  function render() {
+    if (panel.classList.contains('hidden')) return;
+    // Conserva lo escrito y el foco al re-renderizar (llegan mensajes mientras tecleas)
+    var keep = {}, ids = ['nvp-name', 'nvp-codein', 'nvp-chatin'], i, el;
+    for (i = 0; i < ids.length; i++) { el = document.getElementById(ids[i]); if (el) keep[ids[i]] = { v: el.value, f: document.activeElement === el, s: el.selectionStart }; }
+    body.innerHTML = '';
+    var site = activeSite();
+    var siteName = site === 'netflix' ? 'Netflix' : site === 'crunchy' ? 'Crunchyroll' : null;
+    if (!party) {
+      var hint = document.createElement('div'); hint.className = 'loot-hint';
+      hint.textContent = site
+        ? 'Listo: la sala verá ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con el de un amigo.'
+        : 'Abre un episodio en Netflix o Crunchyroll (el botón se ilumina con el color del sitio) y vuelve aquí.';
+      body.appendChild(hint);
+      var nameRow = document.createElement('div'); nameRow.className = 'nvp-row';
+      var nameIn = document.createElement('input'); nameIn.id = 'nvp-name'; nameIn.className = 'nvp-in'; nameIn.maxLength = 32;
+      nameIn.placeholder = 'Tu nombre (opcional)'; nameIn.value = localStorage.__navPartyName || '';
+      nameIn.addEventListener('change', function () { localStorage.__navPartyName = nameIn.value.trim(); });
+      nameRow.appendChild(nameIn); body.appendChild(nameRow);
+      var go = document.createElement('button'); go.className = 'loot-go' + (site ? '' : ' off'); go.disabled = !site;
+      go.textContent = 'Crear sala';
+      go.addEventListener('click', function () { localStorage.__navPartyName = nameIn.value.trim(); start(randomCode(), true); });
+      body.appendChild(go);
+      var lbl = document.createElement('div'); lbl.className = 'loot-lbl'; lbl.textContent = 'O ÚNETE A UNA SALA'; body.appendChild(lbl);
+      var joinRow = document.createElement('div'); joinRow.className = 'nvp-row';
+      var codeIn = document.createElement('input'); codeIn.id = 'nvp-codein'; codeIn.className = 'nvp-in code'; codeIn.maxLength = 12; codeIn.placeholder = 'Código';
+      var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; joinBtn.disabled = !site;
+      var doJoin = function () { var c = codeIn.value.trim().toUpperCase(); if (!c) return; localStorage.__navPartyName = nameIn.value.trim(); start(c, false); };
+      joinBtn.addEventListener('click', doJoin);
+      codeIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doJoin(); });
+      joinRow.appendChild(codeIn); joinRow.appendChild(joinBtn); body.appendChild(joinRow);
+    } else {
+      var codeBox = document.createElement('div'); codeBox.className = 'nvp-code'; codeBox.title = 'Copiar el código';
+      codeBox.innerHTML = '<span class="c"></span><span class="h">toca para copiar y compartir</span>';
+      codeBox.querySelector('.c').textContent = party.code;
+      codeBox.addEventListener('click', function () { navigator.clipboard.writeText(party.code).then(function () { naviris.toast('Código copiado: ' + party.code); }).catch(function () {}); });
+      body.appendChild(codeBox);
+      var st = document.createElement('div'); st.className = 'nvp-status' + (party.ok ? '' : ' err');
+      st.innerHTML = '<span class="dot"></span><span></span>';
+      st.lastChild.textContent = party.n + ' viendo · ' + (party.host ? 'anfitrión' : 'invitado') + ' · ' + party.status;
+      body.appendChild(st);
+      var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
+      if (title) {
+        var w = document.createElement('div'); w.className = 'nvp-watch';
+        var nm = document.createElement('span'); nm.className = 'n'; nm.textContent = title;
+        w.appendChild(nm); body.appendChild(w);
+      }
+      var chat = document.createElement('div'); chat.className = 'nvp-chat';
+      for (i = 0; i < party.msgs.length; i++) {
+        var m = party.msgs[i], line = document.createElement('div');
+        if (m.sys) { line.className = 's'; line.textContent = m.text; }
+        else { line.className = 'l'; var b = document.createElement('b'); b.textContent = m.who + ': '; line.appendChild(b); line.appendChild(document.createTextNode(m.text)); }
+        chat.appendChild(line);
+      }
+      body.appendChild(chat); chat.scrollTop = chat.scrollHeight;
+      var chatRow = document.createElement('div'); chatRow.className = 'nvp-row';
+      var chatIn = document.createElement('input'); chatIn.id = 'nvp-chatin'; chatIn.className = 'nvp-in'; chatIn.maxLength = 300; chatIn.placeholder = 'Escribe en el chat…';
+      var sendBtn = document.createElement('button'); sendBtn.className = 'nvp-btn'; sendBtn.textContent = 'Enviar';
+      var doChat = function () { var msg = chatIn.value.trim(); if (!msg || !party) return; send({ t: 'chat', msg: msg }); logChat(party.name, msg); chatIn.value = ''; };
+      sendBtn.addEventListener('click', doChat);
+      chatIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doChat(); });
+      chatRow.appendChild(chatIn); chatRow.appendChild(sendBtn); body.appendChild(chatRow);
+      var lv = document.createElement('button'); lv.className = 'nvp-leave'; lv.textContent = 'Salir de la sala';
+      lv.addEventListener('click', function () { leave(false); });
+      body.appendChild(lv);
+    }
+    for (i = 0; i < ids.length; i++) {
+      el = document.getElementById(ids[i]);
+      if (el && keep[ids[i]]) { el.value = keep[ids[i]].v; if (keep[ids[i]].f) { el.focus(); try { el.setSelectionRange(keep[ids[i]].s, keep[ids[i]].s); } catch (e) { /* nada */ } } }
+    }
+  }
+
+  /* ---------- Botón del sidebar + glow por sitio ---------- */
+  naviris.registerTool({
+    id: ID,
+    label: 'Watch Party — ver a la vez con amigos',
+    icon: 'film',
+    onClick: function () { togglePanel(); }
   });
-  $('#np-leave').addEventListener('click', function () { leaveRoom(); exitUI(); });
-  function doChat() { var i = $('#np-chat'); var msg = (i.value || '').trim(); if (!msg || !room) return; send({ t: 'chat', msg: msg }); log(name + ': ' + msg); i.value = ''; }
-  $('#np-send').addEventListener('click', doChat);
-  $('#np-chat').addEventListener('keydown', function (e) { if (e.key === 'Enter') doChat(); });
+  var btn = document.getElementById(BTN_ID);
+  if (btn) btn.innerHTML = ICON_USERS;
 
-  setStatus('fuera de la sala · servidor: ' + SERVER.replace(/^wss?:\/\//, ''));
+  function glow() {
+    var b = document.getElementById(BTN_ID); if (!b) return;
+    var site = activeSite();
+    b.classList.toggle('nvp-live', !!party);
+    b.classList.toggle('nvp-netflix', !party && site === 'netflix');
+    b.classList.toggle('nvp-crunchy', !party && site === 'crunchy');
+  }
+  // Sondeo ligero (2 s): la API de addons no expone eventos de navegación. Si el
+  // addon se quita/pausa (botón fuera del DOM), se limpia todo solo.
+  var glowTimer = setInterval(function () {
+    if (!document.getElementById(BTN_ID)) {
+      clearInterval(glowTimer); leave(true);
+      panel.remove(); css.remove(); document.removeEventListener('mousedown', onAway, true);
+      return;
+    }
+    glow();
+    if (!panel.classList.contains('hidden')) render();
+  }, 2000);
+
+  function togglePanel(force) {
+    var open = force !== undefined ? force : panel.classList.contains('hidden');
+    if (open) { panel.classList.remove('hidden'); render(); }
+    else panel.classList.add('hidden');
+  }
+  panel.querySelector('#nvp-close').addEventListener('click', function () { togglePanel(false); });
+  function onAway(e) {
+    var b = document.getElementById(BTN_ID);
+    if (!panel.classList.contains('hidden') && !panel.contains(e.target) && (!b || !b.contains(e.target))) togglePanel(false);
+  }
+  document.addEventListener('mousedown', onAway, true);
+
+  glow();
 })();
