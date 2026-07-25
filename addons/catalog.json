@@ -12,7 +12,7 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.1.0",
+      "version": "2.1.1",
       "kind": "tool",
       "icon": "film",
       "description": "Ve series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (rojo Netflix, naranja Crunchyroll) y panel con salas por código: al unirte, tu pestaña salta sola al episodio del anfitrión, el chat narra cada acción (quién dio play, pausó o saltó y a qué minuto) y el anfitrión puede reservarse el control. No transmite vídeo; cada persona reproduce con su propia cuenta. Reproducir Crunchyroll requiere Naviris 2.6+ (canal dev).",

@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.1.0
+/* Naviris addon: Watch Party v2.1.1
    Ver series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty pero
    más simple y sin cuentas de terceros. NO transmite vídeo: cada quien reproduce
    su propia copia con su propia cuenta; solo se sincronizan las señales de
@@ -44,9 +44,14 @@
     'if(m.paused&&!st.paused){mute=Date.now()+' + ECHO_MS + ';doPause()}' +
     'else if(!m.paused&&st.paused){mute=Date.now()+' + ECHO_MS + ';doPlay()}' +
     'if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + '){mute=Date.now()+' + ECHO_MS + ';doSeek(m.time)}};' +
-    'var wired=null;' +
-    'function emit(kind){return function(){if(Date.now()<mute)return;console.log("NAVPARTY|"+JSON.stringify({kind:kind,time:(vid()||{currentTime:0}).currentTime}))}}' +
-    'function wire(){var v=vid();if(!v||v===wired)return;wired=v;v.addEventListener("play",emit("play"));v.addEventListener("pause",emit("pause"));v.addEventListener("seeked",emit("seek"))}' +
+    'var wired=null,last={k:"",at:0};' +
+    'function emit(kind){return function(){if(Date.now()<mute)return;' +
+    'var now=Date.now();if(last.k===kind&&now-last.at<1200)return;last={k:kind,at:now};' + // dedup de eventos repetidos (stalls del player)
+    'console.log("NAVPARTY|"+JSON.stringify({kind:kind,time:(vid()||{currentTime:0}).currentTime}))}}' +
+    // "seeking" y no "seeked": es inmediato (los saltos remotos caen SIEMPRE dentro
+    // del mute, sin eco aunque el buffering DRM tarde) y Crunchyroll no dispara
+    // "seeked" de forma fiable en saltos programáticos.
+    'function wire(){var v=vid();if(!v||v===wired)return;wired=v;v.addEventListener("play",emit("play"));v.addEventListener("pause",emit("pause"));v.addEventListener("seeking",emit("seek"))}' +
     'var iv=setInterval(wire,1500);wire();' +
     'window.__navPartyStop=function(){clearInterval(iv);wired=null;window.__navPartyAgent=0};' +
     '})();';
@@ -138,6 +143,16 @@
   }
   function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
   function logSys(text) { if (!party) return; party.msgs.push({ text: text, sys: true }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
+  // Narración filtrada: sin duplicados seguidos y sin los pausa/play espurios
+  // que el reproductor dispara al bufferizar justo después de un salto.
+  var narr = { kind: '', at: 0 };
+  function narrate(kind, text) {
+    var now = Date.now();
+    if ((kind === 'play' || kind === 'pause') && narr.kind === 'seek' && now - narr.at < 2500) return;
+    if (narr.kind === kind && now - narr.at < 1500) return;
+    narr = { kind: kind, at: now };
+    logSys(text);
+  }
   function logChat(who, text) { if (!party) return; party.msgs.push({ who: who, text: text }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
   function inject(wv) { try { wv.executeJavaScript(AGENT).catch(function () {}); } catch (e) { /* nada */ } }
 
@@ -151,7 +166,7 @@
       return;
     }
     send({ t: 'ev', kind: m.kind, time: m.time, at: Date.now() });
-    logSys(m.kind === 'play' ? 'Has dado play' : m.kind === 'pause' ? 'Has pausado en ' + fmtT(m.time) : 'Has saltado a ' + fmtT(m.time));
+    narrate(m.kind, m.kind === 'play' ? 'Has dado play' : m.kind === 'pause' ? 'Has pausado en ' + fmtT(m.time) : 'Has saltado a ' + fmtT(m.time));
   }
   function onRenav() { if (party) inject(party.wv); }
   function onGone() { if (party) { leave(true); naviris.toast('Watch Party terminada: se cerró la pestaña'); } }
@@ -159,7 +174,7 @@
   function applyRemote(m) {
     if (!party) return;
     var who = m.from || 'Alguien';
-    logSys(m.kind === 'play' ? who + ' ha dado play' : m.kind === 'pause' ? who + ' ha pausado en ' + fmtT(m.time) : who + ' ha saltado a ' + fmtT(m.time));
+    narrate(m.kind, m.kind === 'play' ? who + ' ha dado play' : m.kind === 'pause' ? who + ' ha pausado en ' + fmtT(m.time) : who + ' ha saltado a ' + fmtT(m.time));
     try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
   }
   // Invitados: seguir el episodio del anfitrión (la URL viaja en su latido). Si
