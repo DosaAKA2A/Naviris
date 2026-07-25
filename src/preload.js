@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   fetchFavicon: (pageUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl),
 
   updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateChannels: () => ipcRenderer.invoke('update:channels'),
+  updateChoose: (line) => ipcRenderer.invoke('update:choose', line),
   updateDownload: () => ipcRenderer.invoke('update:download'),
   updateInstall: () => ipcRenderer.send('update:install'),
   onUpdateStatus: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s)),

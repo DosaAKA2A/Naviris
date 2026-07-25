@@ -18,7 +18,7 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu',
-  'opt-agent', 'opt-devupdates', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
+  'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
@@ -1208,7 +1208,6 @@ els.optRestore.addEventListener('change', async () => { settings = await window.
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
-els.optDevupdates.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ devUpdates: els.optDevupdates.checked }); toast(els.optDevupdates.checked ? 'Canal dev activo: busca actualizaciones para ver las versiones de prueba' : 'Canal estable'); });
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 
@@ -1485,26 +1484,62 @@ async function loadToolAddons() {
 }
 loadToolAddons();
 
-/* Actualización */
-const updStatus = $('#upd-status'), updBtn = $('#upd-btn'), updBar = $('#upd-bar');
-let updState = 'idle';
+/* Actualización: dos líneas oficiales (Naviris estable y NavirisDev), ambas
+   visibles al buscar; el usuario instala la que quiera desde cualquier versión */
+const updStatus = $('#upd-status'), updBtn = $('#upd-btn'), updBar = $('#upd-bar'), updLines = $('#upd-lines');
+let updChosen = null;     // línea elegida ('stable'|'dev') mientras descarga
+let updReadyLine = null;  // línea ya descargada, lista para instalar
+let updBusy = false;
+const UPD_LABEL = { stable: 'Naviris', dev: 'NavirisDev' };
 function setUpd(text, cls) { updStatus.textContent = text; updStatus.className = cls || ''; }
-updBtn.addEventListener('click', async () => {
-  if (updState === 'available') { updBtn.textContent = 'Descargando…'; updBtn.disabled = true; updBar.classList.remove('hidden'); await window.cobalt.updateDownload(); return; }
-  if (updState === 'downloaded') { window.cobalt.updateInstall(); return; }
-  setUpd('Buscando…'); updBtn.disabled = true;
-  const r = await window.cobalt.updateCheck();
-  if (r.state === 'dev') { setUpd('Las actualizaciones solo funcionan en la versión instalada.'); updBtn.disabled = false; }
-  else if (r.state === 'error') { setUpd('Error: ' + r.message, 'err'); updBtn.disabled = false; }
-});
+function updLineEls(line) { return { ver: $('#upd-' + line + '-ver'), btn: $('#upd-' + line + '-btn') }; }
+async function showChannels() {
+  setUpd('Consultando versiones…'); updBtn.disabled = true;
+  const r = await window.cobalt.updateChannels();
+  updBtn.disabled = false;
+  if (!r.ok) { setUpd('Error: ' + r.message, 'err'); return; }
+  for (const line of ['stable', 'dev']) {
+    const info = r[line], { ver, btn } = updLineEls(line);
+    if (!info) { ver.textContent = 'no publicada'; btn.classList.add('hidden'); continue; }
+    ver.textContent = 'v' + info.version; btn.classList.remove('hidden');
+    if (updReadyLine === line) { btn.textContent = 'Reiniciar e instalar'; btn.disabled = false; }
+    else if (info.version === r.current) { btn.textContent = 'Instalada'; btn.disabled = true; }
+    else { btn.textContent = 'Instalar'; btn.disabled = updBusy; }
+  }
+  updLines.classList.remove('hidden');
+  if (!updBusy && !updReadyLine) setUpd('Estás en la v' + r.current + '. Elige la versión que quieras usar.');
+}
+async function chooseLine(line) {
+  if (updReadyLine === line) { window.cobalt.updateInstall(); return; }
+  if (updBusy || updReadyLine) return;
+  updBusy = true; updChosen = line;
+  updLineEls('stable').btn.disabled = true; updLineEls('dev').btn.disabled = true;
+  const r = await window.cobalt.updateChoose(line);
+  if (r.state === 'dev') { setUpd('Las actualizaciones solo funcionan en la versión instalada.'); updBusy = false; updChosen = null; showChannels(); }
+  else if (r.state === 'error') { setUpd('Error: ' + r.message, 'err'); updBusy = false; updChosen = null; showChannels(); }
+}
+updBtn.addEventListener('click', showChannels);
+$('#upd-stable-btn').addEventListener('click', () => chooseLine('stable'));
+$('#upd-dev-btn').addEventListener('click', () => chooseLine('dev'));
 window.cobalt.onUpdateStatus((s) => {
-  updState = s.state;
-  if (s.state === 'checking') { setUpd('Buscando actualizaciones…'); updBtn.disabled = true; }
-  else if (s.state === 'available') { setUpd('¡Versión ' + s.version + ' disponible!', 'hot'); updBtn.textContent = 'Descargar e instalar'; updBtn.disabled = false; if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Acerca de)'); }
-  else if (s.state === 'latest') { setUpd('Ya tienes la última versión.'); updBtn.textContent = 'Buscar actualizaciones'; updBtn.disabled = false; }
-  else if (s.state === 'downloading') { setUpd('Descargando… ' + s.percent + '%'); updBar.classList.remove('hidden'); updBar.querySelector('i').style.width = s.percent + '%'; }
-  else if (s.state === 'downloaded') { setUpd('Listo para instalar la versión ' + s.version + '.', 'hot'); updBtn.textContent = 'Reiniciar e instalar'; updBtn.disabled = false; updBar.classList.add('hidden'); }
-  else if (s.state === 'error') { setUpd('Error al actualizar: ' + s.message, 'err'); updBtn.disabled = false; }
+  if (s.state === 'available') {
+    // Solo se descarga si el usuario eligió línea; el aviso silencioso de arranque solo notifica
+    if (!updChosen) { if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Acerca de)'); return; }
+    setUpd('Descargando ' + UPD_LABEL[updChosen] + ' v' + s.version + '…'); updBar.classList.remove('hidden');
+    window.cobalt.updateDownload();
+  } else if (s.state === 'latest') {
+    if (updChosen) { setUpd('Ya estás en la última versión de ' + UPD_LABEL[updChosen] + '.'); updBusy = false; updChosen = null; showChannels(); }
+  } else if (s.state === 'downloading') {
+    if (updChosen) { setUpd('Descargando ' + UPD_LABEL[updChosen] + '… ' + s.percent + '%'); updBar.classList.remove('hidden'); updBar.querySelector('i').style.width = s.percent + '%'; }
+  } else if (s.state === 'downloaded') {
+    if (!updChosen) return;
+    updReadyLine = updChosen; updChosen = null; updBusy = false;
+    updBar.classList.add('hidden');
+    setUpd(UPD_LABEL[updReadyLine] + ' v' + s.version + ' lista para instalar.', 'hot');
+    const { btn } = updLineEls(updReadyLine); btn.textContent = 'Reiniciar e instalar'; btn.disabled = false;
+  } else if (s.state === 'error') {
+    if (updChosen || updBusy) { setUpd('Error al actualizar: ' + s.message, 'err'); updBusy = false; updChosen = null; }
+  }
 });
 
 /* Ventana */
@@ -1536,11 +1571,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
-  window.cobalt.version().then((v) => {
-    const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v;
-    // Sin elección explícita, el toggle refleja el canal implícito de la versión instalada
-    els.optDevupdates.checked = (typeof settings.devUpdates === 'boolean') ? settings.devUpdates : /-dev/i.test(v);
-  });
+  window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderSidebarSites(); renderBookmarksBar(); renderHub();
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)

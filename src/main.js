@@ -995,6 +995,37 @@ ipcMain.handle('update:check', async () => {
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
+// Las DOS líneas oficiales (Naviris estable y NavirisDev) tal y como están
+// publicadas ahora mismo, para que el usuario elija desde cualquier versión.
+ipcMain.handle('update:channels', async () => {
+  try {
+    const res = await fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=30', { headers: { 'User-Agent': 'Naviris' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const list = await res.json();
+    const find = (dev) => {
+      for (const r of list) {
+        if (r.draft || !!r.prerelease !== dev) continue;
+        const names = (r.assets || []).map((a) => a.name);
+        if (!names.some((n) => /Setup.*\.exe$/i.test(n))) continue;
+        if (!names.includes(dev ? 'dev.yml' : 'latest.yml')) continue; // sin feed, el updater no podría instalarla
+        return { version: String(r.tag_name || '').replace(/^v/, '') };
+      }
+      return null;
+    };
+    return { ok: true, current: app.getVersion(), stable: find(false), dev: find(true) };
+  } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; }
+});
+// El usuario eligió LÍNEA explícitamente: se apunta el feed a esa línea y se
+// permite bajar de versión (volver de NavirisDev a la estable es un downgrade).
+ipcMain.handle('update:choose', async (_e, line) => {
+  if (!app.isPackaged) return { state: 'dev' };
+  const dev = line === 'dev';
+  autoUpdater.channel = dev ? 'dev' : 'latest';
+  autoUpdater.allowPrerelease = dev;
+  autoUpdater.allowDowngrade = true;
+  try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
+  catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
+});
 ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
 ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 
