@@ -19,7 +19,7 @@ const els = {};
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
-  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
+  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'sb-vpn', 'vpn-panel', 'vpn-close', 'vpn-body',
@@ -38,6 +38,9 @@ const els = {};
 const SLEEP_AFTER_MS = 5 * 60 * 1000;
 let settings = { hardwareAcceleration: true, powerSaver: true };
 let tabs = [], activeId = null, nextId = 1;
+// Pestañas cerradas hace poco, para reabrirlas con Ctrl+Shift+T (como Chrome,
+// las últimas 10). Se declara aquí arriba porque closeTab la usa.
+const cerradas = [];
 
 const toUrl = (input) => {
   const t = input.trim(); if (!t) return null;
@@ -218,6 +221,7 @@ window.addEventListener('keydown', (e) => {
 });
 function closeTab(id) {
   const idx = tabs.findIndex((t) => t.id === id); if (idx === -1) return;
+  recordarCerrada(tabs[idx]);   // para reabrirla con Ctrl+Shift+T
   tabs[idx].webview?.remove(); tabs.splice(idx, 1);
   if (!tabs.length) { createTab(); return; }
   if (activeId === id) activateTab(tabs[Math.max(0, idx - 1)].id); else renderTabs();
@@ -1173,14 +1177,13 @@ els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 let panelView = null;
 function openWebPanel(url, title, btn) {
   const same = panelView && els.webPanel.dataset.url === url && !els.webPanel.classList.contains('hidden');
-  document.querySelectorAll('.sb-site, #sb-claude').forEach((b) => b.classList.remove('open'));
+  document.querySelectorAll('.sb-site').forEach((b) => b.classList.remove('open'));
   if (same) { els.webPanel.classList.add('hidden'); return; }
   els.webPanel.classList.remove('hidden'); els.webPanel.dataset.url = url; els.wpzTitle.textContent = title; btn?.classList.add('open');
   if (!panelView) { panelView = document.createElement('webview'); panelView.setAttribute('partition', PARTITION); panelView.setAttribute('allowpopups', ''); els.wpzHost.appendChild(panelView); }
   if (panelView.getAttribute('src') !== url) panelView.src = url;
 }
-els.sbClaude.addEventListener('click', () => openWebPanel('https://claude.ai', 'Claude', els.sbClaude));
-$('#wpz-close').addEventListener('click', () => { els.webPanel.classList.add('hidden'); document.querySelectorAll('.sb-site, #sb-claude').forEach((b) => b.classList.remove('open')); });
+$('#wpz-close').addEventListener('click', () => { els.webPanel.classList.add('hidden'); document.querySelectorAll('.sb-site').forEach((b) => b.classList.remove('open')); });
 $('#wpz-reload').addEventListener('click', () => panelView?.reload());
 $('#wpz-tab').addEventListener('click', () => { const u = els.webPanel.dataset.url; if (u) createTab(panelView?.getURL() || u); });
 // Redimensionar panel
@@ -1200,7 +1203,10 @@ const KNOWN_SITES = [
 ];
 let sidebarSites = store.get('cobalt.sidebarSites', KNOWN_SITES.slice(0, 5));
 const saveSidebar = () => store.set('cobalt.sidebarSites', sidebarSites);
+// Sidebar sin accesos directos desde 2.7.0-dev.2: solo herramientas y funciones
+// del navegador. Se conserva la configuración por si vuelve como otra cosa.
 function renderSidebarSites() {
+  if (!els.sbSites) return;
   els.sbSites.innerHTML = '';
   for (const s of sidebarSites) {
     const btn = document.createElement('button'); btn.className = 'sb-site'; btn.title = s.name; btn.dataset.url = s.url;
@@ -1643,16 +1649,88 @@ $('#win-max').addEventListener('click', () => window.cobalt.maximize());
 $('#win-close').addEventListener('click', () => window.cobalt.close());
 window.cobalt.onMaximized((max) => { $('#win-max').innerHTML = window.icon(max ? 'square-2-stack' : 'stop'); });
 
-/* Atajos */
+/* ============ Atajos de teclado y ratón ============ */
+// Juego estándar de navegador (Chrome/Firefox/Edge). Los webviews reciben las
+// teclas por su cuenta, así que estos van en la ventana y actúan sobre la
+// pestaña activa.
+function activeWv() { const t = activeTab(); return t?.kind === 'web' ? t.webview : null; }
+function recargar(forzado) {
+  const wv = activeWv(); if (!wv) return;
+  try { forzado ? wv.reloadIgnoringCache() : wv.reload(); } catch { /* nada */ }
+}
+function irAtras() { const wv = activeWv(); try { if (wv?.canGoBack()) wv.goBack(); } catch { /* nada */ } }
+function irAdelante() { const wv = activeWv(); try { if (wv?.canGoForward()) wv.goForward(); } catch { /* nada */ } }
+function pararCarga() { const wv = activeWv(); try { wv?.stop(); } catch { /* nada */ } }
+// Zoom por pestaña (como los navegadores: se recuerda mientras viva la pestaña)
+function zoom(delta) {
+  const tab = activeTab(); const wv = activeWv(); if (!wv || !tab) return;
+  const nivel = delta === 0 ? 0 : Math.max(-5, Math.min(5, (tab.zoom || 0) + delta));
+  tab.zoom = nivel;
+  try { wv.setZoomLevel(nivel); } catch { /* nada */ }
+  toast(nivel === 0 ? 'Zoom al 100 %' : 'Zoom ' + Math.round(Math.pow(1.2, nivel) * 100) + ' %');
+}
+function recordarCerrada(tab) {
+  if (!tab || tab.kind !== 'web' || !tab.url) return;
+  cerradas.push({ url: tab.url, title: tab.title });
+  if (cerradas.length > 10) cerradas.shift();
+}
+function reabrirCerrada() {
+  const t = cerradas.pop(); if (!t) { toast('No hay pestañas cerradas recientes'); return; }
+  createTab(t.url);
+}
 window.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
-  if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); createTab(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); els.urlbar.focus(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'j') { e.preventDefault(); toggleDownloads(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHistory(); }
-  if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); }
+  const k = (e.key || '').toLowerCase();
+  const soloCtrl = e.ctrlKey && !e.shiftKey && !e.altKey;
+  const escribiendo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+
+  // --- Pestañas ---
+  if (e.ctrlKey && e.shiftKey && k === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
+  if (e.ctrlKey && e.shiftKey && k === 't') { e.preventDefault(); reabrirCerrada(); return; }
+  if (soloCtrl && k === 't') { e.preventDefault(); createTab(); return; }
+  if (soloCtrl && k === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); return; }
+  if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); return; }
+  if (e.ctrlKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
+    e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId);
+    const n = tabs[(i + (e.key === 'PageDown' ? 1 : tabs.length - 1)) % tabs.length]; if (n) activateTab(n.id); return;
+  }
+  // Ctrl+1..8 va a esa pestaña; Ctrl+9 a la última (igual que Chrome)
+  if (soloCtrl && /^[1-9]$/.test(k)) {
+    e.preventDefault();
+    const n = k === '9' ? tabs[tabs.length - 1] : tabs[parseInt(k, 10) - 1];
+    if (n) activateTab(n.id);
+    return;
+  }
+
+  // --- Navegación ---
+  if (e.key === 'F5' || (soloCtrl && k === 'r')) { e.preventDefault(); recargar(e.shiftKey); return; }
+  if ((e.ctrlKey && e.shiftKey && k === 'r') || (e.shiftKey && e.key === 'F5')) { e.preventDefault(); recargar(true); return; }
+  if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); irAtras(); return; }
+  if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); irAdelante(); return; }
+  if (e.altKey && e.key === 'Home') { e.preventDefault(); els.sbHome.click(); return; }
+  if (e.key === 'Escape' && !escribiendo) { pararCarga(); return; }
+
+  // --- Barra de direcciones ---
+  if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
+
+  // --- Ventana y página ---
+  if (e.key === 'F11') { e.preventDefault(); window.cobalt.toggleFullscreen(); return; }
+  if (soloCtrl && (k === '+' || k === '=' || e.key === 'Add')) { e.preventDefault(); zoom(1); return; }
+  if (soloCtrl && (k === '-' || e.key === 'Subtract')) { e.preventDefault(); zoom(-1); return; }
+  if (soloCtrl && k === '0') { e.preventDefault(); zoom(0); return; }
+  if (soloCtrl && k === 'p') { e.preventDefault(); try { activeWv()?.print(); } catch { /* nada */ } return; }
+  if (soloCtrl && k === 'd') { e.preventDefault(); els.navStar.click(); return; }
+
+  // --- Paneles ---
+  if (soloCtrl && k === 'j') { e.preventDefault(); toggleDownloads(); return; }
+  if (soloCtrl && k === 'h') { e.preventDefault(); toggleHistory(); return; }
 });
+// Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
+// el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 3) { e.preventDefault(); irAtras(); }
+  else if (e.button === 4) { e.preventDefault(); irAdelante(); }
+});
+window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
 window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
 
 /* Arranque */

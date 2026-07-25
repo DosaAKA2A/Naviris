@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   fetchFavicon: (pageUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl),
 
+  toggleFullscreen: () => ipcRenderer.send('win:fullscreen'),
+
   vpnState: () => ipcRenderer.invoke('vpn:state'),
   vpnList: (country) => ipcRenderer.invoke('vpn:list', country),
   vpnConnect: (srv) => ipcRenderer.invoke('vpn:connect', srv),

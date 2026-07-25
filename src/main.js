@@ -567,6 +567,8 @@ const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
 ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
 ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
 ipcMain.on('win:close', (e) => winOf(e)?.close());
+// F11: pantalla completa de la VENTANA (distinto del fullscreen del vídeo)
+ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen(!w.isFullScreen()); });
 ipcMain.on('win:new-private', () => createWindow(true));
 
 ipcMain.handle('settings:get', () => settings);
