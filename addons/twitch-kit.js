@@ -55,7 +55,7 @@
     r.push('.nk-deleted{opacity:.55}.nk-deleted .text-fragment{text-decoration:line-through}');
     r.push('.nk-deleted-tag{font-size:10px;color:#e6a9b4;margin-left:6px;font-style:italic}');
     /* Botón del kit en el top-nav (como 7TV/BTTV) */
-    r.push('#nk-btn.nk-topnav{display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:34px;padding:0 8px;margin:0 4px;border:none;border-radius:8px;background:rgba(185,140,255,.16);color:#c8a6ff;font-weight:800;font-size:12px;letter-spacing:.5px;cursor:pointer;transition:background .12s}');
+    r.push('#nk-btn.nk-topnav{display:inline-flex;align-items:center;justify-content:center;align-self:center;height:30px;min-width:34px;padding:0 8px;margin:0 4px;border:none;border-radius:8px;background:rgba(185,140,255,.16);color:#c8a6ff;font-weight:800;font-size:12px;letter-spacing:.5px;cursor:pointer;transition:background .12s}');
     r.push('#nk-btn.nk-topnav:hover{background:rgba(185,140,255,.28);color:#fff}');
     r.push('#nk-btn.nk-chatrow{border:none;background:none;color:#b98cff;font-weight:800;font-size:11px;letter-spacing:.5px;cursor:pointer;padding:4px 6px;border-radius:6px}');
     r.push('#nk-btn.nk-chatrow:hover{background:rgba(185,140,255,.12)}');
@@ -238,14 +238,22 @@
   }
   function armButton() {
     if (document.getElementById('nk-btn')) return;
-    // PREFERIDO: el top-nav de Twitch, junto a donde 7TV y BetterTTV ponen sus
-    // botones (barra superior derecha, cerca de notificaciones y Prime).
-    var top = document.querySelector('.top-nav__menu');
-    if (top) {
-      var b = makeBtn();
-      b.className = 'nk-topnav';
-      // se coloca al principio del grupo de iconos de la derecha
-      top.insertBefore(b, top.firstChild);
+    // PREFERIDO: la barra superior de Twitch, en el grupo de iconos de la derecha
+    // (notificaciones, whispers, Prime), donde 7TV y BetterTTV ponen los suyos.
+    // Se ancla RELATIVO al botón de notificaciones (data-a-target estable):
+    // se sube hasta el ancestro que comparte fila con el botón de Prime/bits y se
+    // inserta el nuestro justo antes de ese "slot".
+    var notif = document.querySelector('[data-a-target="notification-button"], button[aria-label*="otificac" i]');
+    var anchor = document.querySelector('.top-nav__prime, [data-a-target="prime-offers-icon"], [data-a-target="top-nav-get-bits-button"], [data-a-target="whispers-menu-button"]');
+    if (notif && anchor) {
+      var row = notif.parentElement, slot = notif, node = notif;
+      for (var i = 0; i < 8; i++) {
+        var p = node.parentElement; if (!p) break;
+        if (p.contains(anchor) && p.contains(notif)) { row = p; slot = node; break; }
+        node = p;
+      }
+      var b = makeBtn(); b.className = 'nk-topnav';
+      row.insertBefore(b, slot);
       return;
     }
     // RESPALDO: la fila de botones del chat (por si cambia el top-nav)
