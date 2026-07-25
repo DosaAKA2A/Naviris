@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.0.0
+/* Naviris addon: Twitch Kit v1.0.1
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -55,7 +55,7 @@
     r.push('.nk-deleted{opacity:.55}.nk-deleted .text-fragment{text-decoration:line-through}');
     r.push('.nk-deleted-tag{font-size:10px;color:#e6a9b4;margin-left:6px;font-style:italic}');
     if (cfg.altBg) r.push('.chat-scrollable-area__message-container > div:nth-child(odd) .chat-line__message{background:rgba(255,255,255,.035)}');
-    if (cfg.hideRecommended) r.push('[aria-label*="ecomendad" i],[aria-label*="ecommended" i]{display:none!important}');
+    if (cfg.hideRecommended) r.push('[aria-label*="ecomendad" i],[aria-label*="ecommended" i],.side-nav-section[aria-label="Para ti" i],.side-nav-section[aria-label="For You" i]{display:none!important}');
     if (cfg.hideAlsoWatch) r.push('[aria-label*="ambién ven" i],[aria-label*="lso watch" i]{display:none!important}');
     if (cfg.hideStories) r.push('[class*="stories-tray" i],[data-a-target*="stories" i],[aria-label*="istorias" i],[aria-label*="tories" i]{display:none!important}');
     if (cfg.hideMonet) r.push('[data-a-target="bits-button"],[data-a-target="top-nav-get-bits-button"],[data-a-target="subscribe-button"],[data-a-target="gift-button"],[data-a-target="prime-offers-icon"],[data-test-selector="paid-pinned-chat-message-list"],[class*="paid-pinned" i],[class*="combos-button" i],[data-a-target="hype-chat-button"]{display:none!important}');
@@ -148,17 +148,12 @@
 
   /* ---------- Player: clic para pausar + saltar avisos ---------- */
   document.addEventListener('click', function (e) {
-    if (!cfg.clickPause) return;
-    var v = e.target && e.target.tagName === 'VIDEO' ? e.target : null;
-    if (!v) {
-      // Twitch pone overlays sobre el video: acepta el clic si cae en la capa de
-      // overlay vacía (no botones/controles)
-      var t = e.target;
-      if (!t || !t.className || typeof t.className !== 'string') return;
-      if (!/player-overlay-background|video-player__overlay/.test(t.className)) return;
-      v = document.querySelector('video');
-    }
-    if (!v) return;
+    if (!cfg.clickPause || !e.target || !e.target.closest) return;
+    // Acepta el clic en cualquier capa del overlay del player, pero NUNCA sobre
+    // controles reales (botones, enlaces, sliders del player)
+    if (!e.target.closest('.video-player__overlay') && e.target.tagName !== 'VIDEO') return;
+    if (e.target.closest('button,a,input,[role="button"],[role="slider"],[data-a-target="player-controls"]')) return;
+    var v = document.querySelector('video'); if (!v) return;
     if (v.paused) v.play().catch(function () {}); else v.pause();
   }, true);
   function skipWarning() {
