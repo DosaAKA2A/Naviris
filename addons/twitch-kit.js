@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.2.1
+/* Naviris addon: Twitch Kit v1.2.2
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -192,14 +192,22 @@
   // OJO: la capa que cubre el vídeo en Twitch es un <button> ANÓNIMO (sin
   // data-a-target ni aria-label). Excluir "cualquier button" dejaba la función
   // inoperativa: hay que excluir solo los controles REALES identificables.
-  var CTRL = '[data-a-target],[aria-label],[role="slider"],[role="menu"],[role="menuitem"],a[href],input,' +
-    '.player-controls,[data-a-target="player-controls"],[class*="player-controls" i],[class*="player-button" i]';
+  // Solo los elementos INTERACTIVOS son candidatos a "control"...
+  var INTER = 'button,a,input,[role="button"],[role="slider"],[role="menu"],[role="menuitem"],[role="tab"]';
+  var BARRA = '.player-controls,[data-a-target="player-controls"],[class*="player-controls" i]';
   var lastToggle = 0;
   document.addEventListener('click', function (e) {
     if (!cfg.clickPause || !e.target || !e.target.closest) return;
     var enPlayer = e.target.tagName === 'VIDEO' || e.target.closest('.video-player__overlay, .video-ref, [data-a-target="video-player"]');
     if (!enPlayer) return;
-    if (e.target.closest(CTRL)) return;                 // control real: no tocar
+    // ...y de esos solo cuenta como control REAL el que tiene etiqueta propia
+    // (aria-label / data-a-target) o vive en la barra de controles.
+    // OJO: NO vale mirar "cualquier ancestro con [data-a-target]": contenedores
+    // como data-a-target="video-ref" envuelven TODO el player, y por eso el
+    // toggle quedaba bloqueado siempre (motivo real de que no funcionase).
+    var it = e.target.closest(INTER);
+    if (it && (it.getAttribute('aria-label') || it.getAttribute('data-a-target') || it.closest(BARRA))) return;
+    if (e.target.closest(BARRA)) return;
     if (Date.now() - lastToggle < 350) return;          // anti-doble (Twitch tiene su propio handler)
     lastToggle = Date.now();
     var v = document.querySelector('video'); if (!v) return;
