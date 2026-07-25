@@ -335,7 +335,7 @@ function setupSession(ses) {
   // de YouTube para que el bloqueador de anuncios inyectado en document_start pueda
   // correr, y (b) abre CORS para las APIs públicas de precios que usan los addons
   // (p. ej. Valve Rat Tool compara mercados desde páginas de Steam).
-  const CORS_OPEN = ['prices.csgotrader.app', 'api.skinport.com', 'api.dmarket.com'];
+  const CORS_OPEN = ['api.skinport.com'];
   const HDR_URLS = [...CORS_OPEN.map((h) => 'https://' + h + '/*'), 'https://*.youtube.com/*', 'https://*.youtube-nocookie.com/*'];
   ses.webRequest.onHeadersReceived({ urls: HDR_URLS }, (details, cb) => {
     let host = ''; try { host = new URL(details.url).hostname; } catch { /* nada */ }

@@ -24,13 +24,11 @@ const els = {};
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
-  'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
-  'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
+  'res-label', 'private-badge', 'toast', 'suggest',   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
   'rat-normal', 'rat-headsub',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
-  'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
-  'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
+  'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
@@ -1089,64 +1087,6 @@ async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 
-/* ============ Panel web lateral ============ */
-let panelView = null;
-function openWebPanel(url, title, btn) {
-  const same = panelView && els.webPanel.dataset.url === url && !els.webPanel.classList.contains('hidden');
-  document.querySelectorAll('.sb-site').forEach((b) => b.classList.remove('open'));
-  if (same) { els.webPanel.classList.add('hidden'); return; }
-  els.webPanel.classList.remove('hidden'); els.webPanel.dataset.url = url; els.wpzTitle.textContent = title; btn?.classList.add('open');
-  if (!panelView) { panelView = document.createElement('webview'); panelView.setAttribute('partition', PARTITION); panelView.setAttribute('allowpopups', ''); els.wpzHost.appendChild(panelView); }
-  if (panelView.getAttribute('src') !== url) panelView.src = url;
-}
-$('#wpz-close').addEventListener('click', () => { els.webPanel.classList.add('hidden'); document.querySelectorAll('.sb-site').forEach((b) => b.classList.remove('open')); });
-$('#wpz-reload').addEventListener('click', () => panelView?.reload());
-$('#wpz-tab').addEventListener('click', () => { const u = els.webPanel.dataset.url; if (u) createTab(panelView?.getURL() || u); });
-// Redimensionar panel
-(function () {
-  let dragging = false;
-  els.wpzGrip.addEventListener('mousedown', (e) => { dragging = true; e.preventDefault(); document.body.style.cursor = 'col-resize'; });
-  window.addEventListener('mousemove', (e) => { if (!dragging) return; const w = Math.max(320, Math.min(760, e.clientX - 48)); document.documentElement.style.setProperty('--panel-w', w + 'px'); });
-  window.addEventListener('mouseup', () => { if (dragging) { dragging = false; document.body.style.cursor = ''; store.set('cobalt.panelW', getComputedStyle(document.documentElement).getPropertyValue('--panel-w')); } });
-})();
-
-/* ============ Sidebar sites (configurable) ============ */
-const KNOWN_SITES = [
-  { name: 'WhatsApp', url: 'https://web.whatsapp.com', brand: 'whatsapp' }, { name: 'Discord', url: 'https://discord.com/app', brand: 'discord' },
-  { name: 'Twitch', url: 'https://www.twitch.tv', brand: 'twitch' }, { name: 'YouTube', url: 'https://www.youtube.com', brand: 'youtube' },
-  { name: 'Reddit', url: 'https://www.reddit.com', brand: 'reddit' }, { name: 'Instagram', url: 'https://www.instagram.com', brand: 'instagram' },
-  { name: 'Spotify', url: 'https://open.spotify.com', brand: 'spotify' }, { name: 'Gmail', url: 'https://mail.google.com', brand: 'gmail' }
-];
-let sidebarSites = store.get('cobalt.sidebarSites', KNOWN_SITES.slice(0, 5));
-const saveSidebar = () => store.set('cobalt.sidebarSites', sidebarSites);
-// Sidebar sin accesos directos desde 2.7.0-dev.2: solo herramientas y funciones
-// del navegador. Se conserva la configuración por si vuelve como otra cosa.
-function renderSidebarSites() {
-  if (!els.sbSites) return;
-  els.sbSites.innerHTML = '';
-  for (const s of sidebarSites) {
-    const btn = document.createElement('button'); btn.className = 'sb-site'; btn.title = s.name; btn.dataset.url = s.url;
-    const mono = s.brand && window.brandIcon(s.brand); btn.innerHTML = mono || (s.name[0] || '·').toUpperCase();
-    if (!mono) getTile(s.url).then((t) => { if (t?.icon) { btn.innerHTML = ''; const im = document.createElement('img'); im.src = t.icon; im.style.cssText = 'width:16px;height:16px;border-radius:4px;filter:grayscale(1) brightness(1.4)'; btn.appendChild(im); } });
-    btn.addEventListener('click', () => openWebPanel(s.url, s.name, btn));
-    els.sbSites.appendChild(btn);
-  }
-}
-function renderSidebarConfig() {
-  els.sidebarConfig.innerHTML = '';
-  sidebarSites.forEach((s, i) => {
-    const row = document.createElement('div'); row.className = 'sc-row';
-    const ic = document.createElement('span'); ic.className = 'sc-ic'; ic.innerHTML = (s.brand && window.brandIcon(s.brand)) || escapeHtml((s.name[0] || '·').toUpperCase());
-    const name = document.createElement('span'); name.className = 'sc-name'; name.textContent = s.name;
-    const rm = document.createElement('button'); rm.className = 'sc-rm'; rm.innerHTML = window.icon('trash'); rm.addEventListener('click', () => { sidebarSites.splice(i, 1); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); });
-    row.append(ic, name, rm); els.sidebarConfig.appendChild(row);
-  });
-  const avail = KNOWN_SITES.filter((k) => !sidebarSites.some((s) => s.url === k.url));
-  if (avail.length) { const t = document.createElement('div'); t.className = 'sp-list-title'; t.textContent = 'Sugeridas'; t.style.margin = '8px 0 4px'; els.sidebarConfig.appendChild(t); for (const k of avail) { const row = document.createElement('div'); row.className = 'sc-row'; const ic = document.createElement('span'); ic.className = 'sc-ic'; ic.innerHTML = (k.brand && window.brandIcon(k.brand)) || k.name[0]; const name = document.createElement('span'); name.className = 'sc-name'; name.textContent = k.name; const add = document.createElement('button'); add.className = 'sc-rm'; add.style.color = 'var(--ok)'; add.innerHTML = window.icon('plus'); add.addEventListener('click', () => { sidebarSites.push(k); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); }); row.append(ic, name, add); els.sidebarConfig.appendChild(row); } }
-}
-els.sidebarAdd.addEventListener('click', () => promptModal('Añadir web al sidebar (URL)', 'https://...', (val) => { const url = toUrl(val); if (!url) return; const name = hostOf(url).split('.')[0]; sidebarSites.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url, brand: brandOf(url) }); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); }));
-els.sidebarDone.addEventListener('click', () => els.sidebarModal.classList.add('hidden'));
-
 /* ============ Resoluciones ============ */
 const RESOLUTIONS = [
   { w: 0, h: 0, label: 'Adaptable', note: 'nativa' }, { w: 1920, h: 1080, label: 'Full HD', note: 'la más usada' },
@@ -1214,7 +1154,6 @@ els.menuPop.addEventListener('click', (e) => {
   if (a === 'newtab') createTab(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   if (a === 'update') { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); }
-  if (a === 'sidebar') { renderSidebarConfig(); els.sidebarModal.classList.remove('hidden'); }
   if (a === 'permissions') showPermManager();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
@@ -1709,11 +1648,10 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
-  const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
-  renderSidebarSites(); renderBookmarksBar(); renderHub();
+  renderBookmarksBar(); renderHub();
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
