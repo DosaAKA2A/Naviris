@@ -24,7 +24,7 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "kind": "tool",
       "icon": "film",
       "description": "Ve vídeo a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (naranja Crunchyroll, rojo Netflix, azul Disney+, rojo YouTube) y panel con salas por código: al unirte, tu pestaña salta sola a lo que esté viendo el anfitrión, el chat narra cada acción (quién dio play, pausó o saltó y a qué minuto) y el anfitrión puede reservarse el control. En YouTube los anuncios no descuadran la sala. No transmite vídeo; cada persona reproduce con su propia cuenta. El vídeo con DRM (Crunchyroll, Netflix, Disney+) requiere Naviris 2.6 o superior.",

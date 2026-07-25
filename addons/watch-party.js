@@ -1,4 +1,12 @@
-/* Naviris addon: Watch Party v2.3.0
+/* Naviris addon: Watch Party v2.4.0
+   v2.4: el panel deja de repintarse entero cada 2 s (destruía los controles: el
+   chat no se vaciaba al enviar y los clics en "Salir" se perdían). Ahora la
+   estructura se construye al cambiar de modo y los datos se actualizan en su
+   sitio, con el chat pintado de forma incremental. Además: el botón conserva
+   SIEMPRE el color de la plataforma (con punto verde si hay sala) y el anfitrión
+   decide si solo él puede cambiar el vídeo o si puede cualquiera.
+*/
+/* Historial v2.3.0:
    v2.3: además de Crunchyroll y Netflix, ahora también Disney+ y YouTube. En
    YouTube se usa su API de reproductor (playVideo/pauseVideo/seekTo) porque el
    <video> a secas se pelea con su controlador, y los anuncios se detectan para
@@ -99,7 +107,10 @@
     '#' + BTN_ID + '.nvp-crunchy{color:#f47521;filter:drop-shadow(0 0 6px rgba(244,117,33,.65))}',
     '#' + BTN_ID + '.nvp-disney{color:#3aa0ff;filter:drop-shadow(0 0 6px rgba(58,160,255,.65))}',
     '#' + BTN_ID + '.nvp-youtube{color:#ff4444;filter:drop-shadow(0 0 6px rgba(255,68,68,.6))}',
-    '#' + BTN_ID + '.nvp-live{color:#9ee2b8;filter:drop-shadow(0 0 6px rgba(158,226,184,.5))}',
+    /* Con sala activa: punto verde en la esquina, sin perder el color del sitio */
+    '#' + BTN_ID + '{position:relative}',
+    '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#9ee2b8;box-shadow:0 0 6px rgba(158,226,184,.95)}',
+    '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube){color:#9ee2b8}',
     /* Panel más ancho y con aire */
     '#nvp-panel{width:340px;max-height:640px}',
     '#nvp-panel .lp-body{padding:10px 16px 18px}',
@@ -247,12 +258,41 @@
     send({ t: 'ev', kind: m.kind, time: m.time, at: Date.now() });
     narrate(m.kind, m.kind === 'play' ? 'Has dado play' : m.kind === 'pause' ? 'Has pausado en ' + fmtT(m.time) : 'Has saltado a ' + fmtT(m.time));
   }
-  function onRenav() { if (party) inject(party.wv); }
+  function onRenav() {
+    if (!party) return;
+    inject(party.wv);
+    // Cambio de vídeo: si el anfitrión lo permite (o eres tú el anfitrión), al
+    // abrir otro vídeo se lleva a toda la sala. Con navLock activo, solo el
+    // anfitrión puede; a los invitados el latido les devuelve al suyo.
+    var url = ''; try { url = party.wv.getURL(); } catch (e) { return; }
+    var ep = epIdOf(url);
+    if (!ep || ep === party.ultimoEp) return;
+    var puedo = party.host || !party.navLock;
+    party.ultimoEp = ep;
+    if (puedo && !party.aplicandoNav) {
+      send({ t: 'ev', kind: 'nav', url: url, at: Date.now() });
+      logSys('Has cambiado el vídeo de la sala');
+    }
+    party.aplicandoNav = false;
+  }
   function onGone() { if (party) { leave(true); naviris.toast('Watch Party terminada: se cerró la pestaña'); } }
 
   function applyRemote(m) {
     if (!party) return;
     var who = m.from || 'Alguien';
+    // Alguien ha cambiado el vídeo de la sala: se sigue si el anfitrión lo
+    // permite (el propio anfitrión siempre acepta el cambio de un invitado
+    // cuando tiene el cambio de vídeo abierto).
+    if (m.kind === 'nav') {
+      if (party.navLock && !party.host) return;   // sala cerrada: manda el anfitrión
+      var want = epIdOf(m.url); if (!want) return;
+      var cur = ''; try { cur = party.wv.getURL(); } catch (e) { /* nada */ }
+      if (epIdOf(cur) === want) return;
+      logSys(who + ' ha cambiado el vídeo');
+      party.aplicandoNav = true; party.ultimoEp = want;
+      try { party.wv.loadURL(m.url); } catch (e) { /* nada */ }
+      return;
+    }
     narrate(m.kind, m.kind === 'play' ? who + ' ha dado play' : m.kind === 'pause' ? who + ' ha pausado en ' + fmtT(m.time) : who + ' ha saltado a ' + fmtT(m.time));
     try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
   }
@@ -282,7 +322,7 @@
           var url = ''; try { url = party.wv.getURL(); } catch (e) { /* nada */ }
           // El latido siempre lleva la URL (los invitados siguen el episodio) y
           // el modo de control; tiempo/pausa solo si ya hay vídeo.
-          var msg = { t: 'beat', url: url, lock: !!party.lock, at: Date.now() };
+          var msg = { t: 'beat', url: url, lock: !!party.lock, nlock: !!party.navLock, at: Date.now() };
           if (st && st.has) { msg.time = st.time; msg.paused = st.paused; }
           send(msg);
         }).catch(function () {});
@@ -299,7 +339,8 @@
     if (!wv || !activeSite()) { naviris.toast('Abre el episodio en Netflix o Crunchyroll y vuelve a intentarlo'); return; }
     leave(true);
     var name = (localStorage.__navPartyName || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
-    party = { code: code, host: asHost, wv: wv, ws: null, n: 1, status: 'Conectando…', ok: false, msgs: [], name: name };
+    // navLock: por defecto SOLO el anfitrión cambia el vídeo de la sala.
+    party = { code: code, host: asHost, wv: wv, ws: null, n: 1, status: 'Conectando…', ok: false, msgs: [], name: name, navLock: true, site: activeSite(), ultimoEp: epIdOf(wv.getURL ? wv.getURL() : '') };
     wv.addEventListener('console-message', onConsole);
     wv.addEventListener('did-navigate', onRenav);
     wv.addEventListener('did-navigate-in-page', onRenav);
@@ -318,7 +359,11 @@
         if (!party.host) {
           var hadLock = !!party.lock; party.lock = !!m.lock;
           if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión ha activado el control exclusivo' : 'El anfitrión ha desactivado el control exclusivo');
-          syncEpisode(m.url);
+          var hadNav = !!party.navLock; party.navLock = m.nlock !== false;
+          if (party.navLock !== hadNav) logSys(party.navLock ? 'Ahora solo el anfitrión puede cambiar el vídeo' : 'Ahora cualquiera puede cambiar el vídeo');
+          // Solo se te devuelve al vídeo del anfitrión si la sala está cerrada;
+          // si está abierta, el vídeo lo manda quien lo haya cambiado.
+          if (party.navLock) syncEpisode(m.url);
           if (typeof m.time === 'number') applyBeat(m);
         }
       }
@@ -343,21 +388,98 @@
     render(); glow();
   }
 
-  /* ---------- Render del panel ---------- */
+  /* ---------- Render del panel ----------
+     OJO: el panel se REPINTABA ENTERO cada 2 s desde el sondeo, y eso destruía
+     los controles a media interacción: el input del chat se restauraba con el
+     texto viejo (parecía que no se borraba al enviar) y los clics en "Salir" se
+     perdían si el nodo se reemplazaba entre el mousedown y el mouseup.
+     Ahora la estructura se construye SOLO al cambiar de modo (dentro/fuera de
+     sala) y lo demás se actualiza en su sitio, sin recrear nada. */
   var body = panel.querySelector('#nvp-body');
-  function render() {
+  var ui = {}, modoActual = null;
+
+  function render(force) {
     if (panel.classList.contains('hidden')) return;
-    // Conserva lo escrito y el foco al re-renderizar (llegan mensajes mientras tecleas)
-    var keep = {}, ids = ['nvp-name', 'nvp-codein', 'nvp-chatin'], i, el;
-    for (i = 0; i < ids.length; i++) { el = document.getElementById(ids[i]); if (el) keep[ids[i]] = { v: el.value, f: document.activeElement === el, s: el.selectionStart }; }
+    var modo = party ? 'dentro' : 'fuera';
+    if (modo === modoActual && !force) { actualizar(); return; }
+    modoActual = modo; ui = {};
+    construir();
+    actualizar();
+  }
+  // Refresca solo los datos: nada de recrear inputs ni botones.
+  function actualizar() {
+    var site = activeSite();
+    if (modoActual === 'fuera') {
+      if (ui.hint) ui.hint.textContent = site
+        ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola a lo que vea el anfitrión.'
+        : 'Abre Crunchyroll, Netflix, Disney+ o YouTube en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+      if (ui.crear) { ui.crear.disabled = !site; ui.crear.className = 'loot-go' + (site ? '' : ' off'); }
+      if (ui.unirse) ui.unirse.disabled = !site;
+      return;
+    }
+    if (!party) return;
+    if (ui.code) ui.code.textContent = party.code;
+    if (ui.estado) {
+      ui.estado.parentNode.className = 'nvp-status' + (party.ok ? '' : ' err');
+      ui.estado.textContent = party.n + (party.n === 1 ? ' persona viendo' : ' personas viendo')
+        + ' · ' + (party.host ? 'eres el anfitrión' : 'invitado') + ' · ' + party.status;
+    }
+    if (ui.viendo) {
+      var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
+      ui.viendo.textContent = (title || '').replace(/ - Crunchyroll.*$| - Netflix.*$| - YouTube$/i, '');
+      ui.viendoBox.style.display = title ? '' : 'none';
+    }
+    if (ui.lock && ui.lock.checked !== !!party.lock) ui.lock.checked = !!party.lock;
+    if (ui.navLock && ui.navLock.checked !== !!party.navLock) ui.navLock.checked = !!party.navLock;
+    pintarChat();
+  }
+  // Chat incremental: solo añade lo nuevo (no se rehace, así no se pierde el
+  // scroll ni el foco mientras escribes).
+  function pintarChat() {
+    if (!ui.chat || !party) return;
+    if (ui.pintados > party.msgs.length) { ui.chat.innerHTML = ''; ui.pintados = 0; ui.grp = null; ui.lastWho = null; }
+    if (!party.msgs.length) {
+      if (!ui.vacio) {
+        ui.vacio = document.createElement('div'); ui.vacio.className = 'empty';
+        ui.vacio.textContent = 'Aún no hay mensajes.' + String.fromCharCode(10) + 'Saluda a la sala.';
+        ui.chat.appendChild(ui.vacio);
+      }
+      return;
+    }
+    if (ui.vacio) { ui.vacio.remove(); ui.vacio = null; }
+    var pegado = ui.chat.scrollHeight - ui.chat.scrollTop - ui.chat.clientHeight < 40;
+    for (var i = ui.pintados || 0; i < party.msgs.length; i++) {
+      var m = party.msgs[i];
+      if (m.sys) {
+        ui.grp = null; ui.lastWho = null;
+        var sysLine = document.createElement('div'); sysLine.className = 'sys';
+        var sp = document.createElement('span'); sp.textContent = m.text; sysLine.appendChild(sp);
+        ui.chat.appendChild(sysLine);
+        continue;
+      }
+      if (!ui.grp || m.who !== ui.lastWho || (m.t || 0) - (ui.lastT || 0) > 180000) {
+        ui.grp = document.createElement('div'); ui.grp.className = 'grp';
+        var au = document.createElement('div'); au.className = 'au';
+        var b = document.createElement('b'); b.textContent = m.who; b.style.color = nameColor(m.who);
+        var tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmtClock(m.t);
+        au.appendChild(b); au.appendChild(tm); ui.grp.appendChild(au);
+        ui.chat.appendChild(ui.grp);
+      }
+      var tx = document.createElement('div'); tx.className = 'tx'; tx.textContent = m.text;
+      ui.grp.appendChild(tx);
+      ui.lastWho = m.who; ui.lastT = m.t || 0;
+    }
+    ui.pintados = party.msgs.length;
+    if (pegado) ui.chat.scrollTop = ui.chat.scrollHeight;
+  }
+
+  function construir() {
     body.innerHTML = '';
     var site = activeSite();
     var siteName = SITIOS[site] || null;
     if (!party) {
       var hint = document.createElement('div'); hint.className = 'nvp-hint';
-      hint.textContent = site
-        ? 'Listo: la sala usará ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola al episodio del anfitrión.'
-        : 'Abre Crunchyroll, Netflix, Disney+ o YouTube en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+      ui.hint = hint;
       body.appendChild(hint);
       var lblN = document.createElement('div'); lblN.className = 'nvp-lbl'; lblN.textContent = 'Tu nombre'; body.appendChild(lblN);
       var nameRow = document.createElement('div'); nameRow.className = 'nvp-row'; nameRow.style.marginTop = '0';
@@ -369,11 +491,11 @@
       go.style.marginTop = '14px';
       go.textContent = 'Crear sala';
       go.addEventListener('click', function () { localStorage.__navPartyName = nameIn.value.trim(); start(randomCode(), true); });
-      body.appendChild(go);
+      body.appendChild(go); ui.crear = go;
       var lbl = document.createElement('div'); lbl.className = 'nvp-lbl'; lbl.textContent = 'O únete a una sala'; body.appendChild(lbl);
       var joinRow = document.createElement('div'); joinRow.className = 'nvp-row'; joinRow.style.marginTop = '0';
       var codeIn = document.createElement('input'); codeIn.id = 'nvp-codein'; codeIn.className = 'nvp-in code'; codeIn.maxLength = 12; codeIn.placeholder = 'Código';
-      var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; joinBtn.disabled = !site;
+      var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; joinBtn.disabled = !site; ui.unirse = joinBtn;
       var doJoin = function () { var c = codeIn.value.trim().toUpperCase(); if (!c) return; localStorage.__navPartyName = nameIn.value.trim(); start(c, false); };
       joinBtn.addEventListener('click', doJoin);
       codeIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doJoin(); });
@@ -385,71 +507,56 @@
       codeBox.querySelector('.c').textContent = party.code;
       codeBox.addEventListener('click', function () { navigator.clipboard.writeText(party.code).then(function () { naviris.toast('Código copiado: ' + party.code); }).catch(function () {}); });
       body.appendChild(codeBox);
-      var st = document.createElement('div'); st.className = 'nvp-status' + (party.ok ? '' : ' err');
+      var st = document.createElement('div'); st.className = 'nvp-status';
       st.innerHTML = '<span class="dot"></span><span></span>';
-      st.lastChild.textContent = party.n + (party.n === 1 ? ' persona viendo' : ' personas viendo') + ' · ' + (party.host ? 'eres el anfitrión' : 'invitado') + ' · ' + party.status;
+      ui.estado = st.lastChild;
       body.appendChild(st);
-      var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
-      if (title) {
-        var lblV = document.createElement('div'); lblV.className = 'nvp-lbl'; lblV.textContent = 'Viendo'; body.appendChild(lblV);
-        var w = document.createElement('div'); w.className = 'nvp-watch';
-        w.innerHTML = '<span class="ic"></span>';
-        var nm = document.createElement('span'); nm.className = 'n'; nm.textContent = title.replace(/ - Crunchyroll.*$| - Netflix.*$/i, '');
-        w.appendChild(nm); body.appendChild(w);
-      }
+      var lblV = document.createElement('div'); lblV.className = 'nvp-lbl'; lblV.textContent = 'Viendo'; body.appendChild(lblV);
+      var w = document.createElement('div'); w.className = 'nvp-watch';
+      w.innerHTML = '<span class="ic"></span>';
+      var nm = document.createElement('span'); nm.className = 'n';
+      w.appendChild(nm); body.appendChild(w);
+      ui.viendo = nm; ui.viendoBox = w; ui.viendoLbl = lblV;
       if (party.host) {
+        // Dos permisos distintos: quién controla la reproducción y quién puede
+        // cambiar el vídeo que ve la sala.
         var lockRow = document.createElement('label'); lockRow.className = 'nvp-lock';
         var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!party.lock;
         cb.addEventListener('change', function () { party.lock = cb.checked; logSys(cb.checked ? 'Control exclusivo: solo tú puedes dar play, pausar y saltar' : 'Control exclusivo desactivado: todos pueden controlar'); });
         lockRow.appendChild(cb); lockRow.appendChild(document.createTextNode('Solo el anfitrión controla la reproducción'));
-        body.appendChild(lockRow);
+        body.appendChild(lockRow); ui.lock = cb;
+
+        var navRow = document.createElement('label'); navRow.className = 'nvp-lock';
+        var cb2 = document.createElement('input'); cb2.type = 'checkbox'; cb2.checked = !!party.navLock;
+        cb2.addEventListener('change', function () {
+          party.navLock = cb2.checked;
+          logSys(cb2.checked ? 'Solo tú puedes cambiar el vídeo de la sala' : 'Cualquiera puede cambiar el vídeo de la sala');
+        });
+        navRow.appendChild(cb2); navRow.appendChild(document.createTextNode('Solo el anfitrión cambia el vídeo'));
+        body.appendChild(navRow); ui.navLock = cb2;
       }
       var lblC = document.createElement('div'); lblC.className = 'nvp-lbl'; lblC.textContent = 'Chat de la sala'; body.appendChild(lblC);
       var chat = document.createElement('div'); chat.className = 'nvp-chat';
-      if (!party.msgs.length) {
-        var em = document.createElement('div'); em.className = 'empty';
-        em.textContent = 'Aún no hay mensajes.' + String.fromCharCode(10) + 'Saluda a la sala.';
-        chat.appendChild(em);
-      }
-      // Mensajes agrupados: los consecutivos del mismo autor (en <3 min) comparten
-      // cabecera de autor coloreado + hora; los del sistema van como separadores.
-      var grp = null, lastWho = null, lastT = 0;
-      for (i = 0; i < party.msgs.length; i++) {
-        var m = party.msgs[i];
-        if (m.sys) {
-          grp = null; lastWho = null;
-          var sysLine = document.createElement('div'); sysLine.className = 'sys';
-          var sp = document.createElement('span'); sp.textContent = m.text; sysLine.appendChild(sp);
-          chat.appendChild(sysLine);
-          continue;
-        }
-        if (!grp || m.who !== lastWho || (m.t || 0) - lastT > 180000) {
-          grp = document.createElement('div'); grp.className = 'grp';
-          var au = document.createElement('div'); au.className = 'au';
-          var b = document.createElement('b'); b.textContent = m.who; b.style.color = nameColor(m.who);
-          var tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmtClock(m.t);
-          au.appendChild(b); au.appendChild(tm); grp.appendChild(au);
-          chat.appendChild(grp);
-        }
-        var tx = document.createElement('div'); tx.className = 'tx'; tx.textContent = m.text;
-        grp.appendChild(tx);
-        lastWho = m.who; lastT = m.t || 0;
-      }
-      body.appendChild(chat); chat.scrollTop = chat.scrollHeight;
+      body.appendChild(chat);
+      ui.chat = chat; ui.pintados = 0; ui.grp = null; ui.lastWho = null; ui.lastT = 0;
       var chatRow = document.createElement('div'); chatRow.className = 'nvp-row';
       var chatIn = document.createElement('input'); chatIn.id = 'nvp-chatin'; chatIn.className = 'nvp-in'; chatIn.maxLength = 300; chatIn.placeholder = 'Escribe en el chat…';
       var sendBtn = document.createElement('button'); sendBtn.className = 'nvp-btn'; sendBtn.textContent = 'Enviar';
-      var doChat = function () { var msg = chatIn.value.trim(); if (!msg || !party) return; send({ t: 'chat', msg: msg }); logChat(party.name, msg); chatIn.value = ''; };
+      // Se vacía el campo ANTES de registrar el mensaje: logChat dispara el
+      // repintado del chat y con el orden inverso el texto se quedaba escrito.
+      var doChat = function () {
+        var msg = chatIn.value.trim(); if (!msg || !party) return;
+        chatIn.value = '';
+        send({ t: 'chat', msg: msg });
+        logChat(party.name, msg);
+        chatIn.focus();
+      };
       sendBtn.addEventListener('click', doChat);
-      chatIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doChat(); });
+      chatIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doChat(); } });
       chatRow.appendChild(chatIn); chatRow.appendChild(sendBtn); body.appendChild(chatRow);
       var lv = document.createElement('button'); lv.className = 'nvp-leave'; lv.textContent = 'Salir de la sala';
-      lv.addEventListener('click', function () { leave(false); });
+      lv.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); leave(false); });
       body.appendChild(lv);
-    }
-    for (i = 0; i < ids.length; i++) {
-      el = document.getElementById(ids[i]);
-      if (el && keep[ids[i]]) { el.value = keep[ids[i]].v; if (keep[ids[i]].f) { el.focus(); try { el.setSelectionRange(keep[ids[i]].s, keep[ids[i]].s); } catch (e) { /* nada */ } } }
     }
   }
 
@@ -465,12 +572,14 @@
 
   function glow() {
     var b = document.getElementById(BTN_ID); if (!b) return;
-    var site = activeSite();
+    // El botón mantiene SIEMPRE el color de la plataforma; con sala activa se
+    // añade un punto verde en la esquina en vez de teñirlo todo de verde.
+    var site = activeSite() || (party && party.site) || null;
     b.classList.toggle('nvp-live', !!party);
-    b.classList.toggle('nvp-netflix', !party && site === 'netflix');
-    b.classList.toggle('nvp-crunchy', !party && site === 'crunchy');
-    b.classList.toggle('nvp-disney', !party && site === 'disney');
-    b.classList.toggle('nvp-youtube', !party && site === 'youtube');
+    b.classList.toggle('nvp-netflix', site === 'netflix');
+    b.classList.toggle('nvp-crunchy', site === 'crunchy');
+    b.classList.toggle('nvp-disney', site === 'disney');
+    b.classList.toggle('nvp-youtube', site === 'youtube');
   }
   // Sondeo ligero (2 s): la API de addons no expone eventos de navegación. Si el
   // addon se quita/pausa (botón fuera del DOM), se limpia todo solo.
