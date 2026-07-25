@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.2.0
+/* Naviris addon: Twitch Kit v1.2.1
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -284,25 +284,35 @@
     return b;
   }
   function armButton() {
-    if (document.getElementById('nk-btn')) return;
+    var ya = document.getElementById('nk-btn');
+    // Si ya está en el top-nav no hay nada que hacer. Si está en el RESPALDO
+    // (fila del chat), se reintenta el top-nav en cada tick: en la primera
+    // pasada la barra superior aún no ha renderizado y sin esto el botón se
+    // quedaba para siempre abajo.
+    if (ya && ya.classList.contains('nk-topnav')) return;
+
     // PREFERIDO: la barra superior de Twitch, en el grupo de iconos de la derecha
-    // (notificaciones, whispers, Prime), donde 7TV y BetterTTV ponen los suyos.
-    // Se ancla RELATIVO al botón de notificaciones (data-a-target estable):
-    // se sube hasta el ancestro que comparte fila con el botón de Prime/bits y se
+    // (notificaciones, whispers, Prime, bits), donde 7TV y BetterTTV ponen los
+    // suyos. Se ancla RELATIVO al botón de notificaciones (data-a-target estable):
+    // se sube hasta el ancestro que comparte fila con Prime/bits/whispers y se
     // inserta el nuestro justo antes de ese "slot".
-    var notif = document.querySelector('[data-a-target="notification-button"], button[aria-label*="otificac" i]');
-    var anchor = document.querySelector('.top-nav__prime, [data-a-target="prime-offers-icon"], [data-a-target="top-nav-get-bits-button"], [data-a-target="whispers-menu-button"]');
+    var notif = document.querySelector('[data-a-target="notification-button"], button[aria-label*="otificac" i], button[aria-label*="otification" i]');
+    var anchor = document.querySelector('.top-nav__prime, [data-a-target="prime-offers-icon"], [data-a-target="top-nav-get-bits-button"], [data-a-target="whisper-box-button"], [data-a-target="whispers-menu-button"], [data-a-target="user-menu-toggle"]');
     if (notif && anchor) {
-      var row = notif.parentElement, slot = notif, node = notif;
+      var row = null, slot = null, node = notif;
       for (var i = 0; i < 8; i++) {
         var p = node.parentElement; if (!p) break;
         if (p.contains(anchor) && p.contains(notif)) { row = p; slot = node; break; }
         node = p;
       }
-      var b = makeBtn(); b.className = 'nk-topnav';
-      row.insertBefore(b, slot);
-      return;
+      if (row && slot) {
+        var b = ya || makeBtn();
+        b.className = 'nk-topnav';
+        row.insertBefore(b, slot);   // insertBefore mueve el nodo si ya existía
+        return;
+      }
     }
+    if (ya) return; // ya hay botón (en el respaldo) y el top-nav aún no está listo
     // RESPALDO: la fila de botones del chat (por si cambia el top-nav)
     var host = document.querySelector('.chat-input__buttons-container .tw-align-items-center, .chat-input__buttons-container > div:last-child');
     if (host) {
