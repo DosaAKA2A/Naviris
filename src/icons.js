@@ -54,7 +54,14 @@
 
   const STAR_SOLID = 'M10.7881 3.21068C11.2364 2.13274 12.7635 2.13273 13.2118 3.21068L15.2938 8.2164L20.6979 8.64964C21.8616 8.74293 22.3335 10.1952 21.4469 10.9547L17.3295 14.4817L18.5874 19.7551C18.8583 20.8908 17.6229 21.7883 16.6266 21.1798L11.9999 18.3538L7.37329 21.1798C6.37697 21.7883 5.14158 20.8908 5.41246 19.7551L6.67038 14.4817L2.55303 10.9547C1.66639 10.1952 2.13826 8.74293 3.302 8.64964L8.70609 8.2164L10.7881 3.21068Z';
 
+  // Escudo del AdBlock (elegido por el usuario: svgrepo shield-half, licencia CC).
+  // Relleno sólido con mitad marcada, en currentColor para heredar los estados.
+  const SHIELD_HALF = 'M4.35009 13.3929C2.37912 11.9851 1.1593 9.76613 1.01453 7.36543C1.00487 7.20539 1 7.04453 1 6.88306V3L8 0L15 3V6.88306C15 9.46667 13.7523 11.8912 11.6499 13.3929L8 16L4.35009 13.3929ZM7 12.8279L8 13.5422L9 12.8279V2.60451L8 2.17594L7 2.60451V12.8279Z';
+
   window.icon = function (name) {
+    if (name === 'shield-half') {
+      return `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="${SHIELD_HALF}" fill="currentColor"/></svg>`;
+    }
     if (name === 'star-solid') {
       return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="${STAR_SOLID}"/></svg>`;
     }
