@@ -1,22 +1,27 @@
-name: Desktop Release
+name: Desktop Release (solo compilacion de prueba)
 
-# Se dispara al empujar una etiqueta vX.Y.Z: compila el instalador de Windows
-# y publica la release en GitHub con el token del propio workflow.
-# Al publicarse la release, el workflow "Mobile APK" adjunta el APK automáticamente.
+# IMPORTANTE: desde Naviris 2.6.0 la base es castlabs Electron (+wvcus) y el
+# instalable NECESITA la firma VMP de castlabs (EVS) para que Widevine conceda
+# licencias; sin ella Crunchyroll y el resto de DRM dejan de reproducir.
+# Esa firma se hace en LOCAL con el hook build/evs-sign.js (requiere la cuenta
+# EVS), y aqui se omite a proposito. Por eso este workflow YA NO PUBLICA nada:
+# si lo hiciera, machacaria los assets firmados con un build sin Widevine
+# (ocurrio el 2026-07-25 con la v2.6.0-dev.3).
+#
+# Flujo de publicacion vigente:
+#   1. En local: `npm run release`  -> compila, firma VMP y sube la release.
+#   2. Al publicarse la release, "Mobile APK" adjunta el APK automaticamente.
+#
+# Este workflow queda solo como comprobacion manual de que el proyecto compila.
+
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
-    # SOLO tags estables (vX.Y.Z). Los tags con sufijo (v2.6.0-dev.3…) se publican
-    # en local con firma VMP (EVS): si el CI corriera, publicaría un build SIN
-    # Widevine y machacaría los assets firmados (pasó el 2026-07-25).
-    if: ${{ !contains(github.ref_name, '-') }}
+  compilar:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,51 +34,7 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar y publicar release
-        run: npm run release
+      - name: Compilar sin publicar (SIN firma VMP: no distribuir)
+        run: npm run dist
         env:
-          GH_TOKEN: ${{ github.token }}
-
-  # La release creada arriba con el token del workflow NO dispara otros workflows
-  # (protección de GitHub), así que el APK se adjunta aquí como segundo job.
-  apk:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Preparar firma (si hay secretos configurados)
-        env:
-          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          if [ -n "$KS_B64" ]; then
-            mkdir -p "$HOME/.android-keys"
-            echo "$KS_B64" | tr -d ' \t\r\n' | base64 -d > "$HOME/.android-keys/cobalt-release.jks"
-            {
-              echo "storeFile=$HOME/.android-keys/cobalt-release.jks"
-              echo "storePassword=$KS_PASS"
-              echo "keyAlias=cobalt"
-              echo "keyPassword=$KS_PASS"
-            } > "$HOME/.android-keys/cobalt-release.properties"
-          fi
-
-      - name: Compilar APK
-        working-directory: mobile
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleRelease --no-daemon --console=plain
-
-      - name: Adjuntar APK a la release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VER=$(grep -oP 'versionName "\K[^"]+' mobile/app/build.gradle)
-          APK=$(ls mobile/app/build/outputs/apk/release/app-release*.apk | head -1)
-          cp "$APK" "Naviris-$VER.apk"
-          gh release upload "${{ github.ref_name }}" "Naviris-$VER.apk" --clobber
+          EVS_SKIP: '1'
