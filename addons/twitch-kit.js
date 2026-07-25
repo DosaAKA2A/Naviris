@@ -1,4 +1,4 @@
-/* Naviris addon: Twitch Kit v1.2.2
+/* Naviris addon: Twitch Kit v1.3.0
    Mejoras para VER streams en Twitch, al estilo BetterTTV/7TV pero de Naviris.
    kind "content" (matches twitch.tv): corre DENTRO de la página, como BTTV, así
    que los arreglos de selectores se despliegan por catálogo sin release.
@@ -119,11 +119,21 @@
     var msg = node.classList && node.classList.contains('chat-line__message') ? node : node.querySelector && node.querySelector('.chat-line__message');
     if (!msg) return;
     var nuevo = !msg.__nk;   // primera vez que vemos este mensaje
+    // Los que ya estaban al arrancar son HISTORIAL: no sabemos su hora real, así
+    // que no se les inventa ninguna (mejor sin hora que con un dato falso). Al
+    // resto se les sella la hora de llegada SIEMPRE (aunque la opción esté
+    // apagada), para que al activarla luego ya tengan su marca correcta.
+    if (nuevo && Date.now() - armadoEn < 4000) msg.__nkHist = 1;
+    if (!msg.__nkAt && !msg.__nkHist) msg.__nkAt = Date.now();
     msg.__nk = 1;
-    // Hora: se (re)pone siempre que falte. React puede rehacer la línea y
-    // llevarse el span, así que el barrido periódico lo restituye.
-    if (cfg.tsChat && !msg.querySelector('.nk-time')) {
-      if (!msg.__nkAt) msg.__nkAt = Date.now();   // hora de llegada, estable entre repintados
+    // Hora: SOLO si Twitch no la pone ya. Twitch tiene su propio ajuste de marcas
+    // de tiempo (Configuración de chat -> Apariencia) y muchos usuarios lo tienen
+    // activo: duplicar la hora quedaría absurdo. Si aparece la nativa después,
+    // se retira la nuestra.
+    var nativo = msg.querySelector('.chat-line__timestamp');
+    var mio = msg.querySelector('.nk-time');
+    if (nativo && mio) { mio.remove(); mio = null; }
+    if (cfg.tsChat && !nativo && !mio && msg.__nkAt) {
       var t = document.createElement('span'); t.className = 'nk-time'; t.textContent = fmtClock(new Date(msg.__nkAt));
       msg.insertBefore(t, msg.firstChild);
     }
@@ -222,7 +232,7 @@
   /* ---------- Panel de ajustes (botón NK junto al engranaje del chat) ---------- */
   var OPTS = [
     ['sec', 'Chat'],
-    ['tsChat', 'Hora en cada mensaje'],
+    ['tsChat', 'Hora en los mensajes (solo si Twitch no la pone)'],
     ['altBg', 'Fondo alterno en el chat'],
     ['mentionHi', 'Resaltar cuando te mencionan'],
     ['mentionSound', 'Sonido al mencionarte'],
