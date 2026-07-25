@@ -1,4 +1,9 @@
-/* Naviris addon: Watch Party v2.1.1
+/* Naviris addon: Watch Party v2.2.0
+   v2.2: rediseño del panel (espaciados generosos, jerarquía por secciones) y
+   chat serio: nombres coloreados por autor, horas, agrupación de mensajes
+   consecutivos, avisos del sistema diferenciados y estado vacío.
+*/
+/* Historial:
    Ver series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty pero
    más simple y sin cuentas de terceros. NO transmite vídeo: cada quien reproduce
    su propia copia con su propia cuenta; solo se sincronizan las señales de
@@ -18,7 +23,8 @@
    revierte).
 
    Anfitrión-autoritativo: quien crea la sala late con su tiempo cada 2 s; los
-   demás corrigen si se desvían más de 1,5 s. */
+   demás corrigen si se desvían más de 1,5 s.
+*/
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
   var DRIFT = 1.5;      // segundos de desvío tolerado antes de re-seek
@@ -56,7 +62,7 @@
     'window.__navPartyStop=function(){clearInterval(iv);wired=null;window.__navPartyAgent=0};' +
     '})();';
 
-  /* ---------- Estilos (reusa side-panel-left, lp- y loot- del core) ---------- */
+  /* ---------- Estilos (reusa side-panel-left y lp- del core) ---------- */
   var css = document.createElement('style');
   css.id = 'nvp-style';
   css.textContent = [
@@ -64,33 +70,63 @@
     '#' + BTN_ID + '.nvp-netflix{color:#e50914;filter:drop-shadow(0 0 6px rgba(229,9,20,.65))}',
     '#' + BTN_ID + '.nvp-crunchy{color:#f47521;filter:drop-shadow(0 0 6px rgba(244,117,33,.65))}',
     '#' + BTN_ID + '.nvp-live{color:#9ee2b8;filter:drop-shadow(0 0 6px rgba(158,226,184,.5))}',
-    '.nvp-row{display:flex;gap:6px;margin-top:8px}',
-    '.nvp-in{flex:1;min-width:0;background:rgba(0,0,0,.25);color:var(--text,#ececef);border:1px solid var(--line-2,#2c2c33);border-radius:9px;padding:9px 10px;font-size:12.5px;outline:none}',
-    '.nvp-in:focus{border-color:var(--muted,#8b8d94)}',
+    /* Panel más ancho y con aire */
+    '#nvp-panel{width:340px;max-height:640px}',
+    '#nvp-panel .lp-body{padding:10px 16px 18px}',
+    '.nvp-lbl{margin:18px 2px 10px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim,#5c5e64)}',
+    '.nvp-lbl:first-child{margin-top:6px}',
+    '.nvp-hint{font-size:12.5px;color:var(--muted,#8b8d94);line-height:1.6;margin:4px 2px 2px}',
+    '.nvp-row{display:flex;gap:8px;margin-top:10px}',
+    '.nvp-in{flex:1;min-width:0;background:rgba(0,0,0,.25);color:var(--text,#ececef);border:1px solid var(--line-2,#2c2c33);border-radius:10px;padding:11px 13px;font-size:13px;outline:none;transition:border-color .12s}',
+    '.nvp-in:focus{border-color:var(--violet,#b98cff)}',
     '.nvp-in::placeholder{color:var(--dim,#5c5e64)}',
-    '.nvp-in.code{text-transform:uppercase;font-family:var(--mono,ui-monospace,monospace);letter-spacing:2px}',
-    '.nvp-btn{border:none;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);flex:0 0 auto}',
-    '.nvp-btn:hover{background:rgba(255,255,255,.14)}',
+    '.nvp-in.code{text-transform:uppercase;font-family:var(--mono,ui-monospace,monospace);letter-spacing:3px;font-weight:700}',
+    '.nvp-btn{border:none;border-radius:10px;padding:11px 16px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);flex:0 0 auto;transition:background .12s}',
+    '.nvp-btn:hover{background:rgba(255,255,255,.15)}',
     '.nvp-btn:disabled{color:var(--dim,#5c5e64);cursor:default;background:rgba(255,255,255,.04)}',
-    '.nvp-code{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:8px;padding:13px 10px;border:1px dashed var(--line-2,#2c2c33);border-radius:12px;cursor:pointer}',
-    '.nvp-code:hover{background:rgba(255,255,255,.04)}',
-    '.nvp-code .c{font-family:var(--mono,ui-monospace,monospace);font-size:26px;font-weight:800;letter-spacing:8px;color:var(--text,#ececef);text-indent:8px}',
+    /* Tarjeta del código de sala */
+    '.nvp-code{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px;padding:20px 12px 16px;border:1px dashed var(--line-2,#2c2c33);border-radius:14px;cursor:pointer;transition:background .12s,border-color .12s}',
+    '.nvp-code:hover{background:rgba(255,255,255,.04);border-color:var(--muted,#8b8d94)}',
+    '.nvp-code .c{font-family:var(--mono,ui-monospace,monospace);font-size:30px;font-weight:800;letter-spacing:10px;color:var(--text,#ececef);text-indent:10px}',
     '.nvp-code .h{font-size:10.5px;color:var(--muted,#8b8d94)}',
-    '.nvp-status{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted,#8b8d94)}',
-    '.nvp-status .dot{width:7px;height:7px;border-radius:50%;background:#9ee2b8;flex:none}',
+    /* Estado */
+    '.nvp-status{display:flex;align-items:center;gap:9px;margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(158,226,184,.07);font-size:12.5px;color:var(--text,#ececef)}',
+    '.nvp-status .dot{width:8px;height:8px;border-radius:50%;background:#9ee2b8;flex:none}',
+    '.nvp-status.err{background:rgba(230,169,180,.08);color:#e6a9b4}',
     '.nvp-status.err .dot{background:#e6a9b4}',
-    '.nvp-watch{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line,#232327);border-radius:10px;margin-top:8px}',
-    '.nvp-watch .n{flex:1;min-width:0;font-size:12.5px;color:var(--text,#ececef);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.nvp-chat{height:150px;overflow-y:auto;margin-top:8px;border:1px solid var(--line,#232327);border-radius:10px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}',
-    '.nvp-chat .l{color:var(--text,#ececef);word-wrap:break-word}',
-    '.nvp-chat .l b{color:var(--violet,#b98cff);font-weight:600}',
-    '.nvp-chat .s{color:var(--muted,#8b8d94);font-size:11.5px}',
-    '.nvp-leave{width:100%;margin-top:10px;border:1px solid var(--line-2,#2c2c33);background:none;color:#e6a9b4;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer}',
+    /* Qué se está viendo */
+    '.nvp-watch{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line,#232327);border-radius:11px;margin-top:0}',
+    '.nvp-watch .ic{width:8px;height:8px;border-radius:2px;background:var(--violet,#b98cff);flex:none}',
+    '.nvp-watch .n{flex:1;min-width:0;font-size:12.5px;color:var(--text,#ececef);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5}',
+    /* Chat: agrupado, con autor coloreado y hora */
+    '.nvp-chat{height:230px;overflow-y:auto;margin-top:0;border:1px solid var(--line,#232327);border-radius:12px;padding:12px 14px;font-size:13px;display:flex;flex-direction:column;background:rgba(0,0,0,.18)}',
+    '.nvp-chat .grp{margin:0 0 10px}',
+    '.nvp-chat .au{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}',
+    '.nvp-chat .au b{font-weight:700;font-size:12.5px}',
+    '.nvp-chat .au .tm{margin-left:auto;font-family:var(--mono,ui-monospace,monospace);font-size:10px;color:var(--dim,#5c5e64)}',
+    '.nvp-chat .tx{color:var(--text,#ececef);line-height:1.55;word-wrap:break-word;padding:1px 0}',
+    '.nvp-chat .sys{display:flex;align-items:center;gap:8px;margin:7px 0;color:var(--muted,#8b8d94);font-size:11.5px;line-height:1.5}',
+    '.nvp-chat .sys::before,.nvp-chat .sys::after{content:"";flex:1;height:1px;background:var(--line,#232327)}',
+    '.nvp-chat .sys span{flex:0 1 auto;text-align:center}',
+    '.nvp-chat .empty{margin:auto;text-align:center;color:var(--dim,#5c5e64);font-size:12px;line-height:1.6}',
+    /* Salir y control exclusivo */
+    '.nvp-leave{width:100%;margin-top:14px;border:1px solid var(--line-2,#2c2c33);background:none;color:#e6a9b4;border-radius:11px;padding:11px;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s}',
     '.nvp-leave:hover{background:rgba(230,169,180,.08)}',
-    '.nvp-lock{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted,#8b8d94);cursor:pointer;user-select:none}',
+    '.nvp-lock{display:flex;align-items:center;gap:9px;margin-top:12px;padding:10px 12px;border:1px solid var(--line,#232327);border-radius:11px;font-size:12.5px;color:var(--muted,#8b8d94);cursor:pointer;user-select:none}',
+    '.nvp-lock:hover{color:var(--text,#ececef)}',
     '.nvp-lock input{accent-color:var(--violet,#b98cff)}'
   ].join('\n');
   document.head.appendChild(css);
+  /* Color estable por autor (paleta suave, sin depender del core) */
+  function nameColor(name) {
+    var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return 'hsl(' + (h % 360) + ', 55%, 72%)';
+  }
+  function fmtClock(t) {
+    var d = new Date(t || Date.now());
+    var m = String(d.getMinutes()); if (m.length < 2) m = '0' + m;
+    return d.getHours() + ':' + m;
+  }
 
   /* ---------- Panel lateral (estructura del core: side-panel-left) ---------- */
   var panel = document.createElement('aside');
@@ -142,7 +178,7 @@
     try { return siteOf(wv.getURL()); } catch (e) { return null; }
   }
   function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
-  function logSys(text) { if (!party) return; party.msgs.push({ text: text, sys: true }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
+  function logSys(text) { if (!party) return; party.msgs.push({ text: text, sys: true, t: Date.now() }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
   // Narración filtrada: sin duplicados seguidos y sin los pausa/play espurios
   // que el reproductor dispara al bufferizar justo después de un salto.
   var narr = { kind: '', at: 0 };
@@ -153,7 +189,7 @@
     narr = { kind: kind, at: now };
     logSys(text);
   }
-  function logChat(who, text) { if (!party) return; party.msgs.push({ who: who, text: text }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
+  function logChat(who, text) { if (!party) return; party.msgs.push({ who: who, text: text, t: Date.now() }); if (party.msgs.length > 200) party.msgs.shift(); render(); }
   function inject(wv) { try { wv.executeJavaScript(AGENT).catch(function () {}); } catch (e) { /* nada */ } }
 
   function onConsole(e) {
@@ -275,22 +311,24 @@
     var site = activeSite();
     var siteName = site === 'netflix' ? 'Netflix' : site === 'crunchy' ? 'Crunchyroll' : null;
     if (!party) {
-      var hint = document.createElement('div'); hint.className = 'loot-hint';
+      var hint = document.createElement('div'); hint.className = 'nvp-hint';
       hint.textContent = site
         ? 'Listo: la sala usará ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola al episodio del anfitrión.'
         : 'Abre Netflix o Crunchyroll en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       body.appendChild(hint);
-      var nameRow = document.createElement('div'); nameRow.className = 'nvp-row';
+      var lblN = document.createElement('div'); lblN.className = 'nvp-lbl'; lblN.textContent = 'Tu nombre'; body.appendChild(lblN);
+      var nameRow = document.createElement('div'); nameRow.className = 'nvp-row'; nameRow.style.marginTop = '0';
       var nameIn = document.createElement('input'); nameIn.id = 'nvp-name'; nameIn.className = 'nvp-in'; nameIn.maxLength = 32;
-      nameIn.placeholder = 'Tu nombre (opcional)'; nameIn.value = localStorage.__navPartyName || '';
+      nameIn.placeholder = 'Cómo te verán en la sala'; nameIn.value = localStorage.__navPartyName || '';
       nameIn.addEventListener('change', function () { localStorage.__navPartyName = nameIn.value.trim(); });
       nameRow.appendChild(nameIn); body.appendChild(nameRow);
       var go = document.createElement('button'); go.className = 'loot-go' + (site ? '' : ' off'); go.disabled = !site;
+      go.style.marginTop = '14px';
       go.textContent = 'Crear sala';
       go.addEventListener('click', function () { localStorage.__navPartyName = nameIn.value.trim(); start(randomCode(), true); });
       body.appendChild(go);
-      var lbl = document.createElement('div'); lbl.className = 'loot-lbl'; lbl.textContent = 'O ÚNETE A UNA SALA'; body.appendChild(lbl);
-      var joinRow = document.createElement('div'); joinRow.className = 'nvp-row';
+      var lbl = document.createElement('div'); lbl.className = 'nvp-lbl'; lbl.textContent = 'O únete a una sala'; body.appendChild(lbl);
+      var joinRow = document.createElement('div'); joinRow.className = 'nvp-row'; joinRow.style.marginTop = '0';
       var codeIn = document.createElement('input'); codeIn.id = 'nvp-codein'; codeIn.className = 'nvp-in code'; codeIn.maxLength = 12; codeIn.placeholder = 'Código';
       var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; joinBtn.disabled = !site;
       var doJoin = function () { var c = codeIn.value.trim().toUpperCase(); if (!c) return; localStorage.__navPartyName = nameIn.value.trim(); start(c, false); };
@@ -298,6 +336,7 @@
       codeIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doJoin(); });
       joinRow.appendChild(codeIn); joinRow.appendChild(joinBtn); body.appendChild(joinRow);
     } else {
+      var lblS = document.createElement('div'); lblS.className = 'nvp-lbl'; lblS.textContent = 'Sala'; body.appendChild(lblS);
       var codeBox = document.createElement('div'); codeBox.className = 'nvp-code'; codeBox.title = 'Copiar el código';
       codeBox.innerHTML = '<span class="c"></span><span class="h">toca para copiar y compartir</span>';
       codeBox.querySelector('.c').textContent = party.code;
@@ -305,27 +344,53 @@
       body.appendChild(codeBox);
       var st = document.createElement('div'); st.className = 'nvp-status' + (party.ok ? '' : ' err');
       st.innerHTML = '<span class="dot"></span><span></span>';
-      st.lastChild.textContent = party.n + ' viendo · ' + (party.host ? 'anfitrión' : 'invitado') + ' · ' + party.status;
+      st.lastChild.textContent = party.n + (party.n === 1 ? ' persona viendo' : ' personas viendo') + ' · ' + (party.host ? 'eres el anfitrión' : 'invitado') + ' · ' + party.status;
       body.appendChild(st);
       var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
       if (title) {
+        var lblV = document.createElement('div'); lblV.className = 'nvp-lbl'; lblV.textContent = 'Viendo'; body.appendChild(lblV);
         var w = document.createElement('div'); w.className = 'nvp-watch';
-        var nm = document.createElement('span'); nm.className = 'n'; nm.textContent = title;
+        w.innerHTML = '<span class="ic"></span>';
+        var nm = document.createElement('span'); nm.className = 'n'; nm.textContent = title.replace(/ - Crunchyroll.*$| - Netflix.*$/i, '');
         w.appendChild(nm); body.appendChild(w);
       }
       if (party.host) {
         var lockRow = document.createElement('label'); lockRow.className = 'nvp-lock';
         var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!party.lock;
         cb.addEventListener('change', function () { party.lock = cb.checked; logSys(cb.checked ? 'Control exclusivo: solo tú puedes dar play, pausar y saltar' : 'Control exclusivo desactivado: todos pueden controlar'); });
-        lockRow.appendChild(cb); lockRow.appendChild(document.createTextNode('Solo el anfitrión controla'));
+        lockRow.appendChild(cb); lockRow.appendChild(document.createTextNode('Solo el anfitrión controla la reproducción'));
         body.appendChild(lockRow);
       }
+      var lblC = document.createElement('div'); lblC.className = 'nvp-lbl'; lblC.textContent = 'Chat de la sala'; body.appendChild(lblC);
       var chat = document.createElement('div'); chat.className = 'nvp-chat';
+      if (!party.msgs.length) {
+        var em = document.createElement('div'); em.className = 'empty';
+        em.textContent = 'Aún no hay mensajes.' + String.fromCharCode(10) + 'Saluda a la sala.';
+        chat.appendChild(em);
+      }
+      // Mensajes agrupados: los consecutivos del mismo autor (en <3 min) comparten
+      // cabecera de autor coloreado + hora; los del sistema van como separadores.
+      var grp = null, lastWho = null, lastT = 0;
       for (i = 0; i < party.msgs.length; i++) {
-        var m = party.msgs[i], line = document.createElement('div');
-        if (m.sys) { line.className = 's'; line.textContent = m.text; }
-        else { line.className = 'l'; var b = document.createElement('b'); b.textContent = m.who + ': '; line.appendChild(b); line.appendChild(document.createTextNode(m.text)); }
-        chat.appendChild(line);
+        var m = party.msgs[i];
+        if (m.sys) {
+          grp = null; lastWho = null;
+          var sysLine = document.createElement('div'); sysLine.className = 'sys';
+          var sp = document.createElement('span'); sp.textContent = m.text; sysLine.appendChild(sp);
+          chat.appendChild(sysLine);
+          continue;
+        }
+        if (!grp || m.who !== lastWho || (m.t || 0) - lastT > 180000) {
+          grp = document.createElement('div'); grp.className = 'grp';
+          var au = document.createElement('div'); au.className = 'au';
+          var b = document.createElement('b'); b.textContent = m.who; b.style.color = nameColor(m.who);
+          var tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmtClock(m.t);
+          au.appendChild(b); au.appendChild(tm); grp.appendChild(au);
+          chat.appendChild(grp);
+        }
+        var tx = document.createElement('div'); tx.className = 'tx'; tx.textContent = m.text;
+        grp.appendChild(tx);
+        lastWho = m.who; lastT = m.t || 0;
       }
       body.appendChild(chat); chat.scrollTop = chat.scrollHeight;
       var chatRow = document.createElement('div'); chatRow.className = 'nvp-row';
