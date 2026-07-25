@@ -27,7 +27,7 @@ function leave(sock) {
   const s = rooms.get(code); if (!s) return;
   s.delete(sock);
   if (s.size === 0) rooms.delete(code);
-  else broadcast(code, { t: 'peers', n: s.size }, null);
+  else broadcast(code, { t: 'peers', n: s.size, who: sock._name, left: true }, null);
 }
 
 /* ---------- Envío de frames (servidor -> cliente, sin máscara) ---------- */

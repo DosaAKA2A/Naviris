@@ -48,7 +48,7 @@ export class PartyRoom {
     const m = this.meta(ws); if (!m.room) return;
     ws.serializeAttachment({});
     const n = this.members(m.room).length;
-    if (n > 0) this.broadcast(m.room, { t: 'peers', n }, null);
+    if (n > 0) this.broadcast(m.room, { t: 'peers', n, who: m.name, left: true }, null);
   }
 
   webSocketMessage(ws, data) {
