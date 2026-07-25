@@ -22,6 +22,7 @@ const els = {};
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
+  'sb-vpn', 'vpn-panel', 'vpn-close', 'vpn-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
@@ -722,7 +723,7 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloads());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); els.vpnPanel.classList.add('hidden'); els.sbVpn.classList.remove('open'); }
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
@@ -990,6 +991,104 @@ els.lootClose.addEventListener('click', () => toggleLootPanel(false));
 els.lootTabSes.addEventListener('click', () => { lootView = 'ses'; renderLootPanel(); });
 els.lootTabHist.addEventListener('click', () => { lootView = 'hist'; renderLootPanel(); });
 
+/* ============ VPN (proxies públicos) ============ */
+// Cambia la IP y el país de salida enrutando el tráfico por un proxy. Son
+// servidores públicos de terceros: gratis y de un clic, pero NO privados. La
+// interfaz lo dice sin rodeos para que nadie los confunda con una VPN de pago.
+const VPN_PAISES = [
+  { code: '', name: 'Cualquier país' },
+  { code: 'US', name: 'Estados Unidos' }, { code: 'GB', name: 'Reino Unido' },
+  { code: 'DE', name: 'Alemania' }, { code: 'FR', name: 'Francia' },
+  { code: 'ES', name: 'España' }, { code: 'NL', name: 'Países Bajos' },
+  { code: 'BR', name: 'Brasil' }, { code: 'MX', name: 'México' },
+  { code: 'AR', name: 'Argentina' }, { code: 'CA', name: 'Canadá' },
+  { code: 'JP', name: 'Japón' }, { code: 'SG', name: 'Singapur' }
+];
+let vpnState = { on: false };
+let vpnServers = [], vpnPais = '', vpnBuscando = false, vpnAviso = '';
+
+function updateVpnUI() {
+  els.sbVpn.classList.toggle('vpn-on', !!vpnState.on);
+  if (!els.vpnPanel.classList.contains('hidden')) renderVpnPanel();
+}
+function toggleVpnPanel(force) {
+  const open = force !== undefined ? force : els.vpnPanel.classList.contains('hidden');
+  if (open) { closeRightPanels(); els.vpnPanel.classList.remove('hidden'); els.sbVpn.classList.add('open'); renderVpnPanel(); }
+  else { els.vpnPanel.classList.add('hidden'); els.sbVpn.classList.remove('open'); }
+}
+function vpnLabel(t) { const d = document.createElement('div'); d.className = 'loot-lbl'; d.textContent = t; return d; }
+async function vpnBuscar() {
+  if (vpnBuscando) return;
+  vpnBuscando = true; vpnAviso = ''; renderVpnPanel();
+  const r = await window.cobalt.vpnList(vpnPais);
+  vpnBuscando = false;
+  if (!r.ok) { vpnAviso = 'No se pudo obtener la lista: ' + r.message; vpnServers = []; }
+  else {
+    vpnServers = r.servers || [];
+    vpnAviso = vpnServers.length ? '' : `Ninguno de los ${r.probados} servidores probados respondió. Prueba con otro país.`;
+  }
+  renderVpnPanel();
+}
+async function vpnConectar(srv) {
+  vpnAviso = 'Conectando…'; renderVpnPanel();
+  const r = await window.cobalt.vpnConnect(srv);
+  if (!r.ok) { vpnAviso = 'No se pudo conectar: ' + r.message; renderVpnPanel(); return; }
+  vpnState = r.state; vpnAviso = '';
+  toast('VPN conectada · salida por ' + (srv.countryName || srv.country || srv.proxy));
+  updateVpnUI();
+  const chk = await window.cobalt.vpnCheck();   // comprobación real de la IP resultante
+  if (chk.ok) { vpnState.ip = chk.ip; vpnState.countryName = chk.country; }
+  updateVpnUI();
+}
+async function vpnDesconectar() {
+  const r = await window.cobalt.vpnDisconnect();
+  if (r.ok) { vpnState = { on: false }; toast('VPN desconectada'); updateVpnUI(); }
+}
+function renderVpnPanel() {
+  const body = els.vpnBody; body.innerHTML = '';
+  if (vpnState.on) {
+    const card = document.createElement('div'); card.className = 'vpn-live';
+    card.innerHTML = '<span class="vl-dot"></span><span class="vl-info"><b></b><span></span></span>';
+    card.querySelector('b').textContent = vpnState.countryName || vpnState.country || 'Conectada';
+    card.querySelector('.vl-info span').textContent = (vpnState.ip || vpnState.proxy || '') + ' · ' + (vpnState.protocol || 'http');
+    body.appendChild(card);
+    const off = document.createElement('button'); off.className = 'vpn-off'; off.textContent = 'Desconectar';
+    off.addEventListener('click', vpnDesconectar); body.appendChild(off);
+    const nota = document.createElement('div'); nota.className = 'loot-hint';
+    nota.textContent = 'Todo el tráfico del navegador sale por este servidor. Si se cae, las páginas darán error de red en vez de revelar tu IP real.';
+    body.appendChild(nota);
+    return;
+  }
+  const aviso = document.createElement('div'); aviso.className = 'vpn-warn';
+  aviso.textContent = 'Servidores públicos gratuitos: cambian tu IP y tu país, pero NO son privados. El HTTPS sigue cifrado, aunque el operador del servidor ve a qué dominios entras. No los uses para banca ni datos sensibles.';
+  body.appendChild(aviso);
+  body.appendChild(vpnLabel('PAÍS DE SALIDA'));
+  const sel = document.createElement('select'); sel.className = 'vpn-sel';
+  for (const p of VPN_PAISES) { const o = document.createElement('option'); o.value = p.code; o.textContent = p.name; if (p.code === vpnPais) o.selected = true; sel.appendChild(o); }
+  sel.addEventListener('change', () => { vpnPais = sel.value; vpnServers = []; renderVpnPanel(); });
+  body.appendChild(sel);
+  const go = document.createElement('button'); go.className = 'loot-go' + (vpnBuscando ? ' off' : ''); go.disabled = vpnBuscando;
+  go.textContent = vpnBuscando ? 'Buscando servidores…' : 'Buscar servidores';
+  go.addEventListener('click', vpnBuscar); body.appendChild(go);
+  if (vpnAviso) { const a = document.createElement('div'); a.className = 'loot-hint'; a.textContent = vpnAviso; body.appendChild(a); }
+  if (vpnServers.length) {
+    body.appendChild(vpnLabel('SERVIDORES DISPONIBLES'));
+    for (const s of vpnServers) {
+      const row = document.createElement('div'); row.className = 'vpn-srv';
+      row.innerHTML = '<span class="vs-flag"></span><span class="vs-info"><span class="vs-name"></span><span class="vs-ip"></span></span>';
+      row.querySelector('.vs-flag').textContent = s.country || '??';
+      row.querySelector('.vs-name').textContent = s.countryName || s.country || 'Servidor';
+      row.querySelector('.vs-ip').textContent = s.ip || s.proxy;
+      const b = document.createElement('button'); b.className = 'ls-btn'; b.textContent = 'conectar';
+      b.addEventListener('click', () => vpnConectar(s));
+      row.appendChild(b); body.appendChild(row);
+    }
+  }
+}
+els.sbVpn.addEventListener('click', () => toggleVpnPanel());
+els.vpnClose.addEventListener('click', () => toggleVpnPanel(false));
+window.cobalt.onVpnStatus((s) => { vpnState = s; updateVpnUI(); });
+
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
   const open = els.ratPop.classList.contains('hidden'); els.ratPop.classList.toggle('hidden'); els.sbRat.classList.toggle('open', open);
@@ -1186,6 +1285,7 @@ document.addEventListener('click', (e) => {
   if (!els.ratPop.contains(e.target) && !els.sbRat.contains(e.target)) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
   if (!els.shieldPop.contains(e.target) && !els.navShield.contains(e.target)) { els.shieldPop.classList.add('hidden'); els.navShield.classList.remove('open'); clearInterval(adblockPoll); adblockPoll = null; }
   if (!els.lootPanel.classList.contains('hidden') && !els.lootPanel.contains(e.target) && !els.sbLoot.contains(e.target)) toggleLootPanel(false);
+  if (!els.vpnPanel.classList.contains('hidden') && !els.vpnPanel.contains(e.target) && !els.sbVpn.contains(e.target)) toggleVpnPanel(false);
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
 });
 els.menuPop.addEventListener('click', (e) => {

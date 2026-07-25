@@ -2,6 +2,11 @@ const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+// OJO: `net` ya viene de electron (net.request). Los módulos de Node van con
+// nombre propio para no pisarlo; los usa el probador de proxies de la VPN.
+const nodeNet = require('net');
+const http = require('http');
+const https = require('https');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 
@@ -110,6 +115,7 @@ const DEFAULT_SETTINGS = {
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   devUpdates: null,         // canal de actualizaciones: null = según la versión instalada; true/false = elección del usuario
+  vpn: null,                // último servidor usado: { proxy, protocol, country } o null
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };
@@ -954,6 +960,143 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
     fs.writeFileSync(r.filePath, Buffer.from(String(dataUrl).split(',')[1], 'base64'));
     return { ok: true, path: r.filePath };
   } catch (err) { return { ok: false, message: String(err.message || err) }; }
+});
+
+// ---------- VPN por proxy (lista pública) ----------
+// Enruta TODO el tráfico de las sesiones (normal y privada) por un proxy con
+// session.setProxy. Chromium no cae a conexión directa si el proxy muere: da
+// error de red, así que no hay fuga silenciosa de la IP real.
+//
+// AVISO que la interfaz debe dejar claro: son proxies públicos de terceros. El
+// HTTPS sigue cifrado de extremo a extremo (el operador ve el dominio, no el
+// contenido), pero cualquier tráfico sin cifrar sí queda expuesto. No es una VPN
+// de pago ni pretende serlo.
+const VPN_PARTS = [PART_NORMAL, PART_PRIVATE];
+let vpnState = { on: false, proxy: null, protocol: null, country: null, ip: null };
+
+async function vpnApply(rules) {
+  for (const part of VPN_PARTS) {
+    const ses = session.fromPartition(part);
+    await ses.setProxy(rules
+      ? { proxyRules: rules, proxyBypassRules: '<local>' }
+      : { mode: 'direct' });
+  }
+}
+// Prueba real del proxy: CONNECT y petición a un servicio de eco de IP. Devuelve
+// la IP de salida o null. Sin dependencias: http/https nativos.
+function vpnProbe(host, port, protocol, ms) {
+  return new Promise((resolve) => {
+    let done = false;
+    const fin = (v) => { if (!done) { done = true; resolve(v); } };
+    const timer = setTimeout(() => fin(null), ms || 6000);
+    try {
+      if (protocol === 'socks4' || protocol === 'socks5') {
+        // Los SOCKS no se pueden validar con http.CONNECT; se comprueba solo que
+        // el puerto acepte conexión (la validación fina la hace el uso real).
+        const s = nodeNet.connect({ host, port: +port }, () => { clearTimeout(timer); s.destroy(); fin('socks-ok'); });
+        s.on('error', () => { clearTimeout(timer); fin(null); });
+        s.setTimeout(ms || 6000, () => { s.destroy(); fin(null); });
+        return;
+      }
+      const req = http.request({ host, port: +port, method: 'CONNECT', path: 'api.ipify.org:443', timeout: ms || 6000 });
+      req.on('connect', (res, socket) => {
+        if (res.statusCode !== 200) { clearTimeout(timer); try { socket.destroy(); } catch (e) {} return fin(null); }
+        const r = https.request({ socket, servername: 'api.ipify.org', agent: false, host: 'api.ipify.org', path: '/?format=json' }, (resp) => {
+          let d = '';
+          resp.on('data', (c) => { d += c; });
+          resp.on('end', () => { clearTimeout(timer); try { socket.destroy(); } catch (e) {} try { fin(JSON.parse(d).ip); } catch (e) { fin(null); } });
+        });
+        r.on('error', () => { clearTimeout(timer); fin(null); });
+        r.end();
+      });
+      req.on('error', () => { clearTimeout(timer); fin(null); });
+      req.on('timeout', () => { clearTimeout(timer); try { req.destroy(); } catch (e) {} fin(null); });
+      req.end();
+    } catch (e) { clearTimeout(timer); fin(null); }
+  });
+}
+
+// Catálogo remoto de proxies públicos (sin clave). Se piden con país para poder
+// ofrecer "salir por X país", que es lo que la gente busca.
+async function vpnFetchList(country) {
+  const url = 'https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies'
+    + '&protocol=http&proxy_format=protocolipport&format=json&timeout=3000'
+    + (country ? '&country=' + encodeURIComponent(country) : '');
+  const res = await fetch(url, { headers: { 'User-Agent': 'Naviris' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const arr = (data && data.proxies) || [];
+  return arr.map((p) => ({
+    proxy: (p.ip || '') + ':' + (p.port || ''),
+    protocol: p.protocol || 'http',
+    country: (p.ip_data && p.ip_data.countryCode) || p.country_code || '',
+    countryName: (p.ip_data && p.ip_data.country) || '',
+    ms: p.timeout || null
+  })).filter((p) => /^\d+\.\d+\.\d+\.\d+:\d+$/.test(p.proxy));
+}
+
+ipcMain.handle('vpn:state', () => vpnState);
+// Lista de servidores VIVOS de un país: se descargan candidatos y se prueban en
+// paralelo (la mayoría de los públicos están muertos: de 360 respondían ~13).
+ipcMain.handle('vpn:list', async (_e, country) => {
+  try {
+    const cands = await vpnFetchList(country);
+    const lote = cands.slice(0, 60);
+    const vivos = [];
+    await Promise.all(lote.map(async (c) => {
+      const [h, p] = c.proxy.split(':');
+      const ip = await vpnProbe(h, p, c.protocol, 6000);
+      if (ip) vivos.push({ ...c, ip: ip === 'socks-ok' ? null : ip });
+    }));
+    return { ok: true, servers: vivos.slice(0, 20), probados: lote.length };
+  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+});
+ipcMain.handle('vpn:connect', async (_e, srv) => {
+  try {
+    if (!srv || !/^\d+\.\d+\.\d+\.\d+:\d+$/.test(srv.proxy || '')) return { ok: false, message: 'Servidor no válido' };
+    const proto = srv.protocol === 'socks5' || srv.protocol === 'socks4' ? srv.protocol : 'http';
+    await vpnApply(proto + '://' + srv.proxy);
+    vpnState = { on: true, proxy: srv.proxy, protocol: proto, country: srv.country || null, ip: srv.ip || null };
+    settings.vpn = { proxy: srv.proxy, protocol: proto, country: srv.country || null };
+    saveSettings(settings);
+    broadcast('vpn:status', vpnState);
+    return { ok: true, state: vpnState };
+  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+});
+ipcMain.handle('vpn:disconnect', async () => {
+  try {
+    await vpnApply(null);
+    vpnState = { on: false, proxy: null, protocol: null, country: null, ip: null };
+    settings.vpn = null; saveSettings(settings);
+    broadcast('vpn:status', vpnState);
+    return { ok: true };
+  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+});
+// Comprueba la IP y el país REALES tal y como se ven ahora mismo (a través del
+// proxy si está activo). Sirve de prueba de que la VPN funciona.
+ipcMain.handle('vpn:check', async () => {
+  const ses = session.fromPartition(PART_NORMAL);
+  // Varios servicios por orden: algunos responden HTML (límite de uso o bloqueo)
+  // en vez de JSON, así que se comprueba el cuerpo antes de parsear y se pasa al
+  // siguiente. El primero da país; el último, al menos la IP.
+  const FUENTES = [
+    { url: 'https://ipwho.is/', map: (j) => ({ ip: j.ip, country: j.country, countryCode: j.country_code, city: j.city, org: j.connection && j.connection.org }) },
+    { url: 'https://ipinfo.io/json', map: (j) => ({ ip: j.ip, country: j.country, countryCode: j.country, city: j.city, org: j.org }) },
+    { url: 'https://api.ipify.org?format=json', map: (j) => ({ ip: j.ip }) }
+  ];
+  for (const f of FUENTES) {
+    try {
+      const r = await ses.fetch(f.url);
+      const txt = await r.text();
+      if (!txt.trim().startsWith('{')) continue;    // respuesta HTML: no sirve
+      const out = f.map(JSON.parse(txt));
+      if (out && out.ip) {
+        if (vpnState.on) { vpnState.ip = out.ip; vpnState.countryName = out.country || vpnState.countryName; }
+        return { ok: true, ...out };
+      }
+    } catch (e) { /* siguiente fuente */ }
+  }
+  return { ok: false, message: 'No se pudo comprobar la IP (todos los servicios fallaron)' };
 });
 
 // ---------- Actualización automática (GitHub Releases) ----------

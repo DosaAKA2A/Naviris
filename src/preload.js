@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   fetchFavicon: (pageUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl),
 
+  vpnState: () => ipcRenderer.invoke('vpn:state'),
+  vpnList: (country) => ipcRenderer.invoke('vpn:list', country),
+  vpnConnect: (srv) => ipcRenderer.invoke('vpn:connect', srv),
+  vpnDisconnect: () => ipcRenderer.invoke('vpn:disconnect'),
+  vpnCheck: () => ipcRenderer.invoke('vpn:check'),
+  onVpnStatus: (cb) => ipcRenderer.on('vpn:status', (_e, s) => cb(s)),
+
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateChannels: () => ipcRenderer.invoke('update:channels'),
   updateChoose: (line) => ipcRenderer.invoke('update:choose', line),
