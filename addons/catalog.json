@@ -12,14 +12,10 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "1.0.0",
-      "kind": "content",
+      "version": "2.0.0",
+      "kind": "tool",
       "icon": "film",
-      "matches": [
-        "crunchyroll.com",
-        "netflix.com"
-      ],
-      "description": "Ve series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty: salas con código, sincronía de play/pausa/seek y chat. No transmite vídeo; cada persona reproduce con su propia cuenta. Reproducir Crunchyroll requiere Naviris 2.6+ (canal dev).",
+      "description": "Ve series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty. Botón en el sidebar que se ilumina al reconocer el sitio (rojo Netflix, naranja Crunchyroll) y panel con salas por código, sincronía de play/pausa/seek y chat. No transmite vídeo; cada persona reproduce con su propia cuenta. Reproducir Crunchyroll requiere Naviris 2.6+ (canal dev).",
       "entry": "https://naviris.site/addons/watch-party.js"
     },
     {
