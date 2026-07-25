@@ -161,6 +161,10 @@
     .dl-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
     .reqs{margin-top:30px;display:flex;justify-content:center;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--dim)}
     .reqs b{color:var(--muted);font-weight:500}
+    .devline{margin-top:14px;padding:11px 14px;border:1px dashed var(--line);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.6}
+    .devline b{color:var(--text)}
+    .devline a{color:var(--muted);border-bottom:1px solid var(--line)}
+    .devline a:hover{color:var(--text);border-color:var(--text)}
     .allver{margin-top:20px;font-size:13px}
     .allver a{color:var(--muted);border-bottom:1px solid var(--line)}
     .allver a:hover{color:var(--text);border-color:var(--text)}
@@ -412,6 +416,10 @@
             <span><b>Licencia:</b> MIT</span>
           </div>
           <div class="allver"><a href="https://github.com/DosaAKA2A/Naviris/releases">Ver todas las versiones y notas →</a></div>
+          <div class="devline" id="dev-line" hidden>
+            <b>NavirisDev</b> <span id="ver-dev">—</span> · versión de desarrollo, con lo que estamos probando antes de la estable.
+            Puede fallar. <a id="dl-dev" href="https://github.com/DosaAKA2A/Naviris/releases">Descargar NavirisDev</a>
+          </div>
           <p class="note">Naviris no está firmado con certificado de código, así que Windows SmartScreen puede avisar la primera vez. Pulsa "Más información → Ejecutar de todas formas". El código es abierto y puedes revisarlo en GitHub.</p>
         </div>
       </div>
@@ -436,16 +444,19 @@
       t();setInterval(t,10000);
     })();
 
-    // Descarga: busca en la lista de releases el instalador Windows y el APK
-    // por separado (el release más reciente puede ser el de Android).
+    // Descarga: los botones principales apuntan SIEMPRE a la última ESTABLE.
+    // Las versiones de desarrollo (prereleases -dev) nunca se ofrecen aquí: se
+    // enlazan aparte, y bajarlas es decisión de quien las quiera probar.
     (async function(){
       const REPO='DosaAKA2A/Naviris';
       const fallback='https://github.com/'+REPO+'/releases/latest';
+      const esEstable=r=>!r.draft && !r.prerelease && !/-dev/i.test(r.tag_name||'');
       try{
         const rr=await fetch('https://api.github.com/repos/'+REPO+'/releases',{headers:{'Accept':'application/vnd.github+json'}});
         if(!rr.ok) throw 0;
         const rels=await rr.json();
         for(const rel of rels){
+          if(!esEstable(rel)) continue;
           const setup=(rel.assets||[]).find(a=>/setup.*\.exe$/i.test(a.name));
           if(!setup) continue;
           const portable=(rel.assets||[]).find(a=>/\.exe$/i.test(a.name) && !/setup/i.test(a.name));
@@ -457,9 +468,21 @@
           document.getElementById('ver-hero').textContent=rel.tag_name||'Última versión';
           break;
         }
+        // El APK sale de la estable más reciente que lo tenga
         for(const rel of rels){
+          if(!esEstable(rel)) continue;
           const apk=(rel.assets||[]).find(a=>/\.apk$/i.test(a.name));
           if(apk){ document.getElementById('dl-android').href=apk.browser_download_url; break; }
+        }
+        // Línea aparte para quien quiera la de desarrollo, con su aviso
+        for(const rel of rels){
+          if(!(rel.prerelease||/-dev/i.test(rel.tag_name||''))) continue;
+          const setup=(rel.assets||[]).find(a=>/setup.*\.exe$/i.test(a.name));
+          if(!setup) continue;
+          document.getElementById('dl-dev').href=setup.browser_download_url;
+          document.getElementById('ver-dev').textContent=rel.tag_name||'';
+          document.getElementById('dev-line').hidden=false;
+          break;
         }
       }catch(e){
         document.getElementById('dl-main').href=fallback;
