@@ -109,6 +109,7 @@ const DEFAULT_SETTINGS = {
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
+  devUpdates: null,         // canal de actualizaciones: null = según la versión instalada; true/false = elección del usuario
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };
@@ -958,6 +959,19 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
 // ---------- Actualización automática (GitHub Releases) ----------
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+// Canal DEV: las versiones con sufijo "-dev" (p. ej. 2.6.0-dev.1) siguen su PROPIO
+// canal (dev.yml) y solo reciben otras DEV. La versión estable (sin sufijo) sigue el
+// canal por defecto (latest.yml). El ajuste "Actualizaciones dev" (devUpdates) deja
+// que cualquier instalación se apunte al canal dev — o que una -dev vuelva a la
+// estable, lo que exige permitir el "downgrade" (2.6.0-dev.1 → 2.5.10).
+function applyUpdateChannel() {
+  const isDevBuild = /-dev/i.test(app.getVersion());
+  const wantDev = (typeof settings.devUpdates === 'boolean') ? settings.devUpdates : isDevBuild;
+  autoUpdater.channel = wantDev ? 'dev' : 'latest';
+  autoUpdater.allowPrerelease = wantDev;
+  autoUpdater.allowDowngrade = !wantDev && isDevBuild;
+}
+applyUpdateChannel();
 // Traduce cualquier error del updater a un mensaje CORTO y genérico. NUNCA expone rutas
 // locales, el nombre de usuario ni stack traces (electron-updater los vuelca crudos, y
 // eso filtraba datos como C:\Users\<usuario>\...). Solo se muestra este texto seguro.
@@ -977,6 +991,7 @@ autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', me
 
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { state: 'dev' };
+  applyUpdateChannel(); // el ajuste puede haber cambiado sin reiniciar
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });

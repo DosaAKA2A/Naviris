@@ -18,7 +18,7 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu',
-  'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
+  'opt-agent', 'opt-devupdates', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
@@ -1208,6 +1208,7 @@ els.optRestore.addEventListener('change', async () => { settings = await window.
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
+els.optDevupdates.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ devUpdates: els.optDevupdates.checked }); toast(els.optDevupdates.checked ? 'Canal dev activo: busca actualizaciones para ver las versiones de prueba' : 'Canal estable'); });
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 
@@ -1535,7 +1536,11 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
-  window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
+  window.cobalt.version().then((v) => {
+    const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v;
+    // Sin elección explícita, el toggle refleja el canal implícito de la versión instalada
+    els.optDevupdates.checked = (typeof settings.devUpdates === 'boolean') ? settings.devUpdates : /-dev/i.test(v);
+  });
   els.optRestore.checked = settings.restoreSession !== false;
   renderSidebarSites(); renderBookmarksBar(); renderHub();
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
