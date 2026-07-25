@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.0.0
+/* Naviris addon: Watch Party v2.1.0
    Ver series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty pero
    más simple y sin cuentas de terceros. NO transmite vídeo: cada quien reproduce
    su propia copia con su propia cuenta; solo se sincronizan las señales de
@@ -10,8 +10,15 @@
    izquierdo con sala, chat y estado. En la página solo se inyecta un agente
    mínimo que controla el <video> y avisa de los eventos por console-message.
 
+   v2.1 (paridad con Teleparty): al unirse, el invitado NAVEGA SOLO al episodio
+   del anfitrión (el latido lleva la URL y se compara el id del capítulo); el
+   chat narra cada acción ("X ha dado play", "X ha saltado a 12:34", "X ha
+   pausado", "X ha salido"); y el anfitrión puede activar "Solo el anfitrión
+   controla" (los play/pausa de los invitados no se difunden y el latido los
+   revierte).
+
    Anfitrión-autoritativo: quien crea la sala late con su tiempo cada 2 s; los
-   demás corrigen si se desvían más de 1,5 s. Cualquiera puede play/pausa/seek. */
+   demás corrigen si se desvían más de 1,5 s. */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
   var DRIFT = 1.5;      // segundos de desvío tolerado antes de re-seek
@@ -74,7 +81,9 @@
     '.nvp-chat .l b{color:var(--violet,#b98cff);font-weight:600}',
     '.nvp-chat .s{color:var(--muted,#8b8d94);font-size:11.5px}',
     '.nvp-leave{width:100%;margin-top:10px;border:1px solid var(--line-2,#2c2c33);background:none;color:#e6a9b4;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer}',
-    '.nvp-leave:hover{background:rgba(230,169,180,.08)}'
+    '.nvp-leave:hover{background:rgba(230,169,180,.08)}',
+    '.nvp-lock{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted,#8b8d94);cursor:pointer;user-select:none}',
+    '.nvp-lock input{accent-color:var(--violet,#b98cff)}'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -105,6 +114,24 @@
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     return null;
   }
+  // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
+  // aunque cambien locale o slug): crunchyroll.com/../watch/GXXXX/..,
+  // netflix.com/watch/123456
+  function epIdOf(url) {
+    var m = /crunchyroll\.com\/(?:[a-z-]+\/)?watch\/([A-Z0-9]+)/i.exec(url || '');
+    if (m) return 'cr:' + m[1].toUpperCase();
+    m = /netflix\.com\/watch\/(\d+)/i.exec(url || '');
+    if (m) return 'nf:' + m[1];
+    return null;
+  }
+  function fmtT(s) {
+    if (typeof s !== 'number' || !isFinite(s)) return '';
+    s = Math.max(0, Math.round(s));
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60);
+    if (ss.length < 2) ss = '0' + ss;
+    if (h) { var mm = String(m); if (mm.length < 2) mm = '0' + mm; return h + ':' + mm + ':' + ss; }
+    return m + ':' + ss;
+  }
   function activeSite() {
     var wv = naviris.activeWebview(); if (!wv) return null;
     try { return siteOf(wv.getURL()); } catch (e) { return null; }
@@ -117,14 +144,35 @@
   function onConsole(e) {
     if (!party || typeof e.message !== 'string' || e.message.indexOf('NAVPARTY|') !== 0) return;
     var m; try { m = JSON.parse(e.message.slice(9)); } catch (x) { return; }
+    // Control exclusivo: las acciones de los invitados no se difunden (y el
+    // siguiente latido del anfitrión las revierte). Aviso sin spamear.
+    if (party.lock && !party.host) {
+      if (Date.now() - (party.lockWarned || 0) > 5000) { party.lockWarned = Date.now(); logSys('Solo el anfitrión controla la reproducción'); }
+      return;
+    }
     send({ t: 'ev', kind: m.kind, time: m.time, at: Date.now() });
+    logSys(m.kind === 'play' ? 'Has dado play' : m.kind === 'pause' ? 'Has pausado en ' + fmtT(m.time) : 'Has saltado a ' + fmtT(m.time));
   }
   function onRenav() { if (party) inject(party.wv); }
   function onGone() { if (party) { leave(true); naviris.toast('Watch Party terminada: se cerró la pestaña'); } }
 
   function applyRemote(m) {
     if (!party) return;
+    var who = m.from || 'Alguien';
+    logSys(m.kind === 'play' ? who + ' ha dado play' : m.kind === 'pause' ? who + ' ha pausado en ' + fmtT(m.time) : who + ' ha saltado a ' + fmtT(m.time));
     try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
+  }
+  // Invitados: seguir el episodio del anfitrión (la URL viaja en su latido). Si
+  // el capítulo no coincide, la pestaña navega sola al del anfitrión.
+  function syncEpisode(url) {
+    if (!party || party.host || !url) return;
+    var want = epIdOf(url); if (!want) return;
+    var cur = ''; try { cur = party.wv.getURL(); } catch (e) { return; }
+    if (epIdOf(cur) === want) { party.navving = 0; return; }
+    if (party.navving && Date.now() - party.navving < 15000) return; // ya está navegando
+    party.navving = Date.now();
+    logSys('Abriendo el episodio del anfitrión…');
+    try { party.wv.loadURL(url); } catch (e) { /* nada */ }
   }
   function applyBeat(m) {
     if (!party) return;
@@ -132,14 +180,22 @@
   }
   function beatStart() {
     beatStop();
-    beatTimer = setInterval(function () {
+    var tick = function () {
       if (!party) return;
       try {
         party.wv.executeJavaScript('window.__navPartyState?__navPartyState():null').then(function (st) {
-          if (st && st.has) send({ t: 'beat', time: st.time, paused: st.paused, at: Date.now() });
+          if (!party) return;
+          var url = ''; try { url = party.wv.getURL(); } catch (e) { /* nada */ }
+          // El latido siempre lleva la URL (los invitados siguen el episodio) y
+          // el modo de control; tiempo/pausa solo si ya hay vídeo.
+          var msg = { t: 'beat', url: url, lock: !!party.lock, at: Date.now() };
+          if (st && st.has) { msg.time = st.time; msg.paused = st.paused; }
+          send(msg);
         }).catch(function () {});
       } catch (e) { /* nada */ }
-    }, 2000);
+    };
+    tick();
+    beatTimer = setInterval(tick, 2000);
   }
   function beatStop() { if (beatTimer) { clearInterval(beatTimer); beatTimer = null; } }
   function randomCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '', i; for (i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
@@ -162,9 +218,16 @@
       if (!party || party.ws !== ws) return;
       var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
       if (m.t === 'joined') { party.ok = true; party.n = m.n; party.status = 'En la sala'; logSys(asHost ? 'Sala creada. Toca el código para copiarlo y compártelo.' : 'Dentro. El anfitrión marca el ritmo.'); if (asHost) beatStart(); }
-      else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logSys(m.who + ' se ha unido'); }
+      else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logSys(m.who + ' se ha unido'); else if (m.left && m.who) logSys(m.who + ' ha salido de la sala'); }
       else if (m.t === 'ev') applyRemote(m);
-      else if (m.t === 'beat') { if (!party.host) applyBeat(m); }
+      else if (m.t === 'beat') {
+        if (!party.host) {
+          var hadLock = !!party.lock; party.lock = !!m.lock;
+          if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión ha activado el control exclusivo' : 'El anfitrión ha desactivado el control exclusivo');
+          syncEpisode(m.url);
+          if (typeof m.time === 'number') applyBeat(m);
+        }
+      }
       else if (m.t === 'chat') logChat(m.from || '?', String(m.msg || ''));
       else if (m.t === 'error') party.status = 'Error: ' + m.msg;
       render(); glow();
@@ -199,8 +262,8 @@
     if (!party) {
       var hint = document.createElement('div'); hint.className = 'loot-hint';
       hint.textContent = site
-        ? 'Listo: la sala verá ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con el de un amigo.'
-        : 'Abre un episodio en Netflix o Crunchyroll (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        ? 'Listo: la sala usará ' + siteName + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola al episodio del anfitrión.'
+        : 'Abre Netflix o Crunchyroll en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       body.appendChild(hint);
       var nameRow = document.createElement('div'); nameRow.className = 'nvp-row';
       var nameIn = document.createElement('input'); nameIn.id = 'nvp-name'; nameIn.className = 'nvp-in'; nameIn.maxLength = 32;
@@ -234,6 +297,13 @@
         var w = document.createElement('div'); w.className = 'nvp-watch';
         var nm = document.createElement('span'); nm.className = 'n'; nm.textContent = title;
         w.appendChild(nm); body.appendChild(w);
+      }
+      if (party.host) {
+        var lockRow = document.createElement('label'); lockRow.className = 'nvp-lock';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!party.lock;
+        cb.addEventListener('change', function () { party.lock = cb.checked; logSys(cb.checked ? 'Control exclusivo: solo tú puedes dar play, pausar y saltar' : 'Control exclusivo desactivado: todos pueden controlar'); });
+        lockRow.appendChild(cb); lockRow.appendChild(document.createTextNode('Solo el anfitrión controla'));
+        body.appendChild(lockRow);
       }
       var chat = document.createElement('div'); chat.className = 'nvp-chat';
       for (i = 0; i < party.msgs.length; i++) {
