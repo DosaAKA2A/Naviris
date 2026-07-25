@@ -674,6 +674,10 @@ button { font-family: inherit; }
 .iris-wrap:hover .iris-logo, #splash .iris-logo { animation: iris-hue 5s linear infinite; }
 @keyframes iris-hue { to { filter: hue-rotate(360deg); } }
 
+/* AutoClaim v2: la pestaña que farmea se marca en verde (sin grupo acoplado) */
+.tab.farming .t-title { color: #9ee2b8; }
+.tab.farming .t-fav { filter: drop-shadow(0 0 4px rgba(158, 226, 184, .6)); }
+
 /* AutoLoot: botón propio en la topbar (solo visible en Twitch) */
 #nav-loot { color: #b98cff; }
 #nav-loot.on { color: #9ee2b8; }
