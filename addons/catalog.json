@@ -10,6 +10,19 @@
       "entry": "https://naviris.site/addons/sound-booster.js"
     },
     {
+      "id": "watch-party",
+      "name": "Watch Party",
+      "version": "1.0.0",
+      "kind": "content",
+      "icon": "film",
+      "matches": [
+        "crunchyroll.com",
+        "netflix.com"
+      ],
+      "description": "Ve series a la vez con amigos en Crunchyroll y Netflix, estilo Teleparty: salas con código, sincronía de play/pausa/seek y chat. No transmite vídeo; cada persona reproduce con su propia cuenta. Reproducir Crunchyroll requiere Naviris 2.6+ (canal dev).",
+      "entry": "https://naviris.site/addons/watch-party.js"
+    },
+    {
       "id": "steam-inventory-helper",
       "name": "Valve Rat Tool",
       "version": "1.5.0",
