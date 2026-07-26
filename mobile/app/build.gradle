@@ -17,8 +17,8 @@ android {
         applicationId "com.estudiodeiris.cobalt"
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName "2.1.0"
+        versionCode 5
+        versionName "2.2.0"
     }
 
     signingConfigs {
@@ -42,6 +42,8 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        // NewPipeExtractor usa java.time/streams: desugaring para minSdk 24
+        coreLibraryDesugaringEnabled true
     }
     kotlinOptions {
         jvmTarget = '17'
@@ -52,6 +54,9 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs_nio:2.0.4'
+    // Rat Tool: extracción de streams en el dispositivo (sin yt-dlp/ffmpeg)
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.26.4'
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'

@@ -10,6 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // NewPipeExtractor (Rat Tool) se sirve desde JitPack
+        maven { url 'https://jitpack.io' }
     }
 }
 rootProject.name = "Naviris"

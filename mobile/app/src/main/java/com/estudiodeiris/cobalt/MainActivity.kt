@@ -292,6 +292,7 @@ class MainActivity : AppCompatActivity() {
         pm.menu.add("Marcadores")
         pm.menu.add("Historial")
         pm.menu.add("Descargas")
+        pm.menu.add("Rat Tool — descargar vídeo")
         pm.menu.add("Contraseñas")
         pm.menu.add("Buscar en página")
         pm.menu.add(if (tab.desktopMode) "Modo escritorio: ON" else "Modo escritorio: OFF")
@@ -307,6 +308,7 @@ class MainActivity : AppCompatActivity() {
                 title == "Marcadores" -> showBookmarks()
                 title == "Historial" -> showHistory()
                 title == "Descargas" -> showDownloads()
+                title.startsWith("Rat Tool") -> openRatTool()
                 title == "Contraseñas" -> startActivity(Intent(this, PasswordActivity::class.java))
                 title == "Buscar en página" -> openFindBar()
                 title.startsWith("Modo escritorio") -> toggleDesktopMode()
@@ -595,6 +597,81 @@ class MainActivity : AppCompatActivity() {
         catch (e: Exception) { toast("No se pudo abrir Descargas") }
     }
 
+    // ---------- Rat Tool: descargar vídeo/audio de la página actual ----------
+
+    private fun openRatTool() {
+        val pageUrl = web.url
+        if (pageUrl == null || pageUrl == HOME || pageUrl.startsWith("file://")) { toast("Abre un vídeo primero"); return }
+        if (RatTool.isYouTube(pageUrl)) {
+            toast("Rat Tool: obteniendo formatos…")
+            Thread {
+                try {
+                    val info = RatTool.fetchYouTube(pageUrl)
+                    runOnUiThread { showRatOptions(info, pageUrl) }
+                } catch (e: Exception) {
+                    runOnUiThread { toast("No se pudo extraer (${e.message ?: "error"})") }
+                }
+            }.start()
+            return
+        }
+        // Genérico (TikTok/X/Instagram/etc.): vídeo de la propia página si su URL
+        // es directa (og:video o <video> src); los streams blob/m3u8 no se pueden
+        // guardar sin extractor propio del sitio.
+        web.evaluateJavascript(
+            "(function(){var v=document.querySelector('video');var s=v&&(v.currentSrc||v.src)||'';" +
+                "if(!s||s.indexOf('blob:')===0){var m=document.querySelector('meta[property=\"og:video:secure_url\"],meta[property=\"og:video:url\"],meta[property=\"og:video\"]');" +
+                "s=(m&&m.content)||s;}return s;})()"
+        ) { raw ->
+            val src = (raw ?: "").trim().trim('"')
+            when {
+                src.startsWith("https://") && !src.contains(".m3u8") && !src.contains(".mpd") -> {
+                    val host = Uri.parse(pageUrl).host?.removePrefix("www.") ?: "video"
+                    AlertDialog.Builder(this)
+                        .setTitle("Rat Tool")
+                        .setMessage("Vídeo detectado en $host. ¿Descargar MP4?")
+                        .setPositiveButton("Descargar") { _, _ ->
+                            ratDownload(src, "$host ${System.currentTimeMillis() / 1000}", "mp4", pageUrl)
+                        }
+                        .setNegativeButton("Cancelar", null)
+                        .show()
+                }
+                src.startsWith("blob:") || src.contains(".m3u8") || src.contains(".mpd") ->
+                    toast("Este sitio emite en streaming: no se puede guardar directo")
+                else -> toast("No se detectó ningún vídeo en la página")
+            }
+        }
+    }
+
+    private fun showRatOptions(info: RatTool.Info, pageUrl: String) {
+        val labels = info.options.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(info.title)
+            .setItems(labels) { _, i ->
+                val o = info.options[i]
+                ratDownload(o.url, info.title, o.fileExt, pageUrl)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun ratDownload(mediaUrl: String, title: String, ext: String, referer: String?) {
+        try {
+            val safe = title.replace(Regex("[\\\\/:*?\"<>|]+"), "_").take(80).trim().ifBlank { "video" }
+            val name = "$safe.$ext"
+            val req = DownloadManager.Request(Uri.parse(mediaUrl)).apply {
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+                setTitle(name)
+                addRequestHeader("User-Agent", web.settings.userAgentString)
+                CookieManager.getInstance().getCookie(mediaUrl)?.let { addRequestHeader("Cookie", it) }
+                referer?.let { addRequestHeader("Referer", it) }
+            }
+            val dlId = (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            recordDownload(name, dlId)
+            toast("Descargando $name")
+        } catch (e: Exception) { toast("No se pudo descargar") }
+    }
+
     // ---------- Actualización ----------
 
     private fun checkUpdate() {
@@ -687,7 +764,7 @@ class MainActivity : AppCompatActivity() {
         val cur = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
         AlertDialog.Builder(this)
             .setTitle("Naviris para Android")
-            .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, descargas propias, historial y contraseñas.")
+            .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, Rat Tool (descarga de vídeo/audio), descargas propias, historial y contraseñas.")
             .setPositiveButton("OK", null)
             .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate() }
             .show()
