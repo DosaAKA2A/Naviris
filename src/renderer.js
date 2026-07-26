@@ -206,18 +206,20 @@ function activateTab(id) {
     // pantalla) para que sigan acumulando tiempo de drops
     t.webview.classList.toggle('loot-live', !active && !!t.autoLoot);
   });
-  if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
+  if (tab.kind === 'hub') { els.urlbar.value = ''; focusUrlbar(); }
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
 }
-function focusHubSearch() {
-  requestAnimationFrame(() => { requestAnimationFrame(() => { const si = document.getElementById('hub-search-input'); (si || els.urlbar).focus(); }); });
+// Pestaña nueva → foco en la BARRA DE DIRECCIONES (no en el buscador del hub):
+// así la búsqueda inteligente sugiere desde la primera tecla.
+function focusUrlbar() {
+  requestAnimationFrame(() => { requestAnimationFrame(() => els.urlbar.focus()); });
 }
-// Si el hub está activo y el usuario empieza a teclear, el foco va al buscador
+// Si el hub está activo y el usuario empieza a teclear, el foco va a la barra
 window.addEventListener('keydown', (e) => {
   if (!els.hub.classList.contains('active')) return;
   const t = document.activeElement; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { const si = document.getElementById('hub-search-input'); if (si) si.focus(); }
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) els.urlbar.focus();
 });
 function closeTab(id) {
   const idx = tabs.findIndex((t) => t.id === id); if (idx === -1) return;
@@ -799,7 +801,7 @@ function renderDownloadsPage() {
   const files = dlpFiles.filter((f) => dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter);
   if (!files.length) {
     const e = document.createElement('div'); e.className = 'dlp-empty';
-    e.textContent = 'No hay archivos en tu carpeta de Descargas.'; els.dlpList.appendChild(e); return;
+    e.textContent = 'Aún no has descargado nada desde Naviris.'; els.dlpList.appendChild(e); return;
   }
   let last = null;
   for (const f of files) {
@@ -1611,7 +1613,10 @@ window.cobalt.onUpdateStatus((s) => {
 $('#win-min').addEventListener('click', () => window.cobalt.minimize());
 $('#win-max').addEventListener('click', () => window.cobalt.maximize());
 $('#win-close').addEventListener('click', () => window.cobalt.close());
-window.cobalt.onMaximized((max) => { $('#win-max').innerHTML = window.icon(max ? 'square-2-stack' : 'stop'); });
+// El botón conserva SIEMPRE el icono de maximizar elegido por el usuario
+// (antes al maximizar se cambiaba por otro y parecía que "desaparecía");
+// solo cambia el tooltip según el estado.
+window.cobalt.onMaximized((max) => { $('#win-max').title = max ? 'Restaurar' : 'Maximizar'; });
 
 /* ============ Atajos de teclado y ratón ============ */
 // Juego estándar de navegador (Chrome/Firefox/Edge). Los webviews reciben las
@@ -1748,7 +1753,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   // animaciones infinitas seguían corriendo toda la sesión en el compositor.
   setTimeout(() => {
     els.splash.classList.add('gone');
-    if (els.hub.classList.contains('active')) focusHubSearch();
+    if (els.hub.classList.contains('active')) focusUrlbar();
     setTimeout(() => els.splash.remove(), 600);
   }, 1800);
 })();

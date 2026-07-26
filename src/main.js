@@ -288,9 +288,25 @@ function registerDownloadItem(item, sourceUrl) {
   item.once('done', (_e, state) => {
     meta.state = state; // completed | cancelled | interrupted
     meta.received = item.getReceivedBytes();
+    if (state === 'completed') recordDlHistory(meta.path);
     broadcast('download:update', meta);
   });
   return meta;
+}
+
+/* Historial persistente de lo descargado DESDE Naviris: la página de descargas
+   lista esto, no la carpeta entera del sistema (ahí hay archivos de cualquier
+   origen y no son asunto del navegador). */
+const dlHistoryPath = () => path.join(app.getPath('userData'), 'naviris-downloads.json');
+let dlHistory = null;
+function loadDlHistory() {
+  if (!dlHistory) { try { dlHistory = JSON.parse(fs.readFileSync(dlHistoryPath(), 'utf8')); } catch { dlHistory = []; } }
+  return dlHistory;
+}
+function recordDlHistory(p) {
+  if (!p) return;
+  dlHistory = [{ path: p, time: Date.now() }, ...loadDlHistory().filter((x) => x.path !== p)].slice(0, 2000);
+  try { fs.writeFileSync(dlHistoryPath(), JSON.stringify(dlHistory), 'utf8'); } catch {}
 }
 
 // Solo anuncios/telemetría puros. NO se tocan rutas del reproductor
@@ -479,6 +495,11 @@ function ytDownload({ url, mode, quality }) {
     meta.state = code === 0 ? 'completed' : 'interrupted';
     meta.percent = code === 0 ? 100 : meta.percent;
     if (code !== 0) { meta.error = lastError || 'yt-dlp terminó con código ' + code; if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + (lastError || 'no se pudo descargar').slice(0, 80); }
+    if (code === 0 && meta.path) {
+      // Tras ExtractAudio/Merger el nombre cambia de extensión pero meta.path no
+      const fin = path.join(path.dirname(meta.path), meta.name);
+      recordDlHistory(fs.existsSync(fin) ? fin : meta.path);
+    }
     broadcast('download:update', meta);
   });
   return id;
@@ -895,17 +916,14 @@ ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) 
 ipcMain.handle('download:path', (_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; });
 ipcMain.on('download:clear', () => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); });
 
-/* Página de descargas: lista los archivos REALES de la carpeta de Descargas
-   (no solo los de esta sesión), para organizarlos por tipo y fecha. */
+/* Página de descargas: SOLO lo descargado desde Naviris (historial propio),
+   comprobando que el archivo siga existiendo en disco. */
 ipcMain.handle('downloads:files', async () => {
-  const dir = app.getPath('downloads');
-  let names = [];
-  try { names = await fs.promises.readdir(dir); } catch {}
   const out = [];
-  for (const name of names) {
+  for (const h of loadDlHistory()) {
     try {
-      const st = await fs.promises.stat(path.join(dir, name));
-      if (st.isFile()) out.push({ name, path: path.join(dir, name), size: st.size, mtime: st.mtimeMs });
+      const st = await fs.promises.stat(h.path);
+      if (st.isFile()) out.push({ name: path.basename(h.path), path: h.path, size: st.size, mtime: h.time || st.mtimeMs });
     } catch {}
   }
   out.sort((a, b) => b.mtime - a.mtime);
