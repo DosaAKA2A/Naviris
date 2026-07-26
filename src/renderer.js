@@ -19,24 +19,25 @@ const els = {};
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu',
   'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
-  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-sites', 'sb-claude', 'sb-rat',
+  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
-  'res-label', 'private-badge', 'toast', 'suggest', 'web-panel', 'wpz-title', 'wpz-host', 'wpz-grip',
-  'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
+  'res-label', 'private-badge', 'toast', 'suggest',   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-headsub',
+  'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
-  'prompt-ok', 'prompt-cancel', 'sidebar-modal', 'sidebar-config', 'sidebar-add', 'sidebar-done',
-  'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
+  'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 const SLEEP_AFTER_MS = 5 * 60 * 1000;
 let settings = { hardwareAcceleration: true, powerSaver: true };
 let tabs = [], activeId = null, nextId = 1;
+// Pestañas cerradas hace poco, para reabrirlas con Ctrl+Shift+T (como Chrome,
+// las últimas 10). Se declara aquí arriba porque closeTab la usa.
+const cerradas = [];
 
 const toUrl = (input) => {
   const t = input.trim(); if (!t) return null;
@@ -159,6 +160,9 @@ function attachWebview(tab, url) {
   wv.setAttribute('allowpopups', ''); wv.setAttribute('partition', PARTITION); wv.src = url;
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   const onNav = (e) => {
+    // Dormir una pestaña la manda a about:blank: NO pisar url/título/favicon,
+    // al pasar el ratón debe seguir viéndose qué contenido tenía.
+    if (tab.asleep || e.url === 'about:blank') return;
     tab.url = e.url; getTile(e.url).then((t) => { tab.favicon = t?.icon || null; renderTabs(); });
     if (tab.autoLoot) {
       const h = hostOf(e.url);
@@ -177,7 +181,7 @@ function attachWebview(tab, url) {
     if (tab.id === activeId) { syncNavUI(); updateLootUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
     saveSession();
   };
-  wv.addEventListener('page-title-updated', (e) => { tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
+  wv.addEventListener('page-title-updated', (e) => { if (tab.asleep) return; tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
   wv.addEventListener('did-navigate', onNav);
   wv.addEventListener('did-navigate-in-page', onNav);
   wv.addEventListener('did-start-loading', () => { if (tab.id === activeId) els.navReload.innerHTML = window.icon('x-mark'); });
@@ -192,7 +196,7 @@ function attachWebview(tab, url) {
 function activateTab(id) {
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
   if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; }
-  hideBookmarkPage(); hideAddonsPage();
+  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => {
     if (!t.webview || t.kind !== 'web') return;
@@ -202,21 +206,24 @@ function activateTab(id) {
     // pantalla) para que sigan acumulando tiempo de drops
     t.webview.classList.toggle('loot-live', !active && !!t.autoLoot);
   });
-  if (tab.kind === 'hub') { els.urlbar.value = ''; focusHubSearch(); }
+  if (tab.kind === 'hub') { els.urlbar.value = ''; focusUrlbar(); }
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
 }
-function focusHubSearch() {
-  requestAnimationFrame(() => { requestAnimationFrame(() => { const si = document.getElementById('hub-search-input'); (si || els.urlbar).focus(); }); });
+// Pestaña nueva → foco en la BARRA DE DIRECCIONES (no en el buscador del hub):
+// así la búsqueda inteligente sugiere desde la primera tecla.
+function focusUrlbar() {
+  requestAnimationFrame(() => { requestAnimationFrame(() => els.urlbar.focus()); });
 }
-// Si el hub está activo y el usuario empieza a teclear, el foco va al buscador
+// Si el hub está activo y el usuario empieza a teclear, el foco va a la barra
 window.addEventListener('keydown', (e) => {
   if (!els.hub.classList.contains('active')) return;
   const t = document.activeElement; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { const si = document.getElementById('hub-search-input'); if (si) si.focus(); }
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) els.urlbar.focus();
 });
 function closeTab(id) {
   const idx = tabs.findIndex((t) => t.id === id); if (idx === -1) return;
+  recordarCerrada(tabs[idx]);   // para reabrirla con Ctrl+Shift+T
   tabs[idx].webview?.remove(); tabs.splice(idx, 1);
   if (!tabs.length) { createTab(); return; }
   if (activeId === id) activateTab(tabs[Math.max(0, idx - 1)].id); else renderTabs();
@@ -225,7 +232,9 @@ function closeTab(id) {
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
   el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (mini ? ' mini loot-member' : '');
-  el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '') : (tab.url || 'Hub de Naviris');
+  el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
+    : tab.asleep ? `Pestaña dormida — ${tab.title}\n${tab.sleptUrl || tab.url}`
+    : (tab.url || 'Hub de Naviris');
   const zzz = document.createElement('span'); zzz.className = 't-zzz'; zzz.innerHTML = window.icon('moon');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
@@ -269,7 +278,22 @@ function reorderTab(fromId, toId) {
   tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
   renderTabs(); saveSession();
 }
-function renderTabs() {
+// Firma del estado visible de las pestañas: si no cambia, no se repinta. Antes
+// se recreaba la barra entera en CADA evento (título, favicon, media-started,
+// media-paused...), y en páginas con vídeo eso llegaba varias veces por segundo:
+// las pestañas parecían temblar porque el navegador rehacía el layout sin parar.
+function firmaTabs() {
+  return tabs.map((t) => [t.id, t.title, t.favicon || '', t.id === activeId, !!t.asleep,
+    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled].join('')).join('');
+}
+let ultimaFirmaTabs = null;
+function renderTabs(forzar) {
+  // AutoClaim se tiñe del morado de Twitch cuando la pestaña activa es un
+  // canal (antes del early-return: es barato y depende de la pestaña activa)
+  els.sbLoot.classList.toggle('on-twitch', activeIsTwitch());
+  const f = firmaTabs();
+  if (!forzar && f === ultimaFirmaTabs) return;
+  ultimaFirmaTabs = f;
   // AutoClaim v2: un solo canal, sin grupo de pestañas acopladas; la pestaña
   // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
@@ -281,7 +305,7 @@ function toggleMute(tab) {
   renderTabs();
 }
 function navigateActive(input) {
-  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage();
+  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
   const tab = activeTab() || createTab();
   if (tab.kind === 'hub') { attachWebview(tab, url); tab.title = 'Cargando…'; activateTab(tab.id); } else tab.webview.src = url;
 }
@@ -290,8 +314,20 @@ function syncNavUI() {
   if (document.activeElement !== els.urlbar) els.urlbar.value = tab?.kind === 'web' ? tab.url : '';
   try { els.navBack.disabled = !wv?.canGoBack(); els.navFwd.disabled = !wv?.canGoForward(); } catch { els.navBack.disabled = els.navFwd.disabled = true; }
   const marked = tab?.kind === 'web' && findBookmark(tab.url);
-  els.navStar.innerHTML = window.icon(marked ? 'star-solid' : 'star'); els.navStar.classList.toggle('starred', !!marked);
+  els.navStar.classList.toggle('starred', !!marked);
+  if (!marked) els.navStar.classList.remove('removing');
+  els.navStar.innerHTML = window.icon(marked ? (els.navStar.classList.contains('removing') ? 'bookmark-remove' : 'bookmark-added') : 'bookmark-add');
 }
+// Con la página ya guardada, pasar por encima ofrece QUITARLA: cinta con un
+// menos en rojo. Al salir del botón vuelve el estado normal.
+els.navStar.addEventListener('mouseenter', () => {
+  if (!els.navStar.classList.contains('starred')) return;
+  els.navStar.classList.add('removing');
+  els.navStar.innerHTML = window.icon('bookmark-remove');
+});
+els.navStar.addEventListener('mouseleave', () => {
+  if (els.navStar.classList.contains('removing')) { els.navStar.classList.remove('removing'); syncNavUI(); }
+});
 setInterval(() => {
   if (!settings.powerSaver) return; const now = Date.now(); let changed = false;
   for (const tab of tabs) {
@@ -367,6 +403,9 @@ function findBookmark(url) { return bookmarksFlat().find((b) => b.url === url); 
 function removeBookmark(url) { bookmarks = bookmarks.filter((it) => !(it.type === 'link' && it.url === url)); bookmarks.forEach((it) => { if (it.type === 'folder') it.children = it.children.filter((c) => c.url !== url); }); saveBm(); }
 function renderBookmarksBar() {
   els.bookmarksBar.innerHTML = '';
+  // Sin marcadores la barra no aporta nada: quitarla en vez de dejar una franja
+  // vacía de 32px bajo la navbar en todas las ventanas.
+  els.bookmarksBar.classList.toggle('empty', !bookmarks.length);
   for (const it of bookmarks) {
     if (it.type === 'folder') { const btn = document.createElement('button'); btn.className = 'bm-folder'; btn.innerHTML = window.icon('folder') + `<span>${escapeHtml(it.name)}</span>`; btn.addEventListener('click', (e) => { e.stopPropagation(); openFolderPop(it, btn); }); els.bookmarksBar.appendChild(btn); }
     else els.bookmarksBar.appendChild(makeBmChip(it));
@@ -391,7 +430,7 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
 function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
@@ -418,7 +457,7 @@ function renderBookmarkTree() {
 }
 function bmManagerRow(b) {
   const row = document.createElement('div'); row.className = 'bm-row';
-  const ic = document.createElement('span'); ic.className = 'bm-ic'; ic.innerHTML = window.icon('star'); getTile(b.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; ic.innerHTML = ''; ic.appendChild(im); } });
+  const ic = document.createElement('span'); ic.className = 'bm-ic'; ic.innerHTML = window.icon('bookmark'); getTile(b.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; ic.innerHTML = ''; ic.appendChild(im); } });
   const label = document.createElement('div'); label.className = 'bm-label'; label.innerHTML = `<div class="bm-t">${escapeHtml(b.title)}</div><div class="bm-u">${escapeHtml(b.url)}</div>`;
   const acts = document.createElement('div'); acts.className = 'bm-actions';
   if (bookmarks.some((x) => x.type === 'folder')) { const mv = document.createElement('button'); mv.title = 'Mover a carpeta'; mv.innerHTML = window.icon('folder'); mv.addEventListener('click', (e) => { e.stopPropagation(); moveToFolder(b); }); acts.appendChild(mv); }
@@ -717,12 +756,77 @@ async function openDownloadInBrowser(id) {
   if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.cobalt.openDownload(id);
 }
 window.cobalt.onDownloadNew((m) => upsertDownload(m));
-window.cobalt.onDownloadUpdate((m) => { upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); } });
+window.cobalt.onDownloadUpdate((m) => { upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
 function toggleDownloads(force) { const open = force !== undefined ? force : els.dlPanel.classList.contains('hidden'); if (open) { closeRightPanels(); els.dlPanel.classList.remove('hidden'); els.sbDownloads.classList.add('open'); } else { els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); } }
-els.sbDownloads.addEventListener('click', () => toggleDownloads());
+els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
 function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+
+/* ============ Página de descargas: archivos reales por tipo y fecha ============ */
+const DLP_TYPES = [
+  { key: 'all', label: 'Todo' },
+  { key: 'image', label: 'Imágenes', re: /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|tiff?)$/i, ico: 'photo' },
+  { key: 'video', label: 'Vídeo', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'film' },
+  { key: 'audio', label: 'Música', re: /\.(mp3|wav|m4a|flac|ogg|opus|aac)$/i, ico: 'musical-note' },
+  { key: 'doc', label: 'Documentos', re: /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|json|epub|rtf)$/i, ico: 'clipboard' },
+  { key: 'zip', label: 'Comprimidos', re: /\.(zip|rar|7z|tar|gz|iso)$/i, ico: 'archive' },
+  { key: 'app', label: 'Programas', re: /\.(exe|msi|apk)$/i, ico: 'squares-plus' },
+  { key: 'other', label: 'Otros' }
+];
+let dlpFilter = 'all', dlpFiles = [];
+const dlpTypeOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || { key: 'other' }).key;
+const dlpIcoOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || {}).ico || 'archive';
+function dlpGroup(ms) {
+  const d = new Date(ms), now = new Date();
+  const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+  if (diff <= 0) return 'Hoy';
+  if (diff === 1) return 'Ayer';
+  if (diff < 7) return 'Esta semana';
+  const m = d.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  return m.charAt(0).toUpperCase() + m.slice(1);
+}
+function renderDownloadsPage() {
+  els.dlpFilters.innerHTML = '';
+  for (const t of DLP_TYPES) {
+    const n = t.key === 'all' ? dlpFiles.length : dlpFiles.filter((f) => dlpTypeOf(f.name) === t.key).length;
+    if (t.key !== 'all' && !n) continue;
+    const b = document.createElement('button');
+    b.className = 'mp-chip' + (dlpFilter === t.key ? ' active' : '');
+    b.textContent = n ? `${t.label} · ${n}` : t.label;
+    b.addEventListener('click', () => { dlpFilter = t.key; renderDownloadsPage(); });
+    els.dlpFilters.appendChild(b);
+  }
+  els.dlpList.innerHTML = '';
+  const files = dlpFiles.filter((f) => dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter);
+  if (!files.length) {
+    const e = document.createElement('div'); e.className = 'dlp-empty';
+    e.textContent = 'Aún no has descargado nada desde Naviris.'; els.dlpList.appendChild(e); return;
+  }
+  let last = null;
+  for (const f of files) {
+    const g = dlpGroup(f.mtime);
+    if (g !== last) { const h = document.createElement('div'); h.className = 'dlp-day'; h.textContent = g; els.dlpList.appendChild(h); last = g; }
+    const row = document.createElement('div'); row.className = 'dlp-row'; row.title = f.name;
+    const when = new Date(f.mtime).toLocaleString('es', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(f.name))}</div><div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub">${fmtBytes(f.size)} · ${when}</div></div><div class="dlp-acts"><button class="dlp-reveal" title="Mostrar en carpeta">${window.icon('folder')}</button></div>`;
+    row.querySelector('.dlp-name').textContent = f.name;
+    row.querySelector('.dlp-reveal').addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.revealDownloadFile(f.name); });
+    row.addEventListener('click', () => { if (VIEWABLE.test(f.name)) createTab('file:///' + f.path.replace(/\\/g, '/')); else window.cobalt.openDownloadFile(f.name); });
+    els.dlpList.appendChild(row);
+  }
+}
+async function showDownloadsPage() {
+  closeRightPanels();
+  tabs.forEach((t) => t.webview?.classList.remove('active'));
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage();
+  els.dlPage.classList.remove('hidden'); els.dlPage.classList.add('active'); els.sbDownloads.classList.add('open');
+  dlpFiles = await window.cobalt.listDownloadFiles();
+  renderDownloadsPage();
+}
+function hideDownloadsPage() { els.dlPage.classList.remove('active'); els.dlPage.classList.add('hidden'); els.sbDownloads.classList.remove('open'); }
+function toggleDownloadsPage() { if (els.dlPage.classList.contains('active')) { hideDownloadsPage(); activateTab(activeId); } else showDownloadsPage(); }
+els.dlpFolder.addEventListener('click', () => window.cobalt.openDownloadsFolder());
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
@@ -1070,62 +1174,6 @@ async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 
-/* ============ Panel web lateral ============ */
-let panelView = null;
-function openWebPanel(url, title, btn) {
-  const same = panelView && els.webPanel.dataset.url === url && !els.webPanel.classList.contains('hidden');
-  document.querySelectorAll('.sb-site, #sb-claude').forEach((b) => b.classList.remove('open'));
-  if (same) { els.webPanel.classList.add('hidden'); return; }
-  els.webPanel.classList.remove('hidden'); els.webPanel.dataset.url = url; els.wpzTitle.textContent = title; btn?.classList.add('open');
-  if (!panelView) { panelView = document.createElement('webview'); panelView.setAttribute('partition', PARTITION); panelView.setAttribute('allowpopups', ''); els.wpzHost.appendChild(panelView); }
-  if (panelView.getAttribute('src') !== url) panelView.src = url;
-}
-els.sbClaude.addEventListener('click', () => openWebPanel('https://claude.ai', 'Claude', els.sbClaude));
-$('#wpz-close').addEventListener('click', () => { els.webPanel.classList.add('hidden'); document.querySelectorAll('.sb-site, #sb-claude').forEach((b) => b.classList.remove('open')); });
-$('#wpz-reload').addEventListener('click', () => panelView?.reload());
-$('#wpz-tab').addEventListener('click', () => { const u = els.webPanel.dataset.url; if (u) createTab(panelView?.getURL() || u); });
-// Redimensionar panel
-(function () {
-  let dragging = false;
-  els.wpzGrip.addEventListener('mousedown', (e) => { dragging = true; e.preventDefault(); document.body.style.cursor = 'col-resize'; });
-  window.addEventListener('mousemove', (e) => { if (!dragging) return; const w = Math.max(320, Math.min(760, e.clientX - 48)); document.documentElement.style.setProperty('--panel-w', w + 'px'); });
-  window.addEventListener('mouseup', () => { if (dragging) { dragging = false; document.body.style.cursor = ''; store.set('cobalt.panelW', getComputedStyle(document.documentElement).getPropertyValue('--panel-w')); } });
-})();
-
-/* ============ Sidebar sites (configurable) ============ */
-const KNOWN_SITES = [
-  { name: 'WhatsApp', url: 'https://web.whatsapp.com', brand: 'whatsapp' }, { name: 'Discord', url: 'https://discord.com/app', brand: 'discord' },
-  { name: 'Twitch', url: 'https://www.twitch.tv', brand: 'twitch' }, { name: 'YouTube', url: 'https://www.youtube.com', brand: 'youtube' },
-  { name: 'Reddit', url: 'https://www.reddit.com', brand: 'reddit' }, { name: 'Instagram', url: 'https://www.instagram.com', brand: 'instagram' },
-  { name: 'Spotify', url: 'https://open.spotify.com', brand: 'spotify' }, { name: 'Gmail', url: 'https://mail.google.com', brand: 'gmail' }
-];
-let sidebarSites = store.get('cobalt.sidebarSites', KNOWN_SITES.slice(0, 5));
-const saveSidebar = () => store.set('cobalt.sidebarSites', sidebarSites);
-function renderSidebarSites() {
-  els.sbSites.innerHTML = '';
-  for (const s of sidebarSites) {
-    const btn = document.createElement('button'); btn.className = 'sb-site'; btn.title = s.name; btn.dataset.url = s.url;
-    const mono = s.brand && window.brandIcon(s.brand); btn.innerHTML = mono || (s.name[0] || '·').toUpperCase();
-    if (!mono) getTile(s.url).then((t) => { if (t?.icon) { btn.innerHTML = ''; const im = document.createElement('img'); im.src = t.icon; im.style.cssText = 'width:16px;height:16px;border-radius:4px;filter:grayscale(1) brightness(1.4)'; btn.appendChild(im); } });
-    btn.addEventListener('click', () => openWebPanel(s.url, s.name, btn));
-    els.sbSites.appendChild(btn);
-  }
-}
-function renderSidebarConfig() {
-  els.sidebarConfig.innerHTML = '';
-  sidebarSites.forEach((s, i) => {
-    const row = document.createElement('div'); row.className = 'sc-row';
-    const ic = document.createElement('span'); ic.className = 'sc-ic'; ic.innerHTML = (s.brand && window.brandIcon(s.brand)) || escapeHtml((s.name[0] || '·').toUpperCase());
-    const name = document.createElement('span'); name.className = 'sc-name'; name.textContent = s.name;
-    const rm = document.createElement('button'); rm.className = 'sc-rm'; rm.innerHTML = window.icon('trash'); rm.addEventListener('click', () => { sidebarSites.splice(i, 1); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); });
-    row.append(ic, name, rm); els.sidebarConfig.appendChild(row);
-  });
-  const avail = KNOWN_SITES.filter((k) => !sidebarSites.some((s) => s.url === k.url));
-  if (avail.length) { const t = document.createElement('div'); t.className = 'sp-list-title'; t.textContent = 'Sugeridas'; t.style.margin = '8px 0 4px'; els.sidebarConfig.appendChild(t); for (const k of avail) { const row = document.createElement('div'); row.className = 'sc-row'; const ic = document.createElement('span'); ic.className = 'sc-ic'; ic.innerHTML = (k.brand && window.brandIcon(k.brand)) || k.name[0]; const name = document.createElement('span'); name.className = 'sc-name'; name.textContent = k.name; const add = document.createElement('button'); add.className = 'sc-rm'; add.style.color = 'var(--ok)'; add.innerHTML = window.icon('plus'); add.addEventListener('click', () => { sidebarSites.push(k); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); }); row.append(ic, name, add); els.sidebarConfig.appendChild(row); } }
-}
-els.sidebarAdd.addEventListener('click', () => promptModal('Añadir web al sidebar (URL)', 'https://...', (val) => { const url = toUrl(val); if (!url) return; const name = hostOf(url).split('.')[0]; sidebarSites.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url, brand: brandOf(url) }); saveSidebar(); renderSidebarConfig(); renderSidebarSites(); }));
-els.sidebarDone.addEventListener('click', () => els.sidebarModal.classList.add('hidden'));
-
 /* ============ Resoluciones ============ */
 const RESOLUTIONS = [
   { w: 0, h: 0, label: 'Adaptable', note: 'nativa' }, { w: 1920, h: 1080, label: 'Full HD', note: 'la más usada' },
@@ -1193,7 +1241,6 @@ els.menuPop.addEventListener('click', (e) => {
   if (a === 'newtab') createTab(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   if (a === 'update') { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); }
-  if (a === 'sidebar') { renderSidebarConfig(); els.sidebarModal.classList.remove('hidden'); }
   if (a === 'permissions') showPermManager();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
@@ -1266,6 +1313,12 @@ function ensureDropClaimer(sourceTab) {
 }
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Botones 4/5 del ratón pulsados DENTRO de la página
+  if (e.channel === 'cobalt-mouse-nav') {
+    const dir = (e.args && e.args[0]) || '';
+    if (dir === 'back') irAtras(); else if (dir === 'forward') irAdelante();
+    return;
+  }
   // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
   if (e.channel === 'cobalt-agent') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
@@ -1376,7 +1429,7 @@ const adEls = {
 };
 function showAddonsPage() {
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage();
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage();
   adEls.page.classList.remove('hidden'); adEls.page.classList.add('active');
   renderAddons();
 }
@@ -1404,7 +1457,12 @@ async function renderAddons() {
     const tt = document.createElement('div');
     tt.innerHTML = '<h3></h3><span class="adp-ver"></span>';
     tt.querySelector('h3').textContent = meta.name || meta.id;
-    tt.querySelector('.adp-ver').textContent = 'v' + (meta.version || '?') + (meta.kind === 'tool' ? ' · herramienta' : ' · para sitios');
+    // Si lo tienes instalado en otra versión, se ve de un vistazo cuál corre
+    // ahora mismo y cuál hay disponible (antes solo salía la del catálogo).
+    const vTxt = inst && meta.version && inst.version !== meta.version
+      ? 'v' + inst.version + ' instalada · v' + meta.version + ' disponible'
+      : 'v' + ((inst && inst.version) || meta.version || '?');
+    tt.querySelector('.adp-ver').textContent = vTxt + (meta.kind === 'tool' ? ' · herramienta' : ' · para sitios');
     top.appendChild(tt);
     const badge = document.createElement('span'); badge.className = 'adp-badge' + (inst?.enabled ? ' on' : '');
     badge.textContent = inst ? (inst.enabled ? 'ACTIVO' : 'PAUSADO') : 'DISPONIBLE';
@@ -1423,9 +1481,23 @@ async function renderAddons() {
       });
     } else {
       if (inCatalog && meta.version && inst.version !== meta.version) {
-        btn('Actualizar a v' + meta.version, 'primary', async () => {
+        btn('Actualizar a v' + meta.version, 'primary', async (ev) => {
+          ev.target.textContent = 'Actualizando…'; ev.target.disabled = true;
           const r = await window.cobalt.addonsInstall(meta);
-          toast(r.ok ? 'Addon actualizado' : 'Error: ' + r.message);
+          if (!r.ok) { toast('Error: ' + r.message); renderAddons(); return; }
+          // Descargar el código nuevo NO basta: la herramienta vieja sigue
+          // corriendo en memoria (su botón, sus temporizadores). Se retira y se
+          // vuelve a cargar para que el usuario vea la versión nueva YA, sin
+          // reiniciar; antes había que reiniciar y nadie lo sabía.
+          if (meta.kind === 'tool') {
+            try { naviris.unregisterTool(meta.id); } catch { /* nada */ }
+            loadedTools.delete(meta.id);
+            await new Promise((res) => setTimeout(res, 2600)); // el addon se auto-limpia al ver su botón fuera
+            await loadToolAddons();
+            toast('Actualizado a v' + meta.version + ' y recargado');
+          } else {
+            toast('Actualizado a v' + meta.version + ' · recarga la página para aplicarlo');
+          }
           renderAddons();
         });
       }
@@ -1541,18 +1613,120 @@ window.cobalt.onUpdateStatus((s) => {
 $('#win-min').addEventListener('click', () => window.cobalt.minimize());
 $('#win-max').addEventListener('click', () => window.cobalt.maximize());
 $('#win-close').addEventListener('click', () => window.cobalt.close());
-window.cobalt.onMaximized((max) => { $('#win-max').innerHTML = window.icon(max ? 'square-2-stack' : 'stop'); });
+// El botón conserva SIEMPRE el icono de maximizar elegido por el usuario
+// (antes al maximizar se cambiaba por otro y parecía que "desaparecía");
+// solo cambia el tooltip según el estado.
+window.cobalt.onMaximized((max) => { $('#win-max').title = max ? 'Restaurar' : 'Maximizar'; });
 
-/* Atajos */
+/* ============ Atajos de teclado y ratón ============ */
+// Juego estándar de navegador (Chrome/Firefox/Edge). Los webviews reciben las
+// teclas por su cuenta, así que estos van en la ventana y actúan sobre la
+// pestaña activa.
+function activeWv() { const t = activeTab(); return t?.kind === 'web' ? t.webview : null; }
+function recargar(forzado) {
+  const wv = activeWv(); if (!wv) return;
+  try { forzado ? wv.reloadIgnoringCache() : wv.reload(); } catch { /* nada */ }
+}
+function irAtras() { const wv = activeWv(); try { if (wv?.canGoBack()) wv.goBack(); } catch { /* nada */ } }
+function irAdelante() { const wv = activeWv(); try { if (wv?.canGoForward()) wv.goForward(); } catch { /* nada */ } }
+function pararCarga() { const wv = activeWv(); try { wv?.stop(); } catch { /* nada */ } }
+// Zoom por pestaña (como los navegadores: se recuerda mientras viva la pestaña)
+function zoom(delta) {
+  const tab = activeTab(); const wv = activeWv(); if (!wv || !tab) return;
+  const nivel = delta === 0 ? 0 : Math.max(-5, Math.min(5, (tab.zoom || 0) + delta));
+  tab.zoom = nivel;
+  try { wv.setZoomLevel(nivel); } catch { /* nada */ }
+  toast(nivel === 0 ? 'Zoom al 100 %' : 'Zoom ' + Math.round(Math.pow(1.2, nivel) * 100) + ' %');
+}
+function recordarCerrada(tab) {
+  if (!tab || tab.kind !== 'web' || !tab.url) return;
+  cerradas.push({ url: tab.url, title: tab.title });
+  if (cerradas.length > 10) cerradas.shift();
+}
+function reabrirCerrada() {
+  const t = cerradas.pop(); if (!t) { toast('No hay pestañas cerradas recientes'); return; }
+  createTab(t.url);
+}
 window.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
-  if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); createTab(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); els.urlbar.focus(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'j') { e.preventDefault(); toggleDownloads(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHistory(); }
-  if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); }
+  const k = (e.key || '').toLowerCase();
+  const soloCtrl = e.ctrlKey && !e.shiftKey && !e.altKey;
+  const escribiendo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+
+  // --- Pestañas ---
+  if (e.ctrlKey && e.shiftKey && k === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
+  if (e.ctrlKey && e.shiftKey && k === 't') { e.preventDefault(); reabrirCerrada(); return; }
+  if (soloCtrl && k === 't') { e.preventDefault(); createTab(); return; }
+  if (soloCtrl && k === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); return; }
+  if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); return; }
+  if (e.ctrlKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
+    e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId);
+    const n = tabs[(i + (e.key === 'PageDown' ? 1 : tabs.length - 1)) % tabs.length]; if (n) activateTab(n.id); return;
+  }
+  // Ctrl+1..8 va a esa pestaña; Ctrl+9 a la última (igual que Chrome)
+  if (soloCtrl && /^[1-9]$/.test(k)) {
+    e.preventDefault();
+    const n = k === '9' ? tabs[tabs.length - 1] : tabs[parseInt(k, 10) - 1];
+    if (n) activateTab(n.id);
+    return;
+  }
+
+  // --- Navegación ---
+  if (e.key === 'F5' || (soloCtrl && k === 'r')) { e.preventDefault(); recargar(e.shiftKey); return; }
+  if ((e.ctrlKey && e.shiftKey && k === 'r') || (e.shiftKey && e.key === 'F5')) { e.preventDefault(); recargar(true); return; }
+  if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); irAtras(); return; }
+  if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); irAdelante(); return; }
+  if (e.altKey && e.key === 'Home') { e.preventDefault(); els.sbHome.click(); return; }
+  if (e.key === 'Escape' && !escribiendo) { pararCarga(); return; }
+
+  // --- Barra de direcciones ---
+  if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
+
+  // --- Ventana y página ---
+  if (e.key === 'F11') { e.preventDefault(); window.cobalt.toggleFullscreen(); return; }
+  if (soloCtrl && (k === '+' || k === '=' || e.key === 'Add')) { e.preventDefault(); zoom(1); return; }
+  if (soloCtrl && (k === '-' || e.key === 'Subtract')) { e.preventDefault(); zoom(-1); return; }
+  if (soloCtrl && k === '0') { e.preventDefault(); zoom(0); return; }
+  if (soloCtrl && k === 'p') { e.preventDefault(); try { activeWv()?.print(); } catch { /* nada */ } return; }
+  if (soloCtrl && k === 'd') { e.preventDefault(); els.navStar.click(); return; }
+
+  // --- Paneles ---
+  if (soloCtrl && k === 'j') { e.preventDefault(); toggleDownloads(); return; }
+  if (soloCtrl && k === 'h') { e.preventDefault(); toggleHistory(); return; }
 });
+// Los mismos atajos, pero llegados desde una página con el foco dentro (el main
+// los intercepta con before-input-event y los reenvía por IPC).
+window.cobalt.onShortcut((cmd) => {
+  const i = tabs.findIndex((t) => t.id === activeId);
+  if (cmd === 'reload') recargar(false);
+  else if (cmd === 'reload-hard') recargar(true);
+  else if (cmd === 'back') irAtras();
+  else if (cmd === 'forward') irAdelante();
+  else if (cmd === 'new-tab') createTab();
+  else if (cmd === 'close-tab') { if (activeId) closeTab(activeId); }
+  else if (cmd === 'reopen-tab') reabrirCerrada();
+  else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
+  else if (cmd === 'downloads') toggleDownloadsPage();
+  else if (cmd === 'history') toggleHistory();
+  else if (cmd === 'bookmark') els.navStar.click();
+  else if (cmd === 'fullscreen') window.cobalt.toggleFullscreen();
+  else if (cmd === 'zoom-in') zoom(1);
+  else if (cmd === 'zoom-out') zoom(-1);
+  else if (cmd === 'zoom-reset') zoom(0);
+  else if (cmd === 'next-tab') { const n = tabs[(i + 1) % tabs.length]; if (n) activateTab(n.id); }
+  else if (cmd === 'prev-tab') { const n = tabs[(i + tabs.length - 1) % tabs.length]; if (n) activateTab(n.id); }
+  else if (cmd.startsWith('tab-')) {
+    const d = cmd.slice(4);
+    const n = d === '9' ? tabs[tabs.length - 1] : tabs[parseInt(d, 10) - 1];
+    if (n) activateTab(n.id);
+  }
+});
+// Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
+// el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 3) { e.preventDefault(); irAtras(); }
+  else if (e.button === 4) { e.preventDefault(); irAdelante(); }
+});
+window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
 window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
 
 /* Arranque */
@@ -1564,11 +1738,10 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
-  const savedW = store.get('cobalt.panelW', null); if (savedW) document.documentElement.style.setProperty('--panel-w', savedW);
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
-  renderSidebarSites(); renderBookmarksBar(); renderHub();
+  renderBookmarksBar(); renderHub();
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
@@ -1576,6 +1749,12 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   } else {
     createTab();
   }
-  setTimeout(() => { els.splash.classList.add('gone'); if (els.hub.classList.contains('active')) focusHubSearch(); }, 1800);
+  // El splash se ELIMINA del DOM tras el fundido: con visibility:hidden sus
+  // animaciones infinitas seguían corriendo toda la sesión en el compositor.
+  setTimeout(() => {
+    els.splash.classList.add('gone');
+    if (els.hub.classList.contains('active')) focusUrlbar();
+    setTimeout(() => els.splash.remove(), 600);
+  }, 1800);
 })();
 

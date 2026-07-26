@@ -1,7 +1,7 @@
 {
   "name": "naviris-browser",
   "productName": "Naviris",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Naviris",
   "author": "Iris Studio",
   "license": "MIT",
@@ -15,7 +15,9 @@
     "icon": "electron build/render-icon.js",
     "fetch-bin": "node build/fetch-bin.js",
     "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish always",
+    "publish": "node build/publish-release.js",
+    "dist-publish": "npm run dist && node build/publish-release.js"
   },
   "devDependencies": {
     "electron": "github:castlabs/electron-releases#v42.5.2+wvcus",
@@ -49,7 +51,8 @@
       "provider": "github",
       "owner": "DosaAKA2A",
       "repo": "Naviris",
-      "releaseType": "release"
+      "releaseType": "prerelease",
+      "channel": "dev"
     },
     "win": {
       "target": [

@@ -28,10 +28,17 @@ contextBridge.exposeInMainWorld('cobalt', {
   revealDownload: (id) => ipcRenderer.send('download:reveal', id),
   downloadPath: (id) => ipcRenderer.invoke('download:path', id),
   clearDownloads: () => ipcRenderer.send('download:clear'),
+  listDownloadFiles: () => ipcRenderer.invoke('downloads:files'),
+  openDownloadFile: (name) => ipcRenderer.send('downloads:open-file', name),
+  revealDownloadFile: (name) => ipcRenderer.send('downloads:reveal-file', name),
+  openDownloadsFolder: () => ipcRenderer.send('downloads:open-folder'),
   onDownloadNew: (cb) => ipcRenderer.on('download:new', (_e, m) => cb(m)),
   onDownloadUpdate: (cb) => ipcRenderer.on('download:update', (_e, m) => cb(m)),
 
   fetchFavicon: (pageUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl),
+
+  toggleFullscreen: () => ipcRenderer.send('win:fullscreen'),
+  onShortcut: (cb) => ipcRenderer.on('ui:shortcut', (_e, cmd) => cb(cmd)),
 
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateChannels: () => ipcRenderer.invoke('update:channels'),

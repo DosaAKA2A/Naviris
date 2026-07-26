@@ -288,9 +288,25 @@ function registerDownloadItem(item, sourceUrl) {
   item.once('done', (_e, state) => {
     meta.state = state; // completed | cancelled | interrupted
     meta.received = item.getReceivedBytes();
+    if (state === 'completed') recordDlHistory(meta.path);
     broadcast('download:update', meta);
   });
   return meta;
+}
+
+/* Historial persistente de lo descargado DESDE Naviris: la página de descargas
+   lista esto, no la carpeta entera del sistema (ahí hay archivos de cualquier
+   origen y no son asunto del navegador). */
+const dlHistoryPath = () => path.join(app.getPath('userData'), 'naviris-downloads.json');
+let dlHistory = null;
+function loadDlHistory() {
+  if (!dlHistory) { try { dlHistory = JSON.parse(fs.readFileSync(dlHistoryPath(), 'utf8')); } catch { dlHistory = []; } }
+  return dlHistory;
+}
+function recordDlHistory(p) {
+  if (!p) return;
+  dlHistory = [{ path: p, time: Date.now() }, ...loadDlHistory().filter((x) => x.path !== p)].slice(0, 2000);
+  try { fs.writeFileSync(dlHistoryPath(), JSON.stringify(dlHistory), 'utf8'); } catch {}
 }
 
 // Solo anuncios/telemetría puros. NO se tocan rutas del reproductor
@@ -335,7 +351,7 @@ function setupSession(ses) {
   // de YouTube para que el bloqueador de anuncios inyectado en document_start pueda
   // correr, y (b) abre CORS para las APIs públicas de precios que usan los addons
   // (p. ej. Valve Rat Tool compara mercados desde páginas de Steam).
-  const CORS_OPEN = ['prices.csgotrader.app', 'api.skinport.com', 'api.dmarket.com'];
+  const CORS_OPEN = ['api.skinport.com'];
   const HDR_URLS = [...CORS_OPEN.map((h) => 'https://' + h + '/*'), 'https://*.youtube.com/*', 'https://*.youtube-nocookie.com/*'];
   ses.webRequest.onHeadersReceived({ urls: HDR_URLS }, (details, cb) => {
     let host = ''; try { host = new URL(details.url).hostname; } catch { /* nada */ }
@@ -479,6 +495,11 @@ function ytDownload({ url, mode, quality }) {
     meta.state = code === 0 ? 'completed' : 'interrupted';
     meta.percent = code === 0 ? 100 : meta.percent;
     if (code !== 0) { meta.error = lastError || 'yt-dlp terminó con código ' + code; if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + (lastError || 'no se pudo descargar').slice(0, 80); }
+    if (code === 0 && meta.path) {
+      // Tras ExtractAudio/Merger el nombre cambia de extensión pero meta.path no
+      const fin = path.join(path.dirname(meta.path), meta.name);
+      recordDlHistory(fs.existsSync(fin) ? fin : meta.path);
+    }
     broadcast('download:update', meta);
   });
   return id;
@@ -511,9 +532,56 @@ function createWindow(isPrivate = false) {
   return win;
 }
 
+// Atajos con el foco DENTRO de la página: cuando el usuario ha hecho clic en la
+// web, las teclas van al webview y el listener del renderer no las ve nunca (de
+// ahí el "F5 funciona a veces sí y a veces no"). Aquí se interceptan antes de
+// que lleguen a la página y se reenvían a la interfaz.
+const ATAJOS_UI = [
+  { k: 'F5', mod: (i) => !i.control && !i.shift, cmd: 'reload' },
+  { k: 'F5', mod: (i) => i.shift || i.control, cmd: 'reload-hard' },
+  { k: 'r', mod: (i) => i.control && !i.shift, cmd: 'reload' },
+  { k: 'r', mod: (i) => i.control && i.shift, cmd: 'reload-hard' },
+  { k: 'F11', mod: () => true, cmd: 'fullscreen' },
+  { k: 'F6', mod: () => true, cmd: 'focus-url' },
+  { k: 'l', mod: (i) => i.control, cmd: 'focus-url' },
+  { k: 't', mod: (i) => i.control && !i.shift, cmd: 'new-tab' },
+  { k: 't', mod: (i) => i.control && i.shift, cmd: 'reopen-tab' },
+  { k: 'w', mod: (i) => i.control && !i.shift, cmd: 'close-tab' },
+  { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
+  { k: 'h', mod: (i) => i.control, cmd: 'history' },
+  { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },
+  { k: 'ArrowLeft', mod: (i) => i.alt, cmd: 'back' },
+  { k: 'ArrowRight', mod: (i) => i.alt, cmd: 'forward' },
+  { k: 'Tab', mod: (i) => i.control && !i.shift, cmd: 'next-tab' },
+  { k: 'Tab', mod: (i) => i.control && i.shift, cmd: 'prev-tab' },
+  { k: '+', mod: (i) => i.control, cmd: 'zoom-in' },
+  { k: '=', mod: (i) => i.control, cmd: 'zoom-in' },
+  { k: '-', mod: (i) => i.control, cmd: 'zoom-out' },
+  { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' }
+];
+function atajosDeWebview(contents) {
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const tecla = input.key;
+    for (const a of ATAJOS_UI) {
+      if (tecla !== a.k && tecla.toLowerCase() !== a.k.toLowerCase()) continue;
+      if (!a.mod(input)) continue;
+      event.preventDefault();
+      contents.hostWebContents?.send('ui:shortcut', a.cmd);
+      return;
+    }
+    // Ctrl+1..9 para saltar de pestaña
+    if (input.control && !input.shift && /^[1-9]$/.test(tecla)) {
+      event.preventDefault();
+      contents.hostWebContents?.send('ui:shortcut', 'tab-' + tecla);
+    }
+  });
+}
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
+    atajosDeWebview(contents);
     contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
         // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano
@@ -561,6 +629,8 @@ const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
 ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
 ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
 ipcMain.on('win:close', (e) => winOf(e)?.close());
+// F11: pantalla completa de la VENTANA (distinto del fullscreen del vídeo)
+ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen(!w.isFullScreen()); });
 ipcMain.on('win:new-private', () => createWindow(true));
 
 ipcMain.handle('settings:get', () => settings);
@@ -846,6 +916,29 @@ ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) 
 ipcMain.handle('download:path', (_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; });
 ipcMain.on('download:clear', () => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); });
 
+/* Página de descargas: SOLO lo descargado desde Naviris (historial propio),
+   comprobando que el archivo siga existiendo en disco. */
+ipcMain.handle('downloads:files', async () => {
+  const out = [];
+  for (const h of loadDlHistory()) {
+    try {
+      const st = await fs.promises.stat(h.path);
+      if (st.isFile()) out.push({ name: path.basename(h.path), path: h.path, size: st.size, mtime: h.time || st.mtimeMs });
+    } catch {}
+  }
+  out.sort((a, b) => b.mtime - a.mtime);
+  return out;
+});
+// Solo se aceptan nombres simples que queden DENTRO de la carpeta de descargas
+function downloadsFilePath(name) {
+  const dir = app.getPath('downloads');
+  const p = path.join(dir, String(name));
+  return path.dirname(p) === dir ? p : null;
+}
+ipcMain.on('downloads:open-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.openPath(p); });
+ipcMain.on('downloads:reveal-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.showItemInFolder(p); });
+ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads')));
+
 // Favicon como dataURL
 ipcMain.handle('favicon:fetch', async (_e, pageUrl) => {
   let host = '';
@@ -955,6 +1048,7 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
     return { ok: true, path: r.filePath };
   } catch (err) { return { ok: false, message: String(err.message || err) }; }
 });
+
 
 // ---------- Actualización automática (GitHub Releases) ----------
 autoUpdater.autoDownload = false;
