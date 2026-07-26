@@ -26,7 +26,7 @@ const els = {};
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest',   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder',
+  'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder', 'dlp-active',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
@@ -745,6 +745,8 @@ function upsertDownload(m) {
   row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelado' : (m.error ? 'Error: ' + m.error : 'Error')) : (pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
   row.querySelector('.dl-bar > i').style.width = pct + '%';
+  // La página de descargas, si está abierta, sigue el progreso en vivo
+  if (els.dlPage.classList.contains('active')) renderDlActive();
   const act = row.querySelector('.dl-act');
   if (done) { act.innerHTML = window.icon('folder'); act.title = 'Mostrar en carpeta'; act.onclick = (e) => { e.stopPropagation(); window.cobalt.revealDownload(m.id); }; }
   else if (error) { act.innerHTML = window.icon('x-mark'); act.title = 'Cerrar'; act.onclick = (e) => { e.stopPropagation(); row.remove(); dlRows.delete(m.id); }; }
@@ -786,7 +788,44 @@ function dlpGroup(ms) {
   const m = d.toLocaleDateString('es', { month: 'long', year: 'numeric' });
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
+/* Descargas EN CURSO en la página: sin esto una descarga larga no se veía en
+   ninguna parte (el panel lateral ya no se abre desde el sidebar y la lista de
+   abajo solo tiene lo terminado), y parecía que "nunca acababa". */
+function renderDlActive() {
+  // Todo lo de esta sesión que NO haya terminado bien: en curso arriba y
+  // fallidas visibles (antes desaparecían sin decir nada).
+  const live = [...dlMeta.values()].filter((m) => m.state !== 'completed');
+  els.dlpActive.innerHTML = '';
+  if (!live.length) return;
+  const h = document.createElement('div'); h.className = 'dlp-day'; h.textContent = 'En curso';
+  els.dlpActive.appendChild(h);
+  for (const m of live) {
+    const failed = m.state !== 'progressing';
+    const pct = m.percent != null ? Math.round(m.percent) : (m.total ? Math.round(m.received / m.total * 100) : null);
+    // Sin Content-Length no hay porcentaje: se muestran los bytes recibidos en
+    // vez de un 0% que parecería atascado.
+    const sub = failed
+      ? (m.state === 'cancelled' ? 'Cancelada' : 'Error: ' + (m.error || 'la descarga se interrumpió'))
+      : pct != null
+        ? `${pct}% · ${fmtBytes(m.received) || '0 B'}${m.total ? ' / ' + fmtBytes(m.total) : ''}`
+        : `Descargando… ${fmtBytes(m.received) || '0 B'}`;
+    const row = document.createElement('div'); row.className = 'dlp-row live' + (failed ? ' failed' : '');
+    row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(m.name))}</div>`
+      + `<div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub"></div>`
+      + (failed ? '' : `<div class="dlp-bar"><i style="width:${pct != null ? pct : 100}%"></i></div>`)
+      + `</div><div class="dlp-acts"><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
+    row.querySelector('.dlp-name').textContent = m.name;
+    row.querySelector('.dlp-sub').textContent = sub;
+    if (!failed && pct == null) row.querySelector('.dlp-bar').classList.add('indet');
+    row.querySelector('.dlp-cancel').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (failed) { dlMeta.delete(m.id); renderDlActive(); } else window.cobalt.cancelDownload(m.id);
+    });
+    els.dlpActive.appendChild(row);
+  }
+}
 function renderDownloadsPage() {
+  renderDlActive();
   els.dlpFilters.innerHTML = '';
   for (const t of DLP_TYPES) {
     const n = t.key === 'all' ? dlpFiles.length : dlpFiles.filter((f) => dlpTypeOf(f.name) === t.key).length;
@@ -800,8 +839,12 @@ function renderDownloadsPage() {
   els.dlpList.innerHTML = '';
   const files = dlpFiles.filter((f) => dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter);
   if (!files.length) {
-    const e = document.createElement('div'); e.className = 'dlp-empty';
-    e.textContent = 'Aún no has descargado nada desde Naviris.'; els.dlpList.appendChild(e); return;
+    // Con algo bajando no se dice "no has descargado nada": eso confundía
+    if (!els.dlpActive.childElementCount) {
+      const e = document.createElement('div'); e.className = 'dlp-empty';
+      e.textContent = 'Aún no has descargado nada desde Naviris.'; els.dlpList.appendChild(e);
+    }
+    return;
   }
   let last = null;
   for (const f of files) {

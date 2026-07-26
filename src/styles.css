@@ -610,6 +610,13 @@ button { font-family: inherit; }
 .dlp-acts button:hover { background: var(--bg); color: var(--text); }
 .dlp-acts button svg { width: 14px; height: 14px; }
 .dlp-empty { color: var(--dim); font-size: 13px; padding: 30px 4px; }
+/* Descarga en curso: fila con barra de progreso dentro de la página */
+.dlp-row.live { cursor: default; border-color: var(--line-3); }
+.dlp-bar { height: 4px; border-radius: 2px; background: var(--active); overflow: hidden; margin-top: 7px; }
+.dlp-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #9aa0ad, #e6e7ea); transition: width .2s; }
+.dlp-bar.indet > i { opacity: .35; }
+.dlp-row.failed .dlp-ic { color: var(--danger); }
+.dlp-row.failed .dlp-sub { color: var(--danger); }
 
 /* Modales */
 .modal { position: fixed; inset: 0; z-index: 600; background: rgba(3,3,4,.65); display: flex; align-items: center; justify-content: center; animation: fade-in .15s ease both; }
