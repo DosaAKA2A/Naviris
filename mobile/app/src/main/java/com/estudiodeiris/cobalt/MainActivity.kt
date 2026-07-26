@@ -3,6 +3,7 @@ package com.estudiodeiris.cobalt
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -31,9 +32,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var container: FrameLayout
-    private lateinit var urlBar: EditText
+    private lateinit var urlBar: AutoCompleteTextView
     private lateinit var progress: ProgressBar
     private lateinit var btnTabs: Button
+    private lateinit var btnBookmark: ImageButton
     private lateinit var findBar: LinearLayout
     private lateinit var findInput: EditText
     private lateinit var findCount: TextView
@@ -70,21 +72,31 @@ class MainActivity : AppCompatActivity() {
         urlBar = findViewById(R.id.urlBar)
         progress = findViewById(R.id.progress)
         btnTabs = findViewById(R.id.btnTabs)
+        btnBookmark = findViewById(R.id.btnBookmark)
         findBar = findViewById(R.id.findBar)
         findInput = findViewById(R.id.findInput)
         findCount = findViewById(R.id.findCount)
         adblock = prefs.getBoolean("adblock", true)
 
-        findViewById<Button>(R.id.btnBack).setOnClickListener { if (web.canGoBack()) web.goBack() }
-        findViewById<Button>(R.id.btnFwd).setOnClickListener { if (web.canGoForward()) web.goForward() }
-        findViewById<Button>(R.id.btnReload).setOnClickListener { web.reload() }
-        findViewById<Button>(R.id.btnMenu).setOnClickListener { showMenu(it) }
+        findViewById<ImageButton>(R.id.btnBack).setOnClickListener { if (web.canGoBack()) web.goBack() }
+        findViewById<ImageButton>(R.id.btnFwd).setOnClickListener { if (web.canGoForward()) web.goForward() }
+        findViewById<ImageButton>(R.id.btnReload).setOnClickListener { web.reload() }
+        findViewById<ImageButton>(R.id.btnMenu).setOnClickListener { showMenu(it) }
         btnTabs.setOnClickListener { showTabs() }
+        btnBookmark.setOnClickListener { toggleBookmark() }
+        btnBookmark.setOnLongClickListener { showBookmarks(); true }
 
         urlBar.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO || event?.keyCode == KeyEvent.KEYCODE_ENTER) {
                 go(urlBar.text.toString()); true
             } else false
+        }
+        // Sugerencias inteligentes: historial + marcadores, filtrado por "contiene"
+        refreshSuggestions()
+        urlBar.setOnItemClickListener { _, view, _, _ ->
+            val url = (view as TextView).text.toString().substringAfterLast('\n')
+            urlBar.dismissDropDown()
+            web.loadUrl(url); hideKeyboard(); web.requestFocus()
         }
 
         setupFindBar()
@@ -123,6 +135,13 @@ class MainActivity : AppCompatActivity() {
         tabs.add(t)
         switchTab(tabs.size - 1)
         wv.loadUrl(url)
+        // Pestaña nueva → el foco va directo a la barra, como en el escritorio:
+        // se puede escribir la dirección sin tocar nada más.
+        if (url == HOME) urlBar.post {
+            urlBar.requestFocus()
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(urlBar, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private fun switchTab(index: Int) {
@@ -134,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         progress.visibility = View.GONE
         closeFindBar()
         updateTabsBtn()
+        updateBookmarkBtn()
     }
 
     private fun closeTab(index: Int) {
@@ -199,10 +219,12 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 if (view == tabs.getOrNull(current)?.web && url != null && url != HOME) urlBar.setText(url)
+                if (view == tabs.getOrNull(current)?.web) updateBookmarkBtn()
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 recordHistory(url, view?.title)
+                if (view == tabs.getOrNull(current)?.web) updateBookmarkBtn()
                 if ((url ?: "").contains("youtube.com")) {
                     view?.evaluateJavascript(
                         "(function(){if(window.__cbYT)return;window.__cbYT=1;setInterval(function(){try{var p=document.querySelector('.html5-video-player');var v=document.querySelector('video');if(p&&p.classList.contains('ad-showing')&&v){v.muted=true;if(isFinite(v.duration))v.currentTime=v.duration;}var b=document.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button');if(b)b.click();}catch(e){}},400);})();",
@@ -234,7 +256,8 @@ class MainActivity : AppCompatActivity() {
                     setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
                     setTitle(name)
                 }
-                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+                val dlId = (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+                recordDownload(name, dlId)
                 toast("Descargando $name")
             } catch (e: Exception) {
                 toast("No se pudo descargar")
@@ -254,6 +277,7 @@ class MainActivity : AppCompatActivity() {
             !t.contains(" ") && t.contains(".") -> "https://$t"
             else -> "https://www.google.com/search?q=" + Uri.encode(t)
         }
+        urlBar.dismissDropDown()
         web.loadUrl(url)
         hideKeyboard()
         web.requestFocus()
@@ -265,7 +289,6 @@ class MainActivity : AppCompatActivity() {
         val pm = PopupMenu(this, anchor)
         pm.menu.add("Inicio")
         pm.menu.add("Nueva pestaña")
-        pm.menu.add("Añadir marcador")
         pm.menu.add("Marcadores")
         pm.menu.add("Historial")
         pm.menu.add("Descargas")
@@ -281,10 +304,9 @@ class MainActivity : AppCompatActivity() {
             when {
                 title == "Inicio" -> web.loadUrl(HOME)
                 title == "Nueva pestaña" -> newTab(HOME)
-                title == "Añadir marcador" -> addBookmark()
                 title == "Marcadores" -> showBookmarks()
                 title == "Historial" -> showHistory()
-                title == "Descargas" -> openDownloads()
+                title == "Descargas" -> showDownloads()
                 title == "Contraseñas" -> startActivity(Intent(this, PasswordActivity::class.java))
                 title == "Buscar en página" -> openFindBar()
                 title.startsWith("Modo escritorio") -> toggleDesktopMode()
@@ -303,15 +325,45 @@ class MainActivity : AppCompatActivity() {
         pm.show()
     }
 
-    // ---------- Marcadores ----------
+    // ---------- Marcadores (mismo ciclo que el escritorio: vacío → lleno → quitar en rojo) ----------
 
-    private fun addBookmark() {
-        val url = web.url ?: return
-        if (url == HOME) { toast("Abre una página primero"); return }
+    private fun currentBookmarkable(): String? {
+        val u = web.url
+        return if (u == null || u == HOME || u.startsWith("file://")) null else u
+    }
+
+    private fun isBookmarked(url: String) = prefs.getStringSet("bookmarks", emptySet())!!.contains(url)
+
+    private fun updateBookmarkBtn() {
+        val u = currentBookmarkable()
+        val saved = u != null && isBookmarked(u)
+        btnBookmark.setImageResource(if (saved) R.drawable.ic_bookmark_added else R.drawable.ic_bookmark_add)
+        btnBookmark.imageTintList = ColorStateList.valueOf(getColor(if (saved) R.color.accent else R.color.muted))
+    }
+
+    private fun toggleBookmark() {
+        val u = currentBookmarkable() ?: run { toast("Abre una página primero"); return }
         val set = prefs.getStringSet("bookmarks", emptySet())!!.toMutableSet()
-        set.add(url)
-        prefs.edit().putStringSet("bookmarks", set).apply()
-        toast("Marcador guardado")
+        if (set.contains(u)) {
+            // Quitar: cinta con el menos en ROJO mientras se decide, como en escritorio
+            btnBookmark.setImageResource(R.drawable.ic_bookmark_remove)
+            btnBookmark.imageTintList = ColorStateList.valueOf(getColor(R.color.danger))
+            AlertDialog.Builder(this)
+                .setTitle("Quitar marcador")
+                .setMessage(u)
+                .setPositiveButton("Quitar") { _, _ ->
+                    set.remove(u)
+                    prefs.edit().putStringSet("bookmarks", set).apply()
+                    toast("Marcador quitado"); refreshSuggestions(); updateBookmarkBtn()
+                }
+                .setNegativeButton("Cancelar") { _, _ -> updateBookmarkBtn() }
+                .setOnCancelListener { updateBookmarkBtn() }
+                .show()
+        } else {
+            set.add(u)
+            prefs.edit().putStringSet("bookmarks", set).apply()
+            toast("Marcador guardado"); refreshSuggestions(); updateBookmarkBtn()
+        }
     }
 
     private fun showBookmarks() {
@@ -351,7 +403,41 @@ class MainActivity : AppCompatActivity() {
             val out = JSONArray().put(entry)
             for (i in 0 until minOf(arr.length(), 299)) out.put(arr.getJSONObject(i))
             prefs.edit().putString("history", out.toString()).apply()
+            refreshSuggestions()
         } catch (e: Exception) { /* historial corrupto: se regenera solo */ }
+    }
+
+    // ---------- Sugerencias inteligentes de la barra (historial + marcadores) ----------
+
+    private inner class SuggestAdapter(private val all: List<String>) :
+        ArrayAdapter<String>(this@MainActivity, R.layout.suggest_item, all.toMutableList()) {
+        override fun getFilter(): Filter = object : Filter() {
+            override fun performFiltering(c: CharSequence?): FilterResults {
+                val q = c?.toString()?.lowercase()?.trim() ?: ""
+                val res = if (q.isEmpty()) all.take(8) else all.filter { it.lowercase().contains(q) }.take(8)
+                return FilterResults().apply { values = res; count = res.size }
+            }
+            @Suppress("UNCHECKED_CAST")
+            override fun publishResults(c: CharSequence?, r: FilterResults) {
+                clear()
+                addAll(r.values as? List<String> ?: emptyList())
+                if (r.count > 0) notifyDataSetChanged() else notifyDataSetInvalidated()
+            }
+        }
+    }
+
+    private fun refreshSuggestions() {
+        val items = LinkedHashSet<String>()
+        for (u in prefs.getStringSet("bookmarks", emptySet())!!) items.add("★ ${Uri.parse(u).host ?: u}\n$u")
+        try {
+            val arr = JSONArray(prefs.getString("history", "[]"))
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val u = o.optString("url"); if (u.isBlank()) continue
+                items.add("${o.optString("title").ifBlank { u }}\n$u")
+            }
+        } catch (e: Exception) { /* nada */ }
+        urlBar.setAdapter(SuggestAdapter(items.toList()))
     }
 
     private fun showHistory() {
@@ -421,7 +507,88 @@ class MainActivity : AppCompatActivity() {
         web.reload()
     }
 
-    // ---------- Descargas ----------
+    // ---------- Descargas: solo lo descargado desde Naviris, por tipo y fecha ----------
+
+    private fun recordDownload(name: String, id: Long) {
+        try {
+            val arr = JSONArray(prefs.getString("downloads", "[]"))
+            val out = JSONArray().put(JSONObject().put("n", name).put("t", System.currentTimeMillis()).put("id", id))
+            for (i in 0 until minOf(arr.length(), 499)) out.put(arr.getJSONObject(i))
+            prefs.edit().putString("downloads", out.toString()).apply()
+        } catch (e: Exception) { /* nada */ }
+    }
+
+    private fun typeOf(name: String): String {
+        val n = name.lowercase()
+        return when {
+            Regex("\\.(png|jpe?g|gif|webp|bmp|svg|avif)$").containsMatchIn(n) -> "Imagen"
+            Regex("\\.(mp4|webm|mkv|mov|avi|m4v)$").containsMatchIn(n) -> "Vídeo"
+            Regex("\\.(mp3|wav|m4a|flac|ogg|opus|aac)$").containsMatchIn(n) -> "Música"
+            Regex("\\.(pdf|docx?|xlsx?|pptx?|txt|csv|epub)$").containsMatchIn(n) -> "Documento"
+            Regex("\\.(zip|rar|7z|tar|gz)$").containsMatchIn(n) -> "Comprimido"
+            Regex("\\.(apk|exe|msi)$").containsMatchIn(n) -> "Programa"
+            else -> "Archivo"
+        }
+    }
+
+    private fun groupOf(t: Long): String {
+        val today = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return when {
+            t >= today -> "Hoy"
+            today - t < 86400000L -> "Ayer"
+            today - t < 7 * 86400000L -> "Esta semana"
+            else -> java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale("es"))
+                .format(java.util.Date(t)).replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    private fun showDownloads() {
+        val arr = try { JSONArray(prefs.getString("downloads", "[]")) } catch (e: Exception) { JSONArray() }
+        if (arr.length() == 0) {
+            AlertDialog.Builder(this)
+                .setTitle("Descargas")
+                .setMessage("Aún no has descargado nada desde Naviris.")
+                .setNeutralButton("Carpeta del sistema") { _, _ -> openDownloads() }
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val labels = ArrayList<String>(arr.length()); val ids = ArrayList<Long>(arr.length())
+        val fecha = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("es"))
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val n = o.optString("n"); val t = o.optLong("t")
+            labels.add("$n\n${groupOf(t)} · ${fecha.format(java.util.Date(t))} · ${typeOf(n)}")
+            ids.add(o.optLong("id", -1))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Descargas de Naviris")
+            .setItems(labels.toTypedArray()) { _, i -> openDownloadedFile(ids[i]) }
+            .setNeutralButton("Carpeta del sistema") { _, _ -> openDownloads() }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun openDownloadedFile(id: Long) {
+        if (id >= 0) {
+            try {
+                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val uri = dm.getUriForDownloadedFile(id)
+                if (uri != null) {
+                    val mime = dm.getMimeTypeForDownloadedFile(id) ?: "*/*"
+                    startActivity(Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, mime); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                    return
+                }
+            } catch (e: Exception) { /* cae a la carpeta */ }
+        }
+        toast("Ese archivo ya no está disponible")
+        openDownloads()
+    }
 
     private fun openDownloads() {
         try { startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) }
@@ -495,7 +662,8 @@ class MainActivity : AppCompatActivity() {
                         setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, apkName)
                         setTitle(apkName)
                     }
-                    (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+                    val dlId = (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+                    recordDownload(apkName, dlId)
                     toast("Descargando $apkName. Ábrelo desde las notificaciones para instalar.")
                 } catch (e: Exception) { toast("No se pudo descargar") }
             }
@@ -519,7 +687,7 @@ class MainActivity : AppCompatActivity() {
         val cur = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
         AlertDialog.Builder(this)
             .setTitle("Naviris para Android")
-            .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores, historial y contraseñas.")
+            .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, descargas propias, historial y contraseñas.")
             .setPositiveButton("OK", null)
             .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate() }
             .show()

@@ -1,10 +1,15 @@
 <resources>
+    <!-- Tokens del sistema visual de Naviris escritorio (styles.css :root) -->
     <color name="bg">#FF0A0A0C</color>
-    <color name="bg2">#FF101013</color>
-    <color name="bg3">#FF16161A</color>
-    <color name="line">#FF232327</color>
+    <color name="bg2">#FF121217</color>
+    <color name="bg3">#FF1B1B21</color>
+    <color name="line">#FF26262D</color>
+    <color name="line3">#FF3A3B41</color>
+    <color name="hover">#FF1F1F24</color>
     <color name="text">#FFECECEF</color>
     <color name="muted">#FF8B8D94</color>
+    <color name="dim">#FF5C5E64</color>
     <color name="accent">#FFE8E9EC</color>
     <color name="danger">#FFE5484D</color>
+    <color name="ok">#FF7FD39B</color>
 </resources>
