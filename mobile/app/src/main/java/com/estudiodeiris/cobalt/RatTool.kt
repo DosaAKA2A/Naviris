@@ -57,12 +57,21 @@ object RatTool {
     }
 
     fun isYouTube(url: String?): Boolean =
-        url != null && Regex("(youtube\\.com/(watch|shorts/|live/)|youtu\\.be/)").containsMatchIn(url)
+        url != null && Regex("(youtube\\.com/(watch|shorts/|live/|embed/)|youtu\\.be/)").containsMatchIn(url)
+
+    private val ID_RE = Regex("(?:[?&]v=|/shorts/|/live/|/embed/|youtu\\.be/)([A-Za-z0-9_-]{11})")
+
+    /** ID del vídeo en cualquier forma de enlace (watch, shorts, live, embed, youtu.be). */
+    fun videoId(url: String?): String? = url?.let { ID_RE.find(it)?.groupValues?.get(1) }
 
     /** Llamar SIEMPRE en un hilo de fondo; lanza excepción si la extracción falla. */
     fun fetchYouTube(url: String): Info {
         init()
-        val info = StreamInfo.getInfo(ServiceList.YouTube, url)
+        // El extractor rechaza muchas variantes reales (dominio móvil, listas de
+        // reproducción, parámetros de sesión, marcas de tiempo): se reduce todo a
+        // la forma canónica antes de pedirle nada.
+        val canon = videoId(url)?.let { "https://www.youtube.com/watch?v=$it" } ?: url
+        val info = StreamInfo.getInfo(ServiceList.YouTube, canon)
         val opts = ArrayList<Option>()
         for (s in info.videoStreams) { // muxed: vídeo+audio juntos, descarga directa
             if (s.deliveryMethod != DeliveryMethod.PROGRESSIVE_HTTP || !s.isUrl) continue

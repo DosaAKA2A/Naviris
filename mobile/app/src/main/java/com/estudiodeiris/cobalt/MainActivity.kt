@@ -114,6 +114,14 @@ class MainActivity : AppCompatActivity() {
 
         val data = intent?.data?.toString()
         newTab(if (!data.isNullOrBlank()) data else HOME)
+
+        // Comprobación automática una vez al día: solo avisa si hay novedad.
+        // Antes había que acordarse de buscarla a mano en el menú.
+        val ahora = System.currentTimeMillis()
+        if (ahora - prefs.getLong("lastUpdCheck", 0L) > 86_400_000L) {
+            prefs.edit().putLong("lastUpdCheck", ahora).apply()
+            urlBar.postDelayed({ checkUpdate(true) }, 4000)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -214,6 +222,10 @@ class MainActivity : AppCompatActivity() {
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
+                // Enlace propio del hub: tocar la versión busca actualizaciones
+                // (esquema propio en vez de exponer un JavascriptInterface al que
+                // podría llamar cualquier web abierta en el navegador).
+                if (url.startsWith("naviris://update")) { checkUpdate(false); return true }
                 return !(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://"))
             }
 
@@ -225,6 +237,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 recordHistory(url, view?.title)
                 if (view == tabs.getOrNull(current)?.web) updateBookmarkBtn()
+                // La versión se pinta en el hub para que esté siempre a la vista
+                if (url == HOME) view?.evaluateJavascript(
+                    "(function(){var e=document.getElementById('ver');if(e)e.textContent='Naviris ${appVersion()}';})()", null
+                )
                 if ((url ?: "").contains("youtube.com")) {
                     view?.evaluateJavascript(
                         "(function(){if(window.__cbYT)return;window.__cbYT=1;setInterval(function(){try{var p=document.querySelector('.html5-video-player');var v=document.querySelector('video');if(p&&p.classList.contains('ad-showing')&&v){v.muted=true;if(isFinite(v.duration))v.currentTime=v.duration;}var b=document.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button');if(b)b.click();}catch(e){}},400);})();",
@@ -298,8 +314,11 @@ class MainActivity : AppCompatActivity() {
         pm.menu.add(if (tab.desktopMode) "Modo escritorio: ON" else "Modo escritorio: OFF")
         pm.menu.add(if (adblock) "Bloqueo de anuncios: ON" else "Bloqueo de anuncios: OFF")
         pm.menu.add("Compartir")
-        pm.menu.add("Buscar actualización")
-        pm.menu.add("Acerca de")
+        // La versión va en el propio texto: antes había que entrar en "Acerca de"
+        // para saber cuál tenías, y quien venía de la v1 (llamada "Cobalt") no
+        // tenía ninguna de estas dos entradas.
+        pm.menu.add("Buscar actualización · tienes la ${appVersion()}")
+        pm.menu.add("Acerca de Naviris")
         pm.setOnMenuItemClickListener { item ->
             val title = item.title.toString()
             when {
@@ -319,8 +338,8 @@ class MainActivity : AppCompatActivity() {
                     web.reload()
                 }
                 title == "Compartir" -> shareUrl()
-                title == "Buscar actualización" -> checkUpdate()
-                title == "Acerca de" -> showAbout()
+                title.startsWith("Buscar actualización") -> checkUpdate(false)
+                title.startsWith("Acerca de") -> showAbout()
             }
             true
         }
@@ -600,8 +619,21 @@ class MainActivity : AppCompatActivity() {
     // ---------- Rat Tool: descargar vídeo/audio de la página actual ----------
 
     private fun openRatTool() {
-        val pageUrl = web.url
-        if (pageUrl == null || pageUrl == HOME || pageUrl.startsWith("file://")) { toast("Abre un vídeo primero"); return }
+        val barUrl = web.url
+        if (barUrl == null || barUrl == HOME || barUrl.startsWith("file://")) { toast("Abre un vídeo primero"); return }
+        // En sitios de una sola página (YouTube móvil) la barra puede ir por
+        // detrás del vídeo que se está viendo: manda la URL canónica del DOM.
+        web.evaluateJavascript(
+            "(function(){var c=document.querySelector('link[rel=\"canonical\"]');" +
+                "return (c&&c.href)||location.href;})()"
+        ) { raw ->
+            val canon = (raw ?: "").trim().trim('"').ifBlank { barUrl }
+            val pageUrl = if (RatTool.videoId(canon) != null) canon else barUrl
+            ratStart(pageUrl)
+        }
+    }
+
+    private fun ratStart(pageUrl: String) {
         if (RatTool.isYouTube(pageUrl)) {
             toast("Rat Tool: obteniendo formatos…")
             Thread {
@@ -609,7 +641,14 @@ class MainActivity : AppCompatActivity() {
                     val info = RatTool.fetchYouTube(pageUrl)
                     runOnUiThread { showRatOptions(info, pageUrl) }
                 } catch (e: Exception) {
-                    runOnUiThread { toast("No se pudo extraer (${e.message ?: "error"})") }
+                    val msg = (e.message ?: "").take(90)
+                    runOnUiThread {
+                        toast(
+                            if (msg.contains("not accepted", true) || msg.contains("ParsingException", true))
+                                "No reconozco este enlace de YouTube. Abre el vídeo en su propia página."
+                            else "No se pudo extraer: $msg"
+                        )
+                    }
                 }
             }.start()
             return
@@ -674,8 +713,33 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- Actualización ----------
 
-    private fun checkUpdate() {
-        toast("Buscando actualización…")
+    private fun appVersion(): String =
+        try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
+
+    /* ¿Está esta instalación firmada con el certificado oficial? Las primeras
+       versiones (la que se llamaba "Cobalt") salieron firmadas en modo debug, y
+       Android RECHAZA actualizarlas con un APK de otra firma: hay que
+       desinstalar antes. Sin este aviso el usuario solo ve "no se instaló". */
+    private val RELEASE_CERT_SHA256 = "bd29a7d9f4e4125bdbdfa7ec35a40e2a5be9529763ac0632903e4843dcd87be8"
+
+    private fun signedOfficially(): Boolean = try {
+        val flag = if (android.os.Build.VERSION.SDK_INT >= 28)
+            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        else @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
+        val info = packageManager.getPackageInfo(packageName, flag)
+        val sigs = if (android.os.Build.VERSION.SDK_INT >= 28)
+            info.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") info.signatures
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        sigs?.any { s ->
+            md.reset()
+            md.digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
+                .equals(RELEASE_CERT_SHA256, true)
+        } ?: false
+    } catch (e: Exception) { true } // ante la duda no se alarma al usuario
+
+    /** silent = comprobación automática: solo habla si hay novedad. */
+    private fun checkUpdate(silent: Boolean) {
+        if (!silent) toast("Buscando actualización…")
         Thread {
             try {
                 val conn = URL(REPO_API).openConnection() as HttpURLConnection
@@ -698,16 +762,21 @@ class MainActivity : AppCompatActivity() {
                         break
                     }
                 }
-                runOnUiThread { onUpdateResult(tag, apkUrl, apkName) }
+                runOnUiThread { onUpdateResult(tag, apkUrl, apkName, silent) }
             } catch (e: Exception) {
-                runOnUiThread { toast("No se pudo comprobar (sin conexión o sin releases)") }
+                runOnUiThread { if (!silent) toast("No se pudo comprobar (sin conexión o sin releases)") }
             }
         }.start()
     }
 
-    private fun onUpdateResult(tag: String, apkUrl: String?, apkName: String?) {
-        val cur = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "0" } catch (e: Exception) { "0" }
+    private fun onUpdateResult(tag: String, apkUrl: String?, apkName: String?, silent: Boolean = false) {
+        val cur = appVersion()
+        if (silent && apkUrl != null && apkName != null) {
+            val remoteV = Regex("\\d+(\\.\\d+)+").find(apkName)?.value ?: tag
+            if (compareVersions(remoteV, cur) <= 0) return // al día: no molestar
+        }
         if (apkUrl == null || apkName == null) {
+            if (silent) return
             AlertDialog.Builder(this)
                 .setTitle("Buscar actualización")
                 .setMessage(
@@ -728,9 +797,14 @@ class MainActivity : AppCompatActivity() {
                 .show()
             return
         }
+        val aviso = if (signedOfficially()) ""
+        else "\n\nAVISO: tu instalación es de una versión antigua firmada de otra " +
+            "forma, así que Android no dejará instalar la nueva encima. Desinstala " +
+            "esta app primero y luego abre el APK descargado (se perderán los " +
+            "marcadores y contraseñas guardados en ella)."
         AlertDialog.Builder(this)
             .setTitle("Actualización disponible")
-            .setMessage("Hay una nueva versión: $remote (tienes la $cur).\n¿Descargar $apkName?")
+            .setMessage("Hay una nueva versión: $remote (tienes la $cur).\n¿Descargar $apkName?$aviso")
             .setPositiveButton("Descargar") { _, _ ->
                 try {
                     val req = DownloadManager.Request(Uri.parse(apkUrl)).apply {
@@ -761,12 +835,11 @@ class MainActivity : AppCompatActivity() {
     // ---------- Varios ----------
 
     private fun showAbout() {
-        val cur = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
         AlertDialog.Builder(this)
             .setTitle("Naviris para Android")
-            .setMessage("Versión $cur\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, Rat Tool (descarga de vídeo/audio), descargas propias, historial y contraseñas.")
+            .setMessage("Versión ${appVersion()}\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, Rat Tool (descarga de vídeo/audio), descargas propias, historial y contraseñas.")
             .setPositiveButton("OK", null)
-            .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate() }
+            .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate(false) }
             .show()
     }
 
