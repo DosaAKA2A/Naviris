@@ -1659,6 +1659,12 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   } else {
     createTab();
   }
-  setTimeout(() => { els.splash.classList.add('gone'); if (els.hub.classList.contains('active')) focusHubSearch(); }, 1800);
+  // El splash se ELIMINA del DOM tras el fundido: con visibility:hidden sus
+  // animaciones infinitas seguían corriendo toda la sesión en el compositor.
+  setTimeout(() => {
+    els.splash.classList.add('gone');
+    if (els.hub.classList.contains('active')) focusHubSearch();
+    setTimeout(() => els.splash.remove(), 600);
+  }, 1800);
 })();
 
