@@ -281,6 +281,9 @@ function firmaTabs() {
 }
 let ultimaFirmaTabs = null;
 function renderTabs(forzar) {
+  // AutoClaim se tiñe del morado de Twitch cuando la pestaña activa es un
+  // canal (antes del early-return: es barato y depende de la pestaña activa)
+  els.sbLoot.classList.toggle('on-twitch', activeIsTwitch());
   const f = firmaTabs();
   if (!forzar && f === ultimaFirmaTabs) return;
   ultimaFirmaTabs = f;

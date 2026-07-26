@@ -709,6 +709,11 @@ button { font-family: inherit; }
 #loot-pop .sp-count { line-height: 1.5; }
 
 /* ===== AutoLoot: botón del sidebar + panel izquierdo ===== */
+/* AutoClaim: el glifo de Twitch con más presencia que el resto del sidebar,
+   morado de marca al detectar un canal abierto y verde si está recolectando
+   (el verde va después para ganar cuando pasan las dos cosas). */
+#sb-loot svg { width: 20px; height: 20px; }
+#sb-loot.on-twitch { color: #9146ff; }
 #sb-loot.collecting { color: #9ee2b8; }
 .side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: calc(var(--titlebar-h) + var(--navbar-h) + 6px); width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 13px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 44px rgba(0,0,0,.55); animation: lp-in .18s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes lp-in { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
