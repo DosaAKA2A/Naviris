@@ -39,15 +39,15 @@
       <!-- Herramientas -->
       <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="mouse"></button>
       <button class="sb-btn" id="sb-loot" title="AutoClaim — puntos y drops de Twitch" data-ico="gift"></button>
-      <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="film"></button>
-      <button class="sb-btn" id="sb-res" title="Escalado de resolución" data-ico="computer-desktop"></button>
+      <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="picture"></button>
+      <button class="sb-btn" id="sb-res" title="Escalado de resolución" data-ico="res-scale"></button>
       <div id="addon-tools"></div>
       <div class="sb-div"></div>
       <!-- Funciones del navegador -->
       <button class="sb-btn" id="sb-history" title="Historial" data-ico="clock"></button>
       <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="star"></button>
       <button class="sb-btn" id="sb-passwords" title="Contraseñas" data-ico="key"></button>
-      <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="arrow-down-tray"></button>
+      <button class="sb-btn" id="sb-downloads" title="Descargas" data-ico="archive"></button>
       <div class="sb-div"></div>
       <button class="sb-btn" id="sb-settings" title="Menú" data-ico="cog-6-tooth"></button>
     </aside>
@@ -131,6 +131,20 @@
               </div>
             </div>
             <div id="bm-tree"></div>
+          </div>
+        </section>
+
+        <!-- Página de descargas: archivos reales de la carpeta, por tipo y fecha -->
+        <section id="dl-page" class="overlay-page hidden">
+          <div class="bmp-inner">
+            <div class="bmp-head">
+              <h2><span data-ico="archive"></span> Descargas</h2>
+              <div class="bmp-tools">
+                <button id="dlp-folder" class="ghost-btn"><span data-ico="folder"></span> Abrir carpeta</button>
+              </div>
+            </div>
+            <div id="dlp-filters" class="mp-filters dlp-filters"></div>
+            <div id="dlp-list"></div>
           </div>
         </section>
 

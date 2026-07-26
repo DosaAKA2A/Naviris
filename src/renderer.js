@@ -26,7 +26,7 @@ const els = {};
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest',   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-headsub',
+  'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
@@ -193,7 +193,7 @@ function attachWebview(tab, url) {
 function activateTab(id) {
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
   if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; }
-  hideBookmarkPage(); hideAddonsPage();
+  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => {
     if (!t.webview || t.kind !== 'web') return;
@@ -295,7 +295,7 @@ function toggleMute(tab) {
   renderTabs();
 }
 function navigateActive(input) {
-  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage();
+  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
   const tab = activeTab() || createTab();
   if (tab.kind === 'hub') { attachWebview(tab, url); tab.title = 'Cargando…'; activateTab(tab.id); } else tab.webview.src = url;
 }
@@ -408,7 +408,7 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
 function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
@@ -734,12 +734,77 @@ async function openDownloadInBrowser(id) {
   if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.cobalt.openDownload(id);
 }
 window.cobalt.onDownloadNew((m) => upsertDownload(m));
-window.cobalt.onDownloadUpdate((m) => { upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); } });
+window.cobalt.onDownloadUpdate((m) => { upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
 function toggleDownloads(force) { const open = force !== undefined ? force : els.dlPanel.classList.contains('hidden'); if (open) { closeRightPanels(); els.dlPanel.classList.remove('hidden'); els.sbDownloads.classList.add('open'); } else { els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); } }
-els.sbDownloads.addEventListener('click', () => toggleDownloads());
+els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
 function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+
+/* ============ Página de descargas: archivos reales por tipo y fecha ============ */
+const DLP_TYPES = [
+  { key: 'all', label: 'Todo' },
+  { key: 'image', label: 'Imágenes', re: /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|tiff?)$/i, ico: 'photo' },
+  { key: 'video', label: 'Vídeo', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'film' },
+  { key: 'audio', label: 'Música', re: /\.(mp3|wav|m4a|flac|ogg|opus|aac)$/i, ico: 'musical-note' },
+  { key: 'doc', label: 'Documentos', re: /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|json|epub|rtf)$/i, ico: 'clipboard' },
+  { key: 'zip', label: 'Comprimidos', re: /\.(zip|rar|7z|tar|gz|iso)$/i, ico: 'archive' },
+  { key: 'app', label: 'Programas', re: /\.(exe|msi|apk)$/i, ico: 'squares-plus' },
+  { key: 'other', label: 'Otros' }
+];
+let dlpFilter = 'all', dlpFiles = [];
+const dlpTypeOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || { key: 'other' }).key;
+const dlpIcoOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || {}).ico || 'archive';
+function dlpGroup(ms) {
+  const d = new Date(ms), now = new Date();
+  const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+  if (diff <= 0) return 'Hoy';
+  if (diff === 1) return 'Ayer';
+  if (diff < 7) return 'Esta semana';
+  const m = d.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  return m.charAt(0).toUpperCase() + m.slice(1);
+}
+function renderDownloadsPage() {
+  els.dlpFilters.innerHTML = '';
+  for (const t of DLP_TYPES) {
+    const n = t.key === 'all' ? dlpFiles.length : dlpFiles.filter((f) => dlpTypeOf(f.name) === t.key).length;
+    if (t.key !== 'all' && !n) continue;
+    const b = document.createElement('button');
+    b.className = 'mp-chip' + (dlpFilter === t.key ? ' active' : '');
+    b.textContent = n ? `${t.label} · ${n}` : t.label;
+    b.addEventListener('click', () => { dlpFilter = t.key; renderDownloadsPage(); });
+    els.dlpFilters.appendChild(b);
+  }
+  els.dlpList.innerHTML = '';
+  const files = dlpFiles.filter((f) => dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter);
+  if (!files.length) {
+    const e = document.createElement('div'); e.className = 'dlp-empty';
+    e.textContent = 'No hay archivos en tu carpeta de Descargas.'; els.dlpList.appendChild(e); return;
+  }
+  let last = null;
+  for (const f of files) {
+    const g = dlpGroup(f.mtime);
+    if (g !== last) { const h = document.createElement('div'); h.className = 'dlp-day'; h.textContent = g; els.dlpList.appendChild(h); last = g; }
+    const row = document.createElement('div'); row.className = 'dlp-row'; row.title = f.name;
+    const when = new Date(f.mtime).toLocaleString('es', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(f.name))}</div><div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub">${fmtBytes(f.size)} · ${when}</div></div><div class="dlp-acts"><button class="dlp-reveal" title="Mostrar en carpeta">${window.icon('folder')}</button></div>`;
+    row.querySelector('.dlp-name').textContent = f.name;
+    row.querySelector('.dlp-reveal').addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.revealDownloadFile(f.name); });
+    row.addEventListener('click', () => { if (VIEWABLE.test(f.name)) createTab('file:///' + f.path.replace(/\\/g, '/')); else window.cobalt.openDownloadFile(f.name); });
+    els.dlpList.appendChild(row);
+  }
+}
+async function showDownloadsPage() {
+  closeRightPanels();
+  tabs.forEach((t) => t.webview?.classList.remove('active'));
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage();
+  els.dlPage.classList.remove('hidden'); els.dlPage.classList.add('active'); els.sbDownloads.classList.add('open');
+  dlpFiles = await window.cobalt.listDownloadFiles();
+  renderDownloadsPage();
+}
+function hideDownloadsPage() { els.dlPage.classList.remove('active'); els.dlPage.classList.add('hidden'); els.sbDownloads.classList.remove('open'); }
+function toggleDownloadsPage() { if (els.dlPage.classList.contains('active')) { hideDownloadsPage(); activateTab(activeId); } else showDownloadsPage(); }
+els.dlpFolder.addEventListener('click', () => window.cobalt.openDownloadsFolder());
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
 let loot = store.get('cobalt.loot', []);
@@ -1342,7 +1407,7 @@ const adEls = {
 };
 function showAddonsPage() {
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage();
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage();
   adEls.page.classList.remove('hidden'); adEls.page.classList.add('active');
   renderAddons();
 }
@@ -1615,7 +1680,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'close-tab') { if (activeId) closeTab(activeId); }
   else if (cmd === 'reopen-tab') reabrirCerrada();
   else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
-  else if (cmd === 'downloads') toggleDownloads();
+  else if (cmd === 'downloads') toggleDownloadsPage();
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();
   else if (cmd === 'fullscreen') window.cobalt.toggleFullscreen();

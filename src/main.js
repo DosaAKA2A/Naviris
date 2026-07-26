@@ -895,6 +895,32 @@ ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) 
 ipcMain.handle('download:path', (_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; });
 ipcMain.on('download:clear', () => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); });
 
+/* Página de descargas: lista los archivos REALES de la carpeta de Descargas
+   (no solo los de esta sesión), para organizarlos por tipo y fecha. */
+ipcMain.handle('downloads:files', async () => {
+  const dir = app.getPath('downloads');
+  let names = [];
+  try { names = await fs.promises.readdir(dir); } catch {}
+  const out = [];
+  for (const name of names) {
+    try {
+      const st = await fs.promises.stat(path.join(dir, name));
+      if (st.isFile()) out.push({ name, path: path.join(dir, name), size: st.size, mtime: st.mtimeMs });
+    } catch {}
+  }
+  out.sort((a, b) => b.mtime - a.mtime);
+  return out;
+});
+// Solo se aceptan nombres simples que queden DENTRO de la carpeta de descargas
+function downloadsFilePath(name) {
+  const dir = app.getPath('downloads');
+  const p = path.join(dir, String(name));
+  return path.dirname(p) === dir ? p : null;
+}
+ipcMain.on('downloads:open-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.openPath(p); });
+ipcMain.on('downloads:reveal-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.showItemInFolder(p); });
+ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads')));
+
 // Favicon como dataURL
 ipcMain.handle('favicon:fetch', async (_e, pageUrl) => {
   let host = '';

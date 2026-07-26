@@ -167,6 +167,9 @@ button { font-family: inherit; }
 #navbar > button:hover:not(:disabled) { background: #202027; color: #fff; }
 #navbar > button:disabled { opacity: .28; cursor: default; }
 #nav-star.starred { color: var(--accent); }
+/* La estrella se pinta por dentro al pasar por encima y cuando ya está guardada
+   (la forma sharp es de línea; el relleno hereda currentColor). */
+#nav-star:hover svg, #nav-star.starred svg { fill: currentColor; }
 #nav-shield.off { color: var(--dim); }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }
 #urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s; }
@@ -562,7 +565,8 @@ button { font-family: inherit; }
 .overlay-page.active { display: block; }
 .bmp-inner { max-width: 760px; margin: 0 auto; padding: 40px 28px 70px; }
 .bmp-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-.bmp-head h2 { font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
+.bmp-head h2 { font-size: 26px; font-weight: 700; letter-spacing: -.5px; display: flex; align-items: center; gap: 12px; }
+.bmp-head h2 [data-ico] svg { width: 24px; height: 24px; }
 .bmp-tools { display: flex; gap: 8px; align-items: center; }
 #bm-filter { height: 34px; width: 170px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); padding: 0 12px; font-size: 12.5px; outline: none; }
 #bm-filter:focus { border-color: var(--focus); }
@@ -590,6 +594,23 @@ button { font-family: inherit; }
 .bm-folder-row.collapsed + .bm-children { display: none; }
 .bm-chev { transition: transform .15s; }
 .bm-folder-row.collapsed .bm-chev { transform: rotate(-90deg); }
+
+/* Página de descargas: archivos de la carpeta real, por tipo y fecha */
+.dlp-filters { padding: 0 0 16px; flex-wrap: wrap; }
+.dlp-day { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); padding: 16px 4px 8px; }
+.dlp-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color .12s, background .12s; }
+.dlp-row:hover { border-color: var(--line-3); background: var(--bg-3); }
+.dlp-ic { width: 34px; height: 34px; border-radius: 9px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex-shrink: 0; }
+.dlp-ic svg { width: 16px; height: 16px; }
+.dlp-info { flex: 1; min-width: 0; }
+.dlp-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dlp-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.dlp-acts { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.dlp-row:hover .dlp-acts { opacity: 1; }
+.dlp-acts button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.dlp-acts button:hover { background: var(--bg); color: var(--text); }
+.dlp-acts button svg { width: 14px; height: 14px; }
+.dlp-empty { color: var(--dim); font-size: 13px; padding: 30px 4px; }
 
 /* Modales */
 .modal { position: fixed; inset: 0; z-index: 600; background: rgba(3,3,4,.65); display: flex; align-items: center; justify-content: center; animation: fade-in .15s ease both; }
