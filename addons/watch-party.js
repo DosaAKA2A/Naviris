@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.4.1
+/* Naviris addon: Watch Party v2.4.2
    Ver vídeo a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube.
    NO transmite vídeo: cada quien reproduce su propia copia con su propia
    cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
@@ -18,6 +18,7 @@
    decide quién controla la reproducción y quién puede cambiar el vídeo.
 
    v2.4.1: icono de ojo propio en el sidebar (elegido para la línea visual).
+   v2.4.2: el botón solo cambia de color al reconocer el sitio (fuera brillos).
    v2.4: el panel deja de repintarse entero cada 2 s; estructura estable y
    datos actualizados en su sitio, chat incremental, color de plataforma
    permanente en el botón y control de cambio de vídeo para el anfitrión.
@@ -85,14 +86,15 @@
   var css = document.createElement('style');
   css.id = 'nvp-style';
   css.textContent = [
-    /* Botón del sidebar: brillo ESTÁTICO por sitio reconocido (nada animado en reposo) */
-    '#' + BTN_ID + '.nvp-netflix{color:#e50914;filter:drop-shadow(0 0 6px rgba(229,9,20,.65))}',
-    '#' + BTN_ID + '.nvp-crunchy{color:#f47521;filter:drop-shadow(0 0 6px rgba(244,117,33,.65))}',
-    '#' + BTN_ID + '.nvp-disney{color:#3aa0ff;filter:drop-shadow(0 0 6px rgba(58,160,255,.65))}',
-    '#' + BTN_ID + '.nvp-youtube{color:#ff4444;filter:drop-shadow(0 0 6px rgba(255,68,68,.6))}',
+    /* Botón del sidebar: SOLO cambia de color por sitio reconocido (sin brillos:
+       el drop-shadow se colaba hasta en el borde de la pastilla del hover) */
+    '#' + BTN_ID + '.nvp-netflix{color:#e50914}',
+    '#' + BTN_ID + '.nvp-crunchy{color:#f47521}',
+    '#' + BTN_ID + '.nvp-disney{color:#3aa0ff}',
+    '#' + BTN_ID + '.nvp-youtube{color:#ff4444}',
     /* Con sala activa: punto verde en la esquina, sin perder el color del sitio */
     '#' + BTN_ID + '{position:relative}',
-    '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#9ee2b8;box-shadow:0 0 6px rgba(158,226,184,.95)}',
+    '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#9ee2b8}',
     '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube){color:#9ee2b8}',
     /* Panel más ancho y con aire */
     '#nvp-panel{width:340px;max-height:640px}',

@@ -167,9 +167,8 @@ button { font-family: inherit; }
 #navbar > button:hover:not(:disabled) { background: #202027; color: #fff; }
 #navbar > button:disabled { opacity: .28; cursor: default; }
 #nav-star.starred { color: var(--accent); }
-/* La estrella se pinta por dentro al pasar por encima y cuando ya está guardada
-   (la forma sharp es de línea; el relleno hereda currentColor). */
-#nav-star:hover svg, #nav-star.starred svg { fill: currentColor; }
+/* Con el marcador guardado, el hover ofrece quitarlo: cinta con menos en rojo */
+#nav-star.removing { color: var(--danger); }
 #nav-shield.off { color: var(--dim); }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }
 #urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s; }
@@ -574,7 +573,7 @@ button { font-family: inherit; }
 .ghost-btn svg { width: 15px; height: 15px; color: var(--text-dim); }
 .ghost-btn:hover { border-color: var(--focus); background: var(--bg-2); }
 #bm-tree { display: flex; flex-direction: column; gap: 6px; }
-#bm-tree:empty::after { content: "Aún no tienes marcadores. Pulsa la estrella de la barra para guardar una página."; color: var(--dim); font-size: 13px; }
+#bm-tree:empty::after { content: "Aún no tienes marcadores. Pulsa el botón de marcador de la barra para guardar una página."; color: var(--dim); font-size: 13px; }
 .bm-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color .12s, background .12s; }
 .bm-row:hover { border-color: var(--line-3); background: var(--bg-3); }
 .bm-row .bm-ic { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }

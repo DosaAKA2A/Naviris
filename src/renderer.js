@@ -160,6 +160,9 @@ function attachWebview(tab, url) {
   wv.setAttribute('allowpopups', ''); wv.setAttribute('partition', PARTITION); wv.src = url;
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   const onNav = (e) => {
+    // Dormir una pestaña la manda a about:blank: NO pisar url/título/favicon,
+    // al pasar el ratón debe seguir viéndose qué contenido tenía.
+    if (tab.asleep || e.url === 'about:blank') return;
     tab.url = e.url; getTile(e.url).then((t) => { tab.favicon = t?.icon || null; renderTabs(); });
     if (tab.autoLoot) {
       const h = hostOf(e.url);
@@ -178,7 +181,7 @@ function attachWebview(tab, url) {
     if (tab.id === activeId) { syncNavUI(); updateLootUI(); if (!els.mediaPanel.classList.contains('hidden')) { clearTimeout(mediaTimer); mediaTimer = setTimeout(collectMedia, 600); } }
     saveSession();
   };
-  wv.addEventListener('page-title-updated', (e) => { tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
+  wv.addEventListener('page-title-updated', (e) => { if (tab.asleep) return; tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
   wv.addEventListener('did-navigate', onNav);
   wv.addEventListener('did-navigate-in-page', onNav);
   wv.addEventListener('did-start-loading', () => { if (tab.id === activeId) els.navReload.innerHTML = window.icon('x-mark'); });
@@ -227,7 +230,9 @@ function closeTab(id) {
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
   el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (mini ? ' mini loot-member' : '');
-  el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '') : (tab.url || 'Hub de Naviris');
+  el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
+    : tab.asleep ? `Pestaña dormida — ${tab.title}\n${tab.sleptUrl || tab.url}`
+    : (tab.url || 'Hub de Naviris');
   const zzz = document.createElement('span'); zzz.className = 't-zzz'; zzz.innerHTML = window.icon('moon');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
@@ -307,8 +312,20 @@ function syncNavUI() {
   if (document.activeElement !== els.urlbar) els.urlbar.value = tab?.kind === 'web' ? tab.url : '';
   try { els.navBack.disabled = !wv?.canGoBack(); els.navFwd.disabled = !wv?.canGoForward(); } catch { els.navBack.disabled = els.navFwd.disabled = true; }
   const marked = tab?.kind === 'web' && findBookmark(tab.url);
-  els.navStar.innerHTML = window.icon(marked ? 'star-solid' : 'star'); els.navStar.classList.toggle('starred', !!marked);
+  els.navStar.classList.toggle('starred', !!marked);
+  if (!marked) els.navStar.classList.remove('removing');
+  els.navStar.innerHTML = window.icon(marked ? (els.navStar.classList.contains('removing') ? 'bookmark-remove' : 'bookmark-added') : 'bookmark-add');
 }
+// Con la página ya guardada, pasar por encima ofrece QUITARLA: cinta con un
+// menos en rojo. Al salir del botón vuelve el estado normal.
+els.navStar.addEventListener('mouseenter', () => {
+  if (!els.navStar.classList.contains('starred')) return;
+  els.navStar.classList.add('removing');
+  els.navStar.innerHTML = window.icon('bookmark-remove');
+});
+els.navStar.addEventListener('mouseleave', () => {
+  if (els.navStar.classList.contains('removing')) { els.navStar.classList.remove('removing'); syncNavUI(); }
+});
 setInterval(() => {
   if (!settings.powerSaver) return; const now = Date.now(); let changed = false;
   for (const tab of tabs) {
@@ -438,7 +455,7 @@ function renderBookmarkTree() {
 }
 function bmManagerRow(b) {
   const row = document.createElement('div'); row.className = 'bm-row';
-  const ic = document.createElement('span'); ic.className = 'bm-ic'; ic.innerHTML = window.icon('star'); getTile(b.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; ic.innerHTML = ''; ic.appendChild(im); } });
+  const ic = document.createElement('span'); ic.className = 'bm-ic'; ic.innerHTML = window.icon('bookmark'); getTile(b.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; ic.innerHTML = ''; ic.appendChild(im); } });
   const label = document.createElement('div'); label.className = 'bm-label'; label.innerHTML = `<div class="bm-t">${escapeHtml(b.title)}</div><div class="bm-u">${escapeHtml(b.url)}</div>`;
   const acts = document.createElement('div'); acts.className = 'bm-actions';
   if (bookmarks.some((x) => x.type === 'folder')) { const mv = document.createElement('button'); mv.title = 'Mover a carpeta'; mv.innerHTML = window.icon('folder'); mv.addEventListener('click', (e) => { e.stopPropagation(); moveToFolder(b); }); acts.appendChild(mv); }
