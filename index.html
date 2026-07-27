@@ -39,13 +39,18 @@
     .logo{transition:filter .6s ease}
     a:hover>.logo{filter:hue-rotate(140deg)}
 
+    /* Barra de progreso de lectura (la mueve GSAP con el scroll) */
+    #bar{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:linear-gradient(90deg,var(--violet),#a4d9c2);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
+
     /* ===== Nav ===== */
     header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(8,8,10,.72);border-bottom:1px solid rgba(35,35,39,.6)}
     .nav{display:flex;align-items:center;gap:26px;height:66px}
     .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.04em;font-size:15px}
     .brand .logo{width:26px;height:26px}
-    .nav a.link{color:var(--muted);font-size:13.5px;transition:color .15s}
+    .nav a.link{position:relative;color:var(--muted);font-size:13.5px;transition:color .15s}
+    .nav a.link::after{content:"";position:absolute;left:0;bottom:-6px;height:1.5px;width:100%;background:var(--violet);transform:scaleX(0);transform-origin:100% 50%;transition:transform .28s cubic-bezier(.2,.7,.2,1)}
     .nav a.link:hover{color:var(--text)}
+    .nav a.link:hover::after{transform:scaleX(1);transform-origin:0 50%}
     .nav .spacer{flex:1}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:none;cursor:pointer;font-family:inherit;border-radius:11px;font-weight:600;transition:transform .15s,background .15s,border-color .15s,color .15s}
     .btn-sm{background:var(--accent);color:#0a0a0a;font-size:13px;padding:9px 16px}
@@ -59,21 +64,25 @@
     h1{font-size:clamp(42px,7vw,92px);font-weight:900;letter-spacing:-0.035em;line-height:.98;text-wrap:balance;color:#fff}
     .hero p.lead{margin:18px auto 26px;max-width:44ch;color:var(--muted);font-size:17px;line-height:1.55}
     .cta-row{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
-    .btn-dl{background:var(--accent);color:#0a0a0a;font-size:16px;padding:16px 28px;border-radius:13px}
-    .btn-dl:hover{background:#fff;transform:translateY(-2px)}
-    .btn-dl svg{width:19px;height:19px}
+    .btn-dl{position:relative;overflow:hidden;background:var(--accent);color:#0a0a0a;font-size:16px;padding:16px 28px;border-radius:13px}
+    .btn-dl:hover{background:#fff}
+    .btn-dl svg{width:19px;height:19px;transition:transform .25s cubic-bezier(.2,.7,.2,1)}
+    .btn-dl:hover svg{transform:translateY(2px)}
+    /* Destello que barre el botón al pasar el cursor (una sola pasada, sin bucle) */
+    .btn-dl::before{content:"";position:absolute;top:0;bottom:0;left:-45%;width:36%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-18deg);pointer-events:none;opacity:0}
+    .btn-dl:hover::before{animation:sheen .55s ease forwards}
+    @keyframes sheen{from{left:-45%;opacity:1}to{left:115%;opacity:1}}
     .btn-ghost{border:1px solid var(--line-2);color:var(--text);font-size:14px;padding:15px 22px;background:transparent}
-    .btn-ghost:hover{border-color:#55565c}
+    .btn-ghost:hover{border-color:#55565c;background:rgba(255,255,255,.04)}
     .dl-meta{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.03em}
     .dl-meta b{color:var(--muted);font-weight:500}
 
     /* ===== Mockup del navegador: panel recostado hacia atrás, centrado ===== */
-    .stage{perspective:1700px;perspective-origin:50% 0%;width:min(880px,100%);animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+    .stage{perspective:1700px;perspective-origin:50% 0%;width:min(880px,100%)}
     /* OJO nitidez: nada de scale() aquí — ampliar el rasterizado emborrona el texto. */
     .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10.6;
       transform:rotateX(16deg);will-change:transform;backface-visibility:hidden;
       box-shadow:0 46px 84px rgba(0,0,0,.62),0 2px 0 rgba(255,255,255,.04)}
-    @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
     .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
@@ -86,7 +95,8 @@
     .m-greet{font-size:10px;color:var(--muted);margin:5px 0 16px}
     .m-search{width:56%;height:30px;border-radius:999px;background:rgba(14,14,17,.85);border:1px solid #26262b;display:flex;align-items:center;padding:0 14px;gap:8px;font-size:9.5px;color:var(--dim);margin-bottom:22px}
     .m-tiles{display:grid;grid-template-columns:repeat(6,44px);gap:12px}
-    .m-tile{width:44px;height:44px;border-radius:13px;background:linear-gradient(140deg,#1e1e23,#141418);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#e4e6ea}
+    .m-tile{width:44px;height:44px;border-radius:13px;background:linear-gradient(140deg,#1e1e23,#141418);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#e4e6ea;transition:transform .2s ease,border-color .2s ease}
+    .m-tile:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18)}
     .m-tile svg{width:20px;height:20px}
     .m-side{position:absolute;left:0;top:72px;bottom:0;width:34px;background:#08080a;border-right:1px solid #151517;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:10px;z-index:2}
     .m-side i{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#55565c}
@@ -94,7 +104,8 @@
     .m-side i svg{width:15px;height:15px}
 
     /* ===== Secciones ===== */
-    section{position:relative;z-index:1;padding:64px 0}
+    /* overflow-x:clip contiene los estados iniciales de los reveals laterales (GSAP) sin crear scroll */
+    section{position:relative;z-index:1;padding:64px 0;overflow-x:clip}
     .sec-head{margin-bottom:36px;max-width:640px}
     h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-0.025em;text-wrap:balance}
     .sec-head .label{margin-bottom:13px;display:block}
@@ -108,7 +119,9 @@
     .spot .tag .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block}
     .spot h3{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;margin-bottom:12px;text-wrap:balance}
     .spot p{color:var(--muted);font-size:15.5px;line-height:1.6;max-width:40ch}
-    .visual{border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,#111114,#0a0a0c);padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+    /* Los visuales se inclinan hacia el cursor (GSAP) */
+    .visual{border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,#111114,#0a0a0c);padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5);will-change:transform;transition:border-color .25s}
+    .visual:hover{border-color:#34353c}
 
     /* Visual AutoClaim */
     .v-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -146,13 +159,15 @@
     .v-msg{align-self:flex-start;background:#17171b;border:1px solid #232327;border-radius:10px;padding:7px 11px;font-size:12.5px;color:var(--text);max-width:85%}
     .v-msg b{color:var(--violet);font-weight:600}
     .v-svcs{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}
-    .v-svc{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+    .v-svc{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 11px;transition:color .2s,border-color .2s,transform .2s}
+    .v-svc:hover{color:var(--text);border-color:#3a3b42;transform:translateY(-2px)}
 
     /* Rejilla de características: microcopys, una línea por tarjeta */
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;transition:border-color .2s,transform .2s,background .2s}
-    .card:hover{border-color:#34353c;transform:translateY(-3px);background:#141418}
-    .card .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:var(--panel-2);border:1px solid var(--line);color:var(--text)}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;transition:border-color .25s,transform .25s,background .25s,box-shadow .25s}
+    .card:hover{border-color:#3a3b42;transform:translateY(-4px);background:#141418;box-shadow:0 16px 38px rgba(0,0,0,.4)}
+    .card .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);transition:transform .3s cubic-bezier(.2,.7,.2,1),color .3s,border-color .3s,background .3s}
+    .card:hover .ic{transform:translateY(-3px) scale(1.08) rotate(-3deg);color:var(--violet);border-color:rgba(145,112,214,.4);background:rgba(120,90,190,.12)}
     .card.hl .ic{background:rgba(120,90,190,.14);border-color:rgba(145,112,214,.35);color:var(--violet)}
     .card .ic svg{width:20px;height:20px}
     .card h3{font-size:15.5px;margin-bottom:5px;font-weight:600}
@@ -189,8 +204,8 @@
     .foot .blurb{margin-top:10px;font-size:13px;color:var(--dim);max-width:26ch}
     .foot h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;font-weight:500}
     .foot ul{list-style:none;display:flex;flex-direction:column;gap:9px}
-    .foot ul a{font-size:13.5px;color:var(--muted)}
-    .foot ul a:hover{color:var(--text)}
+    .foot ul a{display:inline-block;font-size:13.5px;color:var(--muted);transition:color .2s,transform .2s}
+    .foot ul a:hover{color:var(--text);transform:translateX(4px)}
     .foot-base{margin-top:36px;padding-top:20px;border-top:1px solid rgba(35,35,39,.6);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
 
     @media (max-width:900px){
@@ -240,6 +255,7 @@
   </svg>
 
   <div class="glow"></div>
+  <div id="bar" aria-hidden="true"></div>
 
   <header>
     <div class="wrap nav">
@@ -606,6 +622,101 @@
         document.getElementById('dl-android').href='https://github.com/'+REPO+'/releases';
       }
     })();
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script>
+    // Animaciones GSAP. Si el CDN no carga, la página queda estática y completa
+    // (por eso se anima con .from(): el estado final vive en el CSS).
+    // Regla del proyecto: nada de bucles infinitos en reposo — todo movimiento
+    // nace de una interacción (carga, scroll, cursor) y termina.
+    window.addEventListener('DOMContentLoaded', function () {
+      if (!window.gsap || !window.ScrollTrigger) return;
+      gsap.registerPlugin(ScrollTrigger);
+      const mm = gsap.matchMedia();
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+
+        // Barra de progreso de lectura
+        gsap.to('#bar', { scaleX: 1, ease: 'none', scrollTrigger: { scrub: .3, start: 0, end: 'max' } });
+
+        // Entrada orquestada del hero
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.from('header .nav > *', { y: -14, autoAlpha: 0, duration: .45, stagger: .05 })
+          .from('.eyebrow', { y: 18, autoAlpha: 0, duration: .5 }, '-=.2')
+          .from('h1', { y: 36, autoAlpha: 0, duration: .7 }, '-=.28')
+          .from('.hero .lead', { y: 24, autoAlpha: 0, duration: .55 }, '-=.42')
+          .from('.cta-row .btn', { y: 18, autoAlpha: 0, duration: .5, stagger: .09 }, '-=.32')
+          .from('.dl-meta', { autoAlpha: 0, duration: .5 }, '-=.28')
+          .from('.stage', { y: 70, autoAlpha: 0, duration: .9 }, '-=.35');
+
+        // El panel recostado se endereza suavemente al hacer scroll
+        gsap.to('.mock', { rotationX: 0, ease: 'none',
+          scrollTrigger: { trigger: '.stage', start: 'top 70%', end: 'top 12%', scrub: .4 } });
+
+        // Spotlights: texto y visual entran desde lados opuestos
+        gsap.utils.toArray('.spot').forEach((sp) => {
+          const fromX = sp.classList.contains('rev') ? 44 : -44;
+          gsap.from(sp.querySelector('.spot-txt'), { x: fromX, autoAlpha: 0, duration: .7, ease: 'power3.out',
+            scrollTrigger: { trigger: sp, start: 'top 74%' } });
+          gsap.from(sp.querySelector('.visual'), { x: -fromX, y: 28, autoAlpha: 0, duration: .8, ease: 'power3.out',
+            scrollTrigger: { trigger: sp, start: 'top 74%' } });
+        });
+
+        // Tarjetas en cascada
+        ScrollTrigger.batch('.grid .card', { start: 'top 88%',
+          onEnter: (els) => gsap.from(els, { y: 28, autoAlpha: 0, duration: .55, stagger: .07, ease: 'power2.out', overwrite: true }) });
+
+        // Encabezados y paneles grandes
+        gsap.utils.toArray('.sec-head, .droid, .dl-panel, .foot').forEach((el) => {
+          gsap.from(el, { y: 30, autoAlpha: 0, duration: .7, ease: 'power3.out',
+            scrollTrigger: { trigger: el, start: 'top 82%' } });
+        });
+
+        // Contadores del panel AutoClaim (128 puntos, 6 drops)
+        gsap.utils.toArray('.v-loot .n').forEach((n) => {
+          const raw = n.textContent.trim();
+          if (!/^\d+$/.test(raw)) return;
+          const target = +raw;
+          n.textContent = '0';
+          gsap.to(n, { textContent: target, duration: 1.1, snap: { textContent: 1 }, ease: 'power1.out',
+            scrollTrigger: { trigger: n, start: 'top 88%' } });
+        });
+
+        // El chat del Watch Party se escribe al llegar a él; el toast del loot rebota
+        gsap.from('.v-chat > *', { y: 14, autoAlpha: 0, duration: .45, stagger: .18, ease: 'power2.out',
+          scrollTrigger: { trigger: '.v-chat', start: 'top 82%' } });
+        gsap.from('.v-toast', { scale: .88, autoAlpha: 0, duration: .5, ease: 'back.out(1.8)',
+          scrollTrigger: { trigger: '.v-toast', start: 'top 88%' } });
+        gsap.from('.v-svcs .v-svc', { y: 10, autoAlpha: 0, duration: .35, stagger: .06, ease: 'power2.out',
+          scrollTrigger: { trigger: '.v-svcs', start: 'top 90%' } });
+
+        // Botones de descarga magnéticos
+        document.querySelectorAll('.btn-dl').forEach((b) => {
+          const qx = gsap.quickTo(b, 'x', { duration: .35, ease: 'power3' });
+          const qy = gsap.quickTo(b, 'y', { duration: .35, ease: 'power3' });
+          b.addEventListener('mousemove', (e) => {
+            const r = b.getBoundingClientRect();
+            qx((e.clientX - r.left - r.width / 2) * .18);
+            qy((e.clientY - r.top - r.height / 2) * .3);
+          });
+          b.addEventListener('mouseleave', () => { qx(0); qy(0); });
+        });
+
+        // Los visuales se inclinan hacia el cursor
+        document.querySelectorAll('.visual').forEach((v) => {
+          gsap.set(v, { transformPerspective: 900 });
+          const rx = gsap.quickTo(v, 'rotationX', { duration: .5, ease: 'power2' });
+          const ry = gsap.quickTo(v, 'rotationY', { duration: .5, ease: 'power2' });
+          v.addEventListener('mousemove', (e) => {
+            const r = v.getBoundingClientRect();
+            ry(((e.clientX - r.left) / r.width - .5) * 7);
+            rx(-((e.clientY - r.top) / r.height - .5) * 7);
+          });
+          v.addEventListener('mouseleave', () => { rx(0); ry(0); });
+        });
+      });
+    });
   </script>
 </body>
 </html>
