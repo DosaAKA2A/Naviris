@@ -51,14 +51,14 @@
     .btn-sm{background:var(--accent);color:#0a0a0a;font-size:13px;padding:9px 16px}
     .btn-sm:hover{background:#fff}
 
-    /* ===== Hero ===== */
-    .hero{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 1.15fr;gap:36px;align-items:center;padding:80px 28px 76px}
+    /* ===== Hero a pantalla completa: titular gigante centrado + mockup asomando en el pliegue ===== */
+    .hero{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:46px;
+      min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:48px 28px 0}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
     .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(185,140,255,.7)}
-    /* Tamaño calibrado para que el titular quepa en DOS líneas en la columna del hero */
-    h1{font-size:clamp(34px,4.4vw,54px);font-weight:900;letter-spacing:-0.035em;line-height:1.02;text-wrap:balance;color:#fff}
-    .hero p.lead{margin:20px 0 28px;max-width:38ch;color:var(--muted);font-size:17px;line-height:1.55}
-    .cta-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    h1{font-size:clamp(42px,7vw,92px);font-weight:900;letter-spacing:-0.035em;line-height:.98;text-wrap:balance;color:#fff}
+    .hero p.lead{margin:18px auto 26px;max-width:44ch;color:var(--muted);font-size:17px;line-height:1.55}
+    .cta-row{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
     .btn-dl{background:var(--accent);color:#0a0a0a;font-size:16px;padding:16px 28px;border-radius:13px}
     .btn-dl:hover{background:#fff;transform:translateY(-2px)}
     .btn-dl svg{width:19px;height:19px}
@@ -67,12 +67,12 @@
     .dl-meta{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.03em}
     .dl-meta b{color:var(--muted);font-weight:500}
 
-    /* ===== Mockup del navegador (en perspectiva, estilo SaaS) ===== */
-    .stage{perspective:2200px;perspective-origin:55% 45%;animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+    /* ===== Mockup del navegador: panel recostado hacia atrás, centrado ===== */
+    .stage{perspective:1700px;perspective-origin:50% 0%;width:min(880px,100%);animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
     /* OJO nitidez: nada de scale() aquí — ampliar el rasterizado emborrona el texto. */
     .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10.6;
-      transform:rotateY(-20deg) rotateX(6deg) rotateZ(.6deg);will-change:transform;backface-visibility:hidden;
-      box-shadow:-38px 46px 84px rgba(0,0,0,.62),-2px 0 0 rgba(255,255,255,.03)}
+      transform:rotateX(16deg);will-change:transform;backface-visibility:hidden;
+      box-shadow:0 46px 84px rgba(0,0,0,.62),0 2px 0 rgba(255,255,255,.04)}
     @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
@@ -194,7 +194,7 @@
     .foot-base{margin-top:36px;padding-top:20px;border-top:1px solid rgba(35,35,39,.6);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
 
     @media (max-width:900px){
-      .hero{grid-template-columns:1fr;padding-top:48px}
+      .hero{padding-top:40px;gap:34px}
       .stage{perspective:none}
       .mock{transform:none;will-change:auto;max-width:600px;margin:0 auto}
       .grid{grid-template-columns:1fr 1fr}
