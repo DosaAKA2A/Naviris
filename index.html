@@ -54,7 +54,8 @@
     .btn-sm:hover{background:#fff}
 
     /* ===== Hero ===== */
-    .hero{position:relative;z-index:1;display:grid;grid-template-columns:.9fr 1.18fr;gap:36px;align-items:center;padding:74px 0 70px}
+    /* OJO: el padding define TAMBIÉN los laterales (pisa al de .wrap en el mismo elemento) */
+    .hero{position:relative;z-index:1;display:grid;grid-template-columns:.9fr 1.18fr;gap:36px;align-items:center;padding:74px 28px 70px}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:22px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
     .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(185,140,255,.7)}
     h1{font-size:clamp(44px,6vw,74px);font-weight:900;letter-spacing:-0.035em;line-height:.97;text-wrap:balance;color:#fff}
@@ -73,8 +74,10 @@
 
     /* ===== Mockup del navegador (en perspectiva, estilo SaaS) ===== */
     .stage{perspective:2200px;perspective-origin:55% 45%;animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+    /* OJO nitidez: nada de scale() aquí — ampliar el rasterizado emborrona el texto.
+       will-change promueve el panel a capa propia y el navegador lo pinta nítido. */
     .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10.6;
-      transform:rotateY(-20deg) rotateX(6deg) rotateZ(.6deg) scale(1.04);transform-style:preserve-3d;
+      transform:rotateY(-20deg) rotateX(6deg) rotateZ(.6deg);will-change:transform;backface-visibility:hidden;
       box-shadow:-38px 46px 84px rgba(0,0,0,.62),-2px 0 0 rgba(255,255,255,.03)}
     @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
@@ -83,7 +86,7 @@
     .m-tab svg{width:12px;height:12px}
     .m-tab.farm{color:var(--green);border:1px solid rgba(158,226,184,.35);background:rgba(158,226,184,.07)}
     .m-nav{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;background:#0e0e12;color:var(--dim)}
-    .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim)}
+    .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim);white-space:nowrap;overflow:hidden}
     .m-body{position:absolute;inset:72px 0 0 34px;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
     .m-clock{font-size:40px;font-weight:250;letter-spacing:1px}
     .m-greet{font-size:10px;color:var(--muted);margin:5px 0 16px}
@@ -126,8 +129,8 @@
     .v-t.farm{color:var(--green);border-color:rgba(158,226,184,.4);background:rgba(158,226,184,.08);font-weight:600}
     .v-toast{margin-top:18px;display:inline-flex;align-items:center;gap:9px;padding:10px 15px;border-radius:11px;background:#0d0d10;border:1px solid var(--line-2);font-size:13px;color:var(--text)}
     .v-toast .pill{font-family:var(--mono);font-size:11px;color:var(--violet)}
-    .v-loot{margin-top:14px;display:flex;gap:10px}
-    .v-loot .box{flex:1;background:#0d0d10;border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+    .v-loot{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+    .v-loot .box{flex:1;min-width:96px;background:#0d0d10;border:1px solid var(--line);border-radius:11px;padding:12px 14px}
     .v-loot .box .n{font-size:20px;font-weight:800}
     .v-loot .box .n.g{color:var(--green)}
     .v-loot .box .l{font-family:var(--mono);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
@@ -196,14 +199,23 @@
     @media (max-width:900px){
       .hero{grid-template-columns:1fr;padding-top:48px}
       .stage{perspective:none}
-      .mock{transform:none}
+      .mock{transform:none;will-change:auto;max-width:600px;margin:0 auto}
       .grid{grid-template-columns:1fr 1fr}
       .spot,.spot.rev{grid-template-columns:1fr;gap:28px}
       .spot.rev .spot-txt{order:0}
       .dl-panel{padding:40px 24px}
       .nav a.link{display:none}
     }
-    @media (max-width:560px){.grid{grid-template-columns:1fr}.m-tiles{grid-template-columns:repeat(4,44px)}.stats{gap:22px}.nav .back{display:none}}
+    @media (max-width:560px){
+      .grid{grid-template-columns:1fr}
+      .stats{gap:22px}
+      .nav .back{display:none}
+      /* El interior del mockup no cabe en 16/10.6 a este ancho: más alto y reloj compacto */
+      .mock{aspect-ratio:5/4}
+      .m-clock{font-size:32px}
+      .m-tiles{grid-template-columns:repeat(4,44px)}
+      .m-tile:nth-child(n+5){display:none}
+    }
     @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   </style>
 </head>
@@ -260,7 +272,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">Iris Studio · Navegador</span></div>
         <h1>Navega ligero.<br>Descarga y reclama todo.</h1>
-        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja video y audio, bloquea anuncios, reclama tus drops de Twitch, ve series con DRM en compañía y amplíalo con addons opcionales. Ligero de instalar y de memoria.</p>
+        <p class="lead">Un navegador monocromático sobre Chromium con las herramientas que normalmente serían extensiones — ya vienen dentro. Baja video y audio, reclama tus drops de Twitch, mira series en compañía y bloquea anuncios sin instalar nada.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -316,10 +328,10 @@
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Integrado en Naviris</div>
             <h3>AutoClaim: deja Twitch de fondo y no pierdas un solo drop.</h3>
-            <p>Presiona el botón de Twitch en la barra lateral y activa AutoClaim en el canal que estés viendo: Naviris lo silencia, baja la resolución al mínimo solo en esa pestaña y reclama por ti los puntos y los drops en segundo plano. La pestaña se queda en su sitio, marcada en verde mientras farmea, y el stream sigue vivo aunque no lo mires.</p>
+            <p>Presiona el botón de Twitch en la barra lateral y activa AutoClaim en el canal que estés viendo: Naviris lo silencia, baja la resolución al mínimo y reclama puntos y drops por ti. La pestaña queda marcada en verde mientras farmea, y el stream sigue vivo aunque no lo mires.</p>
             <ul>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Una sesión, un canal.</b> Un clic para activarlo y otro para cambiar el farmeo al canal que tengas delante. Sin ventanas raras ni grupos de pestañas.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Puntos y drops.</b> Reclama los puntos del canal y recoge los drops de tu inventario en cuanto se completan, gastando recursos mínimos.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Una sesión, un canal.</b> Un clic para activarlo y otro para cambiar el farmeo de canal.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Puntos y drops.</b> Se reclaman solos en cuanto están listos, gastando recursos mínimos.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Registro del loot.</b> Todo lo reclamado —puntos y drops— con canal y fecha, en el panel de AutoClaim.</span></li>
             </ul>
           </div>
@@ -346,7 +358,7 @@
           <div class="spot-txt">
             <div class="tag">Descargas</div>
             <h3>Rat Tool: baja video y audio sin extensiones ni sitios raros.</h3>
-            <p>Detecta el video de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta. También está en el Naviris de Android.</p>
+            <p>Detecta el video de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta. También en Android.</p>
             <ul>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Selector de resolución</b> con las calidades reales del video (4K, 1080p, 720p…).</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Recursos gráficos:</b> extrae y descarga todas las imágenes y videos de cualquier página.</span></li>
@@ -360,7 +372,7 @@
               <div class="v-in">youtube.com/watch?v=…</div>
               <div class="v-sel"><span>Resolución</span><span class="q">1080p ▾</span></div>
               <div class="v-row">
-                <div class="b"><svg viewBox="0 0 489 489" fill="currentColor"><use href="#icoDownload"/></svg>Vídeo MP4</div>
+                <div class="b"><svg viewBox="0 0 489 489" fill="currentColor"><use href="#icoDownload"/></svg>Video MP4</div>
                 <div class="b"><svg viewBox="0 0 24 24" fill="none"><path d="M9 9l10.5-3M9 9v10.5A2.25 2.25 0 1 1 6.75 17.25M9 9l10.5-3m0 0v10.5A2.25 2.25 0 1 1 17.25 14.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Audio MP3</div>
               </div>
             </div>
@@ -376,11 +388,11 @@
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Addon oficial</div>
             <h3>Watch Party: vean lo mismo a la vez, cada quien con su cuenta.</h3>
-            <p>Crea una sala, comparte el código y vean el mismo episodio a la vez en Crunchyroll, Netflix, Disney+ o YouTube. La reproducción se sincroniza sola con la del anfitrión y el chat narra cada acción. Nadie transmite nada: cada persona reproduce con su propia cuenta.</p>
+            <p>Crea una sala, comparte el código y vean el mismo episodio a la vez en Crunchyroll, Netflix, Disney+ o YouTube. La reproducción se sincroniza sola con la del anfitrión y el chat narra cada acción. Cada quien reproduce con su propia cuenta.</p>
             <ul>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sincronización real.</b> Play, pausa y saltos se aplican a todos al momento; si alguien se descuelga, se corrige solo.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sincronización real.</b> Play, pausa y saltos se aplican a todos al momento; si alguien se desincroniza, se corrige solo.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Los invitados llegan solos.</b> Al unirte, Naviris te lleva al episodio del anfitrión sin buscar nada.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>El anfitrión manda.</b> Puede reservarse el control para que nadie pause la película a mitad.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>El anfitrión manda.</b> Puede reservarse el control para que nadie pause la película a la mitad.</span></li>
             </ul>
           </div>
           <div class="visual">
@@ -413,27 +425,27 @@
           <div class="card hl" data-tag="Estrella">
             <div class="ic"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></div>
             <h3>Rat Tool</h3>
-            <p>Descarga video (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución y detección automática del enlace. En escritorio y en Android.</p>
+            <p>Descarga video (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución. En escritorio y Android.</p>
           </div>
           <div class="card hl" data-tag="Twitch">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></div>
             <h3>AutoClaim</h3>
-            <p>Activa el farmeo en un canal y Naviris lo silencia, baja su resolución y reclama puntos y drops en segundo plano mientras haces otra cosa. Con registro de todo el loot.</p>
+            <p>Activa el farmeo en un canal y Naviris lo silencia, baja su resolución y reclama puntos y drops en segundo plano. Con registro de todo el loot.</p>
           </div>
           <div class="card hl" data-tag="Addon oficial">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
             <h3>Watch Party</h3>
-            <p>Salas con código para ver lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube, con chat y sincronización automática. Cada persona reproduce con su cuenta.</p>
+            <p>Salas con código para ver lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube, con chat y sincronización automática. Cada quien con su cuenta.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
             <h3>Series y películas con DRM</h3>
-            <p>Widevine viene de fábrica: Crunchyroll y otros servicios con DRM reproducen a 1080p sin instalar ni configurar nada. La base sobre la que corre Watch Party.</p>
+            <p>Widevine viene de fábrica: Crunchyroll y otros servicios con DRM reproducen a 1080p sin configurar nada. La base sobre la que corre Watch Party.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoShield"/></svg></div>
             <h3>Bloqueador de anuncios</h3>
-            <p>Motor de bloqueo integrado con listas de filtros que se actualizan solas, sin esperar a una versión nueva. Incluye un saltador de anuncios de YouTube y permite excepciones por dominio.</p>
+            <p>Motor integrado con listas de filtros que se actualizan solas. Salta los anuncios de YouTube y permite excepciones por dominio.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><use href="#icoKey"/></svg></div>
@@ -443,12 +455,12 @@
           <div class="card hl" data-tag="Ampliable">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
             <h3>Addons</h3>
-            <p>Un catálogo de extensiones propias que instalas solo si las quieres y crece sin actualizar el navegador: Watch Party, Twitch Kit (mejoras de chat y player), Sound Booster (volumen hasta 500%), Valve Rat Tool (precios y venta en Steam) y Captura larga.</p>
+            <p>Extensiones propias que instalas solo si las quieres: Watch Party, Twitch Kit, Sound Booster, Valve Rat Tool y Captura larga. El catálogo crece sin actualizar el navegador.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></div>
             <h3>Importa tus marcadores</h3>
-            <p>Trae tus favoritos de Chrome, Edge, Opera GX y Firefox de un clic — sí, también Firefox, leyendo su formato comprimido. Con carpetas y página gestora propia.</p>
+            <p>Trae tus favoritos de Chrome, Edge, Opera GX y Firefox con un clic. Con carpetas y página gestora propia.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
@@ -468,7 +480,7 @@
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99M19.969 14.135a8.25 8.25 0 0 1-13.803 3.7l-3.181-3.182m0 4.99v-4.99" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Se actualiza solo</h3>
-            <p>Cada versión llega automáticamente desde GitHub, con verificación de integridad, y puedes elegir entre la línea estable y NavirisDev. También en Android (APK). Código abierto bajo licencia MIT.</p>
+            <p>Cada versión llega sola desde GitHub, con verificación de integridad. Elige entre la línea estable y NavirisDev. También en Android (APK).</p>
           </div>
         </div>
       </div>
