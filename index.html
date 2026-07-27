@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Naviris — Navegador ligero de Iris Studio</title>
-  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga vídeo y audio con Rat Tool, bloqueador con el motor de Brave, gestor de contraseñas con Windows Hello, addons instalables y bajo consumo. Gratis y de código abierto." />
+  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga vídeo y audio con Rat Tool, AutoClaim de puntos y drops de Twitch, Watch Party para ver series a la vez, bloqueador integrado, gestor de contraseñas con Windows Hello y addons instalables. Gratis y de código abierto." />
   <meta property="og:title" content="Naviris — Navegador ligero de Iris Studio" />
-  <meta property="og:description" content="Las herramientas que normalmente son extensiones, aquí vienen dentro. Rat Tool, AutoLoot para Twitch, gestor de contraseñas y más." />
+  <meta property="og:description" content="Las herramientas que normalmente son extensiones, aquí vienen dentro. Rat Tool, AutoClaim para Twitch, Watch Party, gestor de contraseñas y más." />
   <meta property="og:type" content="website" />
   <link rel="icon" href="./assets/iris-favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,7 +16,7 @@
     :root{
       --bg:#08080a; --bg-2:#0e0e12; --panel:#131317; --panel-2:#1a1a20; --line:#232327; --line-2:#2c2c33;
       --text:#ececef; --muted:#8b8d94; --dim:#5c5e64; --accent:#e8e9ec;
-      --violet:#b98cff; --violet-dim:#8f6fd6;
+      --violet:#b98cff; --violet-dim:#8f6fd6; --green:#9ee2b8;
       --font:'Inter',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace;
       --maxw:1180px;
     }
@@ -34,6 +34,10 @@
     /* Halo de color detrás del hero */
     .glow{position:fixed;top:-16%;left:50%;transform:translateX(-50%);width:1100px;height:620px;z-index:0;pointer-events:none;
       background:radial-gradient(50% 50% at 50% 50%,rgba(140,110,215,.16),transparent 70%);filter:blur(24px)}
+
+    /* Gradiente del logo: estático; el color solo gira en hover, como en la app */
+    .logo{transition:filter .6s ease}
+    a:hover>.logo{filter:hue-rotate(140deg)}
 
     /* ===== Nav ===== */
     header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(8,8,10,.72);border-bottom:1px solid rgba(35,35,39,.6)}
@@ -73,9 +77,8 @@
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
     .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
-    .m-group{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:8px;border:1px solid rgba(145,112,214,.4);background:rgba(120,90,190,.12);font-size:10px;color:#d3c1ff}
-    .m-group svg{width:12px;height:12px}
-    .m-mini{display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:8px;border:1px solid rgba(145,112,214,.22);background:rgba(120,90,190,.06);font-size:10px;color:#c9b8ef}
+    .m-tab svg{width:12px;height:12px}
+    .m-tab.farm{color:var(--green);border:1px solid rgba(158,226,184,.35);background:rgba(158,226,184,.07)}
     .m-nav{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;background:#0e0e12;color:var(--dim)}
     .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim)}
     .m-body{position:absolute;inset:72px 0 0 0;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
@@ -85,10 +88,10 @@
     .m-tiles{display:grid;grid-template-columns:repeat(6,44px);gap:12px}
     .m-tile{width:44px;height:44px;border-radius:13px;background:linear-gradient(140deg,#1e1e23,#141418);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#e4e6ea}
     .m-tile svg{width:20px;height:20px}
-    .m-side{position:absolute;left:0;top:72px;bottom:0;width:34px;background:#08080a;border-right:1px solid #151517;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:10px}
-    .m-side i{width:20px;height:20px;border-radius:6px;display:block;color:#55565c}
+    .m-side{position:absolute;left:0;top:72px;bottom:0;width:34px;background:#08080a;border-right:1px solid #151517;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:10px;z-index:2}
+    .m-side i{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#55565c}
     .m-side i.on{color:var(--violet)}
-    .m-side i svg{width:16px;height:16px}
+    .m-side i svg{width:15px;height:15px}
 
     /* ===== Secciones ===== */
     section{position:relative;z-index:1;padding:60px 0}
@@ -102,6 +105,7 @@
     .spot.rev{grid-template-columns:1fr 1.05fr}
     .spot.rev .spot-txt{order:2}
     .spot .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--violet);margin-bottom:16px}
+    .spot .tag .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block}
     .spot h3{font-size:clamp(23px,2.8vw,31px);font-weight:800;letter-spacing:-.02em;margin-bottom:14px;text-wrap:balance}
     .spot p{color:var(--muted);font-size:15px;line-height:1.66;max-width:44ch}
     .spot ul{list-style:none;margin-top:20px;display:flex;flex-direction:column;gap:11px}
@@ -111,25 +115,24 @@
     .spot li b{color:var(--text);font-weight:600}
     .visual{border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,#111114,#0a0a0c);padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
 
-    /* Visual AutoLoot: barra de pestañas con grupo */
+    /* Visual AutoClaim: pestaña farmeando + sesión */
     .v-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
     .v-t{display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9px;background:#17171b;border:1px solid #232327;font-size:12px;color:var(--muted)}
     .v-t .d{width:8px;height:8px;border-radius:50%;background:#45464c}
-    .v-g{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:9px;border:1px solid rgba(145,112,214,.45);background:rgba(120,90,190,.16);font-size:12px;color:#d9c9ff;font-weight:600}
-    .v-g svg{width:14px;height:14px}
-    .v-m{display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:9px;border:1px solid rgba(145,112,214,.25);background:rgba(120,90,190,.08);font-size:12px;color:#c9b8ef;animation:vslide .5s ease both}
-    .v-m:nth-child(3){animation-delay:.08s}.v-m:nth-child(4){animation-delay:.16s}
-    @keyframes vslide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+    .v-t svg{width:14px;height:14px}
+    .v-t.farm{color:var(--green);border-color:rgba(158,226,184,.4);background:rgba(158,226,184,.08);font-weight:600}
     .v-toast{margin-top:18px;display:inline-flex;align-items:center;gap:9px;padding:10px 15px;border-radius:11px;background:#0d0d10;border:1px solid var(--line-2);font-size:13px;color:var(--text)}
     .v-toast .pill{font-family:var(--mono);font-size:11px;color:var(--violet)}
     .v-loot{margin-top:14px;display:flex;gap:10px}
     .v-loot .box{flex:1;background:#0d0d10;border:1px solid var(--line);border-radius:11px;padding:12px 14px}
     .v-loot .box .n{font-size:20px;font-weight:800}
+    .v-loot .box .n.g{color:var(--green)}
     .v-loot .box .l{font-family:var(--mono);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
 
     /* Visual Rat Tool: popup */
     .v-pop{max-width:280px;margin:0 auto}
-    .v-pop .h{font-weight:700;font-size:14px;margin-bottom:2px}
+    .v-pop .h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:2px}
+    .v-pop .h svg{width:16px;height:16px;color:var(--violet)}
     .v-pop .s{font-size:11px;color:var(--dim);margin-bottom:14px}
     .v-in{height:34px;border-radius:9px;border:1px solid #2c2c33;background:#08080a;display:flex;align-items:center;padding:0 12px;font-size:11px;color:var(--dim);margin-bottom:10px}
     .v-sel{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:12px}
@@ -137,6 +140,18 @@
     .v-row{display:flex;gap:8px}
     .v-row .b{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:#17171b;border-radius:9px;padding:10px;font-size:12px}
     .v-row .b svg{width:14px;height:14px;color:var(--muted)}
+
+    /* Visual Watch Party: sala + chat narrado */
+    .v-room{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .v-room .t{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+    .v-room .t svg{width:16px;height:16px;color:var(--violet)}
+    .v-code{font-family:var(--mono);letter-spacing:.18em;font-size:14px;color:var(--violet);border:1px dashed rgba(145,112,214,.45);border-radius:9px;padding:6px 12px}
+    .v-chat{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+    .v-sys{font-family:var(--mono);font-size:11px;color:var(--dim)}
+    .v-msg{align-self:flex-start;background:#17171b;border:1px solid #232327;border-radius:10px;padding:7px 11px;font-size:12.5px;color:var(--text);max-width:85%}
+    .v-msg b{color:var(--violet);font-weight:600}
+    .v-svcs{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}
+    .v-svc{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
 
     /* Rejilla de características */
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -189,15 +204,31 @@
 </head>
 <body>
 
-  <!-- Logo animado reutilizable (símbolo) -->
-  <svg width="0" height="0" style="position:absolute">
+  <!-- Símbolos reutilizables: logo (gradiente ESTÁTICO, sin SMIL) e iconos reales de la app -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
       <linearGradient id="cobaltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#b9aae6"><animate attributeName="stop-color" values="#b9aae6;#9dc3e6;#a4d9c2;#e6d6a4;#e6a9b4;#b9aae6" dur="9s" repeatCount="indefinite"/></stop>
-        <stop offset="50%" stop-color="#a4d9c2"><animate attributeName="stop-color" values="#a4d9c2;#e6d6a4;#e6a9b4;#b9aae6;#9dc3e6;#a4d9c2" dur="9s" repeatCount="indefinite"/></stop>
-        <stop offset="100%" stop-color="#e6a9b4"><animate attributeName="stop-color" values="#e6a9b4;#b9aae6;#9dc3e6;#a4d9c2;#e6d6a4;#e6a9b4" dur="9s" repeatCount="indefinite"/></stop>
+        <stop offset="0%" stop-color="#b9aae6"/>
+        <stop offset="50%" stop-color="#a4d9c2"/>
+        <stop offset="100%" stop-color="#e6a9b4"/>
       </linearGradient>
       <path id="cobaltPath" fill-rule="evenodd" d="M1.08,582.41L0,302.19C-.65,131.46,130.07-1.65,303,.02l306.38,2.95c152.34,1.47,267.72,141.24,266.88,290.55l-1.72,307.39c-.86,154.14-136.95,274.21-288.33,273.92l-299.69-.58C128.09,873.93,1.69,742.98,1.08,582.41ZM670.98,820.63c85.92-7.81,145.77-71.41,151.41-157.79,5.07-77.74-16.57-152.57-53.84-222.68-82.97-156.09-213.93-281-375.71-352.86-56.61-25.15-115.91-37.9-176.04-34.9C124.83,56.97,57.47,124.72,53.55,217.62c-11.51,273.02,343.75,627.9,617.43,603.01Z"/>
+      <!-- Glifo Twitch del AutoClaim (mismo dibujo que la barra lateral de Naviris) -->
+      <g id="icoTwitch"><path fill-rule="evenodd" d="M4.5 1L2 3.5v9h3V15l2.5-2.5h2L14 8V1H4.5zM13 7.5l-2 2H9l-1.75 1.75V9.5H5V2h8v5.5z"/><path d="M11.5 3.75h-1v3h1v-3zM8.75 3.75h-1v3h1v-3z"/></g>
+      <!-- Escudo del AdBlock -->
+      <path id="icoShield" fill-rule="evenodd" clip-rule="evenodd" d="M4.35009 13.3929C2.37912 11.9851 1.1593 9.76613 1.01453 7.36543C1.00487 7.20539 1 7.04453 1 6.88306V3L8 0L15 3V6.88306C15 9.46667 13.7523 11.8912 11.6499 13.3929L8 16L4.35009 13.3929ZM7 12.8279L8 13.5422L9 12.8279V2.60451L8 2.17594L7 2.60451V12.8279Z"/>
+      <!-- Ojo del Watch Party -->
+      <path id="icoEye" fill-rule="evenodd" clip-rule="evenodd" d="M0 8L3.07945 4.30466C4.29638 2.84434 6.09909 2 8 2C9.90091 2 11.7036 2.84434 12.9206 4.30466L16 8L12.9206 11.6953C11.7036 13.1557 9.90091 14 8 14C6.09909 14 4.29638 13.1557 3.07945 11.6953L0 8ZM8 11C9.65685 11 11 9.65685 11 8C11 6.34315 9.65685 5 8 5C6.34315 5 5 6.34315 5 8C5 9.65685 6.34315 11 8 11Z"/>
+      <!-- Ratón del Rat Tool -->
+      <g id="icoMouse"><polygon points="87.782,387.68 188.96,428.576 194.888,413.901 93.711,373.015"/><rect x="133.426" y="416.602" transform="matrix(-0.335 -0.9422 0.9422 -0.335 -254.4378 761.0066)" width="15.82" height="107.382"/><rect x="316.108" y="459.927" transform="matrix(-0.9272 -0.3746 0.3746 -0.9272 539.0723 1040.4717)" width="109.114" height="15.827"/><rect x="316.977" y="390.433" transform="matrix(0.9422 -0.3351 0.3351 0.9422 -112.0575 147.2467)" width="107.372" height="15.82"/><path d="M393.84,16.268c-65.249,0-118.15,52.895-118.15,118.149c0,3.399,0.226,6.74,0.506,10.06h-40.288c0.169-2.616,0.396-5.223,0.396-7.878c0-65.254-52.902-118.14-118.15-118.14C52.901,18.459,0,71.345,0,136.599c0,60.505,45.512,110.311,104.152,117.252l114.462,162.106c-1.549,4.258-2.529,8.786-2.529,13.574c0,22.041,17.875,39.921,39.916,39.921c22.036,0,39.911-17.88,39.911-39.921c0-4.779-0.98-9.307-2.525-13.565l116.2-164.577C467.377,243.676,512,194.323,512,134.417C512,69.163,459.094,16.268,393.84,16.268z M118.155,189.775c-29.364,0-53.166-23.816-53.166-53.176c0-29.368,23.803-53.166,53.166-53.166s53.166,23.798,53.166,53.166C171.322,165.959,147.519,189.775,118.155,189.775z M201.999,311.836c-9.616,0-17.421-7.8-17.421-17.416c0-9.616,7.805-17.416,17.421-17.416c9.615,0,17.421,7.8,17.421,17.416C219.42,304.036,211.614,311.836,201.999,311.836z M310.002,311.836c-9.635,0-17.436-7.8-17.436-17.416c0-9.616,7.801-17.416,17.436-17.416c9.615,0,17.416,7.8,17.416,17.416C327.418,304.036,319.617,311.836,310.002,311.836z M393.84,187.584c-29.369,0-53.171-23.798-53.171-53.167c0-29.358,23.802-53.176,53.171-53.176c29.36,0,53.167,23.818,53.167,53.176C447.007,163.786,423.2,187.584,393.84,187.584z"/></g>
+      <!-- Bandeja de descargas -->
+      <g id="icoDownload"><path d="M329.2,327.2c-4.5,0-8.1,3.4-8.6,7.9c-3.9,38.6-36.5,68.7-76.2,68.7c-39.6,0-72.2-30.1-76.2-68.7 c-0.5-4.4-4.1-7.9-8.6-7.9h-104c-21.8,0-39.5,17.7-39.5,39.5v82.8c0,21.8,17.7,39.5,39.5,39.5h377.8c21.8,0,39.5-17.7,39.5-39.5 v-82.7c0-21.8-17.7-39.5-39.5-39.5H329.2V327.2z"/><path d="M303.5,198.6l-30.9,30.9V28.1C272.6,12.6,260,0,244.5,0l0,0c-15.5,0-28.1,12.6-28.1,28.1v201.4l-30.9-30.9 c-9.5-9.5-24.7-11.9-35.9-4.4c-15.3,10.2-16.8,31.1-4.5,43.4l82.8,82.8c9.2,9.2,24.1,9.2,33.3,0l82.8-82.8 c12.3-12.3,10.8-33.2-4.5-43.4C328.2,186.6,313,189,303.5,198.6z"/></g>
+      <!-- Llave del gestor de contraseñas -->
+      <path id="icoKey" d="M19.7887 4.22031C16.8287 1.27031 12.0287 1.27031 9.08868 4.22031C7.01868 6.27031 6.39868 9.22031 7.19868 11.8203L2.49868 16.5203C2.16868 16.8603 1.93868 17.5303 2.00868 18.0103L2.30868 20.1903C2.41868 20.9103 3.08868 21.5903 3.80868 21.6903L5.98868 21.9903C6.46868 22.0603 7.13868 21.8403 7.47868 21.4903L8.29868 20.6703C8.49868 20.4803 8.49868 20.1603 8.29868 19.9603L6.35868 18.0203C6.06868 17.7303 6.06868 17.2503 6.35868 16.9603C6.64868 16.6703 7.12868 16.6703 7.41868 16.9603L9.36868 18.9103C9.55868 19.1003 9.87868 19.1003 10.0687 18.9103L12.1887 16.8003C14.7787 17.6103 17.7287 16.9803 19.7887 14.9303C22.7387 11.9803 22.7387 7.17031 19.7887 4.22031ZM14.4987 12.0003C13.1187 12.0003 11.9987 10.8803 11.9987 9.50031C11.9987 8.12031 13.1187 7.00031 14.4987 7.00031C15.8787 7.00031 16.9987 8.12031 16.9987 9.50031C16.9987 10.8803 15.8787 12.0003 14.4987 12.0003Z"/>
+      <!-- Cinta de marcadores -->
+      <path id="icoBookmark" fill-rule="evenodd" d="M260.086,0H69.846C54.368,0,41.788,12.58,41.788,28.04v287.428c0,4.78,2.366,9.235,6.308,11.926s8.965,3.255,13.417,1.495 l103.441-40.875l103.454,40.875c1.699,0.679,3.501,1.003,5.29,1.003c2.847,0,5.687-0.841,8.101-2.492 c3.957-2.684,6.312-7.146,6.312-11.919V28.04C288.123,12.58,275.543,0,260.086,0z M213.033,158.674l-25.137,18.264l9.596,29.556 c0.643,1.981-0.06,4.155-1.741,5.374c-0.853,0.606-1.837,0.919-2.822,0.919c-0.991,0-1.981-0.312-2.834-0.919l-25.134-18.261 l-25.136,18.261c-1.684,1.219-3.966,1.219-5.645,0c-1.678-1.219-2.405-3.387-1.753-5.374l9.61-29.556l-25.142-18.264 c-1.684-1.225-2.387-3.39-1.748-5.374c0.64-1.981,2.486-3.327,4.576-3.327h31.068l9.611-29.54c1.273-3.966,7.842-3.966,9.139,0 l9.599,29.54h31.075c2.084,0,3.921,1.346,4.569,3.327C215.423,155.278,214.714,157.449,213.033,158.674z"/>
+      <!-- Candado del DRM -->
+      <path id="icoLock" d="M403.88,196.563h-9.484v-44.388c0-82.099-65.151-150.681-146.582-152.145c-2.225-0.04-6.671-0.04-8.895,0 C157.486,1.494,92.336,70.076,92.336,152.175v44.388h-9.485c-14.616,0-26.538,15.082-26.538,33.709v222.632 c0,18.606,11.922,33.829,26.539,33.829h321.028c14.616,0,26.539-15.223,26.539-33.829V230.272 C430.419,211.646,418.497,196.563,403.88,196.563z M273.442,341.362v67.271c0,7.703-6.449,14.222-14.158,14.222H227.45 c-7.71,0-14.159-6.519-14.159-14.222v-67.271c-7.477-7.36-11.83-17.537-11.83-28.795c0-21.334,16.491-39.666,37.459-40.513 c2.222-0.09,6.673-0.09,8.895,0c20.968,0.847,37.459,19.179,37.459,40.513C285.272,323.825,280.919,334.002,273.442,341.362z M331.886,196.563h-84.072h-8.895h-84.072v-44.388c0-48.905,39.744-89.342,88.519-89.342c48.775,0,88.521,40.437,88.521,89.342 V196.563z"/>
     </defs>
   </svg>
 
@@ -210,7 +241,8 @@
         Naviris
       </a>
       <a class="link" href="#features">Características</a>
-      <a class="link" href="#autoloot">AutoLoot</a>
+      <a class="link" href="#autoclaim">AutoClaim</a>
+      <a class="link" href="#party">Watch Party</a>
       <a class="link" href="#descargar">Descarga</a>
       <span class="spacer"></span>
       <a class="back" href="https://iris.it.com/">← iris.it.com</a>
@@ -223,7 +255,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">Iris Studio · Navegador</span></div>
         <h1>Navega ligero.<br>Descarga y reclama todo.</h1>
-        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja vídeo y audio, bloquea anuncios con el motor de Brave, guarda tus contraseñas y amplíalo con Addons opcionales. Ligero de instalar y de memoria.</p>
+        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja vídeo y audio, bloquea anuncios, reclama tus drops de Twitch, ve series con DRM en compañía y amplíalo con addons opcionales. Ligero de instalar y de memoria.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -231,25 +263,28 @@
           </a>
           <a class="btn btn-ghost" href="#features">Ver qué incluye</a>
         </div>
-        <div class="dl-meta"><b id="ver-hero">Última versión</b> · Windows 10/11 · 64 bits · Gratis</div>
+        <div class="dl-meta"><b id="ver-hero">Última versión</b> · Windows 10/11 · 64 bits · Android · Gratis</div>
         <div class="stats">
-          <div class="stat"><div class="n">~73 MB</div><div class="l">Instalador</div></div>
-          <div class="stat"><div class="n">Brave</div><div class="l">Motor del adblock</div></div>
+          <div class="stat"><div class="n">Widevine</div><div class="l">DRM de fábrica</div></div>
+          <div class="stat"><div class="n">5</div><div class="l">Addons en catálogo</div></div>
           <div class="stat"><div class="n">MIT</div><div class="l">Código abierto</div></div>
         </div>
       </div>
 
       <div class="mock" aria-label="Vista previa de Naviris">
         <div class="m-bar">
+          <div class="m-tab farm"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg>Canal en farmeo</div>
           <div class="m-tab"><span class="tdot"></span>Nueva pestaña</div>
-          <div class="m-group"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18.75a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H3.375A.75.75 0 0 0 2.625 9v1.5c0 .414.336.75.75.75Z"/></svg>AutoLoot · 3</div>
         </div>
         <div class="m-nav">
           <span>←</span><span>→</span><span>↻</span>
           <div class="m-url">Busca en Google o escribe una dirección</div>
         </div>
         <div class="m-side">
-          <i></i><i class="on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0 0V21m-8.625-9.75h18.75a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H3.375A.75.75 0 0 0 2.625 9v1.5c0 .414.336.75.75.75Z"/></svg></i><i></i><i></i>
+          <i class="on"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></i>
+          <i><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></i>
+          <i><svg viewBox="0 0 489 489" fill="currentColor"><use href="#icoDownload"/></svg></i>
+          <i><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></i>
         </div>
         <div class="m-body">
           <div class="m-clock" id="mockclock">21:47</div>
@@ -267,29 +302,28 @@
       </div>
     </div>
 
-    <!-- ===== Spotlight: AutoLoot ===== -->
-    <section id="autoloot">
+    <!-- ===== Spotlight: AutoClaim ===== -->
+    <section id="autoclaim">
       <div class="wrap">
         <div class="spot">
           <div class="spot-txt">
-            <div class="tag"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block"></span>Addon oficial</div>
-            <h3>AutoLoot: deja Twitch de fondo y no pierdas un solo drop.</h3>
-            <p>Instala el addon AutoLoot y pulsa <b>Rat Loot</b> en cualquier canal: Naviris lo silencia, baja la resolución solo en esa pestaña y la agrupa a la izquierda mientras reclama por ti puntos y drops en segundo plano. Mantiene el stream vivo cerrando el aviso de "¿sigues ahí?" y nunca duerme esas pestañas.</p>
+            <div class="tag"><span class="dot"></span>Integrado en Naviris</div>
+            <h3>AutoClaim: deja Twitch de fondo y no pierdas un solo drop.</h3>
+            <p>Pulsa el botón de Twitch en la barra lateral y activa AutoClaim en el canal que estés viendo: Naviris lo silencia, baja la resolución al mínimo solo en esa pestaña y reclama por ti los puntos y los drops en segundo plano. La pestaña se queda en su sitio, marcada en verde mientras farmea, y el stream sigue vivo aunque no lo mires.</p>
             <ul>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sesión Rat Loot.</b> Un clic: silencio, resolución mínima por pestaña y reclamo automático, gastando recursos mínimos.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Agrupado a la izquierda.</b> Las sesiones se colapsan como primera pestaña del grupo y se despliegan cuando las necesitas.</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Registro del loot.</b> Todo lo reclamado —puntos y drops— con canal y fecha, dentro del propio addon.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Una sesión, un canal.</b> Un clic para activarlo y otro para cambiar el farmeo al canal que tengas delante. Sin ventanas raras ni grupos de pestañas.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Puntos y drops.</b> Reclama los puntos del canal y recoge los drops de tu inventario en cuanto se completan, gastando recursos mínimos.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Registro del loot.</b> Todo lo reclamado —puntos y drops— con canal y fecha, en el panel de AutoClaim.</span></li>
             </ul>
           </div>
           <div class="visual">
             <div class="v-tabs">
-              <div class="v-g"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0 0V21m-8.625-9.75h18.75a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H3.375A.75.75 0 0 0 2.625 9v1.5c0 .414.336.75.75.75Z"/></svg>AutoLoot · 3</div>
-              <div class="v-m">shroud</div>
-              <div class="v-m">pokimane</div>
-              <div class="v-m">summit1g</div>
+              <div class="v-t farm"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg>Canal en farmeo</div>
+              <div class="v-t"><span class="d"></span>Tú, a lo tuyo</div>
             </div>
-            <div class="v-toast"><span class="pill">✓ LOOT</span> Drop de Twitch reclamado</div>
+            <div class="v-toast"><span class="pill">LOOT</span> Drop reclamado en segundo plano</div>
             <div class="v-loot">
+              <div class="box"><div class="n g">2 h 14 m</div><div class="l">Sesión</div></div>
               <div class="box"><div class="n">128</div><div class="l">Puntos</div></div>
               <div class="box"><div class="n">6</div><div class="l">Drops</div></div>
             </div>
@@ -305,22 +339,56 @@
           <div class="spot-txt">
             <div class="tag">Descargas</div>
             <h3>Rat Tool: baja vídeo y audio sin extensiones ni webs raras.</h3>
-            <p>Detecta el vídeo de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta.</p>
+            <p>Detecta el vídeo de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta. También está en el Naviris de Android.</p>
             <ul>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Selector de resolución</b> con las calidades reales del vídeo (4K, 1080p, 720p…).</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Recursos gráficos:</b> extrae y descarga todas las imágenes y vídeos de cualquier página.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Página de Descargas</b> con el progreso en vivo y el historial de todo lo bajado, agrupado por fecha y tipo.</span></li>
             </ul>
           </div>
           <div class="visual">
             <div class="v-pop">
-              <div class="h">Rat Tool</div>
+              <div class="h"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg>Rat Tool</div>
               <div class="s">Descargar vídeo o audio</div>
               <div class="v-in">youtube.com/watch?v=…</div>
               <div class="v-sel"><span>Resolución</span><span class="q">1080p ▾</span></div>
               <div class="v-row">
-                <div class="b"><svg viewBox="0 0 24 24" fill="none"><path d="M3.375 19.5h17.25M2.25 5.625v12.75M21.75 5.625v12.75M6 5.625v12.75M18 5.625v12.75M2.25 5.625h19.5M7.125 12h9.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Vídeo MP4</div>
+                <div class="b"><svg viewBox="0 0 489 489" fill="currentColor"><use href="#icoDownload"/></svg>Vídeo MP4</div>
                 <div class="b"><svg viewBox="0 0 24 24" fill="none"><path d="M9 9l10.5-3M9 9v10.5A2.25 2.25 0 1 1 6.75 17.25M9 9l10.5-3m0 0v10.5A2.25 2.25 0 1 1 17.25 14.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Audio MP3</div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Spotlight: Watch Party ===== -->
+    <section id="party" style="padding-top:20px">
+      <div class="wrap">
+        <div class="spot">
+          <div class="spot-txt">
+            <div class="tag"><span class="dot"></span>Addon oficial</div>
+            <h3>Watch Party: ved lo mismo a la vez, cada uno con su cuenta.</h3>
+            <p>Crea una sala, comparte el código y ved el mismo episodio a la vez en Crunchyroll, Netflix, Disney+ o YouTube. La reproducción se sincroniza sola con la del anfitrión y el chat narra cada acción. Nadie transmite nada: cada persona reproduce con su propia cuenta.</p>
+            <ul>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sincronización real.</b> Play, pausa y saltos se aplican a todos al momento; si alguien se descuelga, se corrige solo.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Los invitados llegan solos.</b> Al unirte, Naviris te lleva al episodio del anfitrión sin buscar nada.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>El anfitrión manda.</b> Puede reservarse el control para que nadie pause la película a mitad.</span></li>
+            </ul>
+          </div>
+          <div class="visual">
+            <div class="v-room">
+              <div class="t"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg>Watch Party</div>
+              <div class="v-code">KQ4-7ZM</div>
+            </div>
+            <div class="v-chat">
+              <div class="v-sys">Vera se ha unido a la sala</div>
+              <div class="v-msg"><b>Iris:</b> dale play cuando quieras</div>
+              <div class="v-sys">Vera ha dado play</div>
+              <div class="v-msg"><b>Vera:</b> qué buen arranque de temporada</div>
+            </div>
+            <div class="v-svcs">
+              <span class="v-svc">Crunchyroll</span><span class="v-svc">Netflix</span><span class="v-svc">Disney+</span><span class="v-svc">YouTube</span>
             </div>
           </div>
         </div>
@@ -336,37 +404,48 @@
         </div>
         <div class="grid">
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3.375 19.5h17.25M2.25 5.625v12.75M21.75 5.625v12.75M6 5.625v12.75M18 5.625v12.75M2.25 5.625h19.5M3.375 4.5h17.25c.621 0 1.125.504 1.125 1.125M7.125 12h9.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></div>
             <div class="tagline">Estrella</div>
             <h3>Rat Tool</h3>
-            <p>Descarga vídeo (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución y detección automática del enlace.</p>
+            <p>Descarga vídeo (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución y detección automática del enlace. En escritorio y en Android.</p>
           </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18.75a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H3.375A.75.75 0 0 0 2.625 9v1.5c0 .414.336.75.75.75Z"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></div>
+            <div class="tagline">Twitch</div>
+            <h3>AutoClaim</h3>
+            <p>Activa el farmeo en un canal y Naviris lo silencia, baja su resolución y reclama puntos y drops en segundo plano mientras haces otra cosa. Con registro de todo el loot.</p>
+          </div>
+          <div class="card hl">
+            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
             <div class="tagline">Addon oficial</div>
-            <h3>AutoLoot para Twitch</h3>
-            <p>Addon instalable: Rat Loot silencia el canal, baja la resolución solo en esa pestaña y reclama puntos y drops en segundo plano, agrupado a la izquierda. Con registro del loot obtenido.</p>
+            <h3>Watch Party</h3>
+            <p>Salas con código para ver lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube, con chat y sincronización automática. Cada persona reproduce con su cuenta.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
+            <h3>Series y pelis con DRM</h3>
+            <p>Widevine viene de fábrica: Crunchyroll y otros servicios con DRM reproducen a 1080p sin instalar ni configurar nada. La base sobre la que corre Watch Party.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoShield"/></svg></div>
+            <h3>Bloqueador de anuncios</h3>
+            <p>Motor de bloqueo integrado con listas de filtros que se actualizan solas, sin esperar a una versión nueva. Incluye un saltador de anuncios de YouTube y permite excepciones por dominio.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><use href="#icoKey"/></svg></div>
             <h3>Gestor de contraseñas</h3>
             <p>Guarda y autorrellena tus contraseñas cifradas con tu cuenta de Windows. Verlas requiere Windows Hello (PIN o biometría). Todo en local.</p>
           </div>
-          <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h3>Bloqueador con el motor de Brave</h3>
-            <p>El mismo motor y las mismas listas de filtros que Brave, actualizándose solas. Incluye un saltador de anuncios de YouTube que cierra el aviso anti-adblock sin romper la reproducción. Permite anuncios por dominio.</p>
-          </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959a.64.64 0 0 1-.657.643 48.4 48.4 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401.31 0 .555.26.532.57a48.04 48.04 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875s2.25.84 2.25 1.875c0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959 0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401a.656.656 0 0 0 .658-.663 48.42 48.42 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
             <div class="tagline">Ampliable</div>
             <h3>Addons</h3>
-            <p>Un catálogo de extensiones propias que instalas a mano solo si las quieres. Crece sin actualizar el navegador. Ya disponibles: AutoLoot, Valve Rat Tool (precios de mercado en Steam) y Captura larga de página.</p>
+            <p>Un catálogo de extensiones propias que instalas solo si las quieres y crece sin actualizar el navegador: Watch Party, Twitch Kit (mejoras de chat y player), Sound Booster (volumen hasta 500%), Valve Rat Tool (precios y venta en Steam) y Captura larga.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3.75 9.75h16.5M8.25 9.75V21M3.75 6.108V18a2.25 2.25 0 0 0 2.25 2.25h12a2.25 2.25 0 0 0 2.25-2.25V6.108M3.75 6.108A2.25 2.25 0 0 1 6 3.858h12a2.25 2.25 0 0 1 2.25 2.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></div>
             <h3>Importa tus marcadores</h3>
-            <p>Trae tus favoritos de Chrome, Brave, Edge, Opera GX y Firefox de un clic — sí, también Firefox, leyendo su formato comprimido.</p>
+            <p>Trae tus favoritos de Chrome, Edge, Opera GX y Firefox de un clic — sí, también Firefox, leyendo su formato comprimido. Con carpetas y página gestora propia.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
@@ -379,14 +458,14 @@
             <p>Alrededor de la mitad de RAM que otros navegadores. Duerme las pestañas inactivas, usa aceleración por hardware y arranca directo a tu hub.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.75 3.75 0 0 1-1.043 3.296 3.75 3.75 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Privacidad y permisos</h3>
             <p>Ventana privada real, sandbox con aislamiento de sitios, HTTPS por defecto y gestión de permisos por sitio (cámara, micrófono, ubicación…).</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99M19.969 14.135a8.25 8.25 0 0 1-13.803 3.7l-3.181-3.182m0 4.99v-4.99" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Se actualiza solo</h3>
-            <p>Cada versión llega automáticamente desde GitHub, con verificación de integridad. También en Android (APK). Código abierto bajo licencia MIT.</p>
+            <p>Cada versión llega automáticamente desde GitHub, con verificación de integridad, y puedes elegir entre la línea estable y NavirisDev. También en Android (APK). Código abierto bajo licencia MIT.</p>
           </div>
         </div>
       </div>
@@ -397,7 +476,7 @@
         <div class="dl-panel">
           <svg class="logo-big" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
           <h2>Descarga Naviris</h2>
-          <p>Para Windows 10 y 11, y también para Android (APK). Gratis y de código abierto. La versión de escritorio se actualiza sola desde el navegador.</p>
+          <p>Para Windows 10 y 11, y también para Android (APK, con Rat Tool incluido). Gratis y de código abierto. La versión de escritorio se actualiza sola desde el navegador.</p>
           <div class="dl-actions">
             <a id="dl-main" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
               <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -411,7 +490,7 @@
           </div>
           <div class="reqs">
             <span><b>Versión:</b> <span id="ver-main">—</span></span>
-            <span><b>Tamaño:</b> <span id="size-main">~73 MB</span></span>
+            <span><b>Tamaño:</b> <span id="size-main">~92 MB</span></span>
             <span><b>SO:</b> Windows 10 / 11 (64 bits)</span>
             <span><b>Licencia:</b> MIT</span>
           </div>
