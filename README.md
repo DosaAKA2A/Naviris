@@ -1,6 +1,6 @@
 # Naviris
 
-Naviris por **Studio Iris** — navegador ligero sobre motor Chromium (Electron). Monocromático, de bajo consumo y con herramientas integradas.
+Naviris por **Iris Studio** — navegador ligero sobre motor Chromium (Electron). Monocromático, de bajo consumo y con herramientas integradas.
 
 ## Características
 
