@@ -74,7 +74,7 @@
     @keyframes sheen{from{left:-45%;opacity:1}to{left:115%;opacity:1}}
     .btn-ghost{border:1px solid var(--line-2);color:var(--text);font-size:14px;padding:15px 22px;background:transparent}
     .btn-ghost:hover{border-color:#55565c;background:rgba(255,255,255,.04)}
-    .dl-meta{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.03em}
+    .dl-meta{margin-top:28px;font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.03em}
     .dl-meta b{color:var(--muted);font-weight:500}
 
     /* ===== Mockup del navegador: panel recostado hacia atrás, centrado ===== */
@@ -697,8 +697,9 @@
           const qy = gsap.quickTo(b, 'y', { duration: .35, ease: 'power3' });
           b.addEventListener('mousemove', (e) => {
             const r = b.getBoundingClientRect();
-            qx((e.clientX - r.left - r.width / 2) * .18);
-            qy((e.clientY - r.top - r.height / 2) * .3);
+            // Tirón suave y acotado para que el botón nunca invada la línea de meta
+            qx((e.clientX - r.left - r.width / 2) * .16);
+            qy(gsap.utils.clamp(-6, 6, (e.clientY - r.top - r.height / 2) * .16));
           });
           b.addEventListener('mouseleave', () => { qx(0); qy(0); });
         });
