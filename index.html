@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Naviris — Navegador ligero de Iris Studio</title>
-  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga vídeo y audio con Rat Tool, AutoClaim de puntos y drops de Twitch, Watch Party para ver series a la vez, bloqueador integrado, gestor de contraseñas con Windows Hello y addons instalables. Gratis y de código abierto." />
+  <meta name="description" content="Naviris: navegador monocromático sobre Chromium. Descarga video y audio con Rat Tool, AutoClaim de puntos y drops de Twitch, Watch Party para ver series a la vez, bloqueador integrado, gestor de contraseñas con Windows Hello y addons instalables. Gratis y de código abierto." />
   <meta property="og:title" content="Naviris — Navegador ligero de Iris Studio" />
   <meta property="og:description" content="Las herramientas que normalmente son extensiones, aquí vienen dentro. Rat Tool, AutoClaim para Twitch, Watch Party, gestor de contraseñas y más." />
   <meta property="og:type" content="website" />
@@ -54,7 +54,7 @@
     .btn-sm:hover{background:#fff}
 
     /* ===== Hero ===== */
-    .hero{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1.08fr;gap:52px;align-items:center;padding:74px 0 70px}
+    .hero{position:relative;z-index:1;display:grid;grid-template-columns:.9fr 1.18fr;gap:36px;align-items:center;padding:74px 0 70px}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:22px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
     .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(185,140,255,.7)}
     h1{font-size:clamp(44px,6vw,74px);font-weight:900;letter-spacing:-0.035em;line-height:.97;text-wrap:balance;color:#fff}
@@ -71,9 +71,12 @@
     .stat .n{font-size:23px;font-weight:800;letter-spacing:-.02em}
     .stat .l{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
 
-    /* ===== Mockup del navegador ===== */
-    .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);box-shadow:0 34px 90px rgba(0,0,0,.6);overflow:hidden;aspect-ratio:16/10.6;animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
-    @keyframes rise{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
+    /* ===== Mockup del navegador (en perspectiva, estilo SaaS) ===== */
+    .stage{perspective:2200px;perspective-origin:55% 45%;animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+    .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10.6;
+      transform:rotateY(-20deg) rotateX(6deg) rotateZ(.6deg) scale(1.04);transform-style:preserve-3d;
+      box-shadow:-38px 46px 84px rgba(0,0,0,.62),-2px 0 0 rgba(255,255,255,.03)}
+    @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
     .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
@@ -81,7 +84,7 @@
     .m-tab.farm{color:var(--green);border:1px solid rgba(158,226,184,.35);background:rgba(158,226,184,.07)}
     .m-nav{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;background:#0e0e12;color:var(--dim)}
     .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim)}
-    .m-body{position:absolute;inset:72px 0 0 0;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
+    .m-body{position:absolute;inset:72px 0 0 34px;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
     .m-clock{font-size:40px;font-weight:250;letter-spacing:1px}
     .m-greet{font-size:10px;color:var(--muted);margin:5px 0 16px}
     .m-search{width:56%;height:30px;border-radius:999px;background:rgba(14,14,17,.85);border:1px solid #26262b;display:flex;align-items:center;padding:0 14px;gap:8px;font-size:9.5px;color:var(--dim);margin-bottom:22px}
@@ -157,13 +160,13 @@
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:24px;transition:border-color .2s,transform .2s,background .2s}
     .card:hover{border-color:#34353c;transform:translateY(-3px);background:#141418}
+    /* Etiqueta de categoría: se reserva su altura en TODAS las tarjetas (vacía si no la tienen) para que iconos y títulos queden alineados por fila */
+    .card::before{content:attr(data-tag) " ";display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);min-height:12px;line-height:12px;margin-bottom:13px;white-space:nowrap}
     .card .ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:15px;background:var(--panel-2);border:1px solid var(--line);color:var(--text)}
     .card.hl .ic{background:rgba(120,90,190,.14);border-color:rgba(145,112,214,.35);color:var(--violet)}
     .card .ic svg{width:21px;height:21px}
     .card h3{font-size:15.5px;margin-bottom:7px;font-weight:600}
     .card p{font-size:13.5px;color:var(--muted);line-height:1.6}
-    .card .tagline{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);margin-bottom:9px;display:none}
-    .card.hl .tagline{display:block}
 
     /* ===== Descarga ===== */
     #descargar{padding-bottom:80px}
@@ -192,6 +195,8 @@
 
     @media (max-width:900px){
       .hero{grid-template-columns:1fr;padding-top:48px}
+      .stage{perspective:none}
+      .mock{transform:none}
       .grid{grid-template-columns:1fr 1fr}
       .spot,.spot.rev{grid-template-columns:1fr;gap:28px}
       .spot.rev .spot-txt{order:0}
@@ -255,7 +260,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">Iris Studio · Navegador</span></div>
         <h1>Navega ligero.<br>Descarga y reclama todo.</h1>
-        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja vídeo y audio, bloquea anuncios, reclama tus drops de Twitch, ve series con DRM en compañía y amplíalo con addons opcionales. Ligero de instalar y de memoria.</p>
+        <p class="lead">Naviris es un navegador monocromático sobre Chromium con las herramientas que normalmente instalarías como extensiones — ya vienen dentro. Baja video y audio, bloquea anuncios, reclama tus drops de Twitch, ve series con DRM en compañía y amplíalo con addons opcionales. Ligero de instalar y de memoria.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -271,6 +276,7 @@
         </div>
       </div>
 
+      <div class="stage">
       <div class="mock" aria-label="Vista previa de Naviris">
         <div class="m-bar">
           <div class="m-tab farm"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg>Canal en farmeo</div>
@@ -300,6 +306,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- ===== Spotlight: AutoClaim ===== -->
@@ -309,7 +316,7 @@
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Integrado en Naviris</div>
             <h3>AutoClaim: deja Twitch de fondo y no pierdas un solo drop.</h3>
-            <p>Pulsa el botón de Twitch en la barra lateral y activa AutoClaim en el canal que estés viendo: Naviris lo silencia, baja la resolución al mínimo solo en esa pestaña y reclama por ti los puntos y los drops en segundo plano. La pestaña se queda en su sitio, marcada en verde mientras farmea, y el stream sigue vivo aunque no lo mires.</p>
+            <p>Presiona el botón de Twitch en la barra lateral y activa AutoClaim en el canal que estés viendo: Naviris lo silencia, baja la resolución al mínimo solo en esa pestaña y reclama por ti los puntos y los drops en segundo plano. La pestaña se queda en su sitio, marcada en verde mientras farmea, y el stream sigue vivo aunque no lo mires.</p>
             <ul>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Una sesión, un canal.</b> Un clic para activarlo y otro para cambiar el farmeo al canal que tengas delante. Sin ventanas raras ni grupos de pestañas.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Puntos y drops.</b> Reclama los puntos del canal y recoge los drops de tu inventario en cuanto se completan, gastando recursos mínimos.</span></li>
@@ -338,18 +345,18 @@
         <div class="spot rev">
           <div class="spot-txt">
             <div class="tag">Descargas</div>
-            <h3>Rat Tool: baja vídeo y audio sin extensiones ni webs raras.</h3>
-            <p>Detecta el vídeo de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta. También está en el Naviris de Android.</p>
+            <h3>Rat Tool: baja video y audio sin extensiones ni sitios raros.</h3>
+            <p>Detecta el video de la página o el enlace que copiaste y lo descarga en MP4 o MP3. Funciona con YouTube, TikTok (sin marca de agua), X e Instagram, y te deja elegir la resolución exacta. También está en el Naviris de Android.</p>
             <ul>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Selector de resolución</b> con las calidades reales del vídeo (4K, 1080p, 720p…).</span></li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Recursos gráficos:</b> extrae y descarga todas las imágenes y vídeos de cualquier página.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Selector de resolución</b> con las calidades reales del video (4K, 1080p, 720p…).</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Recursos gráficos:</b> extrae y descarga todas las imágenes y videos de cualquier página.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Página de Descargas</b> con el progreso en vivo y el historial de todo lo bajado, agrupado por fecha y tipo.</span></li>
             </ul>
           </div>
           <div class="visual">
             <div class="v-pop">
               <div class="h"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg>Rat Tool</div>
-              <div class="s">Descargar vídeo o audio</div>
+              <div class="s">Descargar video o audio</div>
               <div class="v-in">youtube.com/watch?v=…</div>
               <div class="v-sel"><span>Resolución</span><span class="q">1080p ▾</span></div>
               <div class="v-row">
@@ -368,8 +375,8 @@
         <div class="spot">
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Addon oficial</div>
-            <h3>Watch Party: ved lo mismo a la vez, cada uno con su cuenta.</h3>
-            <p>Crea una sala, comparte el código y ved el mismo episodio a la vez en Crunchyroll, Netflix, Disney+ o YouTube. La reproducción se sincroniza sola con la del anfitrión y el chat narra cada acción. Nadie transmite nada: cada persona reproduce con su propia cuenta.</p>
+            <h3>Watch Party: vean lo mismo a la vez, cada quien con su cuenta.</h3>
+            <p>Crea una sala, comparte el código y vean el mismo episodio a la vez en Crunchyroll, Netflix, Disney+ o YouTube. La reproducción se sincroniza sola con la del anfitrión y el chat narra cada acción. Nadie transmite nada: cada persona reproduce con su propia cuenta.</p>
             <ul>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Sincronización real.</b> Play, pausa y saltos se aplican a todos al momento; si alguien se descuelga, se corrige solo.</span></li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.75 10.5 18.75 19.5 5.25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Los invitados llegan solos.</b> Al unirte, Naviris te lleva al episodio del anfitrión sin buscar nada.</span></li>
@@ -403,27 +410,24 @@
           <p>Sin instalar nada extra, sin permisos raros. Todo integrado, monocromático y pensado para consumir poco.</p>
         </div>
         <div class="grid">
-          <div class="card hl">
+          <div class="card hl" data-tag="Estrella">
             <div class="ic"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></div>
-            <div class="tagline">Estrella</div>
             <h3>Rat Tool</h3>
-            <p>Descarga vídeo (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución y detección automática del enlace. En escritorio y en Android.</p>
+            <p>Descarga video (MP4) y audio (MP3) de YouTube, TikTok sin marca de agua, X e Instagram, con selector de resolución y detección automática del enlace. En escritorio y en Android.</p>
           </div>
-          <div class="card hl">
+          <div class="card hl" data-tag="Twitch">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></div>
-            <div class="tagline">Twitch</div>
             <h3>AutoClaim</h3>
             <p>Activa el farmeo en un canal y Naviris lo silencia, baja su resolución y reclama puntos y drops en segundo plano mientras haces otra cosa. Con registro de todo el loot.</p>
           </div>
-          <div class="card hl">
+          <div class="card hl" data-tag="Addon oficial">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
-            <div class="tagline">Addon oficial</div>
             <h3>Watch Party</h3>
             <p>Salas con código para ver lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube, con chat y sincronización automática. Cada persona reproduce con su cuenta.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
-            <h3>Series y pelis con DRM</h3>
+            <h3>Series y películas con DRM</h3>
             <p>Widevine viene de fábrica: Crunchyroll y otros servicios con DRM reproducen a 1080p sin instalar ni configurar nada. La base sobre la que corre Watch Party.</p>
           </div>
           <div class="card">
@@ -436,9 +440,8 @@
             <h3>Gestor de contraseñas</h3>
             <p>Guarda y autorrellena tus contraseñas cifradas con tu cuenta de Windows. Verlas requiere Windows Hello (PIN o biometría). Todo en local.</p>
           </div>
-          <div class="card hl">
+          <div class="card hl" data-tag="Ampliable">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
-            <div class="tagline">Ampliable</div>
             <h3>Addons</h3>
             <p>Un catálogo de extensiones propias que instalas solo si las quieres y crece sin actualizar el navegador: Watch Party, Twitch Kit (mejoras de chat y player), Sound Booster (volumen hasta 500%), Valve Rat Tool (precios y venta en Steam) y Captura larga.</p>
           </div>
@@ -499,7 +502,7 @@
             <b>NavirisDev</b> <span id="ver-dev">—</span> · versión de desarrollo, con lo que estamos probando antes de la estable.
             Puede fallar. <a id="dl-dev" href="https://github.com/DosaAKA2A/Naviris/releases">Descargar NavirisDev</a>
           </div>
-          <p class="note">Naviris no está firmado con certificado de código, así que Windows SmartScreen puede avisar la primera vez. Pulsa "Más información → Ejecutar de todas formas". El código es abierto y puedes revisarlo en GitHub.</p>
+          <p class="note">Naviris no está firmado con certificado de código, así que Windows SmartScreen puede avisar la primera vez. Haz clic en "Más información → Ejecutar de todas formas". El código es abierto y puedes revisarlo en GitHub.</p>
         </div>
       </div>
     </section>
