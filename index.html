@@ -52,10 +52,11 @@
     .btn-sm:hover{background:#fff}
 
     /* ===== Hero ===== */
-    .hero{position:relative;z-index:1;display:grid;grid-template-columns:.88fr 1.2fr;gap:36px;align-items:center;padding:80px 28px 76px}
+    .hero{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 1.15fr;gap:36px;align-items:center;padding:80px 28px 76px}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
     .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(185,140,255,.7)}
-    h1{font-size:clamp(46px,6.2vw,78px);font-weight:900;letter-spacing:-0.035em;line-height:.96;text-wrap:balance;color:#fff}
+    /* Tamaño calibrado para que el titular quepa en DOS líneas en la columna del hero */
+    h1{font-size:clamp(34px,4.4vw,54px);font-weight:900;letter-spacing:-0.035em;line-height:1.02;text-wrap:balance;color:#fff}
     .hero p.lead{margin:20px 0 28px;max-width:38ch;color:var(--muted);font-size:17px;line-height:1.55}
     .cta-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
     .btn-dl{background:var(--accent);color:#0a0a0a;font-size:16px;padding:16px 28px;border-radius:13px}
