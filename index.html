@@ -663,9 +663,17 @@
             scrollTrigger: { trigger: sp, start: 'top 74%' } });
         });
 
-        // Tarjetas en cascada
-        ScrollTrigger.batch('.grid .card', { start: 'top 88%',
-          onEnter: (els) => gsap.from(els, { y: 28, autoAlpha: 0, duration: .55, stagger: .07, ease: 'power2.out', overwrite: true }) });
+        // Tarjetas: cascada diagonal suave (stagger 2D por posición real en la rejilla,
+        // no por orden del DOM), con un punto de escala y desenfoque para que respire.
+        ScrollTrigger.batch('.grid .card', {
+          start: 'top 92%',
+          onEnter: (els) => gsap.from(els, {
+            y: 46, scale: .965, autoAlpha: 0, filter: 'blur(6px)',
+            duration: .85, ease: 'power3.out', overwrite: true,
+            stagger: { each: .09, grid: 'auto', from: 'start', ease: 'power1.inOut' },
+            clearProps: 'filter'
+          })
+        });
 
         // Encabezados y paneles grandes
         gsap.utils.toArray('.sec-head, .droid, .dl-panel, .foot').forEach((el) => {
