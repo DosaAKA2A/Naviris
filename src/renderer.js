@@ -1582,9 +1582,13 @@ const naviris = {
 const loadedTools = new Set();
 async function loadToolAddons() {
   const installed = await window.cobalt.addonsList();
-  // Migración: AutoLoot dejó de ser addon (ahora vive en el core). Si alguien lo
-  // tenía instalado, se retira para no duplicar el botón.
-  if (installed.autoloot) { try { await window.cobalt.addonsUninstall('autoloot'); naviris.unregisterTool('autoloot'); delete installed.autoloot; } catch { /* nada */ } }
+  // Migración: addons retirados del producto. AutoLoot pasó al core; Twitch Kit
+  // y Valve Rat Tool se descatalogaron (2026-07-29). Si alguien los tiene
+  // instalados, se desinstalan solos para que no quede código muerto sin
+  // actualizaciones.
+  for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper']) {
+    if (installed[retirado]) { try { await window.cobalt.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
+  }
   for (const [id, meta] of Object.entries(installed)) {
     if (meta.kind !== 'tool' || !meta.enabled || loadedTools.has(id)) continue;
     const code = await window.cobalt.addonsCode(id);

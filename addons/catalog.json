@@ -10,18 +10,6 @@
       "entry": "https://naviris.site/addons/sound-booster.js"
     },
     {
-      "id": "twitch-kit",
-      "name": "Twitch Kit",
-      "version": "1.4.0",
-      "kind": "content",
-      "icon": "gift",
-      "matches": [
-        "twitch.tv"
-      ],
-      "description": "Mejora el chat y el reproductor de Twitch: resaltado de menciones y palabras clave con aviso sonoro, mensajes borrados que se conservan legibles, fondo alterno para seguir el chat sin perderse, clic en el vídeo para pausar y limpieza de las piezas de la interfaz que no usas. Todo se configura desde el botón NK en la propia barra de Twitch.",
-      "entry": "https://naviris.site/addons/twitch-kit.js"
-    },
-    {
       "id": "watch-party",
       "name": "Watch Party",
       "version": "2.4.2",
@@ -29,18 +17,6 @@
       "icon": "eye-fill",
       "description": "Crea una sala, comparte el código y ved lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube. La reproducción se sincroniza sola con la del anfitrión, el chat narra cada acción y el anfitrión decide quién controla y quién puede cambiar el vídeo. Nadie transmite nada: cada persona reproduce con su propia cuenta. Requiere Naviris 2.6 o superior.",
       "entry": "https://naviris.site/addons/watch-party.js"
-    },
-    {
-      "id": "steam-inventory-helper",
-      "name": "Valve Rat Tool",
-      "version": "1.5.1",
-      "kind": "content",
-      "icon": "mouse",
-      "matches": [
-        "steamcommunity.com"
-      ],
-      "description": "Tu inventario de Steam, valorado al instante: precio por objeto con selector de mercado, valor total del inventario, venta rápida o masiva al precio actual y suma del valor de cada lado en las ofertas de intercambio. Incluye búsqueda por nombre, orden por precio o nombre y modo selección para operar en lote.",
-      "entry": "https://naviris.site/addons/steam-inventory-helper.js"
     },
     {
       "id": "long-screenshot",
