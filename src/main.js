@@ -109,6 +109,7 @@ const DEFAULT_SETTINGS = {
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
+  lightMode: false,         // tema claro de la interfaz
   devUpdates: null,         // canal de actualizaciones: null = según la versión instalada; true/false = elección del usuario
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
@@ -185,6 +186,12 @@ function saveSettings(s) {
     console.error('No se pudieron guardar los ajustes:', e);
   }
 }
+
+// Perfil alternativo por CLI (dev/pruebas): --user-data-dir=<carpeta> corre una
+// segunda instancia totalmente aislada sin tocar el perfil real del usuario.
+// Electron NO honra ese switch de Chromium por sí solo; hay que redirigir userData.
+const perfilCli = process.argv.find((a) => a.startsWith('--user-data-dir='));
+if (perfilCli) app.setPath('userData', perfilCli.slice('--user-data-dir='.length));
 
 let settings = loadSettings();
 
