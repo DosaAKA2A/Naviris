@@ -32,7 +32,10 @@ const els = {};
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
-const SLEEP_AFTER_MS = 5 * 60 * 1000;
+// 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
+// volver ya se había recargado). Edge duerme a las 2 h y Chrome ronda ahí;
+// 30 min es el punto en que ya no molesta y aún libera memoria de verdad.
+const SLEEP_AFTER_MS = 30 * 60 * 1000;
 let settings = { hardwareAcceleration: true, powerSaver: true };
 let tabs = [], activeId = null, nextId = 1;
 // Pestañas cerradas hace poco, para reabrirlas con Ctrl+Shift+T (como Chrome,

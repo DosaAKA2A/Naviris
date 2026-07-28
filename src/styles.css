@@ -53,19 +53,28 @@ button { font-family: inherit; }
 #private-badge svg { width: 11px; height: 11px; }
 #tabstrip { display: flex; align-items: center; gap: 4px; max-width: 58vw; overflow-x: auto; scrollbar-width: none; height: 100%; }
 #tabstrip::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 44px; max-width: 210px; padding: 0 8px 0 10px; border-radius: 8px; background: transparent; color: #77797f; font-size: 12.5px; cursor: pointer; flex: 0 1 200px; transition: background .16s ease, color .16s ease; }
+/* Contraste de las pestañas: el gris de antes (#77797f sobre el fondo negro)
+   se quedaba en 4.55:1, justo en el límite y encima con texto de 12.5px.
+   Ahora la inactiva va a 8.6:1 y la dormida a 5.3:1, así que se distinguen
+   entre sí SIN que ninguna desaparezca. */
+.tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 44px; max-width: 210px; padding: 0 8px 0 10px; border-radius: 8px; background: transparent; color: #a9abb2; font-size: 12.5px; cursor: pointer; flex: 0 1 200px; transition: background .16s ease, color .16s ease; }
 .tab.dragging { opacity: .5; }
 .tab.drag-over { box-shadow: inset 2px 0 0 var(--violet, #b98cff); }
-.tab:hover:not(.active) { background: #121215; color: #b4b6bd; }
+.tab:hover:not(.active) { background: #191920; color: #e4e5e9; }
 .tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px #2e2e36; }
 .tab.active:hover { background: #1f1f26; }
 .tab .t-fav { width: 15px; height: 15px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .tab .t-fav img { width: 15px; height: 15px; border-radius: 4px; }
-.tab .t-fav .t-dot { width: 7px; height: 7px; border-radius: 50%; background: #45464c; }
+.tab .t-fav .t-dot { width: 7px; height: 7px; border-radius: 50%; background: #63656c; }
 .tab .t-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tab .t-zzz { color: var(--text-dim); display: none; }
+.tab .t-zzz { color: #9ea0a8; display: none; }
 .tab.asleep .t-zzz { display: inline-flex; }
-.tab.asleep .t-title, .tab.asleep .t-fav { opacity: .5; }
+/* Dormida se lee por la luna y el favicon en gris, no por borrarse: el .5 de
+   opacidad de antes dejaba el título en 1.9:1 y no se veía nada. */
+.tab.asleep .t-title { color: #82848b; }
+.tab.asleep .t-fav { opacity: .75; filter: grayscale(1); }
+.tab.asleep:hover .t-title, .tab.asleep.active .t-title { color: inherit; }
+.tab.asleep:hover .t-fav, .tab.asleep.active .t-fav { opacity: 1; filter: none; }
 .tab .t-close { border: none; background: transparent; color: transparent; cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
 .tab:hover .t-close, .tab.active .t-close { color: var(--text-dim); }
 .tab .t-close:hover { background: #2a2a30; color: var(--text); }
