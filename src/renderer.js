@@ -18,7 +18,7 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light',
-  'opt-agent', 'opt-smartsearch', 'opt-xsensitive', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
+  'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
@@ -164,9 +164,11 @@ function createTab(url = null, activate = true) {
 }
 // Guarda las URLs abiertas para restaurarlas al reabrir (si el ajuste está activo).
 // No aplica en ventana privada. Se llama al crear/cerrar/navegar pestañas.
+// Formato: string (histórico) u objeto { u, p } cuando la pestaña está fijada.
 function saveSession() {
   if (IS_PRIVATE) return;
-  const urls = tabs.filter((t) => t.kind === 'web' && t.url && /^https?:/.test(t.url)).map((t) => t.sleptUrl || t.url);
+  const urls = tabs.filter((t) => t.kind === 'web' && t.url && /^https?:/.test(t.url))
+    .map((t) => t.pinned ? { u: t.sleptUrl || t.url, p: 1 } : (t.sleptUrl || t.url));
   store.set('cobalt.session', urls);
 }
 let mediaTimer = null;
@@ -244,9 +246,62 @@ function closeTab(id) {
   if (activeId === id) activateTab(tabs[Math.max(0, idx - 1)].id); else renderTabs();
   saveSession();
 }
+/* ===== Fijar pestañas: comprimidas (solo favicon) al lado izquierdo ===== */
+function setPinned(tab, pin) {
+  tab.pinned = !!pin;
+  const i = tabs.findIndex((t) => t.id === tab.id); if (i === -1) return;
+  tabs.splice(i, 1);
+  // Fijada va al final del bloque de fijadas; soltada, justo después de él
+  const limite = tabs.filter((t) => t.pinned).length;
+  tabs.splice(limite, 0, tab);
+  renderTabs(true); saveSession();
+}
+function copiarDireccion(tab) {
+  const u = tab.sleptUrl || tab.url; if (!u) return;
+  navigator.clipboard.writeText(u).then(() => toast('Dirección copiada'), () => toast('No se pudo copiar'));
+}
+function duplicarTab(tab) {
+  const nueva = createTab(tab.sleptUrl || tab.url, false);
+  // Se coloca justo a la derecha de la original, como en Opera/Chrome
+  const from = tabs.findIndex((t) => t.id === nueva.id); tabs.splice(from, 1);
+  tabs.splice(tabs.findIndex((t) => t.id === tab.id) + 1, 0, nueva);
+  renderTabs(true); saveSession();
+}
+function menuDePestana(e, tab) {
+  e.preventDefault();
+  const web = tab.kind === 'web';
+  const idx = tabs.findIndex((t) => t.id === tab.id);
+  const otras = tabs.filter((t) => t.id !== tab.id && !t.pinned);
+  const aLaDerecha = tabs.slice(idx + 1).filter((t) => !t.pinned);
+  // Duplicadas: misma URL (la primera de cada URL sobrevive)
+  const vistas = new Set(); const duplicadas = [];
+  for (const t of tabs) { const u = t.kind === 'web' ? (t.sleptUrl || t.url) : 'hub'; if (vistas.has(u)) duplicadas.push(t); else vistas.add(u); }
+  const items = [
+    { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
+    { sep: true },
+    ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => { try { tab.webview?.reload(); } catch {} } }] : []),
+    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabs.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) },
+    ...(web ? [{ label: 'Copiar dirección de página', icon: 'clipboard', action: () => copiarDireccion(tab) }] : []),
+    { sep: true },
+    ...(web ? [{ label: 'Duplicar pestaña', icon: 'square-2-stack', action: () => duplicarTab(tab) }] : []),
+    { label: tab.pinned ? 'Soltar pestaña' : 'Fijar pestaña', icon: 'pin', action: () => setPinned(tab, !tab.pinned) },
+    ...(web ? [{ label: 'Guardar en marcadores', icon: 'bookmark-add', action: () => { if (tab.id !== activeId) activateTab(tab.id); if (!findBookmark(tab.url)) els.navStar.click(); else toast('Ya está en marcadores'); } }] : []),
+    { sep: true },
+    ...(web ? [{ label: tab.muted ? 'Activar sonido de la pestaña' : 'Silenciar pestaña', icon: tab.muted ? 'speaker-wave' : 'speaker-x-mark', action: () => toggleMute(tab) }] : []),
+    { label: 'Silenciar otras pestañas', icon: 'speaker-x-mark', action: () => tabs.forEach((t) => { if (t.id !== tab.id && t.kind === 'web' && !t.muted) toggleMute(t); }) },
+    { sep: true },
+    { label: 'Cerrar pestaña', icon: 'x-mark', action: () => closeTab(tab.id) },
+    ...(otras.length ? [{ label: 'Cerrar otras pestañas', icon: 'x-mark', action: () => otras.forEach((t) => closeTab(t.id)) }] : []),
+    ...(aLaDerecha.length ? [{ label: 'Cerrar pestañas a la derecha', icon: 'x-mark', action: () => aLaDerecha.forEach((t) => closeTab(t.id)) }] : []),
+    ...(duplicadas.length ? [{ label: 'Cerrar pestañas duplicadas', icon: 'x-mark', action: () => duplicadas.forEach((t) => closeTab(t.id)) }] : []),
+    { sep: true },
+    { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada }
+  ];
+  showCtxMenu(e.clientX, e.clientY, items);
+}
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
-  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (mini ? ' mini loot-member' : '');
+  el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (tab.pinned ? ' pinned' : '') + (mini ? ' mini loot-member' : '');
   el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
     : tab.asleep ? `Pestaña dormida — ${tab.title}\n${tab.sleptUrl || tab.url}`
     : (tab.url || 'Hub de Naviris');
@@ -260,21 +315,30 @@ function makeTabEl(tab, mini) {
     else fav.innerHTML = '<span class="t-dot"></span>';
     el.appendChild(fav);
   }
-  el.append(zzz, title);
-  if (tab.agentControlled) { const ag = document.createElement('span'); ag.className = 't-agent'; ag.title = 'Un agente (CDP) está controlando esta pestaña'; el.appendChild(ag); }
-  // Botón de silencio: aparece si la pestaña suena o está silenciada
-  if (tab.kind === 'web' && (tab.audible || tab.muted)) {
-    const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
-    spk.title = tab.muted ? 'Activar sonido' : 'Silenciar pestaña';
-    spk.innerHTML = window.icon(tab.muted ? 'speaker-x-mark' : 'speaker-wave');
-    spk.addEventListener('click', (e) => { e.stopPropagation(); toggleMute(tab); });
-    el.appendChild(spk);
+  // Fijada: comprimida a solo el favicon (título y cierre viven en el tooltip
+  // y el menú contextual). El resto, como siempre.
+  if (!tab.pinned) {
+    el.append(zzz, title);
+    if (tab.agentControlled) { const ag = document.createElement('span'); ag.className = 't-agent'; ag.title = 'Un agente (CDP) está controlando esta pestaña'; el.appendChild(ag); }
+    // Botón de silencio: aparece si la pestaña suena o está silenciada
+    if (tab.kind === 'web' && (tab.audible || tab.muted)) {
+      const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
+      spk.title = tab.muted ? 'Activar sonido' : 'Silenciar pestaña';
+      spk.innerHTML = window.icon(tab.muted ? 'speaker-x-mark' : 'speaker-wave');
+      spk.addEventListener('click', (e) => { e.stopPropagation(); toggleMute(tab); });
+      el.appendChild(spk);
+    }
+    el.appendChild(close);
+  } else {
+    el.title = (tab.title || '') + '\n' + (tab.sleptUrl || tab.url || '');
+    // El hub no tiene favicon: fijado se representa con su icono de casa
+    if (tab.kind !== 'web') { const h = document.createElement('span'); h.className = 't-fav'; h.innerHTML = window.icon('home'); el.prepend(h); }
   }
-  el.appendChild(close);
   el.addEventListener('click', () => activateTab(tab.id));
-  el.addEventListener('auxclick', (e) => { if (e.button === 1) closeTab(tab.id); });
-  // Reordenar pestañas arrastrando (no en las mini del grupo AutoLoot)
-  if (!mini) {
+  el.addEventListener('auxclick', (e) => { if (e.button === 1 && !tab.pinned) closeTab(tab.id); });
+  el.addEventListener('contextmenu', (e) => menuDePestana(e, tab));
+  // Reordenar pestañas arrastrando (no en las mini del grupo AutoLoot ni fijadas)
+  if (!mini && !tab.pinned) {
     el.draggable = true;
     el.addEventListener('dragstart', (e) => { dragTabId = tab.id; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
     el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.querySelectorAll('.tab.drag-over').forEach((t) => t.classList.remove('drag-over')); });
@@ -285,10 +349,12 @@ function makeTabEl(tab, mini) {
   return el;
 }
 let dragTabId = null;
-// Mueve la pestaña arrastrada justo delante de la de destino
+// Mueve la pestaña arrastrada justo delante de la de destino. Las fijadas
+// forman su propio bloque a la izquierda: no se cruza de un bloque al otro.
 function reorderTab(fromId, toId) {
   const from = tabs.findIndex((t) => t.id === fromId), to = tabs.findIndex((t) => t.id === toId);
   if (from === -1 || to === -1 || from === to) return;
+  if (!!tabs[from].pinned !== !!tabs[to].pinned) return;
   const [moved] = tabs.splice(from, 1);
   tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
   renderTabs(); saveSession();
@@ -299,7 +365,7 @@ function reorderTab(fromId, toId) {
 // las pestañas parecían temblar porque el navegador rehacía el layout sin parar.
 function firmaTabs() {
   return tabs.map((t) => [t.id, t.title, t.favicon || '', t.id === activeId, !!t.asleep,
-    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled].join('')).join('');
+    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled, !!t.pinned].join('')).join('');
 }
 let ultimaFirmaTabs = null;
 function renderTabs(forzar) {
@@ -533,13 +599,25 @@ const DEFAULT_DIALS = [
 let dials = store.get('cobalt.dials', DEFAULT_DIALS);
 function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt.dials', dials); renderHub(); }
 
-// Estilo único: logo monocromo sobre tile oscuro
+// Logos de los dials: monocromos por defecto, o con su color de marca original
+// si "Logos a color" está activo (los diseños son los mismos SVG de siempre;
+// el color va por CSS variable para que el toggle no tenga que repintar a mano).
+const colorLogosOn = () => store.get('cobalt.colorLogos', true);
+function applyColorLogos() {
+  document.documentElement.classList.toggle('color-logos', colorLogosOn());
+  renderHub();
+}
 function styleDial(tile, letter, d) {
   const brand = brandOf(d.url);
   // El fondo y el filtro del favicon los pone el CSS (tokens --tile-default y
   // --fav-filter): antes se fijaban aquí en línea y en modo claro quedaban
   // tiles negros con iconos aclarados sobre un hub blanco.
-  if (brand && window.brandIcon(brand)) { const m = document.createElement('span'); m.className = 'd-mono'; m.innerHTML = window.brandIcon(brand); tile.appendChild(m); letter.remove(); return; }
+  if (brand && window.brandIcon(brand)) {
+    const m = document.createElement('span'); m.className = 'd-mono'; m.innerHTML = window.brandIcon(brand);
+    const c = window.brandColor(brand);
+    if (c) m.style.setProperty('--brand-c', c); // .color-logos lo usa; sin la clase, se ignora
+    tile.appendChild(m); letter.remove(); return;
+  }
   getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.className = 'd-fav'; im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
 }
 function makeDialEl(d) {
@@ -632,7 +710,29 @@ setInterval(tickClock, 10000);
 
 /* Clima y región (open-meteo + ipapi, sin claves) */
 let geoCache = null, wxCache = null;
-const WMO = (c) => c === 0 ? ['Despejado', 'sun'] : c <= 3 ? ['Parcialmente nublado', 'cloud'] : c <= 48 ? ['Niebla', 'cloud'] : c <= 67 ? ['Lluvia', 'cloud'] : c <= 77 ? ['Nieve', 'cloud'] : c <= 82 ? ['Chubascos', 'cloud'] : ['Tormenta', 'bolt'];
+// Estado del clima → [descripción, icono]. Los iconos son el set de clima
+// elegido a mano (Dazzle Line Icons vía svgrepo, prefijo wx-). Prioridad:
+// aviso severo > precipitación > viento fuerte > frío/calor > humedad > cielo.
+function WMO(cur) {
+  const c = cur.weather_code, t = cur.temperature_2m;
+  const v = cur.wind_speed_10m || 0, h = cur.relative_humidity_2m || 0, dia = cur.is_day !== 0;
+  if (c >= 95) return ['Tormenta', 'wx-alerta'];
+  if (c >= 85) return ['Nevando', 'wx-nevando'];
+  if (c >= 80) return (c === 80 && dia) ? ['Chubascos con sol', 'wx-arcoiris'] : ['Chubascos', 'wx-lluvia'];
+  if (c === 77 || c === 66 || c === 67 || c === 56 || c === 57) return ['Granizo', 'wx-granizo'];
+  if (c >= 71) return ['Nevando', 'wx-nevando'];
+  if (c >= 61) return ['Lluvia', 'wx-lluvia'];
+  if (c >= 51) return ['Posible lluvia', 'wx-paraguas'];
+  if (c >= 45) return ['Niebla', 'wx-nublado'];
+  if (v >= 40) return ['Ventoso', 'wx-viento'];
+  if (t <= 3) return ['Frío', 'wx-frio'];
+  if (t >= 33) return ['Caluroso', 'wx-calor'];
+  if (h >= 85 && t >= 20) return ['Mucha humedad', 'wx-humedad'];
+  if (c === 3) return ['Nublado', 'wx-nublado'];
+  if (c >= 1) return ['Sol y nubes', 'wx-sol-nubes'];
+  return dia ? ['Soleado', 'wx-sol'] : ['Despejado', 'moon'];
+}
+const WX_QUERY = 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m,is_day';
 // ipapi.co limita peticiones sin aviso (devuelve HTML): se prueba en cadena con
 // dos alternativas gratuitas y se normaliza al mismo formato.
 async function getGeo() {
@@ -654,8 +754,8 @@ async function loadWeather(el, kind) {
   try {
     const geo = await getGeo();
     if (kind === 'region') { el.innerHTML = `<div class="wx-ic">${window.icon('map-pin')}</div><div><div class="wx-temp" style="font-size:20px">${escapeHtml(geo.city || '—')}</div><div class="wx-desc">${escapeHtml(geo.region || '')}, ${escapeHtml(geo.country_name || '')}</div><div class="wx-city">${escapeHtml(geo.timezone || '')}</div></div>`; return; }
-    if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,weather_code`); wxCache = (await r.json()).current; }
-    const [desc, ic] = WMO(wxCache.weather_code);
+    if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=${WX_QUERY}`); wxCache = (await r.json()).current; }
+    const [desc, ic] = WMO(wxCache);
     el.innerHTML = `<div class="wx-ic">${window.icon(ic)}</div><div><div class="wx-temp">${Math.round(wxCache.temperature_2m)}°</div><div class="wx-desc">${desc}</div><div class="wx-city">${window.icon('map-pin')} ${escapeHtml(geo.city || '')}</div></div>`;
   } catch { el.innerHTML = '<div class="w-loading">Clima no disponible (sin conexión)</div>'; }
 }
@@ -665,8 +765,8 @@ async function loadWeatherPill() {
   const el = document.getElementById('hub-weather'); if (!el) return;
   try {
     const geo = await getGeo();
-    if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,weather_code`); wxCache = (await r.json()).current; }
-    const [desc, ic] = WMO(wxCache.weather_code);
+    if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=${WX_QUERY}`); wxCache = (await r.json()).current; }
+    const [desc, ic] = WMO(wxCache);
     el.innerHTML = `${window.icon(ic)}<span>${Math.round(wxCache.temperature_2m)}°C</span><span class="wxp-sep"></span><span class="wxp-city">${escapeHtml(geo.city || desc)}</span>`;
     el.title = desc;
     el.classList.remove('hidden');
@@ -690,7 +790,8 @@ function buildSyncData() {
     dials: store.get('cobalt.dials', null),
     widgets: store.get('cobalt.widgets', null),
     notes: store.get('cobalt.notes', ''),
-    hubBg: store.get('cobalt.hubBg', null)
+    hubBg: store.get('cobalt.hubBg', null),
+    colorLogos: store.get('cobalt.colorLogos', true)
   };
 }
 async function applySyncData(d) {
@@ -700,10 +801,11 @@ async function applySyncData(d) {
   if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
   if (d.hubBg) { store.set('cobalt.hubBg', d.hubBg); applyBackground(d.hubBg); }
+  if (typeof d.colorLogos === 'boolean') { store.set('cobalt.colorLogos', d.colorLogos); applyColorLogos(); }
   if (d.settings) {
     settings = await window.cobalt.setSettings(d.settings);
     applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
-    els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive;
+    els.optSmartsearch.checked = settings.smartSearch !== false;
     els.optPasskeys.checked = settings.blockPasskeys !== false; els.optRestore.checked = settings.restoreSession !== false;
     els.optPowersaver.checked = settings.powerSaver;
     const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
@@ -1471,7 +1573,7 @@ async function loadRatQualities() {
   heights.forEach((h) => { const o = document.createElement('option'); o.value = String(h); o.textContent = h + 'p'; els.ratQuality.appendChild(o); });
 }
 els.ratUrl.addEventListener('input', () => { updateRatPlat(); clearTimeout(ratQualityTimer); ratQualityTimer = setTimeout(loadRatQualities, 700); });
-els.ratXcheck.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.ratXcheck.checked }); els.optXsensitive.checked = els.ratXcheck.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
+els.ratXcheck.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.ratXcheck.checked }); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
 async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando vídeo (${quality}p)…` : 'Descargando vídeo…')); }
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
@@ -1521,6 +1623,43 @@ els.navShield.addEventListener('click', async (e) => { e.stopPropagation(); cons
 els.adblockToggle.addEventListener('change', async () => { await window.cobalt.adblockSetEnabled(els.adblockToggle.checked); refreshAdblockUI(); toast(els.adblockToggle.checked ? 'Bloqueador activado' : 'Bloqueador desactivado'); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)youtube\.com$/.test(hostOf(tab.url))) tab.webview.reload(); });
 els.adblockSite.addEventListener('click', async () => { const host = els.adblockSite.dataset.host; if (!host) return; await window.cobalt.adblockWhitelist(els.adblockSite.dataset.allowed ? 'remove' : 'add', host); refreshAdblockUI(); activeTab()?.webview?.reload(); });
 
+/* ============ Información del sitio (candado) ============ */
+const sitePop = document.getElementById('site-pop');
+const stp = {
+  host: document.getElementById('stp-host'), close: document.getElementById('stp-close'),
+  secure: document.getElementById('stp-secure'), secureTitle: document.getElementById('stp-secure-title'),
+  secureSub: document.getElementById('stp-secure-sub'), cookieN: document.getElementById('stp-cookie-n'),
+  clear: document.getElementById('stp-cookies-clear'), config: document.getElementById('stp-siteconfig'),
+  lock: document.getElementById('url-secure')
+};
+function cerrarSitePop() { sitePop.classList.add('hidden'); }
+async function abrirSitePop() {
+  const tab = activeTab();
+  if (!tab || tab.kind !== 'web' || !tab.url) return;
+  const u = (() => { try { return new URL(tab.url); } catch { return null; } })();
+  if (!u) return;
+  stp.host.textContent = u.hostname.replace(/^www\./, '');
+  const seguro = u.protocol === 'https:';
+  stp.secure.classList.toggle('danger', !seguro && u.protocol === 'http:');
+  stp.secure.querySelector('.stp-ic').innerHTML = window.icon(seguro ? 'lock-closed' : 'eye-slash');
+  if (seguro) { stp.secureTitle.textContent = 'La conexión es segura'; stp.secureSub.textContent = 'Lo que envías a este sitio (contraseñas, tarjetas) viaja cifrado.'; }
+  else if (u.protocol === 'http:') { stp.secureTitle.textContent = 'La conexión no es segura'; stp.secureSub.textContent = 'Este sitio va por HTTP: no escribas datos sensibles aquí.'; }
+  else { stp.secureTitle.textContent = 'Página local'; stp.secureSub.textContent = ''; }
+  stp.cookieN.textContent = 'Contando…';
+  sitePop.classList.remove('hidden');
+  const d = await window.cobalt.siteData(tab.url, PARTITION);
+  stp.cookieN.textContent = d.ok ? (d.cookies === 1 ? '1 cookie de este sitio' : d.cookies + ' cookies de este sitio') : 'No disponible';
+}
+stp.lock.addEventListener('click', (e) => { e.stopPropagation(); sitePop.classList.contains('hidden') ? abrirSitePop() : cerrarSitePop(); });
+stp.close.addEventListener('click', cerrarSitePop);
+stp.clear.addEventListener('click', async () => {
+  const tab = activeTab(); if (!tab || tab.kind !== 'web') return;
+  const r = await window.cobalt.siteClear(tab.url, PARTITION);
+  if (r.ok) { toast('Cookies y datos del sitio borrados'); stp.cookieN.textContent = '0 cookies de este sitio'; try { tab.webview?.reload(); } catch { /* nada */ } }
+  else toast('No se pudieron borrar los datos');
+});
+stp.config.addEventListener('click', () => { cerrarSitePop(); showPermManager(); });
+
 /* ============ Navegación ============ */
 els.navBack.addEventListener('click', () => activeTab()?.webview?.goBack());
 els.navFwd.addEventListener('click', () => activeTab()?.webview?.goForward());
@@ -1535,6 +1674,7 @@ document.addEventListener('click', (e) => {
   if (!els.resPop.contains(e.target) && !els.sbRes.contains(e.target)) { els.resPop.classList.add('hidden'); els.sbRes.classList.toggle('open', !!resMode); }
   if (!els.ratPop.contains(e.target) && !els.sbRat.contains(e.target)) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
   if (!els.shieldPop.contains(e.target) && !els.navShield.contains(e.target)) { els.shieldPop.classList.add('hidden'); els.navShield.classList.remove('open'); clearInterval(adblockPoll); adblockPoll = null; }
+  if (!sitePop.contains(e.target) && !stp.lock.contains(e.target)) cerrarSitePop();
   if (!els.lootPanel.classList.contains('hidden') && !els.lootPanel.contains(e.target) && !els.sbLoot.contains(e.target)) toggleLootPanel(false);
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
 });
@@ -1546,11 +1686,16 @@ els.menuPop.addEventListener('click', (e) => {
   if (a === 'permissions') showPermManager();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
-els.optXsensitive.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.optXsensitive.checked }); els.ratXcheck.checked = els.optXsensitive.checked; const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); });
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
 els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
+// Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
+document.getElementById('hub-theme').addEventListener('click', async () => {
+  settings = await window.cobalt.setSettings({ lightMode: !settings.lightMode });
+  els.optLight.checked = !!settings.lightMode;
+  applyTheme(settings.lightMode);
+});
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
@@ -1846,7 +1991,19 @@ const naviris = {
     b.addEventListener('click', () => onClick(b));
     adEls.tools.appendChild(b);
   },
-  unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); }
+  unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); },
+  // Sensibilidad de X: única puerta de los addons hacia ese ajuste (lo usa el
+  // addon "Sensibilidad X"; el resto de settings no se expone a addons).
+  xSensitive: {
+    get: () => !!settings.xRevealSensitive,
+    set: async (v) => {
+      settings = await window.cobalt.setSettings({ xRevealSensitive: !!v });
+      els.ratXcheck.checked = !!v;
+      const tab = activeTab();
+      if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload();
+      return !!settings.xRevealSensitive;
+    }
+  }
 };
 
 const loadedTools = new Set();
@@ -1858,6 +2015,17 @@ async function loadToolAddons() {
   // actualizaciones.
   for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper']) {
     if (installed[retirado]) { try { await window.cobalt.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
+  }
+  // Migración 2.7.3: la sensibilidad de X salió de Ajustes y ahora es el addon
+  // "Sensibilidad X". Quien la tenía activa recibe el addon solo, para no
+  // quedarse sin interruptor (si el catálogo no responde, se reintenta al
+  // próximo arranque; el ajuste no se toca).
+  if (settings.xRevealSensitive && !installed['x-sensitive']) {
+    try {
+      const cat = await window.cobalt.addonsCatalog();
+      const meta = cat.ok && cat.addons.find((a) => a.id === 'x-sensitive');
+      if (meta) { const r = await window.cobalt.addonsInstall(meta); if (r.ok) installed[meta.id] = { ...meta, enabled: true }; }
+    } catch { /* nada */ }
   }
   for (const [id, meta] of Object.entries(installed)) {
     if (meta.kind !== 'tool' || !meta.enabled || loadedTools.has(id)) continue;
@@ -1967,6 +2135,11 @@ function reabrirCerrada() {
   const t = cerradas.pop(); if (!t) { toast('No hay pestañas cerradas recientes'); return; }
   createTab(t.url);
 }
+// F12: consola de desarrollador de la página activa (abre/cierra, como Chrome)
+function alternarDevtools() {
+  const wv = activeWv(); if (!wv) { toast('Abre una página para inspeccionarla'); return; }
+  try { wv.isDevToolsOpened() ? wv.closeDevTools() : wv.openDevTools(); } catch { /* nada */ }
+}
 window.addEventListener('keydown', (e) => {
   const k = (e.key || '').toLowerCase();
   const soloCtrl = e.ctrlKey && !e.shiftKey && !e.altKey;
@@ -1976,7 +2149,8 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.shiftKey && k === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
   if (e.ctrlKey && e.shiftKey && k === 't') { e.preventDefault(); reabrirCerrada(); return; }
   if (soloCtrl && k === 't') { e.preventDefault(); createTab(); return; }
-  if (soloCtrl && k === 'w') { e.preventDefault(); if (activeId) closeTab(activeId); return; }
+  // Ctrl+W respeta las fijadas (como Chrome): se sueltan o cierran desde su menú
+  if (soloCtrl && k === 'w') { e.preventDefault(); const t = activeTab(); if (t && !t.pinned) closeTab(t.id); return; }
   if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId); const n = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]; if (n) activateTab(n.id); return; }
   if (e.ctrlKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
     e.preventDefault(); const i = tabs.findIndex((t) => t.id === activeId);
@@ -2002,6 +2176,7 @@ window.addEventListener('keydown', (e) => {
   if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
 
   // --- Ventana y página ---
+  if (e.key === 'F12') { e.preventDefault(); alternarDevtools(); return; }
   if (e.key === 'F11') { e.preventDefault(); window.cobalt.toggleFullscreen(); return; }
   if (soloCtrl && (k === '+' || k === '=' || e.key === 'Add')) { e.preventDefault(); zoom(1); return; }
   if (soloCtrl && (k === '-' || e.key === 'Subtract')) { e.preventDefault(); zoom(-1); return; }
@@ -2032,6 +2207,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'zoom-in') zoom(1);
   else if (cmd === 'zoom-out') zoom(-1);
   else if (cmd === 'zoom-reset') zoom(0);
+  else if (cmd === 'devtools') alternarDevtools();
   else if (cmd === 'next-tab') { const n = tabs[(i + 1) % tabs.length]; if (n) activateTab(n.id); }
   else if (cmd === 'prev-tab') { const n = tabs[(i + tabs.length - 1) % tabs.length]; if (n) activateTab(n.id); }
   else if (cmd.startsWith('tab-')) {
@@ -2056,10 +2232,14 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   els.optLight.checked = !!settings.lightMode; applyTheme(settings.lightMode);
   // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
   refreshAgentBadge();
-  els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive; els.optPasskeys.checked = settings.blockPasskeys !== false;
+  els.optSmartsearch.checked = settings.smartSearch !== false; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
+  document.documentElement.classList.toggle('color-logos', colorLogosOn());
+  const optColor = document.getElementById('opt-colorlogos');
+  optColor.checked = colorLogosOn();
+  optColor.addEventListener('change', () => { store.set('cobalt.colorLogos', optColor.checked); applyColorLogos(); });
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderBookmarksBar(); renderHub();
@@ -2067,7 +2247,8 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
-    session.forEach((u, i) => createTab(u, i === 0));
+    session.forEach((s, i) => { const t = createTab(typeof s === 'string' ? s : s.u, i === 0); if (s && s.p) t.pinned = true; });
+    renderTabs(true);
   } else {
     createTab();
   }

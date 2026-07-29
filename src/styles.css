@@ -54,18 +54,20 @@
   --bg: #eef0f3; --bg-2: #f6f7f9; --bg-3: #ffffff; --line: #dcdee4;
   --line-2: #d2d5db; --line-3: #c3c6ce; --focus: #9ba0ab;
   --hover: #e5e7eb; --active: #dde0e5; --btn: #e4e6eb; --btn-hover: #d9dce2; --track: #cdd0d7;
-  --accent: #1d1e23; --accent-2: #878a92; --text: #1b1c20; --text-dim: #5d5f66;
+  /* Grises carbón en vez de negro puro: el #1b1c20/#000 de antes contrastaba
+     con dureza sobre las superficies claras (petición 2026-07-29). */
+  --accent: #3a3d45; --accent-2: #878a92; --text: #2e3038; --text-dim: #5d5f66;
   --muted: #5d5f66; --dim: #8b8d95; --violet: #6e46c8;
   --danger: #d02f34; --ok: #1e8e4f;
-  --accent-fg: #f6f7f9; --accent-hover: #000; --text-strong: #000;
-  --tab-fg: #54565d; --tab-hover-bg: #e2e4e9; --tab-hover-fg: #1b1c20;
+  --accent-fg: #f6f7f9; --accent-hover: #1b1c20; --text-strong: #23252b;
+  --tab-fg: #54565d; --tab-hover-bg: #e2e4e9; --tab-hover-fg: #2e3038;
   --tab-asleep-fg: #84868e; --tab-zzz: #7b7d85; --fav-dot: #a3a6ad;
   --winctl-fg: #4a4c53; --winctl-hover: #e0e2e7; --winctl-active: #d4d7dd;
   --sb-border: #e2e4e8; --sb-fg: #5d5f66; --sb-hover: #e2e4e9; --sb-open: #d8dbe1; --sb-sep: #dcdee3; --sb-div: #c9ccd3;
   --nav-fg: #4a4c53; --nav-hover: #e2e4e9; --bm-fg: #43454c;
   --chip: rgba(20,22,28,.08); --chip-hover: rgba(20,22,28,.14); --chip-dim: rgba(20,22,28,.05);
-  --track-knob: #f9fafb; --track-on: #1d1e23; --track-knob-on: #f6f7f9;
-  --bar-from: #6a6d75; --bar-to: #1d1e23; --backdrop: rgba(35,39,46,.4);
+  --track-knob: #f9fafb; --track-on: #3a3d45; --track-knob-on: #f6f7f9;
+  --bar-from: #6a6d75; --bar-to: #3a3d45; --backdrop: rgba(35,39,46,.4);
   --shadow-pop: rgba(24,28,36,.22); --shadow-panel: rgba(24,28,36,.16); --focus-ring: rgba(27,28,32,.08);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #eef0f3 60%);
   --checker-a: #e8eaee; --checker-b: #f4f5f7;
@@ -77,7 +79,7 @@
   --hub-pill: rgba(255,255,255,.86); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
   --tile-default: linear-gradient(140deg,#ffffff,#e7e9ee); --tile-line: rgba(18,20,26,.10);
-  --tile-letter: #1b1c20; --tile-mono: #2a2c33; --dial-add-line: #b9bcc4;
+  --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
 }
@@ -88,6 +90,11 @@
 :root.light .adp-badge.on { border-color: #bfe3cd; }
 :root.light .adp-btn.danger:hover { border-color: #e3a5b0; color: #b3283e; }
 :root.light .ls-btn.stop { color: #c25a68; }
+/* Logo de Naviris en claro: gradiente rojo→naranja (los pasteles se perdían
+   sobre blanco). El splash queda fuera: es momento de marca y va sobre oscuro. */
+:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #d93a2b; }
+:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ea6a2c; }
+:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f59a35; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
@@ -134,6 +141,8 @@ button { font-family: inherit; }
 .tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 44px; max-width: 210px; padding: 0 8px 0 10px; border-radius: 8px; background: transparent; color: var(--tab-fg); font-size: 12.5px; cursor: pointer; flex: 0 1 200px; transition: background .16s ease, color .16s ease; }
 .tab.dragging { opacity: .5; }
 .tab.drag-over { box-shadow: inset 2px 0 0 var(--violet, #b98cff); }
+/* Pestaña fijada: comprimida a solo el favicon, en el bloque izquierdo de la barra */
+.tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
 .tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--tab-hover-fg); }
 .tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
 .tab.active:hover { background: var(--hover); }
@@ -283,7 +292,7 @@ button { font-family: inherit; }
 .bm-folder-pop:empty::after { content: "Carpeta vacía"; color: var(--dim); font-size: 12px; padding: 8px; display: block; }
 
 /* Popups */
-#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 16px 44px var(--shadow-pop); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; }
+#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 16px 44px var(--shadow-pop); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 #menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
@@ -305,6 +314,23 @@ button { font-family: inherit; }
 .menu-toggle input:checked::after { transform: translateX(16px); background: var(--track-knob-on); }
 
 #shield-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 84px; width: 292px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+/* Información del sitio: se despliega desde el candado de la barra */
+#site-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); left: calc(var(--sidebar-w) + 158px); width: 310px; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.stp-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; color: var(--text); }
+.stp-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 12.5px; color: var(--text); }
+.stp-row .stp-ic { color: var(--nav-fg); display: inline-flex; }
+.stp-row .stp-ic svg { width: 15px; height: 15px; }
+.stp-row.danger, .stp-row.danger .stp-ic { color: var(--danger); }
+.stp-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.stp-txt small { color: var(--text-dim); font-size: 11px; }
+.stp-btn { border: none; background: transparent; cursor: pointer; text-align: left; font-family: inherit; transition: background .12s; }
+.stp-btn:hover { background: var(--hover); }
+.stp-go { color: var(--dim); display: inline-flex; }
+.stp-go svg { width: 13px; height: 13px; }
+.stp-act { border: 1px solid var(--line-3); background: var(--btn); color: var(--text); font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-family: inherit; }
+.stp-act:hover { background: var(--btn-hover); }
+#url-secure { cursor: pointer; border-radius: 6px; padding: 2px; }
+#url-secure:hover { background: var(--nav-hover); }
 .sp-head { display: flex; justify-content: space-between; align-items: center; }
 .sp-title { font-size: 13.5px; font-weight: 600; }
 .sp-count { font-size: 12px; color: var(--text-dim); }
@@ -610,6 +636,11 @@ button { font-family: inherit; }
 .d-tile .d-letter { font-size: 30px; font-weight: 650; color: var(--letter, var(--tile-letter)); position: relative; z-index: 1; }
 .d-tile .d-mono { width: 40px; height: 40px; color: var(--tile-mono); position: relative; z-index: 1; }
 .d-tile .d-mono svg { width: 40px; height: 40px; }
+/* Logos a color: mismo diseño, color oficial de la marca; los favicons dejan
+   de pasar por el filtro monocromo. GitHub y X no traen --brand-c (son negros)
+   y conservan el tono del tema. */
+:root.color-logos .d-tile .d-mono { color: var(--brand-c, var(--tile-mono)); }
+:root.color-logos .d-tile img.d-fav { filter: none; }
 .dial:hover .d-tile { transform: translateY(-6px); box-shadow: 0 14px 30px -10px var(--tile-glow, rgba(0,0,0,.6)); border-color: var(--hub-hairline); }
 .dial:active .d-tile { transform: translateY(-2px) scale(.98); transition-duration: .08s; }
 .d-name { font-size: 11.5px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
@@ -648,6 +679,16 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .hub-pill.wx .wxp-sep { width: 1px; height: 12px; background: var(--hub-hairline); }
 /* Con sesión iniciada, la pastilla marca presencia con el acento del sistema */
 .hub-pill.logged { border-color: var(--hub-hairline); color: var(--text); }
+/* Interruptor de tema del hub: la bolita se desliza de la luna al sol con una
+   transición finita al hacer clic (nada de animaciones infinitas). */
+.theme-switch { position: relative; gap: 0; padding: 5px 8px; width: 66px; justify-content: space-between; overflow: hidden; }
+.theme-switch .ts-ico { position: relative; z-index: 1; display: inline-flex; width: 24px; justify-content: center; transition: color .3s; }
+.theme-switch .ts-ico:first-child { color: var(--text); }
+.theme-switch .ts-ico:nth-child(2) { color: var(--hub-label); }
+:root.light .theme-switch .ts-ico:first-child { color: var(--hub-label); }
+:root.light .theme-switch .ts-ico:nth-child(2) { color: var(--text); }
+.theme-switch .ts-knob { position: absolute; left: 4px; top: 3px; bottom: 3px; width: 28px; border-radius: 999px; background: var(--chip-hover); border: 1px solid var(--hub-pill-line); transition: transform .35s cubic-bezier(.34, 1.35, .45, 1); }
+:root.light .theme-switch .ts-knob { transform: translateX(30px); }
 
 /* Modal de cuenta */
 .acc-error { color: var(--danger); font-size: 12px; }
@@ -673,6 +714,9 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .bg-thumb.sel { border-color: var(--accent); }
 .wp-custom { display: block; text-align: center; font-size: 12.5px; padding: 8px; border-radius: 8px; border: 1px dashed var(--line-3); color: var(--text-dim); cursor: pointer; transition: color .12s, border-color .12s; }
 .wp-custom:hover { color: var(--text); border-color: var(--focus); }
+/* Fila de ajuste dentro de un panel del hub (interruptor a la derecha) */
+.hp-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.hp-toggle small { color: var(--text-dim); font-size: 11px; }
 .ts-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); cursor: pointer; font-size: 12.5px; transition: border-color .12s; }
 .ts-item:hover { border-color: var(--line-3); }
 .ts-item.sel { border-color: var(--accent); }

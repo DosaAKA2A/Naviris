@@ -565,7 +565,8 @@ const ATAJOS_UI = [
   { k: '+', mod: (i) => i.control, cmd: 'zoom-in' },
   { k: '=', mod: (i) => i.control, cmd: 'zoom-in' },
   { k: '-', mod: (i) => i.control, cmd: 'zoom-out' },
-  { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' }
+  { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' },
+  { k: 'F12', mod: () => true, cmd: 'devtools' }
 ];
 function atajosDeWebview(contents) {
   contents.on('before-input-event', (event, input) => {
@@ -662,7 +663,38 @@ ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen
 ipcMain.on('win:new-private', () => createWindow(true));
 
 ipcMain.handle('settings:get', () => settings);
-ipcMain.handle('settings:set', soloUI((_e, patch) => { settings = { ...settings, ...patch }; saveSettings(settings); return settings; }));
+// ---------- Información del sitio (popover del candado) ----------
+// Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
+const PARTICIONES_VALIDAS = new Set(['persist:cobalt', 'cobalt-private']);
+ipcMain.handle('site:data', soloUI(async (_e, { url, partition }) => {
+  try {
+    if (!PARTICIONES_VALIDAS.has(partition)) return { ok: false };
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const cookies = await session.fromPartition(partition).cookies.get({ domain: host });
+    return { ok: true, cookies: cookies.length };
+  } catch { return { ok: false }; }
+}));
+ipcMain.handle('site:clear', soloUI(async (_e, { url, partition }) => {
+  try {
+    if (!PARTICIONES_VALIDAS.has(partition)) return { ok: false };
+    const u = new URL(url); const host = u.hostname.replace(/^www\./, '');
+    const ses = session.fromPartition(partition);
+    const cookies = await ses.cookies.get({ domain: host });
+    for (const c of cookies) {
+      const cu = (c.secure ? 'https://' : 'http://') + c.domain.replace(/^\./, '') + (c.path || '/');
+      await ses.cookies.remove(cu, c.name).catch(() => {});
+    }
+    await ses.clearStorageData({ origin: u.origin }).catch(() => {});
+    return { ok: true, cleared: cookies.length };
+  } catch { return { ok: false }; }
+}));
+
+ipcMain.handle('settings:set', soloUI((_e, patch) => {
+  settings = { ...settings, ...patch }; saveSettings(settings);
+  // Cambiar el modo claro retematiza también las webs abiertas (prefers-color-scheme)
+  if ('lightMode' in patch) nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
+  return settings;
+}));
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
@@ -1231,7 +1263,10 @@ ipcMain.handle('update:choose', async (_e, line) => {
 ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
 ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 
-nativeTheme.themeSource = 'dark';
+// El tema del navegador se propaga a las webs: con modo claro activo, las
+// páginas que respetan prefers-color-scheme (YouTube, Outlook…) también
+// renderizan en claro. nativeTheme afecta a TODOS los webContents, webviews incluidos.
+nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
 
 app.whenReady().then(async () => {
   // Widevine (castlabs ECS): descargar/registrar el CDM antes de crear ventanas,

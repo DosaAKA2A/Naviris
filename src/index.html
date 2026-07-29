@@ -115,6 +115,11 @@
           <div class="hub-corner">
             <button id="hub-account" class="hub-pill" title="Cuenta Naviris"><span data-ico="user-circle"></span><span id="hub-account-label">Iniciar sesión</span></button>
             <div id="hub-weather" class="hub-pill wx hidden"></div>
+            <button id="hub-theme" class="hub-pill theme-switch" title="Cambiar entre modo oscuro y claro">
+              <span class="ts-ico" data-ico="moon"></span>
+              <span class="ts-ico" data-ico="sun"></span>
+              <span class="ts-knob"></span>
+            </button>
           </div>
 
           <!-- Paleta de widgets (modo edición) -->
@@ -128,6 +133,7 @@
             <div class="hp-title">Fondo del hub</div>
             <div id="bg-presets"></div>
             <label class="wp-custom">Imagen propia…<input type="file" id="wp-file" accept="image/*" hidden /></label>
+            <label class="hp-toggle"><span>Logos a color<br /><small>Los accesos usan el color original de cada marca</small></span><span class="switch"><input type="checkbox" id="opt-colorlogos" /><span class="slider"></span></span></label>
           </div>
         </section>
 
@@ -188,7 +194,6 @@
     <hr />
     <label class="menu-toggle"><span><span class="mt-ico" data-ico="sun"></span>Modo claro<br /><small>Tema claro para la interfaz de Naviris</small></span><input type="checkbox" id="opt-light" /></label>
     <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
-    <label class="menu-toggle"><span>Mostrar contenido sensible en X<br /><small>Salta el aviso de sensibilidad de X/Twitter</small></span><input type="checkbox" id="opt-xsensitive" /></label>
     <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita el prompt de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Continuar donde lo dejaste<br /><small>Reabre las pestañas al iniciar</small></span><input type="checkbox" id="opt-restore" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme las pestañas tras 30 min sin usarlas</small></span><input type="checkbox" id="opt-powersaver" /></label>
@@ -212,6 +217,25 @@
     </div>
     <div id="loot-body" class="lp-body"></div>
   </aside>
+
+  <!-- ===== Información del sitio (candado de la barra) ===== -->
+  <div id="site-pop" class="hidden">
+    <div class="stp-head"><b id="stp-host"></b><button id="stp-close" class="lp-x" data-ico="x-mark" title="Cerrar"></button></div>
+    <div class="stp-row" id="stp-secure">
+      <span class="stp-ic" data-ico="lock-closed"></span>
+      <div class="stp-txt"><span id="stp-secure-title">La conexión es segura</span><small id="stp-secure-sub"></small></div>
+    </div>
+    <div class="stp-row">
+      <span class="stp-ic" data-ico="cookie"></span>
+      <div class="stp-txt"><span>Cookies y datos de sitios</span><small id="stp-cookie-n">—</small></div>
+      <button id="stp-cookies-clear" class="stp-act">Borrar</button>
+    </div>
+    <button class="stp-row stp-btn" id="stp-siteconfig">
+      <span class="stp-ic" data-ico="cog-6-tooth"></span>
+      <div class="stp-txt"><span>Configuración del sitio</span><small>Permisos de cámara, micrófono, ubicación…</small></div>
+      <span class="stp-go" data-ico="arrow-up-right"></span>
+    </button>
+  </div>
 
   <!-- ===== Bloqueador ===== -->
   <div id="shield-pop" class="hidden">

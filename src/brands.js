@@ -22,4 +22,14 @@
     return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
   };
   window.brandNames = () => Object.keys(B);
+
+  // Color oficial de cada marca (para el modo "logos a color" del hub).
+  // GitHub y X son negros: se quedan en null y siguen el tono del tema, que
+  // ya los pinta claros en oscuro y oscuros en claro.
+  const COLORS = {
+    whatsapp: '#25d366', discord: '#5865f2', twitch: '#9146ff', youtube: '#ff0000',
+    claude: '#d97757', gmail: '#ea4335', github: null, x: null,
+    crunchyroll: '#f47521', spotify: '#1db954', reddit: '#ff4500', instagram: '#e4405f'
+  };
+  window.brandColor = (name) => COLORS[name] || null;
 })();

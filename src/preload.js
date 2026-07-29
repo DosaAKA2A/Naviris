@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('cobalt', {
   addonsCode: (id) => ipcRenderer.invoke('addons:code', id),
   savePng: (dataUrl, suggestedName) => ipcRenderer.invoke('file:save-png', { dataUrl, suggestedName }),
 
+  siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
+  siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),
+
   onPermAsk: (cb) => ipcRenderer.on('perm:ask', (_e, req) => cb(req)),
   permRespond: (id, decision, remember) => ipcRenderer.send('perm:respond', { id, decision, remember }),
   permList: () => ipcRenderer.invoke('perm:list'),

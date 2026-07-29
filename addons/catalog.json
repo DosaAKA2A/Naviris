@@ -19,6 +19,24 @@
       "entry": "https://naviris.site/addons/watch-party.js"
     },
     {
+      "id": "design-lens",
+      "name": "Inspector de diseño",
+      "version": "1.0.0",
+      "kind": "tool",
+      "icon": "magnifying-glass",
+      "description": "Radiografía de diseño de cualquier página, pensada para diseñadores: tipografías y tamaños en uso, paleta de colores y fondos en hex, escala de espaciado (márgenes, rellenos y sangrías), interlineados y radios de borde. Incluye un selector de elemento: haz clic sobre cualquier cosa de la página y ve su ficha completa. Todos los valores se copian al portapapeles con un clic.",
+      "entry": "https://naviris.site/addons/design-lens.js"
+    },
+    {
+      "id": "x-sensitive",
+      "name": "Sensibilidad X",
+      "version": "1.0.0",
+      "kind": "tool",
+      "icon": "eye",
+      "description": "Muestra el contenido marcado como sensible en X/Twitter sin el aviso de 'este contenido puede ser delicado': Naviris pulsa el 'Mostrar' por ti en cada publicación tapada. Un clic en el botón del sidebar lo activa o desactiva (azul = activo) y el cambio se aplica al recargar la pestaña de X. Antes vivía en Ajustes; ahora lo instalas solo si lo quieres.",
+      "entry": "https://naviris.site/addons/x-sensitive.js"
+    },
+    {
       "id": "long-screenshot",
       "name": "Captura larga",
       "version": "1.1.0",
