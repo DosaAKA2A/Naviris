@@ -161,10 +161,14 @@ defensa real ahí es no tener el equipo comprometido.
 
 ### Lo que aún no está verificado
 
-- El **autorrelleno de tarjetas no se ha probado en una pasarela de pago real**,
-  solo con formularios sintéticos. La detección puede fallar (no rellenar) pero
-  no puede filtrar: el número solo sale tras Windows Hello y solo va al
-  formulario de la página que estás viendo.
+- El **autorrelleno de tarjetas funciona en formularios de pago que viven en la
+  propia página** (verificado el 2026-07-29 contra el markup exacto del checkout
+  alojado de Stripe y contra una pasarela clásica de campos name/id con
+  selectores de mes y año: detección, barra de aviso y relleno correctos, CVC
+  intacto). Su límite conocido: las pasarelas que incrustan el campo del número
+  en un **iframe** (Stripe Elements y similares) no se detectan — ahí la barra
+  simplemente no aparece. No puede filtrar en ningún caso: el número solo sale
+  tras Windows Hello y solo va al formulario de la página que estás viendo.
 - El servidor de cuentas **no tiene auditoría externa**. Es código propio,
   pequeño y publicado en el repositorio para que cualquiera lo revise.
 
