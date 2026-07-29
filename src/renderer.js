@@ -2007,6 +2007,22 @@ const naviris = {
 };
 
 const loadedTools = new Set();
+// Los addons se cargan como <script> desde el esquema naviris-addon:, NO con
+// new Function: la CSP de esta interfaz no permite 'unsafe-eval' (a propósito,
+// ver SEGURIDAD.md) y con new Function ningún addon llegaba a arrancar. El
+// addon ve `naviris` porque este const vive en el ámbito global del documento.
+// El parámetro v evita que se reutilice el código viejo tras una actualización.
+let addonSeq = 0;
+function ejecutarAddon(id) {
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.dataset.addon = id;
+    s.src = `naviris-addon://tool/${encodeURIComponent(id)}.js?v=${++addonSeq}`;
+    s.onload = () => resolve(true);
+    s.onerror = () => { console.error('Addon roto (no carga):', id); s.remove(); resolve(false); };
+    document.head.appendChild(s);
+  });
+}
 async function loadToolAddons() {
   const installed = await window.cobalt.addonsList();
   // Migración: addons retirados del producto. AutoLoot pasó al core; Twitch Kit
@@ -2029,12 +2045,13 @@ async function loadToolAddons() {
   }
   for (const [id, meta] of Object.entries(installed)) {
     if (meta.kind !== 'tool' || !meta.enabled || loadedTools.has(id)) continue;
-    const code = await window.cobalt.addonsCode(id);
-    if (!code) continue;
-    try { new Function('naviris', code)(naviris); loadedTools.add(id); } catch (e) { console.error('Addon roto:', id, e); }
+    if (await ejecutarAddon(id)) loadedTools.add(id);
   }
   for (const id of [...loadedTools]) {
-    if (!installed[id] || !installed[id].enabled) { naviris.unregisterTool(id); loadedTools.delete(id); }
+    if (!installed[id] || !installed[id].enabled) {
+      naviris.unregisterTool(id); loadedTools.delete(id);
+      document.querySelector(`script[data-addon="${id}"]`)?.remove();
+    }
   }
 }
 loadToolAddons();

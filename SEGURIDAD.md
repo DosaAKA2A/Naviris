@@ -93,6 +93,14 @@ queda bloqueado.
 (títulos, URLs, favicons, nombres de archivo) y estaban correctamente tratados
 con `escapeHtml` o `textContent`. La CSP es una segunda barrera, no un parche.
 
+*Efecto colateral, ya resuelto:* al prohibir `eval` dejaron de cargarse los
+addons de herramienta, porque se ejecutaban con `new Function()`. En vez de
+volver a permitir `eval` —que es justo lo que la CSP debe impedir— los addons
+pasaron a cargarse por un esquema propio del navegador, `naviris-addon:`, que
+**solo sirve addons instalados y activos** y valida el identificador. Un fallo
+de tipo XSS en la interfaz sigue sin poder ejecutar código inventado: como
+mucho podría recargar un addon que tú ya tenías puesto.
+
 ### 3. El IPC sensible no comprobaba quién llamaba — **corregido**
 
 Los canales de contraseñas, tarjetas, ajustes y addons atendían a cualquier

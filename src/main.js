@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -7,6 +7,17 @@ const braveAdblock = require('./adblock');
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
+
+// Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
+// con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
+// (a propósito, ver SEGURIDAD.md) y eso hacía que ningún addon llegara a cargar.
+// Con esquema propio la CSP sigue estricta y además solo se puede cargar código
+// de addons instalados y activos: un XSS no puede inventarse un script.
+// registerSchemesAsPrivileged tiene que ir ANTES de que la app esté lista.
+const ADDON_SCHEME = 'naviris-addon';
+protocol.registerSchemesAsPrivileged([
+  { scheme: ADDON_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
+]);
 
 // Migración de perfil: el rebrand Cobalt→Naviris cambia la carpeta de userData,
 // así que si existe el perfil antiguo y no el nuevo, se renombra para conservar
@@ -1277,6 +1288,19 @@ app.whenReady().then(async () => {
   // Comprobación silenciosa al arrancar (solo en versión instalada)
   if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
   braveAdblock.init();
+  // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.
+  // El id se valida contra la lista de instalados y se limita a [a-z0-9-], así
+  // que no hay forma de salirse de la carpeta de addons ni de cargar otra cosa.
+  protocol.handle(ADDON_SCHEME, async (req) => {
+    try {
+      const id = decodeURIComponent(new URL(req.url).pathname.replace(/^\/+/, '')).replace(/\.js$/, '');
+      if (!/^[a-z0-9-]+$/.test(id)) return new Response('', { status: 400 });
+      const meta = settings.addons && settings.addons[id];
+      if (!meta || !meta.enabled) return new Response('', { status: 404 });
+      const code = await fs.promises.readFile(addonFile(id), 'utf8');
+      return new Response(code, { headers: { 'Content-Type': 'text/javascript; charset=utf-8' } });
+    } catch { return new Response('', { status: 404 }); }
+  });
   setupSession(session.fromPartition(PART_NORMAL));
   setupSession(session.fromPartition(PART_PRIVATE));
   createWindow();
