@@ -169,14 +169,14 @@ defensa real ahí es no tener el equipo comprometido.
   en un **iframe** (Stripe Elements y similares) no se detectan — ahí la barra
   simplemente no aparece. No puede filtrar en ningún caso: el número solo sale
   tras Windows Hello y solo va al formulario de la página que estás viendo.
-- El servidor de cuentas **no tiene auditoría externa**. Es código propio,
-  pequeño y publicado en el repositorio para que cualquiera lo revise.
+- El servidor de cuentas **no tiene auditoría externa**. Es código propio y
+  pequeño, y puedes leerlo completo en
+  [naviris.site/sync/worker/worker.js](https://naviris.site/sync/worker/worker.js).
 
 ---
 
 ## Si encuentras un fallo
 
-Escribe a **hatr_ed@outlook.com** o abre un issue en
-[github.com/DosaAKA2A/Naviris](https://github.com/DosaAKA2A/Naviris). Si es algo
-que pueda afectar a datos de otras personas, cuéntalo en privado primero y danos
-margen para publicar el arreglo.
+Escribe a **studio.iris2026@gmail.com**. Si es algo que pueda afectar a datos de
+otras personas, cuéntalo en privado primero y danos margen para publicar el
+arreglo.
