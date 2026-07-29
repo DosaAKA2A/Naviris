@@ -59,6 +59,12 @@ contextBridge.exposeInMainWorld('cobalt', {
   pwImportCsv: () => ipcRenderer.invoke('pw:import-csv'),
   pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),
 
+  cardsList: () => ipcRenderer.invoke('cards:list'),
+  cardsAdd: (card) => ipcRenderer.invoke('cards:add', card),
+  cardsDelete: (id) => ipcRenderer.invoke('cards:delete', id),
+  cardsReveal: (id) => ipcRenderer.invoke('cards:reveal', id),
+  cardsFill: (id) => ipcRenderer.invoke('cards:fill', id),
+
   addonsCatalog: () => ipcRenderer.invoke('addons:catalog'),
   addonsList: () => ipcRenderer.invoke('addons:list'),
   addonsInstall: (meta) => ipcRenderer.invoke('addons:install', meta),

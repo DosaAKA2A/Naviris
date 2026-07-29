@@ -1,0 +1,9 @@
+name = "naviris-account"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# KV para cuentas, tokens y el blob de sincronización de cada cuenta.
+# El id se rellena al crear el namespace:  npx wrangler kv namespace create SYNC
+[[kv_namespaces]]
+binding = "SYNC"
+id = "12a885b27b70493b8b650b48ce83a9e0"

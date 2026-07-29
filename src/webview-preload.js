@@ -85,6 +85,55 @@ try {
   setTimeout(() => obs.disconnect(), 8000);
 } catch (e) { /* nada */ }
 
+// --- Formularios de pago: detectar y autorrellenar tarjeta (como Opera/Brave) ---
+function findCardForm() {
+  const q = (sel) => document.querySelector(sel);
+  const number = q('input[autocomplete="cc-number"]:not([disabled])')
+    || q('input[name*="cardnumber" i]:not([disabled]), input[name*="card-number" i]:not([disabled]), input[name*="card_number" i]:not([disabled]), input[id*="cardnumber" i]:not([disabled]), input[id*="card-number" i]:not([disabled]), input[name="pan" i]:not([disabled])');
+  if (!number) return null;
+  const scope = number.form || document;
+  const s = (sel) => scope.querySelector(sel);
+  return {
+    number,
+    holder: s('input[autocomplete="cc-name"], input[name*="cardholder" i], input[name*="card-holder" i], input[name*="holdername" i], input[id*="cardholder" i]'),
+    exp: s('input[autocomplete="cc-exp"], input[name*="expiry" i]:not([name*="month" i]):not([name*="year" i]), input[id*="expiry" i], input[name*="exp-date" i], input[placeholder*="MM" i][placeholder*="AA" i], input[placeholder*="MM" i][placeholder*="YY" i]'),
+    expMonth: s('input[autocomplete="cc-exp-month"], select[autocomplete="cc-exp-month"], input[name*="exp" i][name*="month" i], select[name*="exp" i][name*="month" i]'),
+    expYear: s('input[autocomplete="cc-exp-year"], select[autocomplete="cc-exp-year"], input[name*="exp" i][name*="year" i], select[name*="exp" i][name*="year" i]')
+  };
+}
+let cardAnnounced = false;
+function announceCard() {
+  if (cardAnnounced) return;
+  if (findCardForm()) { cardAnnounced = true; ipcRenderer.sendToHost('cobalt-cardform', { url: location.href }); }
+}
+if (document.readyState !== 'loading') announceCard();
+document.addEventListener('DOMContentLoaded', announceCard);
+[600, 1500, 3000, 6000].forEach((ms) => setTimeout(announceCard, ms));
+
+ipcRenderer.on('cobalt-fill-card', (_e, card) => {
+  const f = findCardForm();
+  if (!f) return;
+  const set = (el, val) => {
+    if (!el || val == null) return;
+    const proto = Object.getPrototypeOf(el);
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value') && Object.getOwnPropertyDescriptor(proto, 'value').set;
+    try { setter ? setter.call(el, String(val)) : (el.value = String(val)); } catch (e) { el.value = String(val); }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const mm = String(card.expMonth).padStart(2, '0');
+  const yy = String(card.expYear).slice(-2);
+  set(f.number, card.number);
+  if (f.holder) set(f.holder, card.holder);
+  if (f.exp) set(f.exp, mm + '/' + yy);
+  if (f.expMonth) set(f.expMonth, f.expMonth.tagName === 'SELECT' ? String(card.expMonth) : mm);
+  if (f.expYear) {
+    // Los <select> de año a veces listan 2027 y a veces 27: probar el largo y si no, el corto
+    if (f.expYear.tagName === 'SELECT') { set(f.expYear, String(card.expYear)); if (f.expYear.value !== String(card.expYear)) set(f.expYear, yy); }
+    else set(f.expYear, String(card.expYear));
+  }
+});
+
 // --- Twitch: AutoLoot por pestaña. Lo activa/para la interfaz con 'cobalt-autoloot'. ---
 if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   let claims = 0, lastPoints = 0, timer = null;

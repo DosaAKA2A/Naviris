@@ -765,6 +765,65 @@ ipcMain.handle('pw:reveal', async (_e, id) => {
   catch { return { ok: false, error: 'no se pudo descifrar' }; }
 });
 
+// ---------- Gestor de tarjetas (como Opera/Brave: safeStorage + Windows Hello) ----------
+// El número viaja y se guarda cifrado; en claro solo quedan marca, últimos 4 y
+// caducidad para pintar la lista. El CVC NO se guarda nunca (como Chrome):
+// autorrellenamos número/titular/caducidad y el CVC lo teclea el usuario.
+const cardsPath = () => path.join(app.getPath('userData'), 'cobalt-cards.json');
+function loadCards() { try { return JSON.parse(fs.readFileSync(cardsPath(), 'utf8')); } catch { return []; } }
+function saveCards(list) { try { fs.writeFileSync(cardsPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('cards save', e); } }
+let cardSeq = Date.now();
+
+function cardBrand(num) {
+  if (/^4/.test(num)) return 'Visa';
+  if (/^(5[1-5]|22[2-9]|2[3-6]|27[01]|2720)/.test(num)) return 'Mastercard';
+  if (/^3[47]/.test(num)) return 'American Express';
+  if (/^(6011|65|64[4-9])/.test(num)) return 'Discover';
+  if (/^(30[0-5]|36|38)/.test(num)) return 'Diners';
+  if (/^35/.test(num)) return 'JCB';
+  return 'Tarjeta';
+}
+function luhnOk(num) {
+  let sum = 0, dbl = false;
+  for (let i = num.length - 1; i >= 0; i--) {
+    let d = +num[i];
+    if (dbl) { d *= 2; if (d > 9) d -= 9; }
+    sum += d; dbl = !dbl;
+  }
+  return sum % 10 === 0;
+}
+
+ipcMain.handle('cards:list', () => loadCards().map((c) => ({ id: c.id, brand: c.brand, last4: c.last4, holder: c.holder, expMonth: c.expMonth, expYear: c.expYear })));
+ipcMain.handle('cards:add', (_e, { number, holder, expMonth, expYear }) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Cifrado no disponible' };
+  const num = String(number || '').replace(/[\s-]/g, '');
+  if (!/^\d{12,19}$/.test(num)) return { ok: false, error: 'Número no válido' };
+  if (!luhnOk(num)) return { ok: false, error: 'El número no supera la comprobación (revísalo)' };
+  const m = parseInt(expMonth, 10), y = parseInt(expYear, 10);
+  if (!(m >= 1 && m <= 12) || !(y >= 2020 && y <= 2100)) return { ok: false, error: 'Caducidad no válida' };
+  const list = loadCards();
+  const last4 = num.slice(-4);
+  const enc = safeStorage.encryptString(num).toString('base64');
+  // Misma tarjeta (mismos últimos 4 y marca): se actualiza en vez de duplicar
+  const existing = list.find((c) => c.last4 === last4 && c.brand === cardBrand(num));
+  if (existing) { existing.enc = enc; existing.holder = String(holder || ''); existing.expMonth = m; existing.expYear = y; }
+  else list.push({ id: 'card' + (++cardSeq), brand: cardBrand(num), last4, holder: String(holder || ''), expMonth: m, expYear: y, enc });
+  saveCards(list);
+  return { ok: true, updated: !!existing };
+});
+ipcMain.handle('cards:delete', (_e, id) => { saveCards(loadCards().filter((c) => c.id !== id)); return { ok: true }; });
+// Ver el número completo o autorrellenar exige Windows Hello, como las contraseñas
+async function revealCard(id, reason) {
+  const c = loadCards().find((x) => x.id === id);
+  if (!c) return { ok: false, error: 'no encontrada' };
+  const verified = await verifyWindowsHello(reason);
+  if (!verified) return { ok: false, error: 'verificacion cancelada' };
+  try { return { ok: true, number: safeStorage.decryptString(Buffer.from(c.enc, 'base64')), holder: c.holder, expMonth: c.expMonth, expYear: c.expYear }; }
+  catch { return { ok: false, error: 'no se pudo descifrar' }; }
+}
+ipcMain.handle('cards:reveal', (_e, id) => revealCard(id, 'Naviris: verifica tu identidad para ver la tarjeta'));
+ipcMain.handle('cards:fill', (_e, id) => revealCard(id, 'Naviris: verifica tu identidad para autorrellenar la tarjeta'));
+
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });
 ipcMain.handle('adblock:whitelist', (_e, { action, domain }) => {

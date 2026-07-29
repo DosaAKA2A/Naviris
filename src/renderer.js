@@ -629,7 +629,23 @@ setInterval(tickClock, 10000);
 /* Clima y región (open-meteo + ipapi, sin claves) */
 let geoCache = null, wxCache = null;
 const WMO = (c) => c === 0 ? ['Despejado', 'sun'] : c <= 3 ? ['Parcialmente nublado', 'cloud'] : c <= 48 ? ['Niebla', 'cloud'] : c <= 67 ? ['Lluvia', 'cloud'] : c <= 77 ? ['Nieve', 'cloud'] : c <= 82 ? ['Chubascos', 'cloud'] : ['Tormenta', 'bolt'];
-async function getGeo() { if (geoCache) return geoCache; const r = await fetch('https://ipapi.co/json/'); geoCache = await r.json(); return geoCache; }
+// ipapi.co limita peticiones sin aviso (devuelve HTML): se prueba en cadena con
+// dos alternativas gratuitas y se normaliza al mismo formato.
+async function getGeo() {
+  if (geoCache) return geoCache;
+  const fuentes = [
+    ['https://ipapi.co/json/', (j) => j],
+    ['https://ipwho.is/', (j) => ({ city: j.city, region: j.region, country_name: j.country, latitude: j.latitude, longitude: j.longitude, timezone: j.timezone && j.timezone.id })],
+    ['https://get.geojs.io/v1/ip/geo.json', (j) => ({ city: j.city, region: j.region, country_name: j.country, latitude: +j.latitude, longitude: +j.longitude, timezone: j.timezone })]
+  ];
+  for (const [url, map] of fuentes) {
+    try {
+      const j = map(await (await fetch(url)).json());
+      if (j && j.latitude != null && !isNaN(+j.latitude)) { geoCache = j; return geoCache; }
+    } catch { /* siguiente fuente */ }
+  }
+  throw new Error('geo no disponible');
+}
 async function loadWeather(el, kind) {
   try {
     const geo = await getGeo();
@@ -639,6 +655,145 @@ async function loadWeather(el, kind) {
     el.innerHTML = `<div class="wx-ic">${window.icon(ic)}</div><div><div class="wx-temp">${Math.round(wxCache.temperature_2m)}°</div><div class="wx-desc">${desc}</div><div class="wx-city">${window.icon('map-pin')} ${escapeHtml(geo.city || '')}</div></div>`;
   } catch { el.innerHTML = '<div class="w-loading">Clima no disponible (sin conexión)</div>'; }
 }
+
+/* ============ Pastilla de clima (esquina del hub, como Opera GX) ============ */
+async function loadWeatherPill() {
+  const el = document.getElementById('hub-weather'); if (!el) return;
+  try {
+    const geo = await getGeo();
+    if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,weather_code`); wxCache = (await r.json()).current; }
+    const [desc, ic] = WMO(wxCache.weather_code);
+    el.innerHTML = `${window.icon(ic)}<span>${Math.round(wxCache.temperature_2m)}°C</span><span class="wxp-sep"></span><span class="wxp-city">${escapeHtml(geo.city || desc)}</span>`;
+    el.title = desc;
+    el.classList.remove('hidden');
+  } catch { el.classList.add('hidden'); }
+}
+loadWeatherPill();
+setInterval(() => { wxCache = null; loadWeatherPill(); }, 30 * 60 * 1000); // refresco cada 30 min
+
+/* ============ Cuenta Naviris (sincronización de preferencias) ============ */
+const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
+let account = store.get('cobalt.account', null); // { email, token }
+// Qué viaja: preferencias de usuario + marcadores + accesos + widgets + notas +
+// fondo. NUNCA contraseñas, tarjetas, historial ni sesión (locales por diseño).
+const SYNC_SETTINGS = ['lightMode', 'smartSearch', 'xRevealSensitive', 'blockPasskeys', 'restoreSession', 'powerSaver', 'adblockEnabled', 'adblockWhitelist'];
+function buildSyncData() {
+  const s = {};
+  for (const k of SYNC_SETTINGS) if (settings[k] !== undefined) s[k] = settings[k];
+  return {
+    v: 1, settings: s,
+    bookmarks: store.get('cobalt.bookmarks2', []),
+    dials: store.get('cobalt.dials', null),
+    widgets: store.get('cobalt.widgets', null),
+    notes: store.get('cobalt.notes', ''),
+    hubBg: store.get('cobalt.hubBg', null)
+  };
+}
+async function applySyncData(d) {
+  if (!d) return;
+  if (Array.isArray(d.bookmarks)) { store.set('cobalt.bookmarks2', d.bookmarks); bookmarks = d.bookmarks; }
+  if (Array.isArray(d.dials)) { store.set('cobalt.dials', d.dials); dials = d.dials; }
+  if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
+  if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
+  if (d.hubBg) { store.set('cobalt.hubBg', d.hubBg); applyBackground(d.hubBg); }
+  if (d.settings) {
+    settings = await window.cobalt.setSettings(d.settings);
+    applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
+    els.optSmartsearch.checked = settings.smartSearch !== false; els.optXsensitive.checked = !!settings.xRevealSensitive;
+    els.optPasskeys.checked = settings.blockPasskeys !== false; els.optRestore.checked = settings.restoreSession !== false;
+    els.optPowersaver.checked = settings.powerSaver;
+    const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
+  }
+  renderBookmarksBar(); renderHub();
+}
+const accEls = {
+  modal: $('#account-modal'), loginView: $('#acc-login-view'), userView: $('#acc-user-view'),
+  email: $('#acc-email'), pass: $('#acc-pass'), error: $('#acc-error'), who: $('#acc-who'), last: $('#acc-last'),
+  pill: $('#hub-account'), pillLabel: $('#hub-account-label')
+};
+function renderAccountPill() {
+  const logged = !!(account && account.token);
+  accEls.pill.classList.toggle('logged', logged);
+  accEls.pillLabel.textContent = logged ? account.email.split('@')[0] : 'Iniciar sesión';
+  accEls.pill.title = logged ? `Cuenta Naviris — ${account.email}` : 'Cuenta Naviris: guarda tus preferencias en la nube';
+}
+function accError(msg) { accEls.error.textContent = msg || ''; accEls.error.classList.toggle('hidden', !msg); }
+function showAccountModal() {
+  const logged = !!(account && account.token);
+  accEls.loginView.classList.toggle('hidden', logged);
+  accEls.userView.classList.toggle('hidden', !logged);
+  if (logged) {
+    accEls.who.textContent = account.email;
+    const st = store.get('cobalt.syncStamp', 0);
+    accEls.last.textContent = st ? 'Última sincronización: ' + new Date(st).toLocaleString('es') : 'Aún sin sincronizar en este equipo.';
+  } else { accError(''); accEls.pass.value = ''; }
+  accEls.modal.classList.remove('hidden');
+  if (!logged) accEls.email.focus();
+}
+accEls.pill.addEventListener('click', showAccountModal);
+$('#acc-cancel').addEventListener('click', () => accEls.modal.classList.add('hidden'));
+$('#acc-close2').addEventListener('click', () => accEls.modal.classList.add('hidden'));
+
+async function accRequest(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (account && account.token) headers.Authorization = 'Bearer ' + account.token;
+  try {
+    const r = await fetch(ACC_API + path, { ...opts, headers });
+    return await r.json();
+  } catch { return { ok: false, error: 'Sin conexión con el servidor de cuentas' }; }
+}
+async function accAuth(path) {
+  const email = accEls.email.value.trim(), password = accEls.pass.value;
+  if (!email || !password) { accError('Escribe el correo y la contraseña'); return; }
+  accError('');
+  const r = await accRequest(path, { method: 'POST', body: JSON.stringify({ email, password }) });
+  if (!r.ok) { accError(r.error || 'No se pudo iniciar sesión'); return; }
+  account = { email: r.email, token: r.token };
+  store.set('cobalt.account', account);
+  renderAccountPill();
+  // Al entrar: si la cuenta ya tiene datos se cargan aquí (eso es "moverse de PC");
+  // si está vacía (recién creada), se sube lo de este equipo.
+  const s = await accRequest('/sync');
+  if (s.ok && s.data) { await applySyncData(s.data); store.set('cobalt.syncStamp', s.updatedAt); toast('Preferencias de tu cuenta cargadas'); }
+  else if (s.ok) { await accPush(); toast('Cuenta lista: tus preferencias ya están en la nube'); }
+  showAccountModal();
+}
+$('#acc-login').addEventListener('click', () => accAuth('/login'));
+$('#acc-register').addEventListener('click', () => accAuth('/register'));
+accEls.pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') accAuth('/login'); });
+$('#acc-logout').addEventListener('click', async () => {
+  await accRequest('/logout', { method: 'POST' });
+  account = null; store.set('cobalt.account', null); store.set('cobalt.syncStamp', 0);
+  renderAccountPill(); showAccountModal();
+});
+let lastPushJson = '';
+async function accPush() {
+  if (!account || !account.token) return;
+  const data = buildSyncData();
+  const r = await accRequest('/sync', { method: 'PUT', body: JSON.stringify({ data }) });
+  if (r.ok) { lastPushJson = JSON.stringify(data); store.set('cobalt.syncStamp', r.updatedAt); }
+  else if (/Sesión caducada/.test(r.error || '')) { account = null; store.set('cobalt.account', null); renderAccountPill(); }
+  return r;
+}
+$('#acc-sync').addEventListener('click', async () => {
+  const r = await accPush();
+  toast(r && r.ok ? 'Sincronizado' : 'No se pudo sincronizar');
+  showAccountModal();
+});
+// Al arrancar con sesión: baja lo del servidor si es más nuevo que lo aplicado aquí
+async function accBootSync() {
+  if (!account || !account.token) return;
+  const s = await accRequest('/sync');
+  if (s.ok && s.data && s.updatedAt > store.get('cobalt.syncStamp', 0)) { await applySyncData(s.data); store.set('cobalt.syncStamp', s.updatedAt); }
+  lastPushJson = JSON.stringify(buildSyncData());
+}
+// Empuje automático: cada minuto, solo si algo cambió de verdad
+setInterval(() => {
+  if (!account || !account.token || IS_PRIVATE) return;
+  const now = JSON.stringify(buildSyncData());
+  if (now !== lastPushJson) accPush();
+}, 60000);
+renderAccountPill();
 
 /* Edición / personalización del hub */
 els.hubEdit.addEventListener('click', () => {
@@ -973,7 +1128,7 @@ async function renderPasswords() {
 function togglePwPanel(force) {
   const open = force !== undefined ? force : els.pwPanel.classList.contains('hidden');
   if (open) { closeRightPanels(); els.pwPanel.classList.remove('hidden'); els.sbPasswords.classList.add('open'); renderPasswords(); }
-  else { els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.pwForm.classList.add('hidden'); }
+  else { els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.pwForm.classList.add('hidden'); document.getElementById('card-form').classList.add('hidden'); }
 }
 els.sbPasswords.addEventListener('click', async () => {
   const info = await window.cobalt.pwAvailable();
@@ -981,7 +1136,12 @@ els.sbPasswords.addEventListener('click', async () => {
   togglePwPanel();
 });
 $('#pw-close').addEventListener('click', () => togglePwPanel(false));
-els.pwAddbtn.addEventListener('click', () => { els.pwForm.classList.toggle('hidden'); els.pwSite.value = ''; els.pwUser.value = ''; els.pwPass.value = ''; els.pwSite.focus(); });
+els.pwAddbtn.addEventListener('click', () => {
+  // Abre el formulario de la pestaña activa del panel (contraseñas o tarjetas)
+  const enTarjetas = !document.getElementById('pw-sec-cards').classList.contains('hidden');
+  if (enTarjetas) { const f = document.getElementById('card-form'); f.classList.toggle('hidden'); document.getElementById('card-number').focus(); return; }
+  els.pwForm.classList.toggle('hidden'); els.pwSite.value = ''; els.pwUser.value = ''; els.pwPass.value = ''; els.pwSite.focus();
+});
 els.pwImport.addEventListener('click', async () => {
   toast('Elige el CSV exportado desde tu navegador (Configuración → Contraseñas → Exportar)');
   const r = await window.cobalt.pwImportCsv();
@@ -996,6 +1156,63 @@ els.pwForm.addEventListener('submit', async (e) => {
   const r = await window.cobalt.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value);
   if (r.ok) { els.pwForm.classList.add('hidden'); renderPasswords(); toast('Contraseña guardada y cifrada'); }
   else toast('No se pudo guardar');
+});
+
+/* ============ Gestor de tarjetas (pestaña del panel de contraseñas) ============ */
+const cardEls = {
+  tabPw: $('#pw-tab-pw'), tabCards: $('#pw-tab-cards'), secPw: $('#pw-sec-pw'), secCards: $('#pw-sec-cards'),
+  form: $('#card-form'), number: $('#card-number'), holder: $('#card-holder'), month: $('#card-month'), year: $('#card-year'),
+  cancel: $('#card-cancel'), list: $('#card-list')
+};
+function switchPwTab(cards) {
+  cardEls.tabPw.classList.toggle('active', !cards); cardEls.tabCards.classList.toggle('active', cards);
+  cardEls.secPw.classList.toggle('hidden', cards); cardEls.secCards.classList.toggle('hidden', !cards);
+  document.querySelector('#pw-panel .mp-head > span').textContent = cards ? 'Tarjetas' : 'Contraseñas';
+  els.pwImport.classList.toggle('hidden', cards); // el CSV es solo de contraseñas
+  if (cards) renderCards(); else renderPasswords();
+}
+cardEls.tabPw.addEventListener('click', () => switchPwTab(false));
+cardEls.tabCards.addEventListener('click', () => switchPwTab(true));
+async function renderCards() {
+  const list = await window.cobalt.cardsList();
+  cardEls.list.innerHTML = '';
+  for (const c of list) {
+    const item = document.createElement('div'); item.className = 'pw-item';
+    const ic = document.createElement('span'); ic.className = 'pw-ic card-chip'; ic.textContent = c.brand === 'American Express' ? 'AmEx' : c.brand.slice(0, 4);
+    const info = document.createElement('div'); info.className = 'pw-info';
+    const num = document.createElement('div'); num.className = 'pw-site card-num'; num.textContent = '•••• ' + c.last4;
+    const sub = document.createElement('div'); sub.className = 'pw-sub';
+    sub.textContent = `${c.brand} · ${String(c.expMonth).padStart(2, '0')}/${c.expYear}` + (c.holder ? ' · ' + c.holder : '');
+    info.append(num, sub);
+    const acts = document.createElement('div'); acts.className = 'pw-acts';
+    const eye = document.createElement('button'); eye.title = 'Ver número completo (Windows Hello)'; eye.innerHTML = window.icon('eye');
+    eye.addEventListener('click', async () => {
+      eye.disabled = true; const r = await window.cobalt.cardsReveal(c.id); eye.disabled = false;
+      if (r.ok) { num.textContent = r.number.replace(/(\d{4})(?=\d)/g, '$1 '); setTimeout(() => { num.textContent = '•••• ' + c.last4; }, 15000); }
+      else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo verificar');
+    });
+    const copy = document.createElement('button'); copy.title = 'Copiar número (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
+    copy.addEventListener('click', async () => {
+      copy.disabled = true; const r = await window.cobalt.cardsReveal(c.id); copy.disabled = false;
+      if (r.ok) { try { await navigator.clipboard.writeText(r.number); toast('Número copiado (se borra en 20 s)'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 20000); } catch { toast('No se pudo copiar'); } }
+      else toast('Verificación cancelada');
+    });
+    const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
+    del.addEventListener('click', async () => { await window.cobalt.cardsDelete(c.id); renderCards(); });
+    acts.append(eye, copy, del); item.append(ic, info, acts); cardEls.list.appendChild(item);
+  }
+}
+cardEls.cancel.addEventListener('click', () => cardEls.form.classList.add('hidden'));
+cardEls.form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await window.cobalt.cardsAdd({ number: cardEls.number.value, holder: cardEls.holder.value.trim(), expMonth: cardEls.month.value, expYear: cardEls.year.value });
+  if (r.ok) { cardEls.form.classList.add('hidden'); cardEls.number.value = cardEls.holder.value = cardEls.month.value = cardEls.year.value = ''; renderCards(); toast(r.updated ? 'Tarjeta actualizada' : 'Tarjeta guardada y cifrada'); }
+  else toast(r.error || 'No se pudo guardar');
+});
+// El número se agrupa de 4 en 4 mientras se escribe, como en los formularios de pago
+cardEls.number.addEventListener('input', () => {
+  const digits = cardEls.number.value.replace(/\D/g, '').slice(0, 19);
+  cardEls.number.value = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
 });
 
 /* ============ Rat Tool ============ */
@@ -1418,7 +1635,20 @@ async function onWebviewMessage(wv, e) {
     const cred = creds[0];
     const who = cred.username ? `<b>${escapeHtml(cred.username)}</b>` : 'la cuenta guardada';
     showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred));
+  } else if (e.channel === 'cobalt-cardform') {
+    // Formulario de pago detectado: ofrecer la tarjeta guardada (CVC no; lo teclea el usuario)
+    if (IS_PRIVATE) return;
+    const host = hostOf(data.url); if (!host) return;
+    const cards = await window.cobalt.cardsList();
+    if (!cards.length) return;
+    const card = cards[0];
+    showPwBar(`Rellenar la tarjeta <b>${escapeHtml(card.brand)} •••• ${escapeHtml(card.last4)}</b> en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows. El CVC lo escribes tú.`, 'Rellenar', () => doFillCard(wv, card));
   }
+}
+async function doFillCard(wv, card) {
+  const r = await window.cobalt.cardsFill(card.id);
+  if (r.ok) { try { wv.send('cobalt-fill-card', r); toast('Tarjeta rellenada (falta el CVC)'); } catch { toast('No se pudo rellenar'); } }
+  else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
 }
 async function doSavePw(host, username, password) {
   const r = await window.cobalt.pwAdd(host, username || '', password);
@@ -1804,6 +2034,7 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderBookmarksBar(); renderHub();
+  if (!IS_PRIVATE) accBootSync(); // cuenta Naviris: baja preferencias si el servidor tiene algo más nuevo
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {

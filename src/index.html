@@ -105,6 +105,12 @@
           </div>
           <div id="hub-version" title="Versión de Naviris">Naviris</div>
 
+          <!-- Esquina superior derecha (como Opera GX): cuenta y clima en pastillas -->
+          <div class="hub-corner">
+            <button id="hub-account" class="hub-pill" title="Cuenta Naviris"><span data-ico="user-circle"></span><span id="hub-account-label">Iniciar sesión</span></button>
+            <div id="hub-weather" class="hub-pill wx hidden"></div>
+          </div>
+
           <!-- Paleta de widgets (modo edición) -->
           <div id="widget-palette" class="hub-panel hidden">
             <div class="hp-title">Añadir widget</div>
@@ -257,14 +263,30 @@
   <!-- ===== Panel de contraseñas ===== -->
   <aside id="pw-panel" class="hidden side-panel">
     <div class="mp-head"><span>Contraseñas</span><span class="mp-tools"><button id="pw-import" data-ico="arrow-down-tray" title="Importar desde CSV (Chrome, Brave, Opera…)"></button><button id="pw-addbtn" data-ico="plus" title="Añadir"></button><button id="pw-close" data-ico="x-mark" title="Cerrar"></button></span></div>
-    <div class="pw-hint">Cifradas con tu cuenta de Windows. Ver una contraseña requiere <b>Windows Hello</b> (PIN o biometría).</div>
-    <form id="pw-form" class="pw-form hidden">
-      <input id="pw-site" type="text" placeholder="Sitio (ej. github.com)" spellcheck="false" />
-      <input id="pw-user" type="text" placeholder="Usuario o correo" spellcheck="false" />
-      <input id="pw-pass" type="password" placeholder="Contraseña" />
-      <div class="pw-form-actions"><button type="button" id="pw-cancel">Cancelar</button><button type="submit" class="primary-btn" style="width:auto;padding:8px 16px">Guardar</button></div>
-    </form>
-    <div id="pw-list"></div>
+    <div class="pw-tabs lp-tabs"><button id="pw-tab-pw" class="lp-tab active">Contraseñas</button><button id="pw-tab-cards" class="lp-tab">Tarjetas</button></div>
+    <div id="pw-sec-pw">
+      <div class="pw-hint">Cifradas con tu cuenta de Windows. Ver una contraseña requiere <b>Windows Hello</b> (PIN o biometría).</div>
+      <form id="pw-form" class="pw-form hidden">
+        <input id="pw-site" type="text" placeholder="Sitio (ej. github.com)" spellcheck="false" />
+        <input id="pw-user" type="text" placeholder="Usuario o correo" spellcheck="false" />
+        <input id="pw-pass" type="password" placeholder="Contraseña" />
+        <div class="pw-form-actions"><button type="button" id="pw-cancel">Cancelar</button><button type="submit" class="primary-btn" style="width:auto;padding:8px 16px">Guardar</button></div>
+      </form>
+      <div id="pw-list"></div>
+    </div>
+    <div id="pw-sec-cards" class="hidden">
+      <div class="pw-hint">Como en Opera o Brave: el número se guarda cifrado y autorrellenarlo o verlo requiere <b>Windows Hello</b>. El CVC nunca se guarda.</div>
+      <form id="card-form" class="pw-form hidden">
+        <input id="card-number" type="text" inputmode="numeric" placeholder="Número de la tarjeta" spellcheck="false" autocomplete="off" />
+        <input id="card-holder" type="text" placeholder="Titular (como aparece en la tarjeta)" spellcheck="false" />
+        <div class="card-exp-row">
+          <input id="card-month" type="text" inputmode="numeric" placeholder="MM" maxlength="2" autocomplete="off" />
+          <input id="card-year" type="text" inputmode="numeric" placeholder="AAAA" maxlength="4" autocomplete="off" />
+        </div>
+        <div class="pw-form-actions"><button type="button" id="card-cancel">Cancelar</button><button type="submit" class="primary-btn" style="width:auto;padding:8px 16px">Guardar</button></div>
+      </form>
+      <div id="card-list"></div>
+    </div>
   </aside>
 
   <!-- ===== Panel descargas ===== -->
@@ -283,6 +305,25 @@
 
 
   <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
+
+  <!-- ===== Cuenta Naviris ===== -->
+  <div id="account-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3><span class="mt-ico" data-ico="user-circle"></span>Cuenta Naviris</h3>
+      <div id="acc-login-view">
+        <p>Guarda tus preferencias, marcadores, accesos y widgets en la nube y recupéralos al entrar en cualquier PC. Las contraseñas y tarjetas nunca salen de este equipo.</p>
+        <input id="acc-email" type="email" placeholder="Correo" spellcheck="false" autocomplete="off" />
+        <input id="acc-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" />
+        <p id="acc-error" class="acc-error hidden"></p>
+        <div class="modal-actions"><button id="acc-cancel" type="button">Cancelar</button><button id="acc-register" type="button">Crear cuenta</button><button id="acc-login" type="button" class="primary">Entrar</button></div>
+      </div>
+      <div id="acc-user-view" class="hidden">
+        <p>Sesión iniciada como <b id="acc-who"></b>.</p>
+        <p id="acc-last" class="acc-last"></p>
+        <div class="modal-actions"><button id="acc-close2" type="button">Cerrar</button><button id="acc-logout" type="button">Cerrar sesión</button><button id="acc-sync" type="button" class="primary">Sincronizar ahora</button></div>
+      </div>
+    </div>
+  </div>
 
   <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Naviris <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
     <div class="upd-box"><div id="upd-status">Comprueba las versiones disponibles.</div>
