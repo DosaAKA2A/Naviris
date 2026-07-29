@@ -8,15 +8,21 @@
  * salen del equipo.
  *
  * KV (binding SYNC):
- *   acct:<email> -> { salt, hash, created }
- *   tok:<token>  -> email                (expirationTtl 90 dias)
- *   sync:<email> -> { data, updatedAt }
+ *   acct:<email>      -> { salt, hash, created }
+ *   tok:<sha256(tok)> -> email            (expirationTtl 90 dias)
+ *   sync:<email>      -> { data, updatedAt }
+ *   rl:<ip>:<ventana> -> intentos fallidos de login
+ *
+ * El token se guarda HASHEADO: quien leyera el KV no podria usarlo para
+ * suplantar a nadie, igual que con las contrasenas.
  */
 'use strict';
 
 const TOKEN_TTL = 90 * 24 * 3600;
 const MAX_BLOB = 300 * 1024; // 300 KB de datos por cuenta: de sobra para preferencias
 const ITER = 100000;
+const RL_MAX = 10;           // intentos fallidos por IP y ventana
+const RL_WINDOW = 900;       // ventana de 15 minutos
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
   status,
@@ -54,11 +60,32 @@ function safeEqual(a, b) {
   return r === 0;
 }
 
+async function sha256Hex(s) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
 async function auth(env, req) {
   const h = req.headers.get('Authorization') || '';
   const m = h.match(/^Bearer ([0-9a-f]{64})$/);
   if (!m) return null;
-  return env.SYNC.get('tok:' + m[1]);
+  return env.SYNC.get('tok:' + (await sha256Hex(m[1])));
+}
+async function nuevoToken(env, email) {
+  const token = randToken();
+  await env.SYNC.put('tok:' + (await sha256Hex(token)), email, { expirationTtl: TOKEN_TTL });
+  return token;
+}
+// Limitador por IP: frena el probado masivo de contraseñas. Solo cuentan los
+// intentos FALLIDOS, así que a un usuario legítimo no le estorba nunca.
+const rlKey = (req) => 'rl:' + (req.headers.get('CF-Connecting-IP') || 'sin-ip') + ':' + Math.floor(Date.now() / (RL_WINDOW * 1000));
+async function rlBloqueado(env, req) {
+  const n = parseInt((await env.SYNC.get(rlKey(req))) || '0', 10);
+  return n >= RL_MAX;
+}
+async function rlFallo(env, req) {
+  const k = rlKey(req);
+  const n = parseInt((await env.SYNC.get(k)) || '0', 10) + 1;
+  await env.SYNC.put(k, String(n), { expirationTtl: RL_WINDOW });
 }
 
 export default {
@@ -73,30 +100,30 @@ export default {
         const em = normEmail(email);
         if (!emailOk(em)) return json({ ok: false, error: 'Correo no válido' }, 400);
         if (String(password || '').length < 8) return json({ ok: false, error: 'La contraseña necesita al menos 8 caracteres' }, 400);
+        if (await rlBloqueado(env, req)) return json({ ok: false, error: 'Demasiados intentos. Espera unos minutos.' }, 429);
         if (await env.SYNC.get('acct:' + em)) return json({ ok: false, error: 'Ya existe una cuenta con ese correo' }, 409);
         const salt = randB64(16);
         const hash = await pbkdf2(String(password), salt);
         await env.SYNC.put('acct:' + em, JSON.stringify({ salt, hash, created: Date.now() }));
-        const token = randToken();
-        await env.SYNC.put('tok:' + token, em, { expirationTtl: TOKEN_TTL });
-        return json({ ok: true, token, email: em });
+        return json({ ok: true, token: await nuevoToken(env, em), email: em });
       }
 
       if (req.method === 'POST' && url.pathname === '/login') {
+        if (await rlBloqueado(env, req)) return json({ ok: false, error: 'Demasiados intentos. Espera unos minutos.' }, 429);
         const { email, password } = await req.json();
         const em = normEmail(email);
         const acct = JSON.parse((await env.SYNC.get('acct:' + em)) || 'null');
-        if (!acct) return json({ ok: false, error: 'No hay ninguna cuenta con ese correo' }, 404);
+        // Mismo mensaje y mismo coste para "no existe" y "contraseña mala": si
+        // no, el error revela qué correos tienen cuenta en Naviris.
+        if (!acct) { await pbkdf2(String(password || ''), randB64(16)); await rlFallo(env, req); return json({ ok: false, error: 'Correo o contraseña incorrectos' }, 401); }
         const hash = await pbkdf2(String(password || ''), acct.salt);
-        if (!safeEqual(hash, acct.hash)) return json({ ok: false, error: 'Contraseña incorrecta' }, 401);
-        const token = randToken();
-        await env.SYNC.put('tok:' + token, em, { expirationTtl: TOKEN_TTL });
-        return json({ ok: true, token, email: em });
+        if (!safeEqual(hash, acct.hash)) { await rlFallo(env, req); return json({ ok: false, error: 'Correo o contraseña incorrectos' }, 401); }
+        return json({ ok: true, token: await nuevoToken(env, em), email: em });
       }
 
       if (req.method === 'POST' && url.pathname === '/logout') {
         const h = (req.headers.get('Authorization') || '').match(/^Bearer ([0-9a-f]{64})$/);
-        if (h) await env.SYNC.delete('tok:' + h[1]);
+        if (h) await env.SYNC.delete('tok:' + (await sha256Hex(h[1])));
         return json({ ok: true });
       }
 

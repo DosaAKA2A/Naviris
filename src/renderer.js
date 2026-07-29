@@ -45,6 +45,8 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 function applyTheme(light) {
   document.documentElement.classList.toggle('light', !!light);
   store.set('cobalt.lightMode', !!light);
+  // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
+  applyBackground(store.get('cobalt.hubBg', null) || BACKGROUNDS[0]);
 }
 if (store.get('cobalt.lightMode', false)) document.documentElement.classList.add('light');
 let tabs = [], activeId = null, nextId = 1;
@@ -534,9 +536,11 @@ function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt
 // Estilo único: logo monocromo sobre tile oscuro
 function styleDial(tile, letter, d) {
   const brand = brandOf(d.url);
-  tile.style.background = 'linear-gradient(140deg,#1e1e23,#141418)';
+  // El fondo y el filtro del favicon los pone el CSS (tokens --tile-default y
+  // --fav-filter): antes se fijaban aquí en línea y en modo claro quedaban
+  // tiles negros con iconos aclarados sobre un hub blanco.
   if (brand && window.brandIcon(brand)) { const m = document.createElement('span'); m.className = 'd-mono'; m.innerHTML = window.brandIcon(brand); tile.appendChild(m); letter.remove(); return; }
-  getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.style.filter = 'grayscale(1) brightness(1.5)'; im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
+  getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.className = 'd-fav'; im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
 }
 function makeDialEl(d) {
   const el = document.createElement('div'); el.className = 'dial'; el.title = d.url;
@@ -821,15 +825,40 @@ const BACKGROUNDS = [
   'radial-gradient(120% 80% at 50% -10%, #1c2740 0%, #0b0e15 62%)',    // Acero
   'linear-gradient(135deg, #2a1030 0%, #100a1e 45%, #0a0a0d 100%)'     // Aurora
 ];
+// Los MISMOS diez fondos en versión clara, en el mismo orden: el fondo guardado
+// se sigue identificando por su valor oscuro (canónico) y aquí se traduce según
+// el tema, de modo que cambiar de claro a oscuro conserva el fondo elegido.
+const BACKGROUNDS_LIGHT = [
+  'linear-gradient(160deg, #eceef2 0%, #dfe2e8 100%)',                 // Gris claro (predeterminado)
+  'linear-gradient(135deg, #f4f5f8 0%, #dcdfe6 100%)',                 // Grafito claro
+  'radial-gradient(120% 80% at 50% -10%, #ece4fb 0%, #dcd6ea 62%)',    // Violeta
+  'radial-gradient(120% 80% at 50% -10%, #e0ecfb 0%, #d2dcea 62%)',    // Azul
+  'radial-gradient(120% 80% at 50% -10%, #ddf1ec 0%, #cfe2dd 62%)',    // Teal
+  'radial-gradient(120% 80% at 50% -10%, #fae2e8 0%, #ebd3d8 62%)',    // Vino
+  'radial-gradient(120% 80% at 50% -10%, #faeddb 0%, #ecdfcd 62%)',    // Ámbar
+  'radial-gradient(120% 80% at 50% -10%, #ddf0e5 0%, #cfe1d7 62%)',    // Bosque
+  'radial-gradient(120% 80% at 50% -10%, #e2e8f3 0%, #d3d9e5 62%)',    // Acero
+  'linear-gradient(135deg, #f2e3f5 0%, #e4dff0 45%, #e9eaee 100%)'     // Aurora
+];
+// Traduce el fondo canónico (oscuro) al del tema activo. Las imágenes propias
+// del usuario se dejan intactas: son suyas y no se reinterpretan.
+function bgForTheme(v) {
+  if (!v || v.startsWith('url(')) return v;
+  const i = BACKGROUNDS.indexOf(v);
+  if (i < 0) return v;
+  return document.documentElement.classList.contains('light') ? BACKGROUNDS_LIGHT[i] : BACKGROUNDS[i];
+}
 function applyBackground(v) {
   if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
-  els.hub.style.setProperty('--hub-bg', v);
+  const i = BACKGROUNDS_LIGHT.indexOf(v);
+  if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
+  els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set('cobalt.hubBg', v);
   document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v));
 }
 function renderBgPresets() {
   els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
-  for (const bg of BACKGROUNDS) { const th = document.createElement('div'); th.className = 'bg-thumb' + (bg === saved ? ' sel' : ''); th.style.background = bg; th.dataset.bg = bg; th.addEventListener('click', () => applyBackground(bg)); els.bgPresets.appendChild(th); }
+  for (const bg of BACKGROUNDS) { const th = document.createElement('div'); th.className = 'bg-thumb' + (bg === saved ? ' sel' : ''); th.style.background = bgForTheme(bg); th.dataset.bg = bg; th.addEventListener('click', () => applyBackground(bg)); els.bgPresets.appendChild(th); }
 }
 els.wpFile.addEventListener('change', () => {
   const f = els.wpFile.files[0]; if (!f) return;

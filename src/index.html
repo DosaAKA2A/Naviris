@@ -2,6 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <!-- CSP de la INTERFAZ (no de las webs que visitas). Esta página tiene acceso
+       al puente window.cobalt (contraseñas, tarjetas), así que se blinda: nada
+       de <script> remotos ni eval, y las conexiones salientes se limitan a los
+       servicios que la interfaz usa de verdad. img-src acepta https: y data:
+       porque los favicons y miniaturas vienen de cualquier sitio. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; media-src 'self' data: https: blob:; font-src 'self'; connect-src 'self' https://naviris-account.studio-iris2026.workers.dev https://api.open-meteo.com https://ipapi.co https://ipwho.is https://get.geojs.io; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'" />
   <title>Naviris</title>
   <link rel="stylesheet" href="styles.css" />
 </head>

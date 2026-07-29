@@ -634,6 +634,26 @@ app.on('web-contents-created', (_event, contents) => {
 // ---------- IPC ----------
 const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
 
+// Defensa en profundidad: los canales sensibles solo se atienden si quien llama
+// es la INTERFAZ de Naviris (index.html cargado por file://), nunca un webview
+// con una web dentro. Hoy las webs ya no pueden hablar por IPC (sandbox +
+// contextIsolation + sin nodeIntegration), pero si un fallo futuro filtrara
+// ipcRenderer a una página, esto impide que pida contraseñas o tarjetas.
+const uiPath = path.join(__dirname, 'index.html');
+function esUI(e) {
+  try {
+    const wc = e.sender;
+    if (wc.getType() === 'webview') return false;                 // contenido de un sitio: nunca
+    const u = new URL(wc.getURL());
+    return u.protocol === 'file:' && decodeURIComponent(u.pathname).replace(/^\//, '').replace(/\//g, path.sep).toLowerCase() === uiPath.toLowerCase();
+  } catch { return false; }
+}
+// Envuelve un handler para que solo responda a la interfaz
+const soloUI = (fn) => (e, ...args) => {
+  if (!esUI(e)) { console.warn('[Naviris] IPC sensible rechazado desde', (() => { try { return e.sender.getURL(); } catch { return 'origen desconocido'; } })()); return { ok: false, error: 'origen no autorizado' }; }
+  return fn(e, ...args);
+};
+
 ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
 ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
 ipcMain.on('win:close', (e) => winOf(e)?.close());
@@ -642,7 +662,7 @@ ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen
 ipcMain.on('win:new-private', () => createWindow(true));
 
 ipcMain.handle('settings:get', () => settings);
-ipcMain.handle('settings:set', (_e, patch) => { settings = { ...settings, ...patch }; saveSettings(settings); return settings; });
+ipcMain.handle('settings:set', soloUI((_e, patch) => { settings = { ...settings, ...patch }; saveSettings(settings); return settings; }));
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
@@ -676,35 +696,56 @@ $task.Wait()
   });
 }
 
-// Reduce un sitio/URL a su dominio base para emparejar credenciales entre subdominios
-function hostKey(s) {
+function normHost(s) {
   let h = String(s || '');
   try { h = new URL(/^https?:\/\//.test(h) ? h : 'https://' + h).hostname; } catch { /* nada */ }
-  h = h.toLowerCase().replace(/^www\./, '');
-  const p = h.split('.');
-  return p.length > 2 ? p.slice(-2).join('.') : h;
+  return h.toLowerCase().replace(/^www\./, '');
+}
+// Sufijos públicos de dos etiquetas más comunes: nadie "posee" bbc.co.uk como
+// co.uk, así que jamás pueden actuar de dominio padre para emparejar.
+const SUFIJOS_PUBLICOS = new Set([
+  'co.uk', 'org.uk', 'me.uk', 'gov.uk', 'ac.uk', 'co.jp', 'ne.jp', 'or.jp', 'co.kr', 'co.in',
+  'co.za', 'co.nz', 'co.il', 'co.th', 'com.br', 'com.ar', 'com.mx', 'com.au', 'com.tr', 'com.cn',
+  'com.es', 'com.co', 'com.pe', 'com.ve', 'com.uy', 'com.py', 'com.ec', 'com.bo', 'com.do',
+  'com.gt', 'com.pa', 'com.sv', 'com.hn', 'com.ni', 'com.pr', 'com.tw', 'com.hk', 'com.sg',
+  'com.my', 'com.ph', 'com.vn', 'com.pk', 'com.sa', 'com.eg', 'com.ng', 'com.pl', 'com.ua',
+  'com.ru', 'org.br', 'net.br', 'gov.br', 'edu.br', 'org.au', 'net.au', 'gov.au', 'edu.au'
+]);
+const esSufijoPublico = (h) => SUFIJOS_PUBLICOS.has(h) || h.split('.').length < 2;
+// ¿La credencial guardada para `saved` vale en la página `current`?
+// Coincidencia EXACTA de host, o que uno sea subdominio del otro (bbc.co.uk
+// vale en login.bbc.co.uk). ANTES esto reducía el host a sus dos últimas
+// etiquetas: bbc.co.uk y evil.co.uk quedaban ambos en "co.uk", así que un
+// dominio recién registrado bajo un sufijo de dos partes recibía la oferta de
+// autorrellenar credenciales de OTRO sitio. Sin la lista de sufijos públicos
+// entera, exigir el host completo como sufijo es la regla segura.
+function sameSite(saved, current) {
+  const a = normHost(saved), b = normHost(current);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (esSufijoPublico(a) || esSufijoPublico(b)) return false;
+  return b.endsWith('.' + a) || a.endsWith('.' + b);
 }
 
-ipcMain.handle('pw:available', async () => ({ encryption: safeStorage.isEncryptionAvailable() }));
-ipcMain.handle('pw:list', () => loadPasswords().map((e) => ({ id: e.id, site: e.site, username: e.username })));
+ipcMain.handle('pw:available', soloUI(async () => ({ encryption: safeStorage.isEncryptionAvailable() })));
+ipcMain.handle('pw:list', soloUI(() => loadPasswords().map((e) => ({ id: e.id, site: e.site, username: e.username }))));
 // Credenciales guardadas para un sitio (sin exponer la contraseña; el revelado exige Windows Hello)
-ipcMain.handle('pw:for-host', (_e, host) => {
-  const k = hostKey(host);
-  return loadPasswords().filter((e) => hostKey(e.site) === k).map((e) => ({ id: e.id, site: e.site, username: e.username }));
-});
-ipcMain.handle('pw:add', (_e, { site, username, password }) => {
+ipcMain.handle('pw:for-host', soloUI((_e, host) => {
+  return loadPasswords().filter((e) => sameSite(e.site, host)).map((e) => ({ id: e.id, site: e.site, username: e.username }));
+}));
+ipcMain.handle('pw:add', soloUI((_e, { site, username, password }) => {
   if (!site || !password || !safeStorage.isEncryptionAvailable()) return { ok: false };
   const list = loadPasswords();
   const enc = safeStorage.encryptString(String(password)).toString('base64');
   const user = String(username || '');
   // Si ya existe una credencial para el mismo dominio + usuario, actualiza la contraseña
-  const existing = list.find((e) => e.username === user && hostKey(e.site) === hostKey(site));
+  const existing = list.find((e) => e.username === user && normHost(e.site) === normHost(site));
   if (existing) { existing.enc = enc; existing.site = String(site); }
   else list.push({ id: 'pw' + (++pwSeq), site: String(site), username: user, enc });
   savePasswords(list);
   return { ok: true, updated: !!existing };
-});
-ipcMain.handle('pw:delete', (_e, id) => { savePasswords(loadPasswords().filter((e) => e.id !== id)); return { ok: true }; });
+}));
+ipcMain.handle('pw:delete', soloUI((_e, id) => { savePasswords(loadPasswords().filter((e) => e.id !== id)); return { ok: true }; }));
 
 // Importa contraseñas desde el CSV que exportan Chrome/Brave/Opera/Edge
 // (Configuración → Contraseñas → Exportar). Es la vía universal: las versiones
@@ -725,7 +766,7 @@ function parseCsv(text) {
   if (field !== '' || row.length) { row.push(field); rows.push(row); }
   return rows;
 }
-ipcMain.handle('pw:import-csv', async (e) => {
+ipcMain.handle('pw:import-csv', soloUI(async (e) => {
   if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Cifrado no disponible' };
   const r = await dialog.showOpenDialog(winOf(e), {
     title: 'Importar contraseñas exportadas (CSV)',
@@ -748,22 +789,22 @@ ipcMain.handle('pw:import-csv', async (e) => {
       if (!site || !password) continue;
       const user = (iUser >= 0 ? rows[i][iUser] : '') || '';
       const enc = safeStorage.encryptString(String(password)).toString('base64');
-      const existing = list.find((x) => x.username === user && hostKey(x.site) === hostKey(site));
+      const existing = list.find((x) => x.username === user && normHost(x.site) === normHost(site));
       if (existing) { existing.enc = enc; updated++; }
       else { list.push({ id: 'pw' + (++pwSeq), site, username: user, enc }); added++; }
     }
     savePasswords(list);
     return { ok: true, added, updated };
   } catch (err) { return { ok: false, error: String(err.message || err) }; }
-});
-ipcMain.handle('pw:reveal', async (_e, id) => {
+}));
+ipcMain.handle('pw:reveal', soloUI(async (_e, id) => {
   const entry = loadPasswords().find((e) => e.id === id);
   if (!entry) return { ok: false, error: 'no encontrada' };
   const verified = await verifyWindowsHello('Naviris: verifica tu identidad para ver la contraseña de ' + entry.site);
   if (!verified) return { ok: false, error: 'verificacion cancelada' };
   try { return { ok: true, password: safeStorage.decryptString(Buffer.from(entry.enc, 'base64')) }; }
   catch { return { ok: false, error: 'no se pudo descifrar' }; }
-});
+}));
 
 // ---------- Gestor de tarjetas (como Opera/Brave: safeStorage + Windows Hello) ----------
 // El número viaja y se guarda cifrado; en claro solo quedan marca, últimos 4 y
@@ -793,8 +834,8 @@ function luhnOk(num) {
   return sum % 10 === 0;
 }
 
-ipcMain.handle('cards:list', () => loadCards().map((c) => ({ id: c.id, brand: c.brand, last4: c.last4, holder: c.holder, expMonth: c.expMonth, expYear: c.expYear })));
-ipcMain.handle('cards:add', (_e, { number, holder, expMonth, expYear }) => {
+ipcMain.handle('cards:list', soloUI(() => loadCards().map((c) => ({ id: c.id, brand: c.brand, last4: c.last4, holder: c.holder, expMonth: c.expMonth, expYear: c.expYear }))));
+ipcMain.handle('cards:add', soloUI((_e, { number, holder, expMonth, expYear }) => {
   if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Cifrado no disponible' };
   const num = String(number || '').replace(/[\s-]/g, '');
   if (!/^\d{12,19}$/.test(num)) return { ok: false, error: 'Número no válido' };
@@ -810,8 +851,8 @@ ipcMain.handle('cards:add', (_e, { number, holder, expMonth, expYear }) => {
   else list.push({ id: 'card' + (++cardSeq), brand: cardBrand(num), last4, holder: String(holder || ''), expMonth: m, expYear: y, enc });
   saveCards(list);
   return { ok: true, updated: !!existing };
-});
-ipcMain.handle('cards:delete', (_e, id) => { saveCards(loadCards().filter((c) => c.id !== id)); return { ok: true }; });
+}));
+ipcMain.handle('cards:delete', soloUI((_e, id) => { saveCards(loadCards().filter((c) => c.id !== id)); return { ok: true }; }));
 // Ver el número completo o autorrellenar exige Windows Hello, como las contraseñas
 async function revealCard(id, reason) {
   const c = loadCards().find((x) => x.id === id);
@@ -821,8 +862,8 @@ async function revealCard(id, reason) {
   try { return { ok: true, number: safeStorage.decryptString(Buffer.from(c.enc, 'base64')), holder: c.holder, expMonth: c.expMonth, expYear: c.expYear }; }
   catch { return { ok: false, error: 'no se pudo descifrar' }; }
 }
-ipcMain.handle('cards:reveal', (_e, id) => revealCard(id, 'Naviris: verifica tu identidad para ver la tarjeta'));
-ipcMain.handle('cards:fill', (_e, id) => revealCard(id, 'Naviris: verifica tu identidad para autorrellenar la tarjeta'));
+ipcMain.handle('cards:reveal', soloUI((_e, id) => revealCard(id, 'Naviris: verifica tu identidad para ver la tarjeta')));
+ipcMain.handle('cards:fill', soloUI((_e, id) => revealCard(id, 'Naviris: verifica tu identidad para autorrellenar la tarjeta')));
 
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });
@@ -1064,7 +1105,7 @@ ipcMain.handle('addons:catalog', async () => {
 
 ipcMain.handle('addons:list', () => settings.addons || {});
 
-ipcMain.handle('addons:install', async (_e, meta) => {
+ipcMain.handle('addons:install', soloUI(async (_e, meta) => {
   try {
     if (!meta || !/^[a-z0-9-]{1,60}$/.test(meta.id || '')) throw new Error('Addon inválido');
     const entry = String(meta.entry || '');
@@ -1084,24 +1125,24 @@ ipcMain.handle('addons:install', async (_e, meta) => {
     saveSettings(settings); loadAddonCode();
     return { ok: true };
   } catch (e) { return { ok: false, message: String(e.message || e) }; }
-});
+}));
 
-ipcMain.handle('addons:uninstall', (_e, id) => {
+ipcMain.handle('addons:uninstall', soloUI((_e, id) => {
   try { fs.rmSync(addonFile(id), { force: true }); } catch { /* nada */ }
   const rest = { ...(settings.addons || {}) }; delete rest[id];
   settings.addons = rest; saveSettings(settings); loadAddonCode();
   return { ok: true };
-});
+}));
 
-ipcMain.handle('addons:toggle', (_e, { id, on }) => {
+ipcMain.handle('addons:toggle', soloUI((_e, { id, on }) => {
   if (settings.addons && settings.addons[id]) { settings.addons[id].enabled = !!on; saveSettings(settings); loadAddonCode(); }
   return settings.addons || {};
-});
+}));
 
-ipcMain.handle('addons:code', (_e, id) => {
+ipcMain.handle('addons:code', soloUI((_e, id) => {
   if (!settings.addons || !settings.addons[id] || !settings.addons[id].enabled) return null;
   try { return fs.readFileSync(addonFile(id), 'utf8'); } catch { return null; }
-});
+}));
 
 // Guardado de imágenes generado por addons (p. ej. capturas largas)
 ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
