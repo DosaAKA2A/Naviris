@@ -396,6 +396,12 @@ function recordDlHistory(p) {
 const YT_AD_PATHS = ['/pagead/', '/api/stats/ads', '/ptracking'];
 
 function setupSession(ses) {
+  // UA de Chrome puro para navegar: el UA por defecto lleva los tokens
+  // "Naviris/x" y "Electron/x", y los sitios que husmean el navegador no lo
+  // reconocen: Spotify, por ejemplo, servía su reproductor degradado de móvil
+  // (barra de pestañas abajo, sin sidebar). Quitando esos tokens queda el UA
+  // estándar de Chrome y sirven la web de escritorio completa.
+  ses.setUserAgent(app.userAgentFallback.replace(/\s(?:Naviris|Electron)\/\S+/g, ''));
   ses.webRequest.onBeforeRequest((details, callback) => {
     if (!settings.adblockEnabled || details.resourceType === 'mainFrame' || isWhitelisted(details.referrer)) {
       return callback({});
