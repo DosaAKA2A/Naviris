@@ -37,6 +37,15 @@
       "entry": "https://naviris.site/addons/x-sensitive.js"
     },
     {
+      "id": "blockify",
+      "name": "Blockify",
+      "version": "1.0.0",
+      "kind": "tool",
+      "icon": "musical-note",
+      "description": "Spotify Web sin anuncios de audio: Naviris detecta cada pista de anuncio y la salta al instante; si alguno alcanza a sonar, silencia la pestaña mientras dure y la desmutea al volver la música. También oculta las tarjetas de anuncio y los banners de Premium del reproductor. El botón del sidebar lo activa o lo pausa (verde = activo) y el tooltip lleva la cuenta de anuncios saltados. Port completo de la extensión Blockify de Chrome, sin su telemetría. Requiere Naviris 2.5 o superior.",
+      "entry": "https://naviris.site/addons/blockify.js"
+    },
+    {
       "id": "long-screenshot",
       "name": "Captura larga",
       "version": "1.1.0",
