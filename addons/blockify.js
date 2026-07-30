@@ -1,4 +1,4 @@
-/* Naviris addon: Blockify v1.0.0
+/* Naviris addon: Blockify v1.1.0
    Port completo de la extensión "Spotify Ad Blocker - Blockify" 1.9.5 de
    Chrome, reescrita como addon de Naviris. Qué hace en open.spotify.com:
 
@@ -21,6 +21,12 @@
    el cuadro de valoración, y sus listas de filtros (easylist y compañía):
    Naviris ya trae el motor de adblock de Brave en el core, igual que los
    bloqueos de YouTube/Twitch/Hulu que la extensión duplicaba.
+
+   v1.1.0: freno anti-congelón. Saltar un anuncio que Spotify re-sirve una y
+   otra vez dejaba el reproductor colgado (y el aluvión de saltos, la interfaz);
+   ahora tras 3 recargas seguidas del anuncio se deja sonar en silencio y el
+   salto se rearma con la siguiente pista normal. Acompaña al arreglo del core
+   (v2.7.3-dev.9) que deja de bloquear por red las peticiones de Spotify.
 
    Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
    En la página solo se inyecta un agente que detecta y salta; la página avisa
@@ -75,9 +81,18 @@
     'try{if(typeof o.nextTrack==="function"&&typeof o.pause==="function"&&typeof o.resume==="function")return o}catch(e){return null}' +
     'for(var k in o){try{var f=deepFind(o[k],vis);if(f)return f}catch(e){}}' +
     'return null}' +
+    // Freno anti-congelón: si Spotify re-sirve el anuncio nada más saltarlo
+    // (3 recargas seguidas en menos de 2,5 s cada una), insistir con el salto
+    // deja el reproductor colgado esperando al servidor. En ese caso se deja
+    // sonar el anuncio EN SILENCIO (mute forzado) y al volver la música normal
+    // se desmutea y se rearma el salto.
+    'var lastSkip=0,rafaga=0,muteForzado=false;' +
     'function engancha(c){try{c._streamer.on("track_loaded",function(e){' +
     'if(window.__navBlockifyOff)return;' +
-    'var t=e&&e.data&&e.data.track;if(!t||!t.isAd)return;' +
+    'var t=e&&e.data&&e.data.track;if(!t)return;' +
+    'if(!t.isAd){rafaga=0;if(muteForzado){muteForzado=false;rep({mute:false})}return}' +
+    'var ahora=Date.now();rafaga=(ahora-lastSkip<2500)?rafaga+1:0;lastSkip=ahora;' +
+    'if(rafaga>=3){if(!muteForzado){muteForzado=true;rep({mute:true})}return}' +
     'try{c._streamer._listPlayer.next("trackdone");rep({skip:1})}catch(x){}});rep({hook:1})}catch(e){}}' +
     'var intentos=0;' +
     'function busca(){if(window.__nbController)return;intentos++;' +

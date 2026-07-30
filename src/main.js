@@ -407,7 +407,16 @@ function setupSession(ses) {
       return callback({});
     }
     const u = details.url;
-    // No romper YouTube: sus recursos PROPIOS de reproducción/sesión NUNCA se bloquean
+    // No romper Spotify: su reproductor exige que el hueco publicitario cargue
+    // (metadatos y audio del anuncio); si el motor le corta esas peticiones se
+    // queda esperando una respuesta que nunca llega y se congela TODO el player
+    // al tocar anuncio. Mismo criterio que con YouTube: por red no se le
+    // bloquea nada, el anuncio se quita en cliente (el addon Blockify lo salta
+    // o lo silencia).
+    try {
+      const refHost = new URL(details.referrer || '').hostname;
+      if (hostMatches(refHost, 'spotify.com') || hostMatches(refHost, 'open.spotify.com')) return callback({});
+    } catch { /* sin referrer válido */ }
     // (el vídeo de googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr,
     // /youtubei/). Bloquearlos rompe la reproducción —sobre todo Shorts— y provoca
     // cargas lentas por reintentos. Los anuncios de YouTube se quitan con el pruning del
