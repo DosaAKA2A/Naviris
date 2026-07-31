@@ -1,14 +1,13 @@
-/* Naviris addon: Blockify v1.2.0
+/* Naviris addon: Blockify v1.3.0
    Port completo de la extensión "Spotify Ad Blocker - Blockify" 1.9.5 de
    Chrome, reescrita como addon de Naviris. Qué hace en open.spotify.com:
 
-   1. Detecta las pistas de anuncio interceptando las respuestas /state del
-      reproductor (fetch) y los mensajes replace_state del websocket "dealer":
-      toda pista con content_type "AD" delata sus file_ids, que se publican en
-      el atributo ad_content_id del <body> (mismo contrato que la extensión).
-   2. Salta el anuncio al instante: captura el controller interno de Spotify
-      vía webpack (objeto con nextTrack/pause/resume), escucha track_loaded y
-      cuando la pista es un anuncio dispara _listPlayer.next("trackdone").
+   1. Captura el controller interno del reproductor colándose en el runtime del
+      empaquetador (el global de chunks del bundle) y recorriendo los módulos
+      hasta dar con un objeto que exponga nextTrack/pause/resume Y el _streamer
+      con _listPlayer.next, que es lo que de verdad hace falta para saltar.
+   2. Salta el anuncio al instante: escucha track_loaded en ese _streamer y,
+      cuando la pista es un anuncio, dispara _listPlayer.next("trackdone").
    3. Mutify de respaldo: si un anuncio llega a sonar (controller aún no
       capturado), un observer reconoce la interfaz de pausa publicitaria
       (ad-companion-card y compañía) y Naviris silencia la pestaña hasta que
@@ -51,6 +50,17 @@
    - El respaldo de silenciar ya no depende de una frase en inglés, que en un
      Spotify en español no aparecía nunca.
 
+   v1.3.0: LA CAUSA DE RAÍZ. Spotify migró su empaquetador de webpack a RSPACK y
+   con ello el global cambió de webpackChunkclient_web a rspackChunkclient_web.
+   El addon lo buscaba por nombre fijo, así que la captura del controller no
+   podía funcionar: el push petaba con "Cannot read properties of undefined" y se
+   lo tragaba el catch. Comprobado en vivo por CDP el 2026-07-31 en
+   open.spotify.com: el único global de chunks presente es rspackChunkclient_web.
+   Todo lo de v1.2.0 seguía siendo necesario, pero no bastaba.
+   Ahora el global se descubre por patrón /^(webpack|rspack)Chunk/ en vez de por
+   nombre, y la caché de módulos se localiza POR FORMA (un objeto cuyos valores
+   son módulos con .exports) en vez de asumir require.c, que rspack no expone.
+
    Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
    En la página solo se inyecta un agente que detecta y salta; la página avisa
    al addon por console-message ("NAVBLOCKIFY|{...}") y el addon silencia o
@@ -69,7 +79,7 @@
   // addon en caliente no cambiaba nada: el renderer cargaba el código nuevo pero
   // la pestaña de Spotify seguía ejecutando el agente viejo y el nuevo se salía en
   // su primera línea. Había que recargar la pestaña para que el arreglo existiera.
-  var AGENTE_VER = 2;
+  var AGENTE_VER = 3;
   var AGENT = '(function(){' +
     'if(window.__navBlockifyAgent>=' + AGENTE_VER + ')return;' +
     'var reemplazo=!!window.__navBlockifyAgent;window.__navBlockifyAgent=' + AGENTE_VER + ';' +
@@ -129,14 +139,42 @@
     'if(id&&id===ultimoId){fallos++}else{fallos=0;ultimoId=id}' +
     'if(fallos>=3){if(!muteForzado){muteForzado=true;manda(true)}return}' +
     'try{c._streamer._listPlayer.next("trackdone");rep({skip:1})}catch(x){}});rep({hook:1})}' +
+    // Spotify migró de webpack a RSPACK: el global pasó de webpackChunkclient_web a
+    // rspackChunkclient_web. Buscarlo por nombre fijo era el motivo REAL de que el
+    // controller no se capturara nunca (comprobado en vivo el 2026-07-31: en
+    // open.spotify.com solo existe rspackChunkclient_web). Se descubre por patrón
+    // para no volver a atarse a un nombre concreto.
+    'function chunkGlobal(){' +
+    'var pref=["rspackChunkclient_web","webpackChunkclient_web"];' +
+    'for(var i=0;i<pref.length;i++){var v=window[pref[i]];if(v&&typeof v.push==="function")return v}' +
+    'try{var ks=Object.keys(window);' +
+    'for(var j=0;j<ks.length;j++){if(!/^(webpack|rspack)Chunk/.test(ks[j]))continue;' +
+    'var w=window[ks[j]];if(w&&typeof w.push==="function")return w}}catch(e){}' +
+    'return null}' +
+    // La caché de módulos tampoco se puede dar por hecha: en webpack es require.c,
+    // pero rspack no la expone ahí. Se localiza por forma (un objeto cuyos valores
+    // son módulos con .exports) en vez de por nombre.
+    'function cacheDe(req){if(!req)return null;' +
+    'if(req.c&&typeof req.c==="object")return req.c;' +
+    'try{var ps=Object.getOwnPropertyNames(req);' +
+    'for(var i=0;i<ps.length;i++){var v;try{v=req[ps[i]]}catch(e){continue}' +
+    'if(!v||typeof v!=="object")continue;' +
+    'var ks=Object.keys(v);if(!ks.length)continue;' +
+    'var ok=0,n=Math.min(ks.length,5);' +
+    'for(var j=0;j<n;j++){var m=v[ks[j]];if(m&&typeof m==="object"&&"exports" in m)ok++}' +
+    'if(ok===n)return v}}catch(e){}' +
+    'return null}' +
     'var intentos=0;' +
     'function busca(){if(window.__nbController)return;intentos++;' +
     'try{window.__nbReq=null;' +
-    'window.webpackChunkclient_web.push([[Math.random()],{},function(r){window.__nbReq=r}]);' +
+    'var g=chunkGlobal();if(!g){if(intentos<8)luego(busca,5000);return}' +
+    'g.push([[Math.random()],{},function(r){window.__nbReq=r}]);' +
     'luego(function(){if(window.__nbController)return;' +
     'var req=window.__nbReq,vis=new Set(),c=null;' +
-    'if(req&&req.c){for(var id in req.c){' +
-    'try{c=deepFind(req.c[id].exports,vis,0);if(c)break}catch(e){}}}' +
+    'var cache=cacheDe(req);' +
+    'if(!cache)rep({sincache:1});' +
+    'if(cache){for(var id in cache){' +
+    'try{c=deepFind(cache[id]&&cache[id].exports,vis,0);if(c)break}catch(e){}}}' +
     // __nbController solo se fija si engancha() DE VERDAD funcionó. Si falla, se
     // deja sin fijar para que el siguiente intento pueda probar otro candidato.
     'if(c){try{engancha(c);window.__nbController=c;return}catch(e){rep({hookfail:1})}}' +
