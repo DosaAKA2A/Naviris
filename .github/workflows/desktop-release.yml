@@ -34,7 +34,11 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar sin publicar (SIN firma VMP: no distribuir)
+      # Las comillas son OBLIGATORIAS: sin ellas, el ": " de "VMP: no distribuir"
+      # convierte el escalar en un mapa anidado y GitHub rechaza el fichero entero
+      # ("workflow file issue"). Estuvo asi del 2026-07-25 al 2026-07-31: el
+      # workflow no se registraba y CADA push a main dejaba un run fallido sin jobs.
+      - name: 'Compilar sin publicar (SIN firma VMP: no distribuir)'
         run: npm run dist
         env:
           EVS_SKIP: '1'
