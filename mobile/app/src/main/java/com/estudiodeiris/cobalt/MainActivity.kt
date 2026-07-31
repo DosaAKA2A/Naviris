@@ -837,7 +837,7 @@ class MainActivity : AppCompatActivity() {
     private fun showAbout() {
         AlertDialog.Builder(this)
             .setTitle("Naviris para Android")
-            .setMessage("Versión ${appVersion()}\nEstudio de Iris\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, Rat Tool (descarga de vídeo/audio), descargas propias, historial y contraseñas.")
+            .setMessage("Versión ${appVersion()}\nIris Studio\n\nNavegador con bloqueo de anuncios, pestañas, marcadores con un toque, sugerencias en la barra, Rat Tool (descarga de vídeo/audio), descargas propias, historial y contraseñas.")
             .setPositiveButton("OK", null)
             .setNeutralButton("Buscar actualización") { _, _ -> checkUpdate(false) }
             .show()
