@@ -142,68 +142,16 @@ function suppressWebAuthn(contents) {
     .catch((e) => console.log('[Naviris] WebAuthn suppress error:', e.message));
 }
 
-// X/Twitter: desactiva el muro de verificación de edad ("contenido no apto para
-// menores"). X decide si mostrarlo con un interruptor que viaja en el
-// window.__INITIAL_STATE__ del HTML, y su lector es
-// `customOverrides[clave] ?? user.config[clave].value`: basta poner la clave en
-// customOverrides. Hay que hacerlo ANTES de que corra ese script inline — cuando la
-// página ya está montada, X ha borrado __INITIAL_STATE__ y pulsar "Mostrar" solo
-// lleva a la verificación (por eso el viejo X_REVEAL, que corría en dom-ready, no
-// tocaba este muro). El preload NO sirve: corre en mundo aislado y la CSP de x.com
-// (con nonce) prohíbe inyectar scripts inline (comprobado en vivo). Por eso se
-// registra por el depurador interno de Electron —igual que suppressWebAuthn—, que
-// evalúa en el mundo principal en document_start sin tocar la CSP del sitio. El
-// script se auto-limita a x.com/twitter.com porque el registro vale para TODOS los
-// documentos de esa webview.
-const X_AGE_GATE = `(function () {
-  if (!/(^|\\.)(x\\.com|twitter\\.com)$/.test(location.hostname)) return;
-  var v;
-  try {
-    Object.defineProperty(window, '__INITIAL_STATE__', {
-      configurable: true,
-      enumerable: true,
-      get: function () { return v; },
-      set: function (n) {
-        try { n.featureSwitch.customOverrides['rweb_age_assurance_flow_enabled'] = false; } catch (e) {}
-        v = n;
-      }
-    });
-  } catch (e) {}
-})();`;
-// Identificador del script registrado en cada webview, para poder retirarlo al
-// apagar el ajuste sin reiniciar la app.
-const xGateScripts = new WeakMap();
-
-function aplicaEdadX(contents) {
-  // Con el modo agente activo el depurador es del agente externo (igual que en
-  // suppressWebAuthn): no lo atacamos aquí.
-  if (settings.agentMode || xGateScripts.has(contents)) return;
-  try {
-    if (!contents.debugger.isAttached()) contents.debugger.attach('1.3');
-  } catch { return; }
-  contents.debugger.sendCommand('Page.enable')
-    .then(() => contents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: X_AGE_GATE }))
-    .then((r) => { if (r && r.identifier) xGateScripts.set(contents, r.identifier); })
-    .catch((e) => console.log('[Naviris] X age gate:', e.message));
-}
-
-function retiraEdadX(contents) {
-  const id = xGateScripts.get(contents);
-  if (!id) return;
-  xGateScripts.delete(contents);
-  try {
-    contents.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: id }).catch(() => {});
-  } catch { /* depurador ya suelto */ }
-}
-
-// Aplica o retira el parche en las webviews YA abiertas (al mover el ajuste).
-function refrescaEdadX() {
-  const { webContents } = require('electron');
-  for (const c of webContents.getAllWebContents()) {
-    if (c.getType() !== 'webview') continue;
-    if (settings.xRevealSensitive) aplicaEdadX(c); else retiraEdadX(c);
-  }
-}
+// X/Twitter: el muro de verificación de edad ("contenido no apto para menores") lo
+// desactiva ahora el PRELOAD de la webview (webview-preload.js), que fija el
+// interruptor rweb_age_assurance_flow_enabled en el __INITIAL_STATE__ con
+// contextBridge.executeInMainWorld. Antes se hacía desde aquí con el depurador
+// interno de Electron, pero eso obligaba a saltárselo con el Modo agente encendido
+// (el depurador es del agente externo) y el muro reaparecía: v2.7.3-dev.9. El
+// preload no depende del depurador, así que funciona también en Modo agente. Aquí
+// solo queda el canal síncrono que le dice al preload si el ajuste está activo (ver
+// 'x:age-gate-on') y el viejo X_REVEAL de dom-ready para las imágenes borrosas
+// clásicas (sensitiveMediaWarning), que es otro muro distinto.
 
 // ---------- Scripts inyectados en las páginas ----------
 // El bloqueo de anuncios de YouTube (pruning de la respuesta del player) lo hace el
@@ -679,7 +627,6 @@ function atajosDeWebview(contents) {
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
-    if (settings.xRevealSensitive) aplicaEdadX(contents);
     atajosDeWebview(contents);
     contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
@@ -783,12 +730,14 @@ ipcMain.handle('settings:set', soloUI((_e, patch) => {
   settings = { ...settings, ...patch }; saveSettings(settings);
   // Cambiar el modo claro retematiza también las webs abiertas (prefers-color-scheme)
   if ('lightMode' in patch) nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
-  // El muro de edad de X se aplica/retira en caliente en las webviews abiertas. El
-  // renderer ya recarga la pestaña de X, con lo que el parche (document_start)
-  // actúa en la nueva carga; aquí solo (des)registramos el script.
-  if ('xRevealSensitive' in patch) refrescaEdadX();
+  // El muro de edad de X no necesita nada aquí: el renderer recarga la pestaña de X
+  // al mover el ajuste y el preload consulta 'x:age-gate-on' en cada carga.
   return settings;
 }));
+// Lo pregunta el preload de la webview en document_start, antes de parchear el muro
+// de edad de X. Síncrono porque a esas alturas no da tiempo a un ida y vuelta
+// asíncrono; solo devuelve un booleano, sin datos sensibles.
+ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive; });
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());

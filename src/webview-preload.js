@@ -1,7 +1,42 @@
 // Preload que corre dentro de cada webview (sitio). Detecta formularios de login
 // para capturar contraseñas al iniciar sesión y para autorrellenarlas después.
 // Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, contextBridge } = require('electron');
+
+// --- X/Twitter: muro de verificación de edad ("contenido no apto para menores") ---
+// X decide si taparlo con el interruptor rweb_age_assurance_flow_enabled, que viaja en
+// el window.__INITIAL_STATE__ del HTML; su lector es `customOverrides[clave] ??
+// user.config[clave].value`, así que basta fijar la clave en customOverrides ANTES de
+// que corra el script inline de X (después, X ya ha borrado __INITIAL_STATE__).
+// Aquí NO sirve el truco del <script> que usa YouTube más abajo: la CSP de x.com lleva
+// nonce y lo rechaza. Y tampoco el depurador de Electron desde el proceso principal:
+// con el Modo agente encendido el depurador es del agente externo y el parche se
+// quedaba sin aplicar (era justo el fallo de v2.7.3-dev.9). executeInMainWorld evalúa
+// en el mundo principal en document_start sin tocar la CSP ni el depurador: funciona
+// siempre. La consulta del ajuste es síncrona a propósito — a document_start no hay
+// tiempo para un ida y vuelta asíncrono — y solo ocurre en x.com/twitter.com.
+if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
+  try {
+    if (ipcRenderer.sendSync('x:age-gate-on')) {
+      contextBridge.executeInMainWorld({
+        func: function () {
+          var v;
+          try {
+            Object.defineProperty(window, '__INITIAL_STATE__', {
+              configurable: true,
+              enumerable: true,
+              get: function () { return v; },
+              set: function (n) {
+                try { n.featureSwitch.customOverrides['rweb_age_assurance_flow_enabled'] = false; } catch (e) {}
+                v = n;
+              }
+            });
+          } catch (e) { /* nada */ }
+        }
+      });
+    }
+  } catch (e) { /* nada */ }
+}
 
 // --- YouTube: bloqueo de anuncios a nivel del player, en document_start ---
 // El preload corre ANTES que los scripts de la página, así que inyectamos en el MUNDO
