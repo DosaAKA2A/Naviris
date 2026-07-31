@@ -1980,18 +1980,34 @@ async function renderAddons() {
 
 // API mínima que Naviris ofrece a los addons de tipo herramienta.
 // Los addons viven en naviris.site: se actualizan sin publicar una release.
+// Limpiadores que registran los addons de tipo herramienta (ver registerTool).
+const toolUnloaders = new Map();
 const naviris = {
   toast,
   activeWebview: () => { const t = activeTab(); return t && t.kind === 'web' && !t.asleep ? t.webview : null; },
+  // TODAS las webviews vivas, no solo la de la pestaña activa. La necesitan los
+  // addons que deben actuar sobre pestañas en segundo plano (Blockify tiene que
+  // armar una pestaña de Spotify aunque el usuario esté mirando otra cosa); con
+  // solo activeWebview esas pestañas no se tocaban hasta ponerlas en primer plano.
+  allWebviews: () => tabs.filter((t) => t.kind === 'web' && !t.asleep && t.webview).map((t) => t.webview),
   savePng: (dataUrl, name) => window.cobalt.savePng(dataUrl, name),
-  registerTool({ id, label, icon, onClick }) {
+  // onUnload: se invoca al retirar la herramienta (desinstalar o actualizar en
+  // caliente) para que el addon suelte sus listeners. Sin esto, actualizar dejaba
+  // vivos los listeners de la instancia vieja colgando de cada <webview> y acababa
+  // habiendo dos manejadores peleándose por el mismo estado.
+  registerTool({ id, label, icon, onClick, onUnload }) {
     if (document.getElementById('adt-' + id)) return;
     const b = document.createElement('button');
     b.id = 'adt-' + id; b.className = 'sb-btn'; b.title = label; b.innerHTML = window.icon(icon || 'puzzle-piece');
     b.addEventListener('click', () => onClick(b));
     adEls.tools.appendChild(b);
+    if (typeof onUnload === 'function') toolUnloaders.set(id, onUnload);
   },
-  unregisterTool(id) { document.getElementById('adt-' + id)?.remove(); },
+  unregisterTool(id) {
+    const fin = toolUnloaders.get(id);
+    if (fin) { toolUnloaders.delete(id); try { fin(); } catch { /* que un addon falle al soltar no impide retirarlo */ } }
+    document.getElementById('adt-' + id)?.remove();
+  },
   // Sensibilidad de X: única puerta de los addons hacia ese ajuste (lo usa el
   // addon "Sensibilidad X"; el resto de settings no se expone a addons).
   xSensitive: {

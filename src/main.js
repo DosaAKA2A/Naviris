@@ -168,8 +168,16 @@ const YT_ADSKIP = `(function(){
     }catch(e){}
   }
   setInterval(tidy,700);
+  try{ new MutationObserver(tidy).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
-const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,.ytp-ad-module,.video-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
+// OJO con lo que se oculta: aquí estaban .ytp-ad-module y .video-ads, que son el
+// módulo de anuncios DENTRO del reproductor. Ocultarlos no impide que el anuncio se
+// reproduzca: solo lo hace invisible. Cuando el pruning fallaba, el resultado era un
+// vídeo en negro 20-30 s que el usuario no entendía y, peor, el botón de saltar vive
+// ahí dentro, así que tampoco podía saltarlo a mano. Se quedan fuera a propósito: si
+// un anuncio se cuela, es preferible verlo y poder saltarlo. Lo que sigue oculto son
+// los anuncios de la interfaz (feed, sidebar, banners), que no bloquean nada.
+const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
 // Revela contenido sensible en X/Twitter
 const X_REVEAL = `(function(){
   if(window.__cobaltX)return; window.__cobaltX=1;
@@ -400,14 +408,12 @@ function setupSession(ses) {
   const HDR_URLS = [...CORS_OPEN.map((h) => 'https://' + h + '/*'), 'https://*.youtube.com/*', 'https://*.youtube-nocookie.com/*'];
   ses.webRequest.onHeadersReceived({ urls: HDR_URLS }, (details, cb) => {
     let host = ''; try { host = new URL(details.url).hostname; } catch { /* nada */ }
-    if (/(^|\.)youtube(-nocookie)?\.com$/.test(host)) {
-      if (settings.adblockEnabled && (details.resourceType === 'mainFrame' || details.resourceType === 'subFrame')) {
-        const headers = { ...details.responseHeaders };
-        for (const k of Object.keys(headers)) if (/^content-security-policy(-report-only)?$/i.test(k)) delete headers[k];
-        return cb({ responseHeaders: headers });
-      }
-      return cb({});
-    }
+    // YouTube ya NO necesita que le borremos la CSP. Se hacía porque el pruning se
+    // inyectaba con un <script> inline, que la CSP con nonce rechazaba; desde que va
+    // por contextBridge.executeInMainWorld (webview-preload.js) la CSP le da igual.
+    // Borrarla dejaba a todo YouTube sin su política de seguridad mientras el
+    // adblock estuviera activo, que es un precio alto por un truco de inyección.
+    if (/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return cb({});
     const headers = { ...details.responseHeaders };
     for (const k of Object.keys(headers)) if (/^access-control-allow-(origin|methods|headers)$/i.test(k)) delete headers[k];
     headers['Access-Control-Allow-Origin'] = ['*'];
@@ -738,6 +744,13 @@ ipcMain.handle('settings:set', soloUI((_e, patch) => {
 // de edad de X. Síncrono porque a esas alturas no da tiempo a un ida y vuelta
 // asíncrono; solo devuelve un booleano, sin datos sensibles.
 ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive; });
+// Lo pregunta el preload antes de parchear el player de YouTube. Respeta el
+// interruptor del adblock Y la lista blanca: antes el bloque de YouTube del preload
+// no miraba ninguno de los dos, así que meter youtube.com en la lista blanca porque
+// se te rompía el vídeo no servía absolutamente de nada.
+ipcMain.on('yt-adblock-on', (e, url) => {
+  e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
+});
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());

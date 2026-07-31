@@ -1,4 +1,4 @@
-/* Naviris addon: Blockify v1.1.0
+/* Naviris addon: Blockify v1.2.0
    Port completo de la extensión "Spotify Ad Blocker - Blockify" 1.9.5 de
    Chrome, reescrita como addon de Naviris. Qué hace en open.spotify.com:
 
@@ -28,6 +28,29 @@
    salto se rearma con la siguiente pista normal. Acompaña al arreglo del core
    (v2.7.3-dev.9) que deja de bloquear por red las peticiones de Spotify.
 
+   v1.2.0: el addon podía quedarse MUERTO pareciendo que funcionaba. Arreglos:
+   - El criterio de captura del controller exige ahora _streamer.on y
+     _listPlayer.next, no solo nextTrack/pause/resume: había envoltorios que
+     cumplían la tripleta sin tener _streamer, engancha() petaba en silencio y
+     como __nbController ya estaba fijado no se reintentaba nunca. Botón verde,
+     cero saltos. Ahora __nbController solo se fija si engancha() funcionó.
+   - El guard del agente lleva versión: actualizar en caliente no llegaba a la
+     página (seguía corriendo el agente viejo) y hacía falta recargar la pestaña.
+   - El freno cuenta saltos QUE NO SIRVIERON (mismo anuncio recargado), no
+     cargas de anuncio seguidas: un corte normal de 3-4 anuncios distintos
+     disparaba el freno justo cuando el salto sí funcionaba.
+   - Un único dueño del mute, y el rearme del freno ocurre aunque el addon esté
+     pausado (antes pausar durante un anuncio dejaba el estado roto para siempre).
+   - deepFind con cota de profundidad y visitados compartidos: recorrer el grafo
+     entero de cada módulo del bundle congelaba la página por sí solo.
+   - Se arman todas las pestañas de Spotify, no solo la activa; se sueltan los
+     listeners al descargar el addon; el CSS se retira al pausar.
+   - Fuera el bloque de ad_content_id con sus hooks de fetch y WebSocket: era
+     código muerto (nadie lee ese atributo en Naviris, y el core exime a Spotify
+     del bloqueo por red) y parcheaba el reproductor a cambio de nada.
+   - El respaldo de silenciar ya no depende de una frase en inglés, que en un
+     Spotify en español no aparecía nunca.
+
    Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
    En la página solo se inyecta un agente que detecta y salta; la página avisa
    al addon por console-message ("NAVBLOCKIFY|{...}") y el addon silencia o
@@ -42,81 +65,100 @@
   var avisado = false;   // un solo toast por sesión al saltar el primer anuncio
 
   /* ---------- Agente que se inyecta en la página (mundo de la página) ---------- */
+  // El guard LLEVA VERSIÓN a propósito. Con un guard sin versión, actualizar el
+  // addon en caliente no cambiaba nada: el renderer cargaba el código nuevo pero
+  // la pestaña de Spotify seguía ejecutando el agente viejo y el nuevo se salía en
+  // su primera línea. Había que recargar la pestaña para que el arreglo existiera.
+  var AGENTE_VER = 2;
   var AGENT = '(function(){' +
-    'if(window.__navBlockifyAgent)return;window.__navBlockifyAgent=1;' +
+    'if(window.__navBlockifyAgent>=' + AGENTE_VER + ')return;' +
+    'var reemplazo=!!window.__navBlockifyAgent;window.__navBlockifyAgent=' + AGENTE_VER + ';' +
     'if(window.__navBlockifyOff===undefined)window.__navBlockifyOff=0;' +
-    'function rep(o){try{console.log("NAVBLOCKIFY|"+JSON.stringify(o))}catch(e){}}' +
-    // Pistas de anuncio: content_type "AD" -> file_ids_mp3[].file_id. Tope de 10
-    // ids (como la extensión) y publicación en ad_content_id del <body>.
-    'var ids=[];' +
-    'function addTracks(tracks){if(!tracks||!tracks.length)return;var nuevos=[],i,j;' +
-    'for(i=0;i<tracks.length;i++){var t=tracks[i];' +
-    'if(t&&t.content_type==="AD"&&t.manifest&&t.manifest.file_ids_mp3){var f=t.manifest.file_ids_mp3;' +
-    'for(j=0;j<f.length;j++)if(f[j]&&f[j].file_id&&ids.indexOf(f[j].file_id)<0)nuevos.push(f[j].file_id)}}' +
-    'if(!nuevos.length)return;ids=ids.concat(nuevos);if(ids.length>10)ids=ids.slice(ids.length-10);' +
-    'try{document.body.setAttribute("ad_content_id",JSON.stringify(ids))}catch(e){}' +
-    'rep({ids:ids.length})}' +
-    // 1. Hook de fetch: las respuestas de /state traen la máquina de estados del
-    // reproductor con la cola de pistas (anuncios incluidos).
-    'var of=window.fetch;' +
-    'window.fetch=function(u,i){var s=(typeof u==="string")?u:((u&&u.url)||"");' +
-    'if(s.indexOf("/state")!==-1){return of.call(window,u,i).then(function(r){' +
-    'try{r.clone().json().then(function(d){if(d&&d.state_machine)addTracks(d.state_machine.tracks)}).catch(function(){})}catch(e){}' +
-    'return r})}' +
-    'return of.call(window,u,i)};' +
-    // 2. Hook de WebSocket: el socket "dealer" empuja replace_state con la misma
-    // máquina de estados. Se escucha sin tocar el mensaje.
-    'var WS=window.WebSocket;' +
-    'window.WebSocket=function(url,prot){var ws=prot?new WS(url,prot):new WS(url);' +
-    'ws.addEventListener("message",function(ev){try{var d=JSON.parse(ev.data);var p=d&&d.payloads;if(!p)return;' +
-    'for(var i=0;i<p.length;i++)if(p[i]&&p[i].type==="replace_state"&&p[i].state_machine)addTracks(p[i].state_machine.tracks)}catch(e){}});' +
-    'return ws};' +
-    'window.WebSocket.prototype=WS.prototype;' +
-    'window.WebSocket.CONNECTING=WS.CONNECTING;window.WebSocket.OPEN=WS.OPEN;' +
-    'window.WebSocket.CLOSING=WS.CLOSING;window.WebSocket.CLOSED=WS.CLOSED;' +
-    // 3. Controller de Spotify vía webpack: objeto con nextTrack/pause/resume.
-    // En track_loaded, si la pista es un anuncio, siguiente pista al instante.
-    'function deepFind(o,vis){if(!o||typeof o!=="object")return null;if(vis.has(o))return null;vis.add(o);' +
-    'if(o===window||o===document)return null;' +
-    'try{if(typeof o.nextTrack==="function"&&typeof o.pause==="function"&&typeof o.resume==="function")return o}catch(e){return null}' +
-    'for(var k in o){try{var f=deepFind(o[k],vis);if(f)return f}catch(e){}}' +
+    // Referencia NATIVA de console.log guardada en la inyección: si Spotify
+    // sustituye console.log por un no-op (práctica habitual en producción), el
+    // canal con el addon moriría en silencio y el botón seguiría en verde.
+    'var LOG=console.log.bind(console);' +
+    'function rep(o){try{LOG("NAVBLOCKIFY|"+JSON.stringify(o))}catch(e){}}' +
+    // Al reemplazar un agente viejo hay que desarmar sus temporizadores y su
+    // observer, o quedan dos agentes mandando mutes contradictorios.
+    'try{if(window.__navBlockifyStop)window.__navBlockifyStop()}catch(e){}' +
+    'var vivos=[],obs=null;' +
+    'window.__navBlockifyStop=function(){for(var i=0;i<vivos.length;i++){try{clearTimeout(vivos[i]);clearInterval(vivos[i])}catch(e){}}' +
+    'vivos=[];try{if(obs)obs.disconnect()}catch(e){}};' +
+    'function luego(f,ms){var t=setTimeout(f,ms);vivos.push(t);return t}' +
+    // 1. Controller de Spotify vía webpack. El criterio EXIGE _streamer.on: antes
+    // bastaba con nextTrack+pause+resume, pero Spotify tiene varios envoltorios
+    // que cumplen esa tripleta y NO tienen _streamer. Al quedarse con uno de esos,
+    // engancha() petaba, el catch se lo tragaba y como __nbController ya estaba
+    // fijado no se reintentaba jamás: botón verde y cero anuncios saltados.
+    'function sirve(o){try{return typeof o.nextTrack==="function"&&typeof o.pause==="function"&&' +
+    'typeof o.resume==="function"&&o._streamer&&typeof o._streamer.on==="function"&&' +
+    'o._streamer._listPlayer&&typeof o._streamer._listPlayer.next==="function"}catch(e){return false}}' +
+    // deepFind con COTA de profundidad y visitados COMPARTIDOS entre módulos. Sin
+    // las dos cosas, recorrer el grafo entero de cada módulo del bundle (con un
+    // Set nuevo por módulo) bloqueaba el hilo de la página varios segundos: era
+    // una causa de congelón independiente de los saltos en bucle.
+    'function deepFind(o,vis,prof){if(!o||typeof o!=="object"||prof>6)return null;' +
+    'if(vis.has(o))return null;vis.add(o);' +
+    'if(o===window||o===document||o.nodeType)return null;' +
+    'if(sirve(o))return o;' +
+    'for(var k in o){try{var f=deepFind(o[k],vis,prof+1);if(f)return f}catch(e){}}' +
     'return null}' +
-    // Freno anti-congelón: si Spotify re-sirve el anuncio nada más saltarlo
-    // (3 recargas seguidas en menos de 2,5 s cada una), insistir con el salto
-    // deja el reproductor colgado esperando al servidor. En ese caso se deja
-    // sonar el anuncio EN SILENCIO (mute forzado) y al volver la música normal
-    // se desmutea y se rearma el salto.
-    'var lastSkip=0,rafaga=0,muteForzado=false;' +
-    'function engancha(c){try{c._streamer.on("track_loaded",function(e){' +
-    'if(window.__navBlockifyOff)return;' +
+    // Freno anti-congelón: cuenta SALTOS QUE NO SIRVIERON, es decir, veces que
+    // vuelve a cargar EL MISMO anuncio tras haberlo saltado. Antes contaba cargas
+    // de anuncio seguidas, así que un corte normal de Spotify (3-4 anuncios
+    // distintos encadenados) disparaba el freno justo cuando el salto SÍ estaba
+    // funcionando, y te comías el bloque en silencio en vez de música.
+    'var ultimoId=null,fallos=0,muteForzado=false;' +
+    'function idDe(t){try{return t.uri||t.id||(t.metadata&&t.metadata.entity_uri)||null}catch(e){return null}}' +
+    // Un único dueño del mute: manda(estado) es la ÚNICA vía. Antes el freno y el
+    // detector de interfaz escribían por su cuenta, cada uno con su propio dedup,
+    // y se desincronizaban (la tarjeta del anuncio desaparecía, el detector
+    // mandaba mute:false y el anuncio seguía sonando a todo volumen).
+    'var muteActual=false;' +
+    'function manda(v){v=!!v;if(v===muteActual)return;muteActual=v;rep({mute:v})}' +
+    'function engancha(c){c._streamer.on("track_loaded",function(e){' +
     'var t=e&&e.data&&e.data.track;if(!t)return;' +
-    'if(!t.isAd){rafaga=0;if(muteForzado){muteForzado=false;rep({mute:false})}return}' +
-    'var ahora=Date.now();rafaga=(ahora-lastSkip<2500)?rafaga+1:0;lastSkip=ahora;' +
-    'if(rafaga>=3){if(!muteForzado){muteForzado=true;rep({mute:true})}return}' +
-    'try{c._streamer._listPlayer.next("trackdone");rep({skip:1})}catch(x){}});rep({hook:1})}catch(e){}}' +
+    'var esAd=!!(t.isAd||t.is_advertisement||(t.metadata&&t.metadata.is_advertisement));' +
+    // El rearme va ANTES de mirar si el addon está pausado: si no, pausar durante
+    // un anuncio dejaba muteForzado en true para siempre y al reactivar ni se
+    // saltaba ni se silenciaba nunca más.
+    'if(!esAd){ultimoId=null;fallos=0;if(muteForzado){muteForzado=false;manda(false)}return}' +
+    'if(window.__navBlockifyOff)return;' +
+    'var id=idDe(t);' +
+    'if(id&&id===ultimoId){fallos++}else{fallos=0;ultimoId=id}' +
+    'if(fallos>=3){if(!muteForzado){muteForzado=true;manda(true)}return}' +
+    'try{c._streamer._listPlayer.next("trackdone");rep({skip:1})}catch(x){}});rep({hook:1})}' +
     'var intentos=0;' +
     'function busca(){if(window.__nbController)return;intentos++;' +
     'try{window.__nbReq=null;' +
     'window.webpackChunkclient_web.push([[Math.random()],{},function(r){window.__nbReq=r}]);' +
-    'setTimeout(function(){if(window.__nbController)return;' +
-    'var req=window.__nbReq;if(req&&req.c){for(var id in req.c){' +
-    'try{var c=deepFind(req.c[id].exports,new Set());if(c){window.__nbController=c;engancha(c);return}}catch(e){}}}' +
-    'if(intentos<4)setTimeout(busca,5000)},1000)}catch(e){if(intentos<4)setTimeout(busca,5000)}}' +
-    'setTimeout(busca,4000);' +
-    // 4. Mutify: reconocer la interfaz de pausa publicitaria y avisar al addon
-    // para silenciar/desmutear la pestaña. Debounce de 500 ms como la extensión.
-    'var adUi=null,deb=null;' +
-    'function esAnuncio(){var p=document.getElementById("Desktop_PanelContainer_Id");' +
-    'if(p){if(p.textContent.indexOf("Your music will continue after the break")!==-1)return true;' +
-    'if(p.querySelector("[data-testid=ad-companion-card]"))return true;' +
-    'if(p.querySelector("[data-testid=ad-companion-card-tagline]"))return true;' +
-    'if(p.querySelector("a[data-context-item-type=ad]"))return true}' +
-    'if(document.querySelector("[data-testid=ad-companion-card],a[data-context-item-type=ad]"))return true;' +
-    'return false}' +
-    'function sync(){var a=!window.__navBlockifyOff&&esAnuncio();if(a===adUi)return;adUi=a;rep({mute:a})}' +
-    'function vigila(){if(!document.body){setTimeout(vigila,1200);return}' +
-    'new MutationObserver(function(){if(deb)clearTimeout(deb);deb=setTimeout(function(){deb=null;sync()},500)})' +
-    '.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true});' +
+    'luego(function(){if(window.__nbController)return;' +
+    'var req=window.__nbReq,vis=new Set(),c=null;' +
+    'if(req&&req.c){for(var id in req.c){' +
+    'try{c=deepFind(req.c[id].exports,vis,0);if(c)break}catch(e){}}}' +
+    // __nbController solo se fija si engancha() DE VERDAD funcionó. Si falla, se
+    // deja sin fijar para que el siguiente intento pueda probar otro candidato.
+    'if(c){try{engancha(c);window.__nbController=c;return}catch(e){rep({hookfail:1})}}' +
+    'if(intentos<8)luego(busca,5000)},1000)}catch(e){if(intentos<8)luego(busca,5000)}}' +
+    // Ventana de búsqueda más larga (8 intentos): con red lenta o entrando al
+    // reproductor tarde, el bundle de Spotify aún no existe en los primeros.
+    'luego(busca,reemplazo?500:4000);' +
+    // 2. Respaldo: reconocer la interfaz de pausa publicitaria. Ya NO depende de
+    // una frase en inglés ("Your music will continue after the break"), que en un
+    // Spotify en español no aparecía nunca y dejaba el respaldo sin cubrir.
+    'var deb=null;' +
+    'function esAnuncio(){try{' +
+    'if(document.querySelector("[data-testid=ad-companion-card],[data-testid=ad-companion-card-tagline],a[data-context-item-type=ad],[data-testid=advertiser-name]"))return true;' +
+    'var b=document.querySelector("[data-testid=context-item-info-ad-title],[data-testid=now-playing-widget] [data-testid=ad-title]");' +
+    'if(b)return true}catch(e){}return false}' +
+    'function sync(){if(window.__navBlockifyOff){manda(false);return}' +
+    // El detector de interfaz NO desmutea mientras el freno tiene el mute forzado:
+    // el anuncio sigue sonando aunque su tarjeta ya no esté en el DOM.
+    'if(muteForzado)return;manda(esAnuncio())}' +
+    'function vigila(){if(!document.body){luego(vigila,1200);return}' +
+    'obs=new MutationObserver(function(){if(deb)clearTimeout(deb);deb=luego(function(){deb=null;sync()},500)});' +
+    'obs.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true});' +
     'sync()}' +
     'vigila()' +
     '})();';
@@ -131,10 +173,25 @@
   function esSpotify(wv) {
     try { return /^https?:\/\/open\.spotify\.com([/?#]|$)/.test(wv.getURL()); } catch (e) { return false; }
   }
+  // Clave de la hoja de estilos por webview, para poder retirarla al pausar el
+  // addon (antes el CSS que oculta tarjetas y banners se quedaba puesto para
+  // siempre, y encima se insertaba dos veces por navegación).
+  var cssKey = new WeakMap();
+  function ponCss(wv) {
+    if (cssKey.has(wv)) return;
+    cssKey.set(wv, true);
+    try { wv.insertCSS(CSS).then(function (k) { cssKey.set(wv, k); }).catch(function () {}); } catch (e) { /* nada */ }
+  }
+  function quitaCss(wv) {
+    var k = cssKey.get(wv);
+    if (!k || k === true) { cssKey.delete(wv); return; }
+    cssKey.delete(wv);
+    try { wv.removeInsertedCSS(k).catch(function () {}); } catch (e) { /* nada */ }
+  }
   function inyectar(wv) {
     try { wv.executeJavaScript(AGENT).catch(function () {}); } catch (e) { /* nada */ }
     try { wv.executeJavaScript('window.__navBlockifyOff=' + (activo ? '0' : '1')).catch(function () {}); } catch (e) { /* nada */ }
-    try { wv.insertCSS(CSS).catch(function () {}); } catch (e) { /* nada */ }
+    ponCss(wv);
   }
   function onMsg(e) {
     if (typeof e.message !== 'string' || e.message.indexOf('NAVBLOCKIFY|') !== 0) return;
@@ -145,27 +202,58 @@
       if (!avisado) { avisado = true; naviris.toast('Blockify: anuncio de Spotify saltado'); }
     }
   }
+  // Los listeners se guardan por webview para poder soltarlos en desarmar(): sin
+  // eso, actualizar el addon dejaba vivos los de la instancia anterior y acababa
+  // habiendo dos manejadores con su propio contador y su propio criterio de mute.
+  var oyentes = new WeakMap();
   function armar(wv) {
     if (wvs.indexOf(wv) !== -1) return;
     wvs.push(wv);
-    wv.addEventListener('console-message', onMsg);
     var re = function () {
       if (esSpotify(wv)) { if (activo) inyectar(wv); }
       else { try { wv.setAudioMuted(false); } catch (e) { /* nada */ } } // fuera de Spotify no queda nada muteado
     };
+    oyentes.set(wv, re);
+    wv.addEventListener('console-message', onMsg);
     wv.addEventListener('dom-ready', re);
     wv.addEventListener('did-navigate', re);
     re();
+  }
+  function desarmar() {
+    for (var i = 0; i < wvs.length; i++) {
+      var wv = wvs[i], re = oyentes.get(wv);
+      try { wv.removeEventListener('console-message', onMsg); } catch (e) { /* nada */ }
+      if (re) {
+        try { wv.removeEventListener('dom-ready', re); } catch (e) { /* nada */ }
+        try { wv.removeEventListener('did-navigate', re); } catch (e) { /* nada */ }
+      }
+      oyentes.delete(wv);
+      try { wv.setAudioMuted(false); } catch (e) { /* nada */ }
+      quitaCss(wv);
+    }
+    wvs = [];
   }
   function apagar() {
     for (var i = 0; i < wvs.length; i++) {
       try { wvs[i].setAudioMuted(false); } catch (e) { /* nada */ }
       try { wvs[i].executeJavaScript('window.__navBlockifyOff=1').catch(function () {}); } catch (e) { /* nada */ }
+      quitaCss(wvs[i]);
     }
   }
   function encender() {
     for (var i = 0; i < wvs.length; i++) {
       try { if (esSpotify(wvs[i])) inyectar(wvs[i]); } catch (e) { /* nada */ }
+    }
+  }
+  // Arma TODAS las pestañas de Spotify, no solo la activa: una abierta en segundo
+  // plano (clic central, restauración de sesión) no se armaba hasta ponerla en
+  // primer plano, así que Blockify no hacía nada en ella.
+  function barre() {
+    var lista = [];
+    try { lista = naviris.allWebviews ? naviris.allWebviews() : []; } catch (e) { lista = []; }
+    if (!lista.length) { var a = naviris.activeWebview(); if (a) lista = [a]; }
+    for (var i = 0; i < lista.length; i++) {
+      if (esSpotify(lista[i])) armar(lista[i]);
     }
   }
   function pinta(btn) {
@@ -185,21 +273,23 @@
     onClick: function (btn) {
       activo = !activo;
       localStorage.__navBlockify = activo ? '1' : '0';
-      if (activo) { encender(); var wv = naviris.activeWebview(); if (wv && esSpotify(wv)) armar(wv); }
+      if (activo) { barre(); encender(); }
       else apagar();
       pinta(btn);
       naviris.toast(activo ? 'Blockify activo: los anuncios de Spotify se saltan solos' : 'Blockify en pausa');
-    }
+    },
+    // Lo llama Naviris al retirar la herramienta (desinstalar o actualizar en
+    // caliente): suelta listeners, desmutea y quita el CSS.
+    onUnload: function () { try { clearInterval(timer); } catch (e) { /* nada */ } desarmar(); }
   });
   pinta();
 
-  // Vigía: arma cada pestaña de Spotify al verla activa; se auto-limpia si
-  // quitan el addon (botón fuera del DOM), desmuteando lo que quede mutado.
+  // Vigía: arma las pestañas de Spotify (todas, no solo la activa); se auto-limpia
+  // si quitan el addon (botón fuera del DOM), desmuteando lo que quede mutado.
   var timer = setInterval(function () {
     var btn = document.getElementById('adt-' + ID);
-    if (!btn) { clearInterval(timer); apagar(); return; }
+    if (!btn) { clearInterval(timer); desarmar(); return; }
     if (!activo) return;
-    var wv = naviris.activeWebview();
-    if (wv && esSpotify(wv)) armar(wv);
+    barre();
   }, 1500);
 })();

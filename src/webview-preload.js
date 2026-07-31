@@ -39,35 +39,85 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
 }
 
 // --- YouTube: bloqueo de anuncios a nivel del player, en document_start ---
-// El preload corre ANTES que los scripts de la página, así que inyectamos en el MUNDO
-// PRINCIPAL un script que vacía los campos de anuncio de la respuesta del player
-// (adPlacements/playerAds/adSlots) ANTES de que el player la lea. Interceptamos la
-// asignación de ytInitialPlayerResponse con un setter (primera carga) y hookeamos
-// JSON.parse y Response.json (navegación SPA). Nada de seek: no congela.
+// El preload corre ANTES que los scripts de la página: vaciamos los campos de anuncio
+// de la respuesta del player (adPlacements/playerAds/adSlots) ANTES de que el player
+// la lea. Se cubren las TRES vías por las que llega esa respuesta:
+//   1. ytInitialPlayerResponse embebido en el HTML (primera carga, con URL directa).
+//   2. fetch(...).json()  -> Response.prototype.json.
+//   3. XHR + JSON.parse   -> buena parte de /youtubei/v1/player viaja así.
+// Cubrir solo la 2 era el fallo de antes: abrir un vídeo por URL directa iba limpio,
+// pero navegar dentro de YouTube (SPA) traía anuncios, porque esa vía no pasa por
+// Response.json. El hook de JSON.parse lleva una guarda barata (mira la cadena antes
+// de tocar nada) para no pagar el coste en los miles de parseos de YouTube, que es
+// justo por lo que se había quitado.
+// Se inyecta con contextBridge.executeInMainWorld, no con un <script> inline: el
+// <script> dependía de que main.js borrase la CSP de YouTube entera (un debilitamiento
+// real de seguridad) y aun así podía fallar en silencio. Ver el bloque de X arriba.
 if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
   try {
-    var __yt = '(' + function () {
-      if (window.__navYT) return; window.__navYT = 1;
-      var AD = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adParams'];
-      function prune(o) {
-        try {
-          if (o && typeof o === 'object') {
-            var ts = [o]; if (o.playerResponse && typeof o.playerResponse === 'object') ts.push(o.playerResponse);
-            ts.forEach(function (t) { AD.forEach(function (k) { if (k in t) delete t[k]; }); });
+    if (ipcRenderer.sendSync('yt-adblock-on', location.href)) {
+      contextBridge.executeInMainWorld({
+        func: function () {
+          if (window.__navYT) return; window.__navYT = 1;
+          var AD = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adParams'];
+          // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
+          // (o.playerResponse, y solo si era objeto), así que las respuestas donde
+          // el player response viene anidado —o como CADENA JSON, que es como lo
+          // sirven las rutas de Shorts— no se tocaban.
+          function prune(o, prof) {
+            try {
+              if (!o || typeof o !== 'object' || prof > 4) return o;
+              for (var i = 0; i < AD.length; i++) if (AD[i] in o) delete o[AD[i]];
+              if (typeof o.playerResponse === 'string' && o.playerResponse.indexOf('adPlacements') !== -1) {
+                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1)); } catch (e) { /* nada */ }
+              }
+              var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
+              for (var k = 0; k < claves.length; k++) {
+                var v = o[claves[k]];
+                if (v && typeof v === 'object') {
+                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1); }
+                  else prune(v, prof + 1);
+                }
+              }
+            } catch (e) { /* nada */ }
+            return o;
           }
-        } catch (e) {}
-        return o;
-      }
-      // Solo hookeamos Response.json (lo que usa YouTube para /youtubei/v1/player) y el
-      // setter de la respuesta inicial embebida. Nada de override global de JSON.parse:
-      // corría en CADA parseo (miles en YouTube) y era el mayor coste; estos dos bastan.
-      try { var _j = Response.prototype.json; Response.prototype.json = function () { return _j.apply(this, arguments).then(prune); }; } catch (e) {}
-      try { var _v; Object.defineProperty(window, 'ytInitialPlayerResponse', { configurable: true, get: function () { return _v; }, set: function (n) { _v = prune(n); } }); } catch (e) {}
-    }.toString() + ')();';
-    var s = document.createElement('script');
-    s.textContent = __yt;
-    (document.documentElement || document.head || document).appendChild(s);
-    s.remove();
+          // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
+          function sospechosa(s) {
+            return typeof s === 'string' && s.length > 3000 &&
+              (s.indexOf('adPlacements') !== -1 || s.indexOf('playerAds') !== -1 || s.indexOf('adSlots') !== -1);
+          }
+          try {
+            var _j = Response.prototype.json;
+            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0); }); };
+          } catch (e) { /* nada */ }
+          try {
+            var _p = JSON.parse;
+            JSON.parse = function (s) {
+              var r = _p.apply(this, arguments);
+              try { if (sospechosa(s)) return prune(r, 0); } catch (e) { /* nada */ }
+              return r;
+            };
+          } catch (e) { /* nada */ }
+          // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
+          // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
+          // además el propio XHR obligaría a registrar un listener en send(), que
+          // corre DESPUÉS del onreadystatechange que la página haya asignado antes:
+          // llegaríamos tarde justo en el caso que queríamos cubrir.
+          // Respuesta embebida: se poda la que YA esté puesta (puede haberse asignado
+          // antes que nosotros) y se deja el setter para la que venga.
+          try {
+            var _v;
+            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0); } catch (e) { /* nada */ }
+            Object.defineProperty(window, 'ytInitialPlayerResponse', {
+              configurable: true,
+              get: function () { return _v; },
+              set: function (n) { _v = prune(n, 0); }
+            });
+          } catch (e) { /* nada */ }
+        }
+      });
+    }
   } catch (e) { /* nada */ }
 }
 
