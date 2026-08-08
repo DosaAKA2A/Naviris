@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.5.0
+/* Naviris addon: Watch Party v2.5.1
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube.
    NO transmite video: cada quien reproduce su propia copia con su propia
    cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
@@ -365,7 +365,7 @@
       if (!party || party.ws !== ws) return;
       var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
       if (m.t === 'joined') {
-        party.ok = true; party.n = m.n; party.status = 'En la sala';
+        party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
         logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
         logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
         if (asHost) beatStart();
@@ -388,8 +388,11 @@
       else if (m.t === 'error') party.status = 'Error: ' + m.msg;
       render(); glow();
     };
-    ws.onclose = function () { if (party && party.ws === ws) { party.ok = false; party.status = 'Desconectado'; beatStop(); render(); } };
-    ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = 'Sin conexión con el servidor'; render(); } };
+    // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
+    // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
+    var neverOk = function () { return !party.everOk; };
+    ws.onclose = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Desconectado'; beatStop(); render(); } };
+    ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Sin conexión con el servidor'; render(); } };
     render(); glow();
   }
   function leave(silent) {
