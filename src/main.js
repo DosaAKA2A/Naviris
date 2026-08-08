@@ -246,7 +246,10 @@ if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', '9
 // HttpsUpgrades: sube automáticamente las navegaciones http:// a https:// con
 //  reintento si el sitio no soporta https. Aislamiento estricto de sitios activo por defecto.
 // MemoryPurgeOnFreeze: purga la memoria de renderers congelados (menos RAM retenida)
-app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades,MemoryPurgeOnFreeze');
+// FluentScrollbar+FluentOverlayScrollbar: scrollbars finos estilo Windows 11 que se
+//  ocultan solos y se adaptan al tema de la página, en la UI y en todas las webs
+//  (los sitios con scrollbar propio por CSS conservan el suyo).
+app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades,MemoryPurgeOnFreeze,FluentScrollbar,FluentOverlayScrollbar');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 // AutoLoot: evita que Chromium suspenda el vídeo/temporizadores de pestañas en segundo
 // plano, para que el tiempo de drops siga contando aunque la pestaña no esté visible.
