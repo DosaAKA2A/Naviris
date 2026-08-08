@@ -12,7 +12,7 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.5.0",
+      "version": "2.5.1",
       "kind": "tool",
       "icon": "eye-fill",
       "description": "Crea una sala, comparte el código y vean lo mismo a la vez en Crunchyroll, Netflix, Disney+ y YouTube. La reproducción se sincroniza sola con la del anfitrión, el chat acompaña al video en un panel lateral y narra cada acción, y el anfitrión decide quién controla y quién puede cambiar el video. Nadie transmite nada: cada persona reproduce con su propia cuenta. Requiere Naviris 2.7.3-dev.12 o superior.",
