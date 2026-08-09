@@ -1,5 +1,6 @@
-/* Naviris addon: Watch Party v2.5.1
-   Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+ y YouTube.
+/* Naviris addon: Watch Party v2.6.0
+   Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
+   el Cine de IRIS (iris.it.com/cine).
    NO transmite video: cada quien reproduce su propia copia con su propia
    cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
    chat, vía el relay de Cloudflare.
@@ -23,6 +24,12 @@
    narran en cursiva junto al nombre; entrada de mensaje fija abajo. Textos en
    español neutro. Requiere Naviris 2.7.3-dev.12+ (el CSP anterior bloqueaba
    la conexión con el servidor de salas y unirse no hacía nada).
+
+   v2.6.0: soporta el Cine de IRIS (iris.it.com/cine), el reproductor propio
+   de IRIS Studio para ver una película cargada por enlace o archivo local.
+   La página habla el mismo protocolo del relay, así que una sala creada allí
+   y una creada desde este addon son intercambiables. La identidad del video
+   es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:cine.
 */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
@@ -92,9 +99,10 @@
     '#' + BTN_ID + '.nvp-crunchy{color:#f47521}',
     '#' + BTN_ID + '.nvp-disney{color:#3aa0ff}',
     '#' + BTN_ID + '.nvp-youtube{color:#ff4444}',
+    '#' + BTN_ID + '.nvp-iris{color:#dc402a}',
     '#' + BTN_ID + '{position:relative}',
     '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#9ee2b8}',
-    '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube){color:#9ee2b8}',
+    '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube):not(.nvp-iris){color:#9ee2b8}',
     /* Panel: columna acoplada al borde derecho, altura completa (el contenido
        se encoge; nada queda tapado, como la barra de Teleparty) */
     '#nvp-panel{flex:0 0 302px;width:302px;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg-2,#121217);border-left:1px solid var(--line,#26262d)}',
@@ -191,14 +199,16 @@
   var beatTimer = null;
 
   var SITIOS = {
-    netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube'
+    netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube', iris: 'el Cine de IRIS'
   };
   function siteOf(url) {
-    var h = ''; try { h = new URL(url).hostname; } catch (e) { return null; }
+    var h = '', p = ''; try { var u = new URL(url); h = u.hostname; p = u.pathname; } catch (e) { return null; }
     if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
+    // El Cine de IRIS: solo la ruta /cine (el resto de iris.it.com no reproduce)
+    if (/(^|\.)iris\.it\.com$/.test(h) && /^\/cine(\/|$)/.test(p)) return 'iris';
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
@@ -217,6 +227,12 @@
     if (m) return 'yt:' + m[1];
     m = /(?:youtu\.be|youtube\.com\/(?:live|embed|shorts))\/([\w-]{6,})/i.exec(url || '');
     if (m) return 'yt:' + m[1];
+    // Cine de IRIS: la película es el parámetro ?v= (URL del video). Sin él,
+    // la página vacía cuenta como "el mismo sitio" para no forzar navegación
+    // cuando el anfitrión reproduce un archivo local.
+    m = /iris\.it\.com\/cine[^#]*[?&]v=([^&#]+)/i.exec(url || '');
+    if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
+    if (/iris\.it\.com\/cine(\/|$|\?)/i.test(url || '')) return 'iris:cine';
     return null;
   }
   function fmtT(s) {
@@ -341,7 +357,7 @@
 
   function start(code, asHost) {
     var wv = naviris.activeWebview();
-    if (!wv || !activeSite()) { naviris.toast('Abre el video en Crunchyroll, Netflix, Disney+ o YouTube y vuelve a intentarlo'); return; }
+    if (!wv || !activeSite()) { naviris.toast('Abre el video en Crunchyroll, Netflix, Disney+, YouTube o el Cine de IRIS y vuelve a intentarlo'); return; }
     leave(true);
     var name = (localStorage.__navPartyName || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
     // navLock: por defecto SOLO el anfitrión cambia el video de la sala.
@@ -429,7 +445,7 @@
     if (modoActual === 'fuera') {
       if (ui.hint) ui.hint.textContent = site
         ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola a lo que vea el anfitrión.'
-        : 'Abre Crunchyroll, Netflix, Disney+ o YouTube en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o el Cine de IRIS (iris.it.com/cine) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       if (ui.crear) ui.crear.disabled = !site;
       if (ui.unirse) ui.unirse.disabled = !site;
       return;
@@ -443,7 +459,7 @@
     }
     if (ui.viendo) {
       var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
-      ui.viendo.textContent = title ? 'Viendo: ' + title.replace(/ - Crunchyroll.*$| - Netflix.*$| - YouTube$/i, '') : '';
+      ui.viendo.textContent = title ? 'Viendo: ' + title.replace(/ - Crunchyroll.*$| - Netflix.*$| - YouTube$| — Cine IRIS$/i, '') : '';
       ui.viendo.style.display = title ? '' : 'none';
     }
     if (ui.lock && ui.lock.checked !== !!party.lock) ui.lock.checked = !!party.lock;
@@ -608,6 +624,7 @@
     b.classList.toggle('nvp-crunchy', site === 'crunchy');
     b.classList.toggle('nvp-disney', site === 'disney');
     b.classList.toggle('nvp-youtube', site === 'youtube');
+    b.classList.toggle('nvp-iris', site === 'iris');
   }
   // Sondeo ligero (2 s): la API de addons no expone eventos de navegación. Si el
   // addon se quita/pausa (botón fuera del DOM), se limpia todo solo.
