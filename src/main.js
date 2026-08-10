@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -119,6 +119,8 @@ const DEFAULT_SETTINGS = {
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   cinePase: '',             // pase de la biblioteca privada de iris.it.com/cine
+  atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
+  mouseNav: true,           // botones laterales del ratón para atrás/adelante
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
@@ -602,6 +604,7 @@ const ATAJOS_UI = [
   { k: 't', mod: (i) => i.control && !i.shift, cmd: 'new-tab' },
   { k: 't', mod: (i) => i.control && i.shift, cmd: 'reopen-tab' },
   { k: 'w', mod: (i) => i.control && !i.shift, cmd: 'close-tab' },
+  { k: 'p', mod: (i) => i.alt && !i.control, cmd: 'pip' },
   { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
   { k: 'h', mod: (i) => i.control, cmd: 'history' },
   { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },
@@ -615,6 +618,107 @@ const ATAJOS_UI = [
   { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' },
   { k: 'F12', mod: () => true, cmd: 'devtools' }
 ];
+/* ---------- Menú contextual de las páginas ----------
+   Un <webview> de Electron no trae ninguno: hasta ahora el clic derecho en una
+   página no hacía absolutamente nada. Se arma con el Menu nativo porque se
+   encarga solo del teclado, de cerrarse al perder el foco y del tema del
+   sistema; replicarlo en HTML sobre el webview era mucho más código y peor.
+   El menú es sensible a lo que hay debajo: selección, campo de texto, enlace,
+   imagen y —lo que pidió Dosa— vídeo, donde ofrece bajarlo con el Rat Tool. */
+
+const puedeAtras = (c) => { try { return c.navigationHistory ? c.navigationHistory.canGoBack() : c.canGoBack(); } catch { return false; } };
+const puedeAdelante = (c) => { try { return c.navigationHistory ? c.navigationHistory.canGoForward() : c.canGoForward(); } catch { return false; } };
+const irAtras = (c) => { try { c.navigationHistory ? c.navigationHistory.goBack() : c.goBack(); } catch { /* nada */ } };
+const irAdelante = (c) => { try { c.navigationHistory ? c.navigationHistory.goForward() : c.goForward(); } catch { /* nada */ } };
+
+async function guardarComo(contents, pdf) {
+  const nombre = (() => {
+    try {
+      const u = new URL(contents.getURL());
+      const base = (u.pathname.split('/').pop() || u.hostname).replace(/[^\w.-]+/g, '-');
+      return (base || 'pagina').replace(/\.(html?|php|aspx?)$/i, '') + (pdf ? '.pdf' : '.html');
+    } catch { return pdf ? 'pagina.pdf' : 'pagina.html'; }
+  })();
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath: path.join(app.getPath('downloads'), nombre)
+  });
+  if (canceled || !filePath) return;
+  try {
+    if (pdf) fs.writeFileSync(filePath, await contents.printToPDF({ printBackground: true }));
+    else await contents.savePage(filePath, 'HTMLComplete');
+  } catch (e) {
+    dialog.showErrorBox('No se pudo guardar', String(e.message || e));
+  }
+}
+
+function menuContextual(contents) {
+  contents.on('context-menu', (_e, p) => {
+    const host = contents.hostWebContents;
+    const aRenderer = (tipo, datos) => host?.send('ctx:accion', { tipo, datos });
+    const items = [];
+    const sep = () => { if (items.length && items[items.length - 1].type !== 'separator') items.push({ type: 'separator' }); };
+
+    if (p.selectionText && !p.isEditable) {
+      const corto = p.selectionText.trim().replace(/\s+/g, ' ').slice(0, 24);
+      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', click: () => contents.copy() });
+      items.push({ label: 'Buscar "' + corto + '" en una pestaña nueva', click: () => aRenderer('buscar', p.selectionText.trim()) });
+      sep();
+    }
+    if (p.isEditable) {
+      items.push({ label: 'Cortar', accelerator: 'Ctrl+X', enabled: !!p.selectionText, click: () => contents.cut() });
+      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', enabled: !!p.selectionText, click: () => contents.copy() });
+      items.push({ label: 'Pegar', accelerator: 'Ctrl+V', enabled: p.editFlags?.canPaste !== false, click: () => contents.paste() });
+      items.push({ label: 'Seleccionar todo', accelerator: 'Ctrl+A', click: () => contents.selectAll() });
+      sep();
+    }
+    if (p.linkURL) {
+      items.push({ label: 'Abrir el enlace en una pestaña nueva', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true }) });
+      items.push({ label: 'Copiar el enlace', click: () => clipboard.writeText(p.linkURL) });
+      items.push({ label: 'Guardar el destino como…', click: () => contents.downloadURL(p.linkURL) });
+      sep();
+    }
+    if (p.mediaType === 'image' && p.srcURL) {
+      items.push({ label: 'Copiar la imagen', click: () => contents.copyImageAt(p.x, p.y) });
+      items.push({ label: 'Copiar la dirección de la imagen', click: () => clipboard.writeText(p.srcURL) });
+      items.push({ label: 'Guardar la imagen como…', click: () => contents.downloadURL(p.srcURL) });
+      sep();
+    }
+    if (p.mediaType === 'video' || p.mediaType === 'audio') {
+      const esVideo = p.mediaType === 'video';
+      items.push({
+        label: 'Descargar ' + (esVideo ? 'el vídeo' : 'el audio') + ' con Rat Tool',
+        click: () => aRenderer('rat', { pagina: contents.getURL(), src: p.srcURL || '' })
+      });
+      if (esVideo) {
+        items.push({ label: 'Ver en miniatura', accelerator: 'Alt+P', click: () => aRenderer('pip') });
+      }
+      if (p.srcURL && /^https?:/.test(p.srcURL)) {
+        items.push({ label: 'Copiar la dirección ' + (esVideo ? 'del vídeo' : 'del audio'), click: () => clipboard.writeText(p.srcURL) });
+      }
+      sep();
+    }
+
+    items.push({ label: 'Atrás', accelerator: 'Alt+Left', enabled: puedeAtras(contents), click: () => irAtras(contents) });
+    items.push({ label: 'Adelante', accelerator: 'Alt+Right', enabled: puedeAdelante(contents), click: () => irAdelante(contents) });
+    items.push({ label: 'Recargar', accelerator: 'F5', click: () => contents.reload() });
+    sep();
+    items.push({ label: 'Añadir al acceso rápido', click: () => aRenderer('acceso', { url: contents.getURL(), titulo: contents.getTitle() }) });
+    items.push({ label: 'Añadir a marcadores', accelerator: 'Ctrl+D', click: () => aRenderer('marcador', { url: contents.getURL(), titulo: contents.getTitle() }) });
+    sep();
+    items.push({ label: 'Pantalla completa', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
+    items.push({ label: 'Copiar la dirección de la página', click: () => clipboard.writeText(contents.getURL()) });
+    sep();
+    items.push({ label: 'Guardar la página como…', accelerator: 'Ctrl+S', click: () => guardarComo(contents, false) });
+    items.push({ label: 'Guardar como PDF…', click: () => guardarComo(contents, true) });
+    items.push({ label: 'Imprimir…', accelerator: 'Ctrl+P', click: () => contents.print() });
+    sep();
+    items.push({ label: 'Código fuente de la página', accelerator: 'Ctrl+U', click: () => host?.send('tab:open-url', { url: 'view-source:' + contents.getURL(), background: false }) });
+    items.push({ label: 'Inspeccionar', accelerator: 'Ctrl+Mayús+C', click: () => contents.inspectElement(p.x, p.y) });
+
+    Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(host) || undefined });
+  });
+}
+
 function atajosDeWebview(contents) {
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
@@ -638,6 +742,7 @@ app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
     atajosDeWebview(contents);
+    menuContextual(contents);
     contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
         // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano

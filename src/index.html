@@ -109,6 +109,14 @@
           </div>
           <div class="hub-actions">
             <button id="hub-edit" class="hub-fab" title="Editar hub"><span data-ico="squares-plus"></span><span class="lbl">Editar</span></button>
+            <div class="temas-wrap">
+              <button id="hub-temas" class="hub-fab" title="Tema de Naviris"><span data-ico="swatch"></span><span class="lbl">Temas</span></button>
+              <div id="temas-pop" class="temas-pop hidden">
+                <button class="tema-op" data-tema="oscuro"><span class="tema-sw sw-oscuro"></span>Naviris</button>
+                <button class="tema-op" data-tema="claro"><span class="tema-sw sw-claro"></span>Claro</button>
+                <button class="tema-op" data-tema="rosa"><span class="tema-sw sw-rosa"></span>Rosa</button>
+              </div>
+            </div>
             <button id="hub-customize" class="hub-fab" title="Aspecto del hub: fondo y logos"><span data-ico="photo"></span></button>
             <button id="hub-addons" class="hub-fab" title="Addons: extensiones instalables"><span data-ico="puzzle-piece"></span><span class="lbl">Addons</span></button>
           </div>
@@ -200,6 +208,8 @@
     <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita el prompt de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Continuar donde lo dejaste<br /><small>Reabre las pestañas al iniciar</small></span><input type="checkbox" id="opt-restore" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme las pestañas tras 30 min sin usarlas</small></span><input type="checkbox" id="opt-powersaver" /></label>
+    <label class="menu-toggle"><span>Atajos de teclado<br /><small>Ctrl+T, Ctrl+W, Ctrl+R… · F11 y F12 siguen activos</small></span><input type="checkbox" id="opt-atajos" /></label>
+    <label class="menu-toggle"><span>Botones laterales del ratón<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <hr />

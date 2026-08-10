@@ -17,7 +17,7 @@ const els = {};
   'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'nav-home', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
-  'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light',
+  'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -42,13 +42,40 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 // Se aplica AQUÍ, antes de que cargue lo demás, leyendo el espejo de
 // localStorage: los settings de verdad llegan por IPC más tarde y sin el
 // espejo la interfaz arrancaría oscura y daría un fogonazo al cambiar.
+/* Puente con el interruptor de modo claro, que existía antes que los temas y
+   lo siguen llamando el arranque, los ajustes y la sincronización de la cuenta.
+   Ojo: "claro apagado" NO significa "oscuro". Si el tema elegido es rosa hay
+   que respetarlo, o al reiniciar se perdería. */
 function applyTheme(light) {
-  document.documentElement.classList.toggle('light', !!light);
-  store.set('cobalt.lightMode', !!light);
+  const t = temaActual();
+  if (light) aplicaTema('claro');
+  else aplicaTema(t === 'claro' ? 'oscuro' : t);
+}
+/* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
+   tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
+   lo sincronizaban, y rosa se guarda aparte. */
+const TEMAS = ['oscuro', 'claro', 'rosa'];
+function temaActual() {
+  const t = store.get('cobalt.tema', null);
+  if (TEMAS.includes(t)) return t;
+  return store.get('cobalt.lightMode', false) ? 'claro' : 'oscuro';
+}
+function aplicaTema(tema) {
+  if (!TEMAS.includes(tema)) tema = 'oscuro';
+  const raiz = document.documentElement;
+  raiz.classList.toggle('light', tema === 'claro');
+  raiz.classList.toggle('rosa', tema === 'rosa');
+  store.set('cobalt.tema', tema);
+  store.set('cobalt.lightMode', tema === 'claro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get('cobalt.hubBg', null) || BACKGROUNDS[0]);
 }
-if (store.get('cobalt.lightMode', false)) document.documentElement.classList.add('light');
+(() => {
+  // Antes de que cargue nada más, para que no haya fogonazo al cambiar.
+  const t = temaActual();
+  document.documentElement.classList.toggle('light', t === 'claro');
+  document.documentElement.classList.toggle('rosa', t === 'rosa');
+})();
 let tabs = [], activeId = null, nextId = 1;
 // Pestañas cerradas hace poco, para reabrirlas con Ctrl+Shift+T (como Chrome,
 // las últimas 10). Se declara aquí arriba porque closeTab la usa.
@@ -167,9 +194,30 @@ function createTab(url = null, activate = true) {
 // Formato: string (histórico) u objeto { u, p } cuando la pestaña está fijada.
 function saveSession() {
   if (IS_PRIVATE) return;
+  // Se guardan también título y favicon: al reabrir, las pestañas entran
+  // dormidas y sin eso se verían todas como "Cargando…" sin icono.
   const urls = tabs.filter((t) => t.kind === 'web' && t.url && /^https?:/.test(t.url))
-    .map((t) => t.pinned ? { u: t.sleptUrl || t.url, p: 1 } : (t.sleptUrl || t.url));
+    .map((t) => {
+      const s = { u: t.sleptUrl || t.url, t: t.title || '', f: t.favicon || '' };
+      if (t.pinned) s.p = 1;
+      return s;
+    });
   store.set('cobalt.session', urls);
+}
+/* Pestaña restaurada SIN cargar: se queda dormida hasta que se abre. El
+   webview existe (en about:blank) para que despertarla sea solo cambiarle el
+   src, igual que hace el ahorro de energía. */
+function crearDormida(dato) {
+  const url = typeof dato === 'string' ? dato : dato.u;
+  const tab = {
+    id: nextId++, kind: 'web', url, title: (dato && dato.t) || hostOf(url) || url,
+    webview: null, favicon: (dato && dato.f) || null,
+    asleep: true, sleptUrl: url, lastActive: 0
+  };
+  tabs.push(tab);
+  attachWebview(tab, 'about:blank');
+  tab.url = url;          // attachWebview lo había puesto en about:blank
+  return tab;
 }
 let mediaTimer = null;
 function attachWebview(tab, url) {
@@ -379,7 +427,22 @@ function renderTabs(forzar) {
   // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
   for (const tab of tabs) els.tabstrip.appendChild(makeTabEl(tab));
+  ajustaPestanas();
 }
+/* Cuánto le toca a cada pestaña con el ancho que hay: por debajo de cierto
+   tamaño se les quita primero la X y luego el título, hasta quedarse en el
+   favicon. Lo decide JS porque el CSS no puede medir a sus hermanas. */
+function ajustaPestanas() {
+  const strip = els.tabstrip;
+  const sueltas = strip.querySelectorAll('.tab:not(.pinned)').length;
+  if (!sueltas) { strip.classList.remove('compacto', 'minimo'); return; }
+  let fijas = 0;
+  strip.querySelectorAll('.tab.pinned').forEach((t) => { fijas += t.offsetWidth + 4; });
+  const cada = (strip.clientWidth - fijas) / sueltas - 4;
+  strip.classList.toggle('compacto', cada < 108);
+  strip.classList.toggle('minimo', cada < 66);
+}
+window.addEventListener('resize', ajustaPestanas);
 function toggleMute(tab) {
   tab.muted = !tab.muted;
   try { tab.webview?.setAudioMuted(tab.muted); } catch {}
@@ -780,7 +843,7 @@ const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
 let account = store.get('cobalt.account', null); // { email, token }
 // Qué viaja: preferencias de usuario + marcadores + accesos + widgets + notas +
 // fondo. NUNCA contraseñas, tarjetas, historial ni sesión (locales por diseño).
-const SYNC_SETTINGS = ['lightMode', 'smartSearch', 'xRevealSensitive', 'blockPasskeys', 'restoreSession', 'powerSaver', 'adblockEnabled', 'adblockWhitelist'];
+const SYNC_SETTINGS = ['lightMode', 'smartSearch', 'xRevealSensitive', 'blockPasskeys', 'restoreSession', 'powerSaver', 'adblockEnabled', 'adblockWhitelist', 'atajos', 'mouseNav'];
 function buildSyncData() {
   const s = {};
   for (const k of SYNC_SETTINGS) if (settings[k] !== undefined) s[k] = settings[k];
@@ -808,6 +871,8 @@ async function applySyncData(d) {
     els.optSmartsearch.checked = settings.smartSearch !== false;
     els.optPasskeys.checked = settings.blockPasskeys !== false; els.optRestore.checked = settings.restoreSession !== false;
     els.optPowersaver.checked = settings.powerSaver;
+    els.optAtajos.checked = settings.atajos !== false;
+    els.optMousenav.checked = settings.mouseNav !== false;
     const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   }
   renderBookmarksBar(); renderHub();
@@ -902,6 +967,39 @@ setInterval(() => {
 renderAccountPill();
 
 /* Edición / personalización del hub */
+/* Selector de tema del hub, al lado de Editar */
+(() => {
+  const boton = document.getElementById('hub-temas');
+  const pop = document.getElementById('temas-pop');
+  if (!boton || !pop) return;
+  const pinta = () => {
+    const t = temaActual();
+    pop.querySelectorAll('.tema-op').forEach((b) => b.classList.toggle('on', b.dataset.tema === t));
+  };
+  boton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const abrir = pop.classList.contains('hidden');
+    pop.classList.toggle('hidden', !abrir);
+    boton.classList.toggle('on', abrir);
+    if (abrir) pinta();
+  });
+  pop.querySelectorAll('.tema-op').forEach((b) => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    aplicaTema(b.dataset.tema);
+    pinta();
+    pop.classList.add('hidden'); boton.classList.remove('on');
+    // lightMode sigue viviendo en los ajustes: lo leen el interruptor de la
+    // sidebar, el tema del sistema y la sincronización de la cuenta.
+    settings = await window.cobalt.setSettings({ lightMode: b.dataset.tema === 'claro' });
+    if (els.optLight) els.optLight.checked = b.dataset.tema === 'claro';
+    toast('Tema ' + (b.dataset.tema === 'oscuro' ? 'Naviris' : b.dataset.tema));
+  }));
+  document.addEventListener('click', (e) => {
+    if (pop.classList.contains('hidden')) return;
+    if (!pop.contains(e.target) && !boton.contains(e.target)) { pop.classList.add('hidden'); boton.classList.remove('on'); }
+  });
+})();
+
 els.hubEdit.addEventListener('click', () => {
   const on = els.hub.classList.toggle('editing'); els.hubEdit.classList.toggle('on', on);
   els.widgetPalette.classList.toggle('hidden', !on); els.customizePanel.classList.add('hidden');
@@ -1689,6 +1787,8 @@ els.optSmartsearch.addEventListener('change', async () => { settings = await win
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
 els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
+els.optAtajos.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ atajos: els.optAtajos.checked }); toast(els.optAtajos.checked ? 'Atajos de teclado activados' : 'Atajos de teclado desactivados'); });
+els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del ratón activados' : 'Botones del ratón desactivados'); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
 document.getElementById('hub-theme').addEventListener('click', async () => {
@@ -2177,6 +2277,9 @@ window.addEventListener('keydown', (e) => {
   const k = (e.key || '').toLowerCase();
   const soloCtrl = e.ctrlKey && !e.shiftKey && !e.altKey;
   const escribiendo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  // Con los atajos desactivados siguen vivos solo los de ventana (F11, F12) y
+  // Escape: quedarse en pantalla completa sin forma de salir sería una trampa.
+  if (settings.atajos === false && !/^(F11|F12|Escape)$/.test(e.key)) return;
 
   // --- Pestañas ---
   if (e.ctrlKey && e.shiftKey && k === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
@@ -2209,6 +2312,7 @@ window.addEventListener('keydown', (e) => {
   if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
 
   // --- Ventana y página ---
+  if (e.altKey && !e.ctrlKey && k === 'p') { e.preventDefault(); miniReproductor(); return; }
   if (e.key === 'F12') { e.preventDefault(); alternarDevtools(); return; }
   if (e.key === 'F11') { e.preventDefault(); window.cobalt.toggleFullscreen(); return; }
   if (soloCtrl && (k === '+' || k === '=' || e.key === 'Add')) { e.preventDefault(); zoom(1); return; }
@@ -2223,6 +2327,35 @@ window.addEventListener('keydown', (e) => {
 });
 // Los mismos atajos, pero llegados desde una página con el foco dentro (el main
 // los intercepta con before-input-event y los reenvía por IPC).
+/* Minireproductor (picture-in-picture). Coge el vídeo que se ve más grande y lo
+   saca a la ventanita del sistema, que queda por encima de cualquier otra app;
+   volver a pulsarlo lo devuelve. El segundo argumento de executeJavaScript es
+   el gesto de usuario: sin él Chromium rechaza la llamada.
+   Funciona en cualquier web con un <video>, incluidas Netflix o Disney+, salvo
+   que la propia web lo desactive con disablePictureInPicture. */
+const PIP_JS = `(() => {
+  const v = Array.from(document.querySelectorAll('video'))
+    .filter((x) => x.readyState !== 0 && !x.disablePictureInPicture)
+    .sort((a, b) => {
+      const ra = a.getClientRects()[0] || { width: 0, height: 0 };
+      const rb = b.getClientRects()[0] || { width: 0, height: 0 };
+      return (rb.width * rb.height) - (ra.width * ra.height);
+    })[0];
+  if (document.pictureInPictureElement) { document.exitPictureInPicture(); return 'salido'; }
+  if (!v) return 'sin-video';
+  return v.requestPictureInPicture().then(() => 'ok').catch((e) => 'error:' + e.message);
+})()`;
+async function miniReproductor() {
+  const tab = activeTab();
+  const wv = tab && tab.kind === 'web' && !tab.asleep ? tab.webview : null;
+  if (!wv) { toast('Abre primero una página con vídeo'); return; }
+  try {
+    const r = await wv.executeJavaScript(PIP_JS, true);
+    if (r === 'sin-video') toast('No hay ningún vídeo en esta página');
+    else if (String(r).startsWith('error:')) toast('Esta página no deja usar el minireproductor');
+  } catch { toast('No se pudo abrir el minireproductor'); }
+}
+
 window.cobalt.onShortcut((cmd) => {
   const i = tabs.findIndex((t) => t.id === activeId);
   if (cmd === 'reload') recargar(false);
@@ -2233,6 +2366,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'close-tab') { if (activeId) closeTab(activeId); }
   else if (cmd === 'reopen-tab') reabrirCerrada();
   else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
+  else if (cmd === 'pip') miniReproductor();
   else if (cmd === 'downloads') toggleDownloadsPage();
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();
@@ -2252,16 +2386,48 @@ window.cobalt.onShortcut((cmd) => {
 // Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
 // el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
 window.addEventListener('mouseup', (e) => {
+  if (settings.mouseNav === false) return;
   if (e.button === 3) { e.preventDefault(); irAtras(); }
   else if (e.button === 4) { e.preventDefault(); irAdelante(); }
 });
 window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
 window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
+/* Lo que el menú contextual de la página no puede hacer desde el proceso
+   principal: cosas de la interfaz (pestañas, marcadores, hub, Rat Tool). */
+window.cobalt.onContextAction(({ tipo, datos }) => {
+  if (tipo === 'buscar') { const u = toUrl(datos); if (u) createTab(u); return; }
+  if (tipo === 'pantalla-completa') { window.cobalt.toggleFullscreen(); return; }
+  if (tipo === 'pip') { miniReproductor(); return; }
+  if (tipo === 'marcador') {
+    if (findBookmark(datos.url)) { toast('Ya estaba en marcadores'); return; }
+    bookmarks.push({ type: 'link', title: datos.titulo || datos.url, url: datos.url });
+    saveBm(); renderBookmarksBar(); syncNavUI(); renderBookmarkTree();
+    toast('Añadido a marcadores');
+    return;
+  }
+  if (tipo === 'acceso') {
+    els.dialName.value = datos.titulo || hostOf(datos.url) || '';
+    els.dialUrl.value = datos.url || '';
+    els.sbHome.click();
+    els.dialModal.classList.remove('hidden');
+    els.dialName.focus(); els.dialName.select();
+    return;
+  }
+  if (tipo === 'rat') {
+    // El Rat Tool prefiere la URL de la página (así reconoce YouTube, TikTok…);
+    // la del propio <video> solo sirve de repuesto para archivos sueltos.
+    const url = /^https?:/.test(datos.pagina || '') ? datos.pagina : (datos.src || '');
+    if (!url) { toast('No he podido identificar ese vídeo'); return; }
+    if (els.ratPop.classList.contains('hidden')) els.sbRat.click();
+    setTimeout(() => { els.ratUrl.value = url; updateRatPlat(); els.ratQrow.classList.add('hidden'); loadRatQualities(); }, 60);
+  }
+});
 
 /* Arranque */
 (async function init() {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
+  els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
   els.optLight.checked = !!settings.lightMode; applyTheme(settings.lightMode);
   // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
   refreshAgentBadge();
@@ -2280,7 +2446,13 @@ window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else c
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
-    session.forEach((s, i) => { const t = createTab(typeof s === 'string' ? s : s.u, i === 0); if (s && s.p) t.pinned = true; });
+    // Solo la primera se carga: las demás entran DORMIDAS. Antes se abrían
+    // todas a la vez y cualquier página con vídeo se ponía a sonar sola nada
+    // más arrancar; ahora cada una carga cuando la abres.
+    session.forEach((s, i) => {
+      const t = i === 0 ? createTab(typeof s === 'string' ? s : s.u, true) : crearDormida(s);
+      if (s && s.p) t.pinned = true;
+    });
     renderTabs(true);
   } else {
     createTab();
