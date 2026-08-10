@@ -100,9 +100,9 @@
     }
     if (name === 'eye-fill') return `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="${EYE_FILL}" fill="currentColor"/></svg>`;
     // Estrella rellena = la misma estrella Lucide con relleno (estado "guardado")
-    if (name === 'star-solid') return `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true">${L['star']}</svg>`;
+    if (name === 'star-solid') return `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">${L['star']}</svg>`;
     const body = L[name] || '';
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
   };
 
   // Logo de Naviris = isotipo correcto de Iris (assets/cobalt_logo.svg), gradiente animado
