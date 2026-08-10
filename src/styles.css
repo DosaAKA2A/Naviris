@@ -675,21 +675,30 @@ button { font-family: inherit; }
 #hub::before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--hub-bg, linear-gradient(160deg, #24242b 0%, #191920 100%)); background-size: cover; background-position: center; }
 #hub .hub-scroll { color: var(--text); }
 
-#widget-grid { max-width: 880px; margin: 0 auto; padding: 6vh 26px 96px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; grid-auto-flow: row dense; }
+#widget-grid { max-width: 920px; margin: 0 auto; padding: 7vh 26px 96px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 26px; grid-auto-flow: row dense; }
 .widget { grid-column: span var(--span, 6); position: relative; animation: rise-in .5s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-/* Tarjeta de widget con profundidad: filo de luz arriba + sombra ambiental
-   suave, como las tarjetas de las referencias; no es botón, no hay hover */
-.w-card { background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: 18px; padding: 18px; height: 100%; backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 32px -14px var(--shadow-panel); }
+/* Limpieza (petición 2026-08-11: "no es poner sombras en cada recuadro, es
+   un diseño mucho más limpio"): la tarjeta es UNA superficie suave, sin borde
+   ni sombra — separa el espacio, no el trazo. */
+.w-card { background: var(--hub-card); border-radius: 20px; padding: 20px; height: 100%; backdrop-filter: blur(10px); }
+/* El reloj y los accesos ni siquiera llevan caja: flotan sobre el fondo, como
+   los widgets de iOS. Sus piezas ya tienen lectura propia (sombra del reloj,
+   superficie de cada tile). */
+.w-clock, .w-shortcuts { background: transparent; backdrop-filter: none; }
 
 /* Widget: reloj */
 .w-clock { text-align: center; background: transparent; border: none; padding: 8px 0; backdrop-filter: none; }
-.w-clock .time { font-family: "Segoe UI Variable Display","Segoe UI",sans-serif; font-size: 58px; font-weight: 250; font-variant-numeric: tabular-nums; letter-spacing: 1px; line-height: 1; text-shadow: 0 2px 22px var(--clock-shadow); }
-.w-clock .greet { color: var(--text-dim); font-size: 13.5px; margin-top: 10px; }
+/* Jerarquía: el reloj es EL dato grande de la portada (referencias: número
+   protagonista + etiqueta pequeña debajo) */
+.w-clock .time { font-family: "Segoe UI Variable Display","Segoe UI",sans-serif; font-size: 68px; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: .5px; line-height: 1; text-shadow: 0 2px 22px var(--clock-shadow); }
+.w-clock .greet { color: var(--text-dim); font-size: 13px; margin-top: 12px; letter-spacing: .2px; }
 
 /* Widget: búsqueda */
 .w-search { grid-column: span 6; }
-#hub-search { display: flex; align-items: center; gap: 10px; width: min(560px, 100%); margin: 0 auto; padding: 0 18px; height: 46px; border-radius: 999px; background: var(--hub-input); border: 1px solid var(--hub-input-line); backdrop-filter: blur(10px); transition: border-color .15s, box-shadow .15s; }
+/* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
+   foco (y en el color de realce) */
+#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: 1px solid transparent; backdrop-filter: blur(10px); transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
 #hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 50%, var(--hub-input-line)); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
 #hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
@@ -718,7 +727,7 @@ button { font-family: inherit; }
 /* Widget: accesos (tiles) */
 .w-shortcuts .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, 92px); justify-content: center; gap: 22px 16px; }
 .dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative; }
-.d-tile { width: 92px; height: 92px; border-radius: 22px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--tile-line); position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s, border-color .18s; }
+.d-tile { width: 92px; height: 92px; border-radius: 22px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
 .d-tile img { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); object-fit: contain; position: relative; z-index: 1; }
 /* Favicon del acceso: monocromo y con el brillo del tema (claro en tiles oscuros, oscuro en tiles claros) */
 .d-tile img.d-fav { filter: var(--fav-filter); }
@@ -759,7 +768,7 @@ button { font-family: inherit; }
 /* Esquina superior derecha del hub (como Opera GX): cuenta y clima en pastillas
    de cristal oscuro sobre el fondo del usuario, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--hub-pill-line); background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(8px); }
+.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(8px); }
 button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
 button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
 button.hub-pill:active { transform: translateY(0) scale(.97); }
@@ -787,8 +796,8 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* FAB + paneles del hub */
 .hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
-#hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
-.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(8px); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+#hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
+.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(8px); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
