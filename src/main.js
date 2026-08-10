@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -596,6 +596,20 @@ function createWindow(isPrivate = false) {
     e.preventDefault();
     if (settings.mouseNav === false) return;
     win.webContents.send('ui:shortcut', cmd === 'browser-backward' ? 'back' : 'forward');
+  });
+  // Clic derecho en la zona de arrastre de la barra (el "caption" de la ventana
+  // sin marco): a la página no le llega ningún contextmenu — el sistema se queda
+  // el evento y Windows mostraría su menú de ventana (Restaurar/Mover/Cerrar).
+  // Se intercepta y se le pasan las coordenadas a la interfaz, que enseña su
+  // menú de barra (nueva pestaña, reabrir cerrada...), como Chrome u Opera.
+  win.on('system-context-menu', (e) => {
+    e.preventDefault();
+    // El point del evento llega desviado con varios monitores; el cursor es
+    // exactamente donde se hizo el clic y viene en los mismos DIPs que
+    // getContentBounds, así que el menú cae justo bajo el puntero.
+    const p = screen.getCursorScreenPoint();
+    const b = win.getContentBounds();
+    win.webContents.send('ui:tabstrip-menu', { x: p.x - b.x, y: p.y - b.y });
   });
   return win;
 }

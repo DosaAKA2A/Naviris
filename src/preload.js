@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   toggleFullscreen: () => ipcRenderer.send('win:fullscreen'),
   onShortcut: (cb) => ipcRenderer.on('ui:shortcut', (_e, cmd) => cb(cmd)),
+  // Clic derecho en la zona de arrastre de la barra: el main lo intercepta
+  // ('system-context-menu') y manda las coordenadas ya en píxeles de la página
+  onTabstripMenu: (cb) => ipcRenderer.on('ui:tabstrip-menu', (_e, p) => cb(p)),
 
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateChannels: () => ipcRenderer.invoke('update:channels'),

@@ -2424,6 +2424,17 @@ window.addEventListener('mouseup', (e) => {
   else if (e.button === 4) { e.preventDefault(); irAdelante(); }
 });
 window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
+// Clic derecho en la ZONA VACÍA de la barra de pestañas (región de arrastre de
+// la ventana): a la página no le llega — el main lo intercepta con
+// 'system-context-menu' y manda las coordenadas. Menú de barra, como Chrome.
+window.cobalt.onTabstripMenu(({ x, y }) => {
+  showCtxMenu(x, y, [
+    { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
+    { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada },
+    { sep: true },
+    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabs.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) }
+  ]);
+});
 window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
 /* Lo que el menú contextual de la página no puede hacer desde el proceso
    principal: cosas de la interfaz (pestañas, marcadores, hub, Rat Tool). */
