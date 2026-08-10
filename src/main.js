@@ -586,6 +586,17 @@ function createWindow(isPrivate = false) {
   win.once('ready-to-show', () => win.show());
   win.on('maximize', () => win.webContents.send('win:maximized', true));
   win.on('unmaximize', () => win.webContents.send('win:maximized', false));
+  // Botones laterales del ratón (4 y 5). En Windows llegan como WM_APPCOMMAND ->
+  // evento 'app-command' de la ventana, NO como 'mouseup' con button 3/4 (por
+  // eso el toggle sobre mouseup no hacía nada). Se toma el control aquí:
+  // preventDefault SIEMPRE para que Chromium no navegue por su cuenta, y solo se
+  // reenvía a la interfaz si el ajuste está activo.
+  win.on('app-command', (e, cmd) => {
+    if (cmd !== 'browser-backward' && cmd !== 'browser-forward') return;
+    e.preventDefault();
+    if (settings.mouseNav === false) return;
+    win.webContents.send('ui:shortcut', cmd === 'browser-backward' ? 'back' : 'forward');
+  });
   return win;
 }
 

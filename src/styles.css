@@ -44,39 +44,43 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* ===== Tema Rosa =====
-   Oscuro de base, no rosa chicle: ciruela muy apagada para las superficies y el
-   rosa reservado al acento, los bordes vivos y el texto de énfasis. Así se lee
-   igual de bien que el tema normal y el color se nota donde importa.
+   Rosa de verdad, cálido y femenino: superficies malva-rosa (no negro con un
+   toque) y el acento en un rosa chicle vivo (#ff5fa8). Sube bastante el tinte
+   respecto a la primera versión, que quedaba demasiado ciruela/oscura. Sigue
+   siendo oscuro para que el texto se lea, pero todo tira a rosa.
    Solo redefine los tokens que cambian; el resto los hereda de :root. */
 :root.rosa {
-  --bg: #100a0e; --bg-2: #191019; --bg-3: #241722; --line: #33212c;
-  --line-2: #3b2632; --line-3: #4d323f; --focus: #7a4a5e;
-  --hover: #21151e; --active: #2a1a25; --btn: #2a1a25; --btn-hover: #35212e; --track: #35212e;
-  --accent: #f4a8c4; --accent-2: #a3697f; --accent-fg: #2a0f1b; --accent-hover: #ffd3e2;
-  --text: #f6eaf0; --text-strong: #fff; --text-dim: #bb95a6; --muted: #bb95a6; --dim: #8a6675;
-  --violet: #ff9ec7; --danger: #ff6b7a; --ok: #8fd8b4;
-  --tab-fg: #c09eae; --tab-hover-bg: #22151f; --tab-hover-fg: #f6e6ee;
-  --tab-asleep-fg: #9c7686; --tab-zzz: #b78c9e; --fav-dot: #7d5b6a;
-  --winctl-fg: #d5b9c6; --winctl-hover: #2c1b26; --winctl-active: #38222f;
-  --sb-border: #1a1017; --sb-fg: #b28ea0; --sb-hover: #221420; --sb-open: #2d1c28; --sb-sep: #221520; --sb-div: #37232f;
-  --nav-fg: #cfaebd; --bm-fg: #d7bac7; --nav-hover: #26172122;
-  --chip: rgba(255,175,205,.12); --chip-hover: rgba(255,175,205,.2); --chip-dim: rgba(255,175,205,.06);
-  --track-knob: #8f6979; --track-on: #f4a8c4; --track-knob-on: #2a0f1b;
-  --bar-from: #b4718c; --bar-to: #ffc2d9; --backdrop: rgba(14,6,10,.68);
-  --focus-ring: rgba(244,168,196,.08);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #24131e 0%, #0f090d 62%);
-  --checker-a: #170e14; --checker-b: #110a0f;
-  --hub-card: rgba(32,18,27,.55); --hub-card-line: rgba(255,190,215,.09);
-  --hub-input: rgba(20,12,17,.82); --hub-input-line: #33212c;
-  --hub-fab: rgba(20,12,17,.84); --hub-fab-line: #3b2632;
-  --hub-pill: rgba(20,12,17,.84); --hub-pill-line: rgba(255,190,215,.12); --hub-pill-fg: #e6cbd7;
-  --hub-hairline: rgba(255,190,215,.2); --hub-label: #97707f;
-  --tile-default: linear-gradient(140deg,#31202b,#1a1017); --tile-line: rgba(255,190,215,.09);
-  --tile-mono: #f2dde6; --dial-add-line: #3b2632;
-  --wx-ic: #e4c3d1; --addons-plate: rgba(28,14,22,.94);
-  --shadow-pop: rgba(20,4,12,.66); --shadow-panel: rgba(20,4,12,.6);
-  --fav-filter: grayscale(1) brightness(1.5) sepia(.3) hue-rotate(292deg) saturate(2);
+  --bg: #21121c; --bg-2: #2c1826; --bg-3: #3a2032; --line: #4a2a3d;
+  --line-2: #56304a; --line-3: #6a3c5b; --focus: #b25c88;
+  --hover: #331d2b; --active: #3f2436; --btn: #3f2436; --btn-hover: #4d2c42; --track: #4d2c42;
+  --accent: #ff5fa8; --accent-2: #d98cae; --accent-fg: #3a0a20; --accent-hover: #ffa9d0;
+  --text: #fdeef5; --text-strong: #fff; --text-dim: #d3a6bd; --muted: #d3a6bd; --dim: #a2748c;
+  --violet: #ff7ac0; --danger: #ff6b8a; --ok: #98dcb8;
+  --tab-fg: #d9a8c2; --tab-hover-bg: #351e2d; --tab-hover-fg: #ffeaf3;
+  --tab-asleep-fg: #b5859d; --tab-zzz: #d29ab6; --fav-dot: #9a6580;
+  --winctl-fg: #eec3d8; --winctl-hover: #3c2233; --winctl-active: #4a2a3e;
+  --sb-border: #2a1522; --sb-fg: #cf9bb6; --sb-hover: #341d2c; --sb-open: #442639; --sb-sep: #341c2a; --sb-div: #4d2c42;
+  --nav-fg: #e6bcd1; --bm-fg: #eec6d9; --nav-hover: #3a2130;
+  --chip: rgba(255,120,185,.16); --chip-hover: rgba(255,120,185,.26); --chip-dim: rgba(255,120,185,.08);
+  --track-knob: #b57a97; --track-on: #ff5fa8; --track-knob-on: #3a0a20;
+  --bar-from: #e56ba0; --bar-to: #ffb2d6; --backdrop: rgba(26,8,17,.7);
+  --focus-ring: rgba(255,95,168,.12);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #431f34 0%, #1c0f18 62%);
+  --checker-a: #2a1522; --checker-b: #22111c;
+  --hub-card: rgba(58,32,50,.55); --hub-card-line: rgba(255,150,200,.14);
+  --hub-input: rgba(38,20,32,.82); --hub-input-line: #4a2a3d;
+  --hub-fab: rgba(38,20,32,.84); --hub-fab-line: #56304a;
+  --hub-pill: rgba(38,20,32,.84); --hub-pill-line: rgba(255,150,200,.18); --hub-pill-fg: #f4cadd;
+  --hub-hairline: rgba(255,150,200,.26); --hub-label: #b07f97;
+  --tile-default: linear-gradient(140deg,#4a2a3d,#2a1522); --tile-line: rgba(255,150,200,.14);
+  --tile-mono: #fbe0ec; --dial-add-line: #56304a;
+  --wx-ic: #f2c6da; --addons-plate: rgba(42,20,33,.94);
+  --shadow-pop: rgba(30,4,18,.66); --shadow-panel: rgba(30,4,18,.6);
+  --fav-filter: grayscale(1) brightness(1.5) sepia(.35) hue-rotate(292deg) saturate(2.6);
 }
+/* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
+   con un halo suave, que le da el toque más femenino sin tocar el resto. */
+:root.rosa .hub-fab.on, :root.rosa .cta, :root.rosa .btn.red { box-shadow: 0 0 0 1px rgba(255,95,168,.35), 0 6px 18px rgba(255,95,168,.22); }
 
 /* ===== Modo claro =====
    Mismo sistema de tokens con la elevación invertida: en oscuro las superficies
@@ -164,14 +168,17 @@ button { font-family: inherit; }
 /* Titlebar */
 #titlebar { height: var(--titlebar-h); display: flex; align-items: center; background: var(--bg); padding-left: 14px; flex-shrink: 0; }
 .tb-logo { display: flex; align-items: center; margin-right: 12px; -webkit-app-region: drag; }
-.tb-drag { flex: 0 0 46px; height: 100%; -webkit-app-region: drag; }
+/* El hueco de arrastre va DESPUÉS del botón + y se come todo lo que sobre, así
+   el + queda siempre pegado a la última pestaña. Cede su espacio a las pestañas
+   cuando la barra se llena (por eso shrink alto y un mínimo pequeño). */
+.tb-drag { flex: 1 1 40px; min-width: 40px; height: 100%; -webkit-app-region: drag; }
 #private-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: 1px; color: var(--text); border: 1px solid var(--line-2); background: var(--bg-2); border-radius: 999px; padding: 3px 10px; margin-right: 10px; }
 #private-badge svg { width: 11px; height: 11px; }
-/* La barra ocupa TODO el hueco libre de la titlebar. Antes estaba topada a
-   58vw: con muchas pestañas se cortaban a media pantalla y el resto quedaba
-   vacío. El hueco sobrante de la propia barra arrastra la ventana (las
-   pestañas quedan excluidas), que es lo que hacía .tb-drag. */
-#tabstrip { display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; height: 100%; -webkit-app-region: drag; }
+/* La barra se estira hasta donde haga falta y no más: así el botón + queda
+   pegado a la última pestaña (antes con flex:1 la barra ocupaba todo el ancho y
+   empujaba el + al extremo). Cuando se llena, encoge y las pestañas con ella;
+   lo que sobra a la derecha lo coge .tb-drag para arrastrar la ventana. */
+#tabstrip { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; height: 100%; -webkit-app-region: drag; }
 #tabstrip::-webkit-scrollbar { display: none; }
 #tabstrip > * { -webkit-app-region: no-drag; }
 /* Al llenarse la barra las pestañas encogen hasta quedarse en el favicon, como
@@ -751,7 +758,11 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .tema-sw { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--hub-hairline); }
 .sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
 .sw-claro { background: linear-gradient(140deg, #ffffff, #dcdee4); }
-.sw-rosa { background: linear-gradient(140deg, #f4a8c4, #241722); }
+.sw-rosa { background: linear-gradient(140deg, #ff5fa8, #3a2032); }
+/* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
+   cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
+   su trabajo; solo se le quita el botón. */
+#adt-x-sensitive { display: none !important; }
 .hub-fab svg { width: 15px; height: 15px; }
 .hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 14px; padding: 14px; box-shadow: 0 16px 44px var(--shadow-pop); animation: pop-in .16s cubic-bezier(.2,.8,.3,1.15) both; max-height: 70vh; overflow-y: auto; }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }

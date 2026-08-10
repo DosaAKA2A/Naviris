@@ -20,7 +20,7 @@ const els = {};
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
-  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-pip', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
@@ -274,6 +274,16 @@ function activateTab(id) {
   if (tab.kind === 'hub') { els.urlbar.value = ''; focusUrlbar(); }
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
+}
+// Arranque con la sesión restaurada: se muestra el hub y las pestañas quedan
+// dormidas en la barra, sin pestaña activa, hasta que se elige una.
+function hubDeInicio() {
+  activeId = null;
+  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
+  els.hub.classList.add('active');
+  tabs.forEach((t) => { if (t.webview) t.webview.classList.remove('active'); });
+  els.urlbar.value = '';
+  syncNavUI();
 }
 // Pestaña nueva → foco en la BARRA DE DIRECCIONES (no en el buscador del hub):
 // así la búsqueda inteligente sugiere desde la primera tecla.
@@ -2353,8 +2363,11 @@ async function miniReproductor() {
     const r = await wv.executeJavaScript(PIP_JS, true);
     if (r === 'sin-video') toast('No hay ningún vídeo en esta página');
     else if (String(r).startsWith('error:')) toast('Esta página no deja usar el minireproductor');
+    else if (r === 'ok') toast('Vídeo en el minireproductor');
+    if (r === 'ok' || r === 'salido') els.sbPip.classList.toggle('on', r === 'ok');
   } catch { toast('No se pudo abrir el minireproductor'); }
 }
+els.sbPip.addEventListener('click', miniReproductor);
 
 window.cobalt.onShortcut((cmd) => {
   const i = tabs.findIndex((t) => t.id === activeId);
@@ -2446,13 +2459,11 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   const session = IS_PRIVATE ? [] : store.get('cobalt.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
-    // Solo la primera se carga: las demás entran DORMIDAS. Antes se abrían
-    // todas a la vez y cualquier página con vídeo se ponía a sonar sola nada
-    // más arrancar; ahora cada una carga cuando la abres.
-    session.forEach((s, i) => {
-      const t = i === 0 ? createTab(typeof s === 'string' ? s : s.u, true) : crearDormida(s);
-      if (s && s.p) t.pinned = true;
-    });
+    // NINGUNA se carga al arrancar: todas entran DORMIDAS y se abre el hub.
+    // Cada pestaña carga solo cuando la seleccionas. Antes se cargaban todas y
+    // cualquier página con vídeo se ponía a sonar sola nada más abrir Naviris.
+    session.forEach((s) => { const t = crearDormida(s); if (s && s.p) t.pinned = true; });
+    hubDeInicio();
     renderTabs(true);
   } else {
     createTab();
