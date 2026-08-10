@@ -58,7 +58,8 @@
   --tab-asleep-fg: #817d74; --fav-dot: #635f57;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
   --winctl-fg: #c4c1b8; --winctl-hover: #262420; --winctl-active: #2e2c27;
-  --sb-border: #151412; --sb-fg: #9b978d; --sb-hover: #1c1b18; --sb-open: #242220; --sb-sep: #1d1c19; --sb-div: #2c2a26;
+  --sb-border: #151412; --sb-fg: #9b978d; --sb-hover: #24221e; --sb-open: #242220; --sb-sep: #1d1c19; --sb-div: #2c2a26;
+  --sb-capsule: #1b1917;
   --nav-fg: #bab6ac; --nav-hover: #201f1b; --bm-fg: #c5c2b8;
   /* Pastillas translúcidas (antes rgba blancas sueltas: invisibles en claro) */
   --chip: rgba(240,237,227,.09); --chip-hover: rgba(240,237,227,.15); --chip-dim: rgba(240,237,227,.05);
@@ -107,6 +108,7 @@
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
   --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
   --sb-border: #f2d8e5; --sb-fg: #8a5674; --sb-hover: #f4d8e5; --sb-open: #ecc9db; --sb-sep: #f0d4e2; --sb-div: #ddb0c9;
+  --sb-capsule: #ffffff;
   --nav-fg: #7c4a66; --nav-hover: #f4d8e5; --bm-fg: #6d3c58;
   --chip: rgba(216,79,150,.10); --chip-hover: rgba(216,79,150,.18); --chip-dim: rgba(216,79,150,.06);
   --track-knob: #ffffff; --track-on: #d84f96; --track-knob-on: #ffffff;
@@ -162,6 +164,7 @@
   --tab-asleep-fg: #84868e; --fav-dot: #a3a6ad;
   --winctl-fg: #4a4c53; --winctl-hover: #e0e2e7; --winctl-active: #d4d7dd;
   --sb-border: #e2e4e8; --sb-fg: #5d5f66; --sb-hover: #e2e4e9; --sb-open: #d8dbe1; --sb-sep: #dcdee3; --sb-div: #c9ccd3;
+  --sb-capsule: #ffffff;
   --nav-fg: #4a4c53; --nav-hover: #e2e4e9; --bm-fg: #43454c;
   --chip: rgba(20,22,28,.08); --chip-hover: rgba(20,22,28,.14); --chip-dim: rgba(20,22,28,.05);
   --track-knob: #f9fafb; --track-on: var(--realce); --track-knob-on: #f6f7f9;
@@ -347,7 +350,9 @@ button { font-family: inherit; }
 #main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
 /* Sidebar */
-#sidebar { width: var(--sidebar-w); background: var(--bg); border-right: 1px solid var(--sb-border); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; flex-shrink: 0; }
+/* Sidebar CÁPSULA FLOTANTE (referencia bee_ui 2026-08-11: el riel despegado
+   de los bordes, no una barra de navegador corriente) */
+#sidebar { width: var(--sidebar-w); margin: 10px 6px 10px 10px; border-radius: 26px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
 .sb-btn { width: 40px; height: 40px; border: none; border-radius: 13px; background: var(--sb-chip); color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
@@ -521,7 +526,8 @@ button { font-family: inherit; }
 .switch input:checked + .slider::after { transform: translateX(17px); background: var(--track-knob-on); }
 
 /* Paneles laterales derechos */
-.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h)); right: 0; bottom: 0; width: 384px; z-index: 400; background: var(--bg-2); border-left: 1px solid var(--line-2); display: flex; flex-direction: column; box-shadow: -28px 0 60px var(--shadow-panel); animation: panel-in .2s cubic-bezier(.2,.8,.3,1) both; }
+/* Panel lateral como cápsula flotante, a juego con el sidebar */
+.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 10px); right: 10px; bottom: 10px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in .2s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes panel-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .mp-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 12px; font-size: 15px; font-weight: 650; letter-spacing: .2px; }
 .mp-tools { display: flex; gap: 4px; }
@@ -709,11 +715,12 @@ button { font-family: inherit; }
 /* Limpieza (petición 2026-08-11: "no es poner sombras en cada recuadro, es
    un diseño mucho más limpio"): la tarjeta es UNA superficie suave, sin borde
    ni sombra — separa el espacio, no el trazo. */
-.w-card { background: var(--hub-card); border-radius: 20px; padding: 20px; height: 100%; backdrop-filter: blur(10px); }
-/* El reloj y los accesos ni siquiera llevan caja: flotan sobre el fondo, como
-   los widgets de iOS. Sus piezas ya tienen lectura propia (sombra del reloj,
-   superficie de cada tile). */
-.w-clock, .w-shortcuts { background: transparent; backdrop-filter: none; }
+/* Bento (referencias bee_ui/dashboard): tarjetas cápsula de radio generoso.
+   El reloj vuelve a su tarjeta como HERO del bento; los accesos siguen
+   flotando (los tiles ya son cápsulas por sí mismos). */
+.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(10px); }
+.w-clock { padding: 30px 24px; }
+.w-shortcuts { background: transparent; backdrop-filter: none; }
 
 /* Widget: reloj */
 .w-clock { text-align: center; background: transparent; border: none; padding: 8px 0; backdrop-filter: none; }
