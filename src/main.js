@@ -118,6 +118,7 @@ const DEFAULT_SETTINGS = {
   agentMode: false,
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
+  cinePase: '',             // pase de la biblioteca privada de iris.it.com/cine
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
@@ -753,6 +754,21 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
 // se te rompía el vídeo no servía absolutamente de nada.
 ipcMain.on('yt-adblock-on', (e, url) => {
   e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
+});
+// Pase de la biblioteca del Cine de IRIS (iris.it.com/cine, privada). Naviris lo
+// recuerda a nivel de navegador para que ahí no aparezca la pantalla del pase.
+// A diferencia de los dos de arriba esto SÍ es un secreto, y el preload corre en
+// todos los sitios: solo se entrega y solo se acepta desde iris.it.com. Tampoco
+// entra en la sincronización de la cuenta: no sale de este equipo.
+const esCine = (e) => {
+  try { return /(^|\.)iris\.it\.com$/.test(new URL(e.senderFrame.url).hostname); }
+  catch { return false; }
+};
+ipcMain.on('cine:pase', (e) => { e.returnValue = esCine(e) ? (settings.cinePase || '') : ''; });
+ipcMain.on('cine:pase-set', (e, v) => {
+  if (!esCine(e) || typeof v !== 'string' || !v.trim() || v.length > 64) return;
+  settings = { ...settings, cinePase: v.trim() };
+  saveSettings(settings);
 });
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
