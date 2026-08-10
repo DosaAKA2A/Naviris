@@ -21,7 +21,7 @@
   --accent: #e8e9ec; --accent-2: #6a6c73; --text: #ececef; --text-dim: #8b8d94;
   --muted: #8b8d94; --dim: #5c5e64; --violet: #b98cff;
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
-  --danger: #e5484d; --ok: #7fd39b; --titlebar-h: 40px; --navbar-h: 46px; --sidebar-w: 48px;
+  --danger: #e5484d; --ok: #7fd39b; --titlebar-h: 40px; --navbar-h: 46px; --sidebar-w: 56px;
   /* ===== Plantilla de estructura: forma y movimiento (dev.18) =====
      Radios, duraciones, curvas y elevación en tokens: cambiar el carácter de
      la interfaz (más seca, más suave, más lenta) es tocar SOLO estas líneas,
@@ -39,6 +39,12 @@
   --wash: color-mix(in srgb, var(--realce) 12%, transparent);
   --wash-2: color-mix(in srgb, var(--realce) 20%, transparent);
   --glow: 0 0 0 1px color-mix(in srgb, var(--realce) 32%, transparent), 0 6px 18px color-mix(in srgb, var(--realce) 18%, transparent);
+  /* El degradado de realce: la firma de color (referencia 2026-08-11 del
+     usuario: acento en degradado violeta->rosa, no plano). Estático siempre. */
+  --grad-realce: linear-gradient(135deg, #8b7bff 0%, #b98cff 45%, #e39ad5 100%);
+  /* Squircle de reposo de los iconos: cada botón del sidebar vive en su
+     pastilla de superficie, como los rieles de la referencia */
+  --sb-chip: rgba(255,255,255,.035);
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #121215; --accent-hover: #fff; --text-strong: #fff;
   /* Pestañas del titlebar */
@@ -87,6 +93,8 @@
   --text: #46243a; --text-strong: #331328; --text-dim: #925d79; --muted: #925d79; --dim: #b287a0;
   --violet: #b666d8; --danger: #d42a55; --ok: #1e8e5a;
   --realce: #d84f96; /* en rosa, el realce ES el acento rosa */
+  --grad-realce: linear-gradient(135deg, #ff7ab0 0%, #d84f96 55%, #b666d8 100%);
+  --sb-chip: rgba(150,45,95,.06);
   --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
   --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
@@ -164,6 +172,8 @@
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
+  --grad-realce: linear-gradient(135deg, #6e46c8 0%, #9a6ae0 60%, #c86bd6 100%);
+  --sb-chip: rgba(18,20,26,.05);
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
 :root.light .sb-btn.accent { color: #a05f37; }
@@ -331,14 +341,13 @@ button { font-family: inherit; }
 #sidebar { width: var(--sidebar-w); background: var(--bg); border-right: 1px solid var(--sb-border); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
-.sb-btn { width: 38px; height: 38px; border: none; border-radius: var(--r-m); background: transparent; color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
+.sb-btn { width: 40px; height: 40px; border: none; border-radius: 13px; background: var(--sb-chip); color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
 .sb-btn svg { width: 18px; height: 18px; }
 .sb-btn:hover { background: var(--sb-hover); color: var(--text-strong); }
 .sb-btn:active { transform: scale(.94); }
-/* Estado abierto con identidad: lavado del realce que se apaga hacia la
-   derecha (como el item activo de las referencias), no otra pastilla gris */
-.sb-btn.open { background: linear-gradient(100deg, var(--wash-2), var(--wash) 55%, transparent); color: var(--text-strong); }
-.sb-btn.open::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--realce); }
+/* Estado abierto = squircle relleno con el degradado de realce e icono en
+   blanco, como el riel de la referencia. El squircle ES el indicador. */
+.sb-btn.open { background: var(--grad-realce); color: #fff; }
 .sb-btn.accent { color: #b98266; }
 .sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
@@ -811,7 +820,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
-.hub-fab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); box-shadow: var(--glow); }
+.hub-fab.on { background: var(--grad-realce); color: #fff; border-color: transparent; box-shadow: var(--glow); }
 /* Selector de tema: se abre hacia arriba desde su botón del hub */
 .temas-wrap { position: relative; display: inline-flex; }
 .temas-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 5px; min-width: 168px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 12px 30px var(--shadow-pop); }
