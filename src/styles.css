@@ -41,7 +41,9 @@
   /* Pastillas translúcidas (antes rgba blancas sueltas: invisibles en claro) */
   --chip: rgba(255,255,255,.09); --chip-hover: rgba(255,255,255,.15); --chip-dim: rgba(255,255,255,.05);
   /* Interruptores: bolita y estado encendido */
-  --track-knob: #77787e; --track-on: #d9dadd; --track-knob-on: #121215;
+  /* Interruptores encendidos en el color de realce (violeta aquí): el "on"
+     se ve de un vistazo, como en las referencias */
+  --track-knob: #77787e; --track-on: var(--realce); --track-knob-on: #fff;
   /* Barras de progreso, velos y sombras */
   --bar-from: #9aa0ad; --bar-to: #e6e7ea; --backdrop: rgba(3,3,4,.65);
   --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(232,233,236,.05);
@@ -136,7 +138,7 @@
   --sb-border: #e2e4e8; --sb-fg: #5d5f66; --sb-hover: #e2e4e9; --sb-open: #d8dbe1; --sb-sep: #dcdee3; --sb-div: #c9ccd3;
   --nav-fg: #4a4c53; --nav-hover: #e2e4e9; --bm-fg: #43454c;
   --chip: rgba(20,22,28,.08); --chip-hover: rgba(20,22,28,.14); --chip-dim: rgba(20,22,28,.05);
-  --track-knob: #f9fafb; --track-on: #3a3d45; --track-knob-on: #f6f7f9;
+  --track-knob: #f9fafb; --track-on: var(--realce); --track-knob-on: #f6f7f9;
   --bar-from: #6a6d75; --bar-to: #3a3d45; --backdrop: rgba(35,39,46,.4);
   --shadow-pop: rgba(24,28,36,.22); --shadow-panel: rgba(24,28,36,.16); --focus-ring: rgba(27,28,32,.08);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #eef0f3 60%);
@@ -230,7 +232,9 @@ button { font-family: inherit; }
 /* Pestaña fijada: comprimida a solo el favicon, en el bloque izquierdo de la barra */
 .tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
 .tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--tab-hover-fg); }
-.tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+/* La pestaña activa remata con un filo de realce arriba, como la tradición
+   de los navegadores gamer, pero al 55%: marca sin gritar */
+.tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 0 color-mix(in srgb, var(--realce) 55%, transparent); }
 .tab.active:hover { background: var(--hover); }
 .tab .t-fav { width: 15px; height: 15px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .tab .t-fav img { width: 15px; height: 15px; border-radius: 4px; }
@@ -351,7 +355,7 @@ button { font-family: inherit; }
 #nav-shield.off { color: var(--dim); }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }
 #urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s; }
-#urlbox:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
+#urlbox:focus-within { border-color: color-mix(in srgb, var(--realce) 45%, var(--line)); box-shadow: 0 0 0 3px var(--wash); }
 #url-secure { color: var(--text-dim); }
 #urlbar { flex: 1; border: none; outline: none; background: transparent; color: var(--text); font-size: 13px; }
 #urlbar::placeholder { color: var(--dim); }
@@ -364,7 +368,10 @@ button { font-family: inherit; }
 .sug .sug-main { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sug .sug-main b { color: var(--text-strong); font-weight: 600; }
 .sug .sug-url { color: var(--text-dim); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
-.sug.sel, .sug:hover { background: var(--active); }
+.sug:hover { background: var(--active); }
+/* La sugerencia elegida con teclado lleva el realce, no otro gris: se sabe
+   cuál se va a abrir con Enter sin contar filas */
+.sug.sel { background: linear-gradient(100deg, var(--wash-2), var(--wash)); }
 
 /* Barra de marcadores */
 #bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 10px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-bottom: 1px solid var(--line); }
@@ -671,7 +678,9 @@ button { font-family: inherit; }
 #widget-grid { max-width: 880px; margin: 0 auto; padding: 6vh 26px 96px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; grid-auto-flow: row dense; }
 .widget { grid-column: span var(--span, 6); position: relative; animation: rise-in .5s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.w-card { background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: 18px; padding: 18px; height: 100%; backdrop-filter: blur(10px); }
+/* Tarjeta de widget con profundidad: filo de luz arriba + sombra ambiental
+   suave, como las tarjetas de las referencias; no es botón, no hay hover */
+.w-card { background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: 18px; padding: 18px; height: 100%; backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 32px -14px var(--shadow-panel); }
 
 /* Widget: reloj */
 .w-clock { text-align: center; background: transparent; border: none; padding: 8px 0; backdrop-filter: none; }
