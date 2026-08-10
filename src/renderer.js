@@ -20,7 +20,7 @@ const els = {};
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
-  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-pip', 'sb-settings', 'res-pop', 'res-list',
+  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
@@ -44,12 +44,14 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 // espejo la interfaz arrancaría oscura y daría un fogonazo al cambiar.
 /* Puente con el interruptor de modo claro, que existía antes que los temas y
    lo siguen llamando el arranque, los ajustes y la sincronización de la cuenta.
-   Ojo: "claro apagado" NO significa "oscuro". Si el tema elegido es rosa hay
-   que respetarlo, o al reiniciar se perdería. */
+   Ojo: el tema rosa ES claro desde 2026-08-10 (rosa pastel), así que viaja como
+   lightMode=true — con eso nativeTheme, scrollbars y webviews renderizan en
+   claro. "Claro encendido" respeta el rosa elegido; apagar el modo claro sí
+   lo pasa a oscuro (es lo que pide el interruptor). */
 function applyTheme(light) {
   const t = temaActual();
-  if (light) aplicaTema('claro');
-  else aplicaTema(t === 'claro' ? 'oscuro' : t);
+  if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
+  else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);
 }
 /* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
    tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
@@ -66,7 +68,7 @@ function aplicaTema(tema) {
   raiz.classList.toggle('light', tema === 'claro');
   raiz.classList.toggle('rosa', tema === 'rosa');
   store.set('cobalt.tema', tema);
-  store.set('cobalt.lightMode', tema === 'claro');
+  store.set('cobalt.lightMode', tema !== 'oscuro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get('cobalt.hubBg', null) || BACKGROUNDS[0]);
 }
@@ -363,7 +365,6 @@ function makeTabEl(tab, mini) {
   el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
     : tab.asleep ? `Pestaña dormida — ${tab.title}\n${tab.sleptUrl || tab.url}`
     : (tab.url || 'Hub de Naviris');
-  const zzz = document.createElement('span'); zzz.className = 't-zzz'; zzz.innerHTML = window.icon('moon');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
   close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tab.id); });
@@ -376,7 +377,7 @@ function makeTabEl(tab, mini) {
   // Fijada: comprimida a solo el favicon (título y cierre viven en el tooltip
   // y el menú contextual). El resto, como siempre.
   if (!tab.pinned) {
-    el.append(zzz, title);
+    el.append(title);
     if (tab.agentControlled) { const ag = document.createElement('span'); ag.className = 't-agent'; ag.title = 'Un agente (CDP) está controlando esta pestaña'; el.appendChild(ag); }
     // Botón de silencio: aparece si la pestaña suena o está silenciada
     if (tab.kind === 'web' && (tab.audible || tab.muted)) {
@@ -999,9 +1000,10 @@ renderAccountPill();
     pinta();
     pop.classList.add('hidden'); boton.classList.remove('on');
     // lightMode sigue viviendo en los ajustes: lo leen el interruptor de la
-    // sidebar, el tema del sistema y la sincronización de la cuenta.
-    settings = await window.cobalt.setSettings({ lightMode: b.dataset.tema === 'claro' });
-    if (els.optLight) els.optLight.checked = b.dataset.tema === 'claro';
+    // sidebar, el tema del sistema y la sincronización de la cuenta. El rosa
+    // también es claro, así que solo el oscuro lo apaga.
+    settings = await window.cobalt.setSettings({ lightMode: b.dataset.tema !== 'oscuro' });
+    if (els.optLight) els.optLight.checked = b.dataset.tema !== 'oscuro';
     toast('Tema ' + (b.dataset.tema === 'oscuro' ? 'Naviris' : b.dataset.tema));
   }));
   document.addEventListener('click', (e) => {
@@ -1050,17 +1052,35 @@ const BACKGROUNDS_LIGHT = [
   'radial-gradient(120% 80% at 50% -10%, #e2e8f3 0%, #d3d9e5 62%)',    // Acero
   'linear-gradient(135deg, #f2e3f5 0%, #e4dff0 45%, #e9eaee 100%)'     // Aurora
 ];
+// Y en versión rosa pastel para el tema rosa (2.7.3-dev.16): todos claros y
+// rosados, conservando un matiz propio para que el selector siga ofreciendo
+// variedad. Mismo orden y misma identidad canónica (el valor oscuro).
+const BACKGROUNDS_ROSA = [
+  'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)',                 // Rosa empolvado (predeterminado)
+  'linear-gradient(135deg, #fef6fa 0%, #f2dbe7 100%)',                 // Porcelana
+  'radial-gradient(120% 80% at 50% -10%, #f3e6fb 0%, #ecd9ef 62%)',    // Lila
+  'radial-gradient(120% 80% at 50% -10%, #e6e9fb 0%, #e0d7ec 62%)',    // Celeste
+  'radial-gradient(120% 80% at 50% -10%, #def2ec 0%, #d5e5e2 62%)',    // Menta
+  'radial-gradient(120% 80% at 50% -10%, #fbdde8 0%, #f3cfdd 62%)',    // Fresa
+  'radial-gradient(120% 80% at 50% -10%, #fdeadf 0%, #f4dcd2 62%)',    // Melocotón
+  'radial-gradient(120% 80% at 50% -10%, #e0f2e8 0%, #d6e6dc 62%)',    // Verde pastel
+  'radial-gradient(120% 80% at 50% -10%, #e7ebf5 0%, #dcdfeb 62%)',    // Gris perla
+  'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)'     // Aurora rosa
+];
 // Traduce el fondo canónico (oscuro) al del tema activo. Las imágenes propias
 // del usuario se dejan intactas: son suyas y no se reinterpretan.
 function bgForTheme(v) {
   if (!v || v.startsWith('url(')) return v;
   const i = BACKGROUNDS.indexOf(v);
   if (i < 0) return v;
-  return document.documentElement.classList.contains('light') ? BACKGROUNDS_LIGHT[i] : BACKGROUNDS[i];
+  const raiz = document.documentElement.classList;
+  if (raiz.contains('rosa')) return BACKGROUNDS_ROSA[i];
+  return raiz.contains('light') ? BACKGROUNDS_LIGHT[i] : BACKGROUNDS[i];
 }
 function applyBackground(v) {
   if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
-  const i = BACKGROUNDS_LIGHT.indexOf(v);
+  let i = BACKGROUNDS_LIGHT.indexOf(v);
+  if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set('cobalt.hubBg', v);
@@ -2342,7 +2362,9 @@ window.addEventListener('keydown', (e) => {
    volver a pulsarlo lo devuelve. El segundo argumento de executeJavaScript es
    el gesto de usuario: sin él Chromium rechaza la llamada.
    Funciona en cualquier web con un <video>, incluidas Netflix o Disney+, salvo
-   que la propia web lo desactive con disablePictureInPicture. */
+   que la propia web lo desactive con disablePictureInPicture.
+   El botón visible vive en el addon "Minireproductor" del catálogo (2.7.3-dev.16);
+   en el core quedan la fontanería, el atajo Alt+P y el menú contextual del video. */
 const PIP_JS = `(() => {
   const v = Array.from(document.querySelectorAll('video'))
     .filter((x) => x.readyState !== 0 && !x.disablePictureInPicture)
@@ -2358,16 +2380,14 @@ const PIP_JS = `(() => {
 async function miniReproductor() {
   const tab = activeTab();
   const wv = tab && tab.kind === 'web' && !tab.asleep ? tab.webview : null;
-  if (!wv) { toast('Abre primero una página con vídeo'); return; }
+  if (!wv) { toast('Abre primero una página con video'); return; }
   try {
     const r = await wv.executeJavaScript(PIP_JS, true);
-    if (r === 'sin-video') toast('No hay ningún vídeo en esta página');
+    if (r === 'sin-video') toast('No hay ningún video en esta página');
     else if (String(r).startsWith('error:')) toast('Esta página no deja usar el minireproductor');
-    else if (r === 'ok') toast('Vídeo en el minireproductor');
-    if (r === 'ok' || r === 'salido') els.sbPip.classList.toggle('on', r === 'ok');
+    else if (r === 'ok') toast('Video en el minireproductor');
   } catch { toast('No se pudo abrir el minireproductor'); }
 }
-els.sbPip.addEventListener('click', miniReproductor);
 
 window.cobalt.onShortcut((cmd) => {
   const i = tabs.findIndex((t) => t.id === activeId);
@@ -2441,6 +2461,10 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
+  // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
+  // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
+  // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).
+  if (temaActual() === 'rosa' && !settings.lightMode) settings = await window.cobalt.setSettings({ lightMode: true });
   els.optLight.checked = !!settings.lightMode; applyTheme(settings.lightMode);
   // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
   refreshAgentBadge();

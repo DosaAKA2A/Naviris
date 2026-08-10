@@ -16,7 +16,7 @@
   --accent-fg: #121215; --accent-hover: #fff; --text-strong: #fff;
   /* Pestañas del titlebar */
   --tab-fg: #a9abb2; --tab-hover-bg: #191920; --tab-hover-fg: #e4e5e9;
-  --tab-asleep-fg: #82848b; --tab-zzz: #9ea0a8; --fav-dot: #63656c;
+  --tab-asleep-fg: #82848b; --fav-dot: #63656c;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
   --winctl-fg: #c2c4cb; --winctl-hover: #26262e; --winctl-active: #2e2e37;
   --sb-border: #151517; --sb-fg: #9a9ca4; --sb-hover: #1c1c22; --sb-open: #24242c; --sb-sep: #1d1d21; --sb-div: #2c2c32;
@@ -44,43 +44,56 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* ===== Tema Rosa =====
-   Rosa de verdad, cálido y femenino: superficies malva-rosa (no negro con un
-   toque) y el acento en un rosa chicle vivo (#ff5fa8). Sube bastante el tinte
-   respecto a la primera versión, que quedaba demasiado ciruela/oscura. Sigue
-   siendo oscuro para que el texto se lea, pero todo tira a rosa.
-   Solo redefine los tokens que cambian; el resto los hereda de :root. */
+   Rosa CLARO y pastel (petición 2026-08-10: "cuando digo rosa debe ser rosa
+   claro, nada de oscuro"; las dos versiones oscuras anteriores no valían).
+   Es un tema claro de pleno derecho: superficies blancas y rosa empolvado,
+   texto en palo de rosa profundo para que se lea, y el acento en rosa vivo.
+   Como el resto heredaría del :root oscuro, define TODOS los tokens que
+   define :root.light, en su versión rosada. */
 :root.rosa {
-  --bg: #21121c; --bg-2: #2c1826; --bg-3: #3a2032; --line: #4a2a3d;
-  --line-2: #56304a; --line-3: #6a3c5b; --focus: #b25c88;
-  --hover: #331d2b; --active: #3f2436; --btn: #3f2436; --btn-hover: #4d2c42; --track: #4d2c42;
-  --accent: #ff5fa8; --accent-2: #d98cae; --accent-fg: #3a0a20; --accent-hover: #ffa9d0;
-  --text: #fdeef5; --text-strong: #fff; --text-dim: #d3a6bd; --muted: #d3a6bd; --dim: #a2748c;
-  --violet: #ff7ac0; --danger: #ff6b8a; --ok: #98dcb8;
-  --tab-fg: #d9a8c2; --tab-hover-bg: #351e2d; --tab-hover-fg: #ffeaf3;
-  --tab-asleep-fg: #b5859d; --tab-zzz: #d29ab6; --fav-dot: #9a6580;
-  --winctl-fg: #eec3d8; --winctl-hover: #3c2233; --winctl-active: #4a2a3e;
-  --sb-border: #2a1522; --sb-fg: #cf9bb6; --sb-hover: #341d2c; --sb-open: #442639; --sb-sep: #341c2a; --sb-div: #4d2c42;
-  --nav-fg: #e6bcd1; --bm-fg: #eec6d9; --nav-hover: #3a2130;
-  --chip: rgba(255,120,185,.16); --chip-hover: rgba(255,120,185,.26); --chip-dim: rgba(255,120,185,.08);
-  --track-knob: #b57a97; --track-on: #ff5fa8; --track-knob-on: #3a0a20;
-  --bar-from: #e56ba0; --bar-to: #ffb2d6; --backdrop: rgba(26,8,17,.7);
-  --focus-ring: rgba(255,95,168,.12);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #431f34 0%, #1c0f18 62%);
-  --checker-a: #2a1522; --checker-b: #22111c;
-  --hub-card: rgba(58,32,50,.55); --hub-card-line: rgba(255,150,200,.14);
-  --hub-input: rgba(38,20,32,.82); --hub-input-line: #4a2a3d;
-  --hub-fab: rgba(38,20,32,.84); --hub-fab-line: #56304a;
-  --hub-pill: rgba(38,20,32,.84); --hub-pill-line: rgba(255,150,200,.18); --hub-pill-fg: #f4cadd;
-  --hub-hairline: rgba(255,150,200,.26); --hub-label: #b07f97;
-  --tile-default: linear-gradient(140deg,#4a2a3d,#2a1522); --tile-line: rgba(255,150,200,.14);
-  --tile-mono: #fbe0ec; --dial-add-line: #56304a;
-  --wx-ic: #f2c6da; --addons-plate: rgba(42,20,33,.94);
-  --shadow-pop: rgba(30,4,18,.66); --shadow-panel: rgba(30,4,18,.6);
-  --fav-filter: grayscale(1) brightness(1.5) sepia(.35) hue-rotate(292deg) saturate(2.6);
+  --bg: #fbeef4; --bg-2: #fdf5f9; --bg-3: #ffffff; --line: #f0d4e2;
+  --line-2: #e9c6d8; --line-3: #ddb0c9; --focus: #d287ae;
+  --hover: #f6dfe9; --active: #f0d2e2; --btn: #f5dce8; --btn-hover: #eeccdd; --track: #e6bcd2;
+  --accent: #d84f96; --accent-2: #e991bd; --accent-fg: #ffffff; --accent-hover: #c13d82;
+  --text: #46243a; --text-strong: #331328; --text-dim: #925d79; --muted: #925d79; --dim: #b287a0;
+  --violet: #b666d8; --danger: #d42a55; --ok: #1e8e5a;
+  --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
+  --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
+  --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
+  --sb-border: #f2d8e5; --sb-fg: #8a5674; --sb-hover: #f4d8e5; --sb-open: #ecc9db; --sb-sep: #f0d4e2; --sb-div: #ddb0c9;
+  --nav-fg: #7c4a66; --nav-hover: #f4d8e5; --bm-fg: #6d3c58;
+  --chip: rgba(216,79,150,.10); --chip-hover: rgba(216,79,150,.18); --chip-dim: rgba(216,79,150,.06);
+  --track-knob: #ffffff; --track-on: #d84f96; --track-knob-on: #ffffff;
+  --bar-from: #e879b2; --bar-to: #d84f96; --backdrop: rgba(90,35,66,.35);
+  --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #fbeef4 60%);
+  --checker-a: #f3dae6; --checker-b: #faeff5;
+  --hub-card: rgba(255,255,255,.74); --hub-card-line: rgba(150,45,95,.10);
+  --hub-input: rgba(255,255,255,.88); --hub-input-line: rgba(150,45,95,.14);
+  --hub-fab: rgba(255,255,255,.88); --hub-fab-line: rgba(150,45,95,.14);
+  --hub-pill: rgba(255,255,255,.88); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
+  --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
+  --tile-default: linear-gradient(140deg,#ffffff,#f6dee9); --tile-line: rgba(150,45,95,.10);
+  --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
+  --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
+  --fav-filter: grayscale(1) brightness(.45);
 }
 /* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
    con un halo suave, que le da el toque más femenino sin tocar el resto. */
-:root.rosa .hub-fab.on, :root.rosa .cta, :root.rosa .btn.red { box-shadow: 0 0 0 1px rgba(255,95,168,.35), 0 6px 18px rgba(255,95,168,.22); }
+:root.rosa .hub-fab.on, :root.rosa .cta, :root.rosa .btn.red { box-shadow: 0 0 0 1px rgba(216,79,150,.30), 0 6px 18px rgba(216,79,150,.18); }
+/* Colores que sobre superficies claras necesitan su propio valor (mismo motivo
+   que en :root.light: los tonos pensados para fondo oscuro no contrastan) */
+:root.rosa .sb-btn.accent { color: #a05f37; }
+:root.rosa .sb-btn.accent:hover { color: #8a4c28; background: var(--hover); }
+:root.rosa .ctx-item.danger, :root.rosa .ctx-item.danger .ctx-ic { color: #c9294f; }
+:root.rosa .adp-badge.on { border-color: #bfe3cd; }
+:root.rosa .adp-btn.danger:hover { border-color: #e3a5b0; color: #b3283e; }
+:root.rosa .ls-btn.stop { color: #c25a68; }
+/* Logo de Naviris en rosa: gradiente de rosas con cuerpo (los pasteles del
+   oscuro se perdían sobre blanco, igual que en el modo claro). */
+:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #c93b86; }
+:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #e05a9e; }
+:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f07eb6; }
 
 /* ===== Modo claro =====
    Mismo sistema de tokens con la elevación invertida: en oscuro las superficies
@@ -100,7 +113,7 @@
   --danger: #d02f34; --ok: #1e8e4f;
   --accent-fg: #f6f7f9; --accent-hover: #1b1c20; --text-strong: #23252b;
   --tab-fg: #54565d; --tab-hover-bg: #e2e4e9; --tab-hover-fg: #2e3038;
-  --tab-asleep-fg: #84868e; --tab-zzz: #7b7d85; --fav-dot: #a3a6ad;
+  --tab-asleep-fg: #84868e; --fav-dot: #a3a6ad;
   --winctl-fg: #4a4c53; --winctl-hover: #e0e2e7; --winctl-active: #d4d7dd;
   --sb-border: #e2e4e8; --sb-fg: #5d5f66; --sb-hover: #e2e4e9; --sb-open: #d8dbe1; --sb-sep: #dcdee3; --sb-div: #c9ccd3;
   --nav-fg: #4a4c53; --nav-hover: #e2e4e9; --bm-fg: #43454c;
@@ -145,7 +158,7 @@ button { font-family: inherit; }
 .win-controls [data-ico] svg { width: 13px; height: 13px; }
 #newtab-btn svg { width: 14px; height: 14px; }
 #url-secure svg { width: 12px; height: 12px; }
-.tab .t-close svg, .tab .t-zzz svg { width: 11px; height: 11px; }
+.tab .t-close svg { width: 11px; height: 11px; }
 #hub-search .g-ico svg { width: 16px; height: 16px; }
 .sb-btn svg { width: 17px; height: 17px; }
 .sb-btn[data-brand] svg { width: 16px; height: 16px; }
@@ -205,9 +218,8 @@ button { font-family: inherit; }
 .tab .t-fav img { width: 15px; height: 15px; border-radius: 4px; }
 .tab .t-fav .t-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fav-dot); }
 .tab .t-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tab .t-zzz { color: var(--tab-zzz); display: none; }
-.tab.asleep .t-zzz { display: inline-flex; }
-/* Dormida se lee por la luna y el favicon en gris, no por borrarse: el .5 de
+/* Dormida se lee SOLO por el favicon en gris (sin icono de luna, retirado a
+   petición del usuario) y un título más tenue, no por borrarse: el .5 de
    opacidad de antes dejaba el título en 1.9:1 y no se veía nada. */
 .tab.asleep .t-title { color: var(--tab-asleep-fg); }
 .tab.asleep .t-fav { opacity: .75; filter: grayscale(1); }
@@ -733,10 +745,11 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .theme-switch .ts-ico { position: relative; z-index: 1; display: inline-flex; width: 24px; justify-content: center; transition: color .3s; }
 .theme-switch .ts-ico:first-child { color: var(--text); }
 .theme-switch .ts-ico:nth-child(2) { color: var(--hub-label); }
-:root.light .theme-switch .ts-ico:first-child { color: var(--hub-label); }
-:root.light .theme-switch .ts-ico:nth-child(2) { color: var(--text); }
+:root.light .theme-switch .ts-ico:first-child, :root.rosa .theme-switch .ts-ico:first-child { color: var(--hub-label); }
+:root.light .theme-switch .ts-ico:nth-child(2), :root.rosa .theme-switch .ts-ico:nth-child(2) { color: var(--text); }
 .theme-switch .ts-knob { position: absolute; left: 4px; top: 3px; bottom: 3px; width: 28px; border-radius: 999px; background: var(--chip-hover); border: 1px solid var(--hub-pill-line); transition: transform .35s cubic-bezier(.34, 1.35, .45, 1); }
-:root.light .theme-switch .ts-knob { transform: translateX(30px); }
+/* El rosa también es claro: la bolita se va al sol, como en el modo claro */
+:root.light .theme-switch .ts-knob, :root.rosa .theme-switch .ts-knob { transform: translateX(30px); }
 
 /* Modal de cuenta */
 .acc-error { color: var(--danger); font-size: 12px; }
@@ -758,7 +771,7 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .tema-sw { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--hub-hairline); }
 .sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
 .sw-claro { background: linear-gradient(140deg, #ffffff, #dcdee4); }
-.sw-rosa { background: linear-gradient(140deg, #ff5fa8, #3a2032); }
+.sw-rosa { background: linear-gradient(140deg, #f48fc0, #fdeff5); }
 /* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */

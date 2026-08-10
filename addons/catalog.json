@@ -1,6 +1,15 @@
 {
   "addons": [
     {
+      "id": "minireproductor",
+      "name": "Minireproductor",
+      "version": "1.0.0",
+      "kind": "tool",
+      "icon": "pip",
+      "description": "Saca el video de la pestaña activa a una ventanita flotante que queda por encima de cualquier aplicación, para seguir viendo mientras haces otra cosa; otro clic lo devuelve a la página. Elige solo el video que se ve más grande y funciona en cualquier web con video, incluidas Netflix y Disney+, salvo que la propia página lo bloquee. También responde al atajo Alt+P y a la opción del menú del video. Requiere Naviris 2.5 o superior.",
+      "entry": "https://naviris.site/addons/minireproductor.js"
+    },
+    {
       "id": "sound-booster",
       "name": "Sound Booster",
       "version": "1.0.0",
