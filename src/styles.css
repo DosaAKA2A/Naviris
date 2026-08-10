@@ -21,6 +21,14 @@
   --dur-1: .12s; --dur-2: .16s; --dur-3: .24s;
   --ease: ease; --spring: cubic-bezier(.2,.8,.3,1.15);
   --elev-pop: 0 16px 44px var(--shadow-pop);
+  /* Realce cromático: el color de ESTADO (activo, foco). Un toque de color
+     sobre la base monocroma, como el indigo de las referencias; cada tema
+     pone el suyo (violeta en oscuro/claro, rosa en rosa). Las mezclas salen
+     de color-mix para no repetir rgba a mano. */
+  --realce: var(--violet);
+  --wash: color-mix(in srgb, var(--realce) 12%, transparent);
+  --wash-2: color-mix(in srgb, var(--realce) 20%, transparent);
+  --glow: 0 0 0 1px color-mix(in srgb, var(--realce) 32%, transparent), 0 6px 18px color-mix(in srgb, var(--realce) 18%, transparent);
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #121215; --accent-hover: #fff; --text-strong: #fff;
   /* Pestañas del titlebar */
@@ -66,6 +74,7 @@
   --accent: #d84f96; --accent-2: #e991bd; --accent-fg: #ffffff; --accent-hover: #c13d82;
   --text: #46243a; --text-strong: #331328; --text-dim: #925d79; --muted: #925d79; --dim: #b287a0;
   --violet: #b666d8; --danger: #d42a55; --ok: #1e8e5a;
+  --realce: #d84f96; /* en rosa, el realce ES el acento rosa */
   --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
   --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
@@ -312,8 +321,10 @@ button { font-family: inherit; }
 .sb-btn svg { width: 17px; height: 17px; }
 .sb-btn:hover { background: var(--sb-hover); color: var(--text-strong); }
 .sb-btn:active { transform: scale(.94); }
-.sb-btn.open { background: var(--sb-open); color: var(--text-strong); }
-.sb-btn.open::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--violet, #b98cff); }
+/* Estado abierto con identidad: lavado del realce que se apaga hacia la
+   derecha (como el item activo de las referencias), no otra pastilla gris */
+.sb-btn.open { background: linear-gradient(100deg, var(--wash-2), var(--wash) 55%, transparent); color: var(--text-strong); }
+.sb-btn.open::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--realce); }
 .sb-btn.accent { color: #b98266; }
 .sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
@@ -670,7 +681,7 @@ button { font-family: inherit; }
 /* Widget: búsqueda */
 .w-search { grid-column: span 6; }
 #hub-search { display: flex; align-items: center; gap: 10px; width: min(560px, 100%); margin: 0 auto; padding: 0 18px; height: 46px; border-radius: 999px; background: var(--hub-input); border: 1px solid var(--hub-input-line); backdrop-filter: blur(10px); transition: border-color .15s, box-shadow .15s; }
-#hub-search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 4px rgba(232,233,236,.04); }
+#hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 50%, var(--hub-input-line)); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
 #hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
 #hub-search input::placeholder { color: var(--dim); }
@@ -740,8 +751,9 @@ button { font-family: inherit; }
    de cristal oscuro sobre el fondo del usuario, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--hub-pill-line); background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(8px); }
-button.hub-pill { cursor: pointer; transition: border-color .15s, background .15s, color .15s; font-family: inherit; }
-button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
+button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
+button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
+button.hub-pill:active { transform: translateY(0) scale(.97); }
 .hub-pill [data-ico] svg, .hub-pill svg { width: 15px; height: 15px; }
 .hub-pill.wx { font-variant-numeric: tabular-nums; }
 .hub-pill.wx .wxp-city { color: var(--hub-label); }
@@ -767,9 +779,11 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 /* FAB + paneles del hub */
 .hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
 #hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
-.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(8px); transition: border-color .15s, background .15s; }
+.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(8px); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.hub-fab:hover { transform: translateY(-1px); }
+.hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
-.hub-fab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.hub-fab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); box-shadow: var(--glow); }
 /* Selector de tema: se abre hacia arriba desde su botón del hub */
 .temas-wrap { position: relative; display: inline-flex; }
 .temas-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 5px; min-width: 168px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 12px 30px var(--shadow-pop); }
@@ -786,7 +800,7 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
    su trabajo; solo se le quita el botón. */
 #adt-x-sensitive { display: none !important; }
 .hub-fab svg { width: 15px; height: 15px; }
-.hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 14px; padding: 14px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; max-height: 70vh; overflow-y: auto; }
+.hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 14px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; max-height: 70vh; overflow-y: auto; }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }
 #palette-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pal-item { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .12s, background .12s; }
@@ -869,7 +883,7 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 /* Modales */
 .modal { position: fixed; inset: 0; z-index: 600; background: var(--backdrop); display: flex; align-items: center; justify-content: center; animation: fade-in .15s ease both; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-.modal-card { width: min(400px, 92vw); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px; animation: pop-in var(--dur-3) var(--spring) both; }
+.modal-card { width: min(400px, 92vw); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 20px; display: flex; flex-direction: column; gap: 12px; animation: pop-in var(--dur-3) var(--spring) both; }
 .modal-card h3 { font-size: 16px; font-weight: 600; }
 .modal-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
 .modal-card input { height: 36px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 12px; font-size: 13px; outline: none; transition: border-color .12s; }
@@ -909,7 +923,8 @@ button.hub-pill:hover { border-color: var(--focus); color: var(--text); }
 .adp-sub { color: var(--muted, #8b8d94); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
 .adp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .adp-loading, .adp-error { color: var(--muted, #8b8d94); font-size: 13px; padding: 24px 0; }
-.adp-card { background: var(--bg-3, #17171b); border: 1px solid var(--line, #232327); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.adp-card { background: var(--bg-3, #17171b); border: 1px solid var(--line, #232327); border-radius: var(--r-l); padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.adp-card:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .adp-card .adp-top { display: flex; align-items: center; gap: 10px; }
 .adp-card .adp-ico { width: 34px; height: 34px; border-radius: 9px; background: var(--chip-dim); display: flex; align-items: center; justify-content: center; flex: none; }
 .adp-card .adp-ico svg { width: 18px; height: 18px; }
