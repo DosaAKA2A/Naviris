@@ -11,15 +11,19 @@
 :root {
   /* Tres niveles de superficie DISTINGUIBLES: fondo, superficie y elevado.
      Antes estaban tan cerca que paneles y popups se fundían con la página. */
-  --bg: #0a0a0c; --bg-2: #121217; --bg-3: #1b1b21; --line: #26262d;
+  /* Gama CÁLIDA del oscuro (referencia Quantic 2026-08-11, imitación pedida
+     con precisión): carbón cálido de base, CREMA como acento (los botones
+     píldora crema con texto oscuro de la referencia) y DORADO como color de
+     estado. Nada de grises azulados. */
+  --bg: #121110; --bg-2: #1a1917; --bg-3: #232120; --line: #2a2825;
   /* Bordes por intención: line = hairline, line-2 = superficie elevada,
      line-3 = control interactivo, focus = realce (foco de input / hover de borde). */
-  --line-2: #2c2c33; --line-3: #3a3b41; --focus: #47484f;
+  --line-2: #322f2b; --line-3: #403c36; --focus: #4e4a42;
   /* Superficies de interacción: una sola pastilla de hover, un solo estado
      seleccionado y un solo botón secundario en todo Naviris. */
-  --hover: #1f1f24; --active: #232329; --btn: #232328; --btn-hover: #2b2b31; --track: #2b2b31;
-  --accent: #e8e9ec; --accent-2: #6a6c73; --text: #ececef; --text-dim: #8b8d94;
-  --muted: #8b8d94; --dim: #5c5e64; --violet: #b98cff;
+  --hover: #201e1b; --active: #262421; --btn: #252320; --btn-hover: #2d2b27; --track: #2d2b27;
+  --accent: #f0ede3; --accent-2: #75716a; --text: #edebe4; --text-dim: #97938a;
+  --muted: #97938a; --dim: #635f57; --violet: #b98cff;
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
   --danger: #e5484d; --ok: #7fd39b; --titlebar-h: 40px; --navbar-h: 46px; --sidebar-w: 56px;
   /* ===== Plantilla de estructura: forma y movimiento (dev.18) =====
@@ -35,46 +39,47 @@
      sobre la base monocroma, como el indigo de las referencias; cada tema
      pone el suyo (violeta en oscuro/claro, rosa en rosa). Las mezclas salen
      de color-mix para no repetir rgba a mano. */
-  --realce: var(--violet);
+  --realce: #d9ba6e; /* el dorado del "New" de la referencia */
   --wash: color-mix(in srgb, var(--realce) 12%, transparent);
   --wash-2: color-mix(in srgb, var(--realce) 20%, transparent);
   --glow: 0 0 0 1px color-mix(in srgb, var(--realce) 32%, transparent), 0 6px 18px color-mix(in srgb, var(--realce) 18%, transparent);
-  /* El degradado de realce: la firma de color (referencia 2026-08-11 del
-     usuario: acento en degradado violeta->rosa, no plano). Estático siempre. */
-  --grad-realce: linear-gradient(135deg, #8b7bff 0%, #b98cff 45%, #e39ad5 100%);
+  /* El "degradado" de realce en oscuro es la píldora CREMA de la referencia
+     (crema hacia dorado suave) con contenido oscuro encima: --grad-fg.
+     Estático siempre. */
+  --grad-realce: linear-gradient(135deg, #f6f2e6 0%, #ead9ac 100%);
+  --grad-fg: #1b1913;
   /* Squircle de reposo de los iconos: cada botón del sidebar vive en su
      pastilla de superficie, como los rieles de la referencia */
-  --sb-chip: rgba(255,255,255,.035);
+  --sb-chip: rgba(240,237,227,.045);
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
-  --accent-fg: #121215; --accent-hover: #fff; --text-strong: #fff;
+  --accent-fg: #17150f; --accent-hover: #fff; --text-strong: #fbf9f4;
   /* Pestañas del titlebar */
-  --tab-fg: #a9abb2; --tab-hover-bg: #191920; --tab-hover-fg: #e4e5e9;
-  --tab-asleep-fg: #82848b; --fav-dot: #63656c;
+  --tab-fg: #a8a49b; --tab-hover-bg: #191815; --tab-hover-fg: #e7e4dc;
+  --tab-asleep-fg: #817d74; --fav-dot: #635f57;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
-  --winctl-fg: #c2c4cb; --winctl-hover: #26262e; --winctl-active: #2e2e37;
-  --sb-border: #151517; --sb-fg: #9a9ca4; --sb-hover: #1c1c22; --sb-open: #24242c; --sb-sep: #1d1d21; --sb-div: #2c2c32;
-  --nav-fg: #b9bbc4; --nav-hover: #202027; --bm-fg: #c4c6cd;
+  --winctl-fg: #c4c1b8; --winctl-hover: #262420; --winctl-active: #2e2c27;
+  --sb-border: #151412; --sb-fg: #9b978d; --sb-hover: #1c1b18; --sb-open: #242220; --sb-sep: #1d1c19; --sb-div: #2c2a26;
+  --nav-fg: #bab6ac; --nav-hover: #201f1b; --bm-fg: #c5c2b8;
   /* Pastillas translúcidas (antes rgba blancas sueltas: invisibles en claro) */
-  --chip: rgba(255,255,255,.09); --chip-hover: rgba(255,255,255,.15); --chip-dim: rgba(255,255,255,.05);
-  /* Interruptores: bolita y estado encendido */
-  /* Interruptores encendidos en el color de realce (violeta aquí): el "on"
-     se ve de un vistazo, como en las referencias */
-  --track-knob: #77787e; --track-on: var(--realce); --track-knob-on: #fff;
+  --chip: rgba(240,237,227,.09); --chip-hover: rgba(240,237,227,.15); --chip-dim: rgba(240,237,227,.05);
+  /* Interruptores: encendidos en dorado con bolita oscura (el "on" crema/oro
+     de la referencia) */
+  --track-knob: #7a766d; --track-on: var(--realce); --track-knob-on: #1b1913;
   /* Barras de progreso, velos y sombras */
-  --bar-from: #9aa0ad; --bar-to: #e6e7ea; --backdrop: rgba(3,3,4,.65);
-  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(232,233,236,.05);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #141418 0%, #0a0a0d 60%);
-  --checker-a: #101013; --checker-b: #0b0b0d;
+  --bar-from: #a39f93; --bar-to: #e9e6da; --backdrop: rgba(6,5,3,.65);
+  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(240,237,227,.05);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #191713 0%, #0f0e0c 60%);
+  --checker-a: #12110e; --checker-b: #0c0b09;
   /* Superficies del hub: van SOBRE el fondo elegido por el usuario, así que son
      cristales translúcidos y necesitan su propio juego de tokens. */
-  --hub-card: rgba(20,20,24,.55); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: rgba(14,14,17,.8); --hub-input-line: #26262b;
-  --hub-fab: rgba(14,14,17,.82); --hub-fab-line: #2c2c32;
-  --hub-pill: rgba(14,14,17,.82); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d8dd;
-  --hub-hairline: rgba(255,255,255,.16); --hub-label: #6a6c73;
-  --tile-default: linear-gradient(140deg,#202024,#131316); --tile-line: rgba(255,255,255,.07);
-  --tile-letter: #fff; --tile-mono: #e4e6ea; --dial-add-line: #2c2c32;
-  --clock-shadow: rgba(0,0,0,.55); --wx-ic: #cfd2da; --addons-plate: rgba(16,14,22,.93);
+  --hub-card: rgba(24,22,19,.55); --hub-card-line: rgba(240,237,227,.06);
+  --hub-input: rgba(17,16,13,.8); --hub-input-line: #262420;
+  --hub-fab: rgba(17,16,13,.82); --hub-fab-line: #2c2a26;
+  --hub-pill: rgba(17,16,13,.82); --hub-pill-line: rgba(240,237,227,.09); --hub-pill-fg: #d8d5cb;
+  --hub-hairline: rgba(240,237,227,.16); --hub-label: #75716a;
+  --tile-default: linear-gradient(140deg,#24221d,#14130f); --tile-line: rgba(240,237,227,.07);
+  --tile-letter: #fbf9f4; --tile-mono: #e7e4da; --dial-add-line: #2c2a26;
+  --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d2cfc5; --addons-plate: rgba(20,18,14,.93);
   --fav-filter: grayscale(1) brightness(1.5);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -86,14 +91,17 @@
    Como el resto heredaría del :root oscuro, define TODOS los tokens que
    define :root.light, en su versión rosada. */
 :root.rosa {
-  --bg: #fbeef4; --bg-2: #fdf5f9; --bg-3: #ffffff; --line: #f0d4e2;
+  --bg: #f6f0fa; --bg-2: #faf6fd; --bg-3: #ffffff; --line: #ecdcf0;
   --line-2: #e9c6d8; --line-3: #ddb0c9; --focus: #d287ae;
   --hover: #f6dfe9; --active: #f0d2e2; --btn: #f5dce8; --btn-hover: #eeccdd; --track: #e6bcd2;
   --accent: #d84f96; --accent-2: #e991bd; --accent-fg: #ffffff; --accent-hover: #c13d82;
   --text: #46243a; --text-strong: #331328; --text-dim: #925d79; --muted: #925d79; --dim: #b287a0;
   --violet: #b666d8; --danger: #d42a55; --ok: #1e8e5a;
   --realce: #d84f96; /* en rosa, el realce ES el acento rosa */
-  --grad-realce: linear-gradient(135deg, #ff7ab0 0%, #d84f96 55%, #b666d8 100%);
+  /* El degradado EXACTO del panel luminoso de la referencia Quantic:
+     lavanda -> rosa -> coral, con contenido ciruela oscuro encima */
+  --grad-realce: linear-gradient(135deg, #b9a8f0 0%, #f2a0cd 55%, #f9917c 100%);
+  --grad-fg: #47203c;
   --sb-chip: rgba(150,45,95,.06);
   --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
@@ -104,7 +112,7 @@
   --track-knob: #ffffff; --track-on: #d84f96; --track-knob-on: #ffffff;
   --bar-from: #e879b2; --bar-to: #d84f96; --backdrop: rgba(90,35,66,.35);
   --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #fbeef4 60%);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f4ecfa 60%);
   --checker-a: #f3dae6; --checker-b: #faeff5;
   --hub-card: rgba(255,255,255,.74); --hub-card-line: rgba(150,45,95,.10);
   --hub-input: rgba(255,255,255,.88); --hub-input-line: rgba(150,45,95,.14);
@@ -173,6 +181,7 @@
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
   --grad-realce: linear-gradient(135deg, #6e46c8 0%, #9a6ae0 60%, #c86bd6 100%);
+  --grad-fg: #ffffff;
   --sb-chip: rgba(18,20,26,.05);
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
@@ -347,7 +356,7 @@ button { font-family: inherit; }
 .sb-btn:active { transform: scale(.94); }
 /* Estado abierto = squircle relleno con el degradado de realce e icono en
    blanco, como el riel de la referencia. El squircle ES el indicador. */
-.sb-btn.open { background: var(--grad-realce); color: #fff; }
+.sb-btn.open { background: var(--grad-realce); color: var(--grad-fg); }
 .sb-btn.accent { color: #b98266; }
 .sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
@@ -820,7 +829,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
-.hub-fab.on { background: var(--grad-realce); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+.hub-fab.on { background: var(--grad-realce); color: var(--grad-fg); border-color: transparent; box-shadow: var(--glow); }
 /* Selector de tema: se abre hacia arriba desde su botón del hub */
 .temas-wrap { position: relative; display: inline-flex; }
 .temas-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 5px; min-width: 168px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 12px 30px var(--shadow-pop); }

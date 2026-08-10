@@ -1026,7 +1026,9 @@ els.hubCustomize.addEventListener('click', () => { const show = els.customizePan
 
 // Fondos oscuros pero con tinte de color distinguible (gris oscuro por defecto)
 const BACKGROUNDS = [
-  'linear-gradient(160deg, #26262d 0%, #191920 100%)',                 // Gris oscuro (predeterminado)
+  // Predeterminado a juego con la gama cálida (referencia Quantic): carbón
+  // cálido con un brillo tenue arriba a la derecha
+  'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)',
   'linear-gradient(135deg, #2f2f38 0%, #16161b 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #0c0a16 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #132a4a 0%, #080d18 62%)',    // Azul
@@ -1056,7 +1058,8 @@ const BACKGROUNDS_LIGHT = [
 // rosados, conservando un matiz propio para que el selector siga ofreciendo
 // variedad. Mismo orden y misma identidad canónica (el valor oscuro).
 const BACKGROUNDS_ROSA = [
-  'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)',                 // Rosa empolvado (predeterminado)
+  // Predeterminado: la malla luminosa lavanda->rosa->coral de la referencia
+  'radial-gradient(55% 45% at 22% 22%, #cdbcf7 0%, rgba(205,188,247,0) 62%), radial-gradient(50% 42% at 78% 26%, #f7a8ce 0%, rgba(247,168,206,0) 62%), radial-gradient(58% 52% at 55% 82%, #f9ab90 0%, rgba(249,171,144,0) 65%), linear-gradient(160deg, #efe8fb 0%, #f8e3ee 100%)',
   'linear-gradient(135deg, #fef6fa 0%, #f2dbe7 100%)',                 // Porcelana
   'radial-gradient(120% 80% at 50% -10%, #f3e6fb 0%, #ecd9ef 62%)',    // Lila
   'radial-gradient(120% 80% at 50% -10%, #e6e9fb 0%, #e0d7ec 62%)',    // Celeste
@@ -1079,6 +1082,9 @@ function bgForTheme(v) {
 }
 function applyBackground(v) {
   if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
+  // Identidades viejas del fondo predeterminado (antes de la gama cálida):
+  // quien lo tenía elegido pasa al predeterminado nuevo, no a "fondo custom"
+  if (v === 'linear-gradient(160deg, #26262d 0%, #191920 100%)' || v === 'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
