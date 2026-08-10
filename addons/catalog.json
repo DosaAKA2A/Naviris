@@ -3,10 +3,10 @@
     {
       "id": "minireproductor",
       "name": "Minireproductor",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "tool",
       "icon": "pip",
-      "description": "Saca el video de la pestaña activa a una ventanita flotante que queda por encima de cualquier aplicación, para seguir viendo mientras haces otra cosa; otro clic lo devuelve a la página. Elige solo el video que se ve más grande y funciona en cualquier web con video, incluidas Netflix y Disney+, salvo que la propia página lo bloquee. También responde al atajo Alt+P y a la opción del menú del video. Requiere Naviris 2.5 o superior.",
+      "description": "Saca el video de la pestaña activa a una ventanita flotante que queda por encima de cualquier aplicación, para seguir viendo mientras haces otra cosa. Con el video flotando, el botón del sidebar abre un panel con deslizador de volumen que manda sobre la ventanita aunque cambies de pestaña, y el botón de devolver el video a la página. Elige solo el video que se ve más grande y funciona en cualquier web con video, incluidas Netflix y Disney+, salvo que la propia página lo bloquee. También responde al atajo Alt+P y a la opción del menú del video. Requiere Naviris 2.5 o superior.",
       "entry": "https://naviris.site/addons/minireproductor.js"
     },
     {
