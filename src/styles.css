@@ -11,10 +11,10 @@
 :root {
   /* Tres niveles de superficie DISTINGUIBLES: fondo, superficie y elevado.
      Antes estaban tan cerca que paneles y popups se fundían con la página. */
-  /* Carbón NEUTRO (2026-08-11 v2: la gama cálida crema/dorado se veía
-     AMARILLENTA y Dosa la rechazó — ni tintes cálidos ni azulados, gris puro)
-     con el realce en la familia violeta. */
-  --bg: #111111; --bg-2: #191919; --bg-3: #222222; --line: #292929;
+  /* CARBÓN + LIMA ÁCIDO (referencia Fitme, 2026-08-11): el oscuro deja el
+     morado y pasa a carbón profundo con acento lima; el lavanda queda como
+     color secundario (--violet), igual que en la referencia. */
+  --bg: #0d0d0d; --bg-2: #151515; --bg-3: #1e1e1e; --line: #262626;
   /* Bordes por intención: line = hairline, line-2 = superficie elevada,
      line-3 = control interactivo, focus = realce (foco de input / hover de borde). */
   --line-2: #313131; --line-3: #3e3e3e; --focus: #4c4c4c;
@@ -22,7 +22,8 @@
      seleccionado y un solo botón secundario en todo Naviris. */
   --hover: #1f1f1f; --active: #252525; --btn: #242424; --btn-hover: #2c2c2c; --track: #2c2c2c;
   --accent: #f0f0f0; --accent-2: #737373; --text: #ececec; --text-dim: #949494;
-  --muted: #949494; --dim: #616161; --violet: #b98cff;
+  --muted: #949494; --dim: #616161; --violet: #c9b6f7; /* lavanda secundario de la referencia */
+  --lima: #dcfb4f; /* acid lime: el acento del tema oscuro */
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
   /* Riel estrecho: la cápsula ciñe el círculo de 34 px (2026-08-11, "demasiado
      ancho"); el margen lateral aporta el aire, no el ancho del riel */
@@ -40,36 +41,37 @@
      sobre la base monocroma, como el indigo de las referencias; cada tema
      pone el suyo (violeta en oscuro/claro, rosa en rosa). Las mezclas salen
      de color-mix para no repetir rgba a mano. */
-  --realce: var(--violet);
+  --realce: var(--lima);
   --wash: color-mix(in srgb, var(--realce) 12%, transparent);
   --wash-2: color-mix(in srgb, var(--realce) 20%, transparent);
   --glow: 0 0 0 1px color-mix(in srgb, var(--realce) 32%, transparent), 0 6px 18px color-mix(in srgb, var(--realce) 18%, transparent);
-  /* El degradado de realce: violeta -> orquídea -> rosa (la versión que
-     gustó; la crema/dorada se veía amarillenta). Estático siempre. */
-  --grad-realce: linear-gradient(135deg, #8b7bff 0%, #b98cff 45%, #e39ad5 100%);
-  --grad-fg: #ffffff;
+  /* Degradado de realce en LIMA; sobre lima el contenido va oscuro (como los
+     botones de la referencia). Estático siempre. */
+  --grad-realce: linear-gradient(135deg, #eaff77 0%, #dcfb4f 55%, #c2ea22 100%);
+  --grad-fg: #10130a;
   /* Círculo de reposo de los iconos: cada botón del sidebar vive en su
      pastilla de superficie, como los rieles de la referencia */
   --sb-chip: rgba(255,255,255,.04);
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #141414; --accent-hover: #fff; --text-strong: #ffffff;
   /* Pestañas del titlebar */
-  --tab-fg: #a6a6a6; --tab-hover-bg: #181818; --tab-hover-fg: #e6e6e6;
+  --tab-fg: #a6a6a6; --tab-hover-bg: #1c1c1c; --tab-hover-fg: #e6e6e6;
   --tab-asleep-fg: #7f7f7f; --fav-dot: #616161;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
   --winctl-fg: #c2c2c2; --winctl-hover: #242424; --winctl-active: #2c2c2c;
-  --sb-border: #141414; --sb-fg: #999999; --sb-hover: #242424; --sb-open: #232323; --sb-sep: #1c1c1c; --sb-div: #2a2a2a;
-  --sb-capsule: #191919;
+  --sb-border: #121212; --sb-fg: #999999; --sb-hover: #222222; --sb-open: #212121; --sb-sep: #1a1a1a; --sb-div: #272727;
+  --sb-capsule: #151515;
   --nav-fg: #b8b8b8; --nav-hover: #1f1f1f; --bm-fg: #c3c3c3;
   /* Pastillas translúcidas (antes rgba blancas sueltas: invisibles en claro) */
   --chip: rgba(255,255,255,.09); --chip-hover: rgba(255,255,255,.15); --chip-dim: rgba(255,255,255,.05);
-  /* Interruptores: encendidos en el realce violeta */
-  --track-knob: #787878; --track-on: var(--realce); --track-knob-on: #fff;
-  /* Barras de progreso, velos y sombras */
-  --bar-from: #a0a0a0; --bar-to: #e8e8e8; --backdrop: rgba(4,4,4,.65);
-  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(255,255,255,.05);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #171717 0%, #0e0e0e 60%);
-  --checker-a: #111111; --checker-b: #0c0c0c;
+  /* Interruptores: encendidos en LIMA con la bolita oscura (como los chips
+     de la referencia: sobre lima, el contenido es oscuro) */
+  --track-knob: #787878; --track-on: var(--realce); --track-knob-on: #10130a;
+  /* Barras de progreso en lima, velos y sombras */
+  --bar-from: #9fc32a; --bar-to: var(--lima); --backdrop: rgba(4,4,4,.65);
+  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(220,251,79,.10);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #151515 0%, #0b0b0b 60%);
+  --checker-a: #101010; --checker-b: #0b0b0b;
   /* Superficies del hub: van SOBRE el fondo elegido por el usuario, así que son
      cristales translúcidos y necesitan su propio juego de tokens. */
   --hub-card: rgba(24,24,24,.44); --hub-card-line: rgba(255,255,255,.06);
@@ -269,8 +271,8 @@ button { font-family: inherit; }
 .tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
 .tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--tab-hover-fg); }
 /* La pestaña activa remata con un filo de realce arriba, como la tradición
-   de los navegadores gamer, pero al 55%: marca sin gritar */
-.tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 0 color-mix(in srgb, var(--realce) 55%, transparent); }
+   de los navegadores gamer, pero al 70%: marca sin gritar */
+.tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 0 color-mix(in srgb, var(--realce) 70%, transparent); }
 .tab.active:hover { background: var(--hover); }
 .tab .t-fav { width: 15px; height: 15px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .tab .t-fav img { width: 15px; height: 15px; border-radius: 4px; }
@@ -396,7 +398,8 @@ button { font-family: inherit; }
 #navbar > button:active:not(:disabled) { transform: scale(.93); }
 #navbar > button:hover:not(:disabled) { background: var(--nav-hover); color: var(--text-strong); }
 #navbar > button:disabled { opacity: .28; cursor: default; }
-#nav-star.starred { color: var(--accent); }
+/* Marcador guardado en el color de realce del tema (lima en oscuro) */
+#nav-star.starred { color: var(--realce); }
 /* Con el marcador guardado, el hover ofrece quitarlo: cinta con menos en rojo */
 #nav-star.removing { color: var(--danger); }
 #nav-shield.off { color: var(--dim); }
