@@ -1026,9 +1026,9 @@ els.hubCustomize.addEventListener('click', () => { const show = els.customizePan
 
 // Fondos oscuros pero con tinte de color distinguible (gris oscuro por defecto)
 const BACKGROUNDS = [
-  // Predeterminado a juego con la gama cálida (referencia Quantic): carbón
-  // cálido con un brillo tenue arriba a la derecha
-  'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)',
+  // Predeterminado: carbón NEUTRO con brillo tenue (la variante cálida se
+  // veía amarillenta y se retiró)
+  'radial-gradient(110% 85% at 70% 8%, #232323 0%, #141414 52%, #0d0d0d 100%)',
   'linear-gradient(135deg, #2f2f38 0%, #16161b 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #0c0a16 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #132a4a 0%, #080d18 62%)',    // Azul
@@ -1084,7 +1084,8 @@ function applyBackground(v) {
   if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
   // Identidades viejas del fondo predeterminado (antes de la gama cálida):
   // quien lo tenía elegido pasa al predeterminado nuevo, no a "fondo custom"
-  if (v === 'linear-gradient(160deg, #26262d 0%, #191920 100%)' || v === 'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)') v = BACKGROUNDS[0];
+  if (v === 'linear-gradient(160deg, #26262d 0%, #191920 100%)' || v === 'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)'
+    || v === 'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
