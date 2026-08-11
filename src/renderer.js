@@ -14,7 +14,7 @@ const store = {
 
 const els = {};
 [
-  'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'nav-home', 'urlbar',
+  'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
@@ -1816,7 +1816,8 @@ stp.config.addEventListener('click', () => { cerrarSitePop(); showPermManager();
 els.navBack.addEventListener('click', () => activeTab()?.webview?.goBack());
 els.navFwd.addEventListener('click', () => activeTab()?.webview?.goForward());
 els.navReload.addEventListener('click', () => { const wv = activeTab()?.webview; if (!wv) return; wv.isLoading() ? wv.stop() : wv.reload(); });
-els.navHome.addEventListener('click', () => createTab());
+// El botón de inicio de la navbar se retiró (2026-08-11): estaba duplicado
+// con el del sidebar (#sb-home), que es el que manda.
 els.newtabBtn.addEventListener('click', () => createTab());
 
 /* ============ Menú ============ */

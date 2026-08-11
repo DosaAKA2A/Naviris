@@ -258,7 +258,7 @@ button { font-family: inherit; }
 /* Titlebar */
 /* Titlebar píldora flotante (las pestañas viven dentro) */
 #titlebar { height: var(--titlebar-h); display: flex; align-items: center; background: var(--bg-2); padding-left: 14px; flex-shrink: 0; margin: 8px 10px 4px; border-radius: 16px; overflow: hidden; }
-.tb-logo { display: flex; align-items: center; margin-right: 12px; -webkit-app-region: drag; }
+.tb-logo { display: flex; align-items: center; justify-content: center; width: calc(var(--sidebar-w) + 12px); margin: 0 0 0 -14px; flex: none; -webkit-app-region: drag; }
 /* El hueco de arrastre va DESPUÉS del botón + y se come todo lo que sobre, así
    el + queda siempre pegado a la última pestaña. Cede su espacio a las pestañas
    cuando la barra se llena (por eso shrink alto y un mínimo pequeño). */
@@ -378,7 +378,7 @@ button { font-family: inherit; }
 /* Sidebar */
 /* Sidebar CÁPSULA FLOTANTE (referencia bee_ui 2026-08-11: el riel despegado
    de los bordes, no una barra de navegador corriente) */
-#sidebar { width: var(--sidebar-w); margin: 2px 4px 10px 8px; border-radius: 22px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 0; flex-shrink: 0; }
+#sidebar { width: var(--sidebar-w); margin: 8px 4px 10px 8px; border-radius: 22px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
 /* Botones del riel en CÍRCULO (petición 2026-08-11: "lo más redondos posible") */
