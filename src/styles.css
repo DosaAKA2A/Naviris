@@ -180,7 +180,10 @@
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
-  --grad-realce: linear-gradient(135deg, #6e46c8 0%, #9a6ae0 60%, #c86bd6 100%);
+  /* Regla de color del usuario (2026-08-11): en claro el realce es ROJO,
+     siempre con degradado (el morado queda para el oscuro) */
+  --realce: #e0384a;
+  --grad-realce: linear-gradient(135deg, #ff7062 0%, #e5384a 55%, #b3234f 100%);
   --grad-fg: #ffffff;
   --sb-chip: rgba(18,20,26,.05);
 }
@@ -355,6 +358,14 @@ button { font-family: inherit; }
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
 /* Botones del riel en CÍRCULO (petición 2026-08-11: "lo más redondos posible") */
 .sb-btn { width: 40px; height: 40px; border: none; border-radius: 50%; background: var(--sb-chip); color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
+/* El anillo de foco del navegador se teñía del color del icono (el naranja
+   del Rat Tool = "borde rojizo"): con ratón no hay anillo, con teclado va
+   en el realce del tema */
+.sb-btn:focus { outline: none; }
+.sb-btn:focus-visible { outline: 2px solid var(--realce); outline-offset: 2px; }
+/* El icono del botón abierto SIEMPRE en el color del degradado, gane a
+   cualquier tinte propio (el naranja del Rat Tool se colaba encima) */
+#sidebar .sb-btn.open { color: var(--grad-fg); }
 .sb-btn svg { width: 18px; height: 18px; }
 .sb-btn:hover { background: var(--sb-hover); color: var(--text-strong); }
 .sb-btn:active { transform: scale(.94); }
@@ -472,6 +483,7 @@ button { font-family: inherit; }
 .sp-item button:hover { color: var(--danger); background: rgba(229,72,77,.12); }
 .sp-item button svg { width: 12px; height: 12px; }
 
+/* res-pop y rat-pop se anclan por JS junto a su botón (anclarPop) */
 #res-pop { left: calc(var(--sidebar-w) + 8px); bottom: 52px; width: 258px; padding: 12px; }
 .rp-title { font-size: 13.5px; font-weight: 600; }
 .rp-sub { font-size: 11.5px; color: var(--text-dim); margin: 3px 0 10px; line-height: 1.5; }

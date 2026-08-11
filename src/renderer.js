@@ -226,6 +226,9 @@ function attachWebview(tab, url) {
   const wv = document.createElement('webview');
   wv.setAttribute('allowpopups', ''); wv.setAttribute('partition', PARTITION); wv.src = url;
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
+  // Clic dentro de la página = cerrar los popovers de herramientas (esos
+  // clics no burbujean hasta el document; el foco del webview sí avisa)
+  wv.addEventListener('focus', () => { try { cerrarPopsHerramientas(); } catch { /* aún no cargó */ } });
   const onNav = (e) => {
     // Dormir una pestaña la manda a about:blank: NO pisar url/título/favicon,
     // al pasar el ratón debe seguir viéndose qué contenido tenía.
@@ -1633,10 +1636,30 @@ els.lootClose.addEventListener('click', () => toggleLootPanel(false));
 els.lootTabSes.addEventListener('click', () => { lootView = 'ses'; renderLootPanel(); });
 els.lootTabHist.addEventListener('click', () => { lootView = 'hist'; renderLootPanel(); });
 
+/* Ancla un popover de herramienta JUNTO a su botón del sidebar. Antes iban
+   clavados abajo por CSS (de cuando sus botones vivían abajo) y se abrían
+   lejos del botón — queja del usuario 2026-08-11. */
+function anclarPop(pop, btn) {
+  const r = btn.getBoundingClientRect();
+  pop.style.left = Math.round(r.right + 14) + 'px';
+  pop.style.bottom = 'auto';
+  pop.style.top = '0px'; // visible y medible antes de colocarlo
+  const h = pop.offsetHeight;
+  pop.style.top = Math.max(8, Math.min(Math.round(r.top), window.innerHeight - h - 12)) + 'px';
+}
+/* Cierra los popovers de herramientas: lo llama el clic fuera (UI) y el foco
+   de cualquier webview (los clics DENTRO de la página no burbujean hasta
+   aquí, así que sin esto los popovers se quedaban abiertos). */
+function cerrarPopsHerramientas() {
+  if (els.ratPop && !els.ratPop.classList.contains('hidden')) { els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); }
+  if (els.resPop && !els.resPop.classList.contains('hidden')) { els.resPop.classList.add('hidden'); els.sbRes.classList.toggle('open', !!resMode); }
+  if (els.lootPop && !els.lootPop.classList.contains('hidden')) toggleLootPanel(false);
+}
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
   const open = els.ratPop.classList.contains('hidden'); els.ratPop.classList.toggle('hidden'); els.sbRat.classList.toggle('open', open);
   if (!open) return;
+  anclarPop(els.ratPop, els.sbRat);
   const tab = activeTab();
   els.ratHeadsub.textContent = 'Descargar vídeo o audio';
   let url = tab?.kind === 'web' ? tab.url : '';
@@ -1737,7 +1760,7 @@ function renderResList() {
   els.resList.innerHTML = '';
   for (const r of RESOLUTIONS) { const btn = document.createElement('button'); const sel = resMode ? resMode.w === r.w && resMode.h === r.h : r.w === 0; btn.className = 'rp-item' + (sel ? ' sel' : ''); btn.innerHTML = `<span>${r.label} <span class="rp-note">${r.note}</span></span><span class="rp-dim">${r.w ? r.w + '×' + r.h : '—'}</span>`; btn.addEventListener('click', () => { resMode = r.w ? r : null; applyResponsive(); renderResList(); }); els.resList.appendChild(btn); }
 }
-els.sbRes.addEventListener('click', (e) => { e.stopPropagation(); const open = els.resPop.classList.contains('hidden'); els.resPop.classList.toggle('hidden'); els.sbRes.classList.toggle('open', open); if (open) renderResList(); });
+els.sbRes.addEventListener('click', (e) => { e.stopPropagation(); const open = els.resPop.classList.contains('hidden'); els.resPop.classList.toggle('hidden'); els.sbRes.classList.toggle('open', open); if (open) { anclarPop(els.resPop, els.sbRes); renderResList(); } });
 window.addEventListener('resize', () => applyResponsive());
 
 /* ============ Sidebar home + ajustes ============ */
