@@ -14,7 +14,7 @@
   /* CARBÓN + LIMA ÁCIDO (referencia Fitme, 2026-08-11): el oscuro deja el
      morado y pasa a carbón profundo con acento lima; el lavanda queda como
      color secundario (--violet), igual que en la referencia. */
-  --bg: #0d0d0d; --bg-2: #151515; --bg-3: #1e1e1e; --line: #262626;
+  --bg: #050607; --bg-2: #0e1010; --bg-3: #171a18; --line: #212422;
   /* Bordes por intención: line = hairline, line-2 = superficie elevada,
      line-3 = control interactivo, focus = realce (foco de input / hover de borde). */
   --line-2: #313131; --line-3: #3e3e3e; --focus: #4c4c4c;
@@ -23,9 +23,9 @@
   --hover: #1f1f1f; --active: #252525; --btn: #242424; --btn-hover: #2c2c2c; --track: #2c2c2c;
   /* El acento (botones primarios, chips activos) es LIMA con contenido oscuro,
      como los CTA de las referencias (Stake / Continue / Income) */
-  --accent: #dcfb4f; --accent-2: #737373; --text: #ececec; --text-dim: #949494;
+  --accent: #b8e351; --accent-2: #737373; --text: #ececec; --text-dim: #949494;
   --muted: #949494; --dim: #616161; --violet: #c9b6f7; /* lavanda secundario de la referencia */
-  --lima: #dcfb4f; /* acid lime: el acento del tema oscuro */
+  --lima: #b8e351; /* acid lime: el acento del tema oscuro */
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
   /* Riel estrecho: la cápsula ciñe el círculo de 34 px (2026-08-11, "demasiado
      ancho"); el margen lateral aporta el aire, no el ancho del riel */
@@ -49,7 +49,7 @@
   --glow: 0 0 0 1px color-mix(in srgb, var(--realce) 32%, transparent), 0 6px 18px color-mix(in srgb, var(--realce) 18%, transparent);
   /* Degradado de realce en LIMA; sobre lima el contenido va oscuro (como los
      botones de la referencia). Estático siempre. */
-  --grad-realce: linear-gradient(135deg, #eaff77 0%, #dcfb4f 55%, #c2ea22 100%);
+  --grad-realce: linear-gradient(135deg, #d4f27e 0%, #b8e351 55%, #7fb52c 100%);
   --grad-fg: #10130a;
   /* Círculo de reposo de los iconos: cada botón del sidebar vive en su
      pastilla de superficie, como los rieles de la referencia */
@@ -76,12 +76,21 @@
   --checker-a: #101010; --checker-b: #0b0b0b;
   /* Superficies del hub: van SOBRE el fondo elegido por el usuario, así que son
      cristales translúcidos y necesitan su propio juego de tokens. */
-  --hub-card: rgba(24,24,24,.44); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: rgba(18,18,18,.48); --hub-input-line: #252525;
-  --hub-fab: rgba(18,18,18,.52); --hub-fab-line: #2b2b2b;
-  --hub-pill: rgba(18,18,18,.52); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
+  /* Superficie con degradado propio: el vidrio no es plano, se aclara arriba
+     a la izquierda (donde le da la luz) — referencia Cryptify */
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.34)); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.09), rgba(10,12,10,.38)); --hub-input-line: #252525;
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.42)); --hub-fab-line: #2b2b2b;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.42)); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #737373;
-  --tile-default: linear-gradient(140deg,rgba(44,44,44,.46),rgba(20,20,20,.5)); --tile-line: rgba(255,255,255,.07);
+  --tile-default: linear-gradient(150deg, rgba(255,255,255,.12), rgba(10,12,10,.38)); --tile-line: rgba(255,255,255,.07);
+  /* ===== Canto y volumen del VIDRIO (referencia Cryptify) =====
+     rim   = hairline clara del canto + brillo interior superior
+     lift  = sombra que despega la pieza del fondo
+     Juntos son lo que hace que se lea como cristal y no como un rectángulo
+     borroso. Se usan en tarjetas, buscador, tiles, pastillas y FABs. */
+  --glass-rim: inset 0 1px 0 rgba(255,255,255,.10);
+  --glass-lift: 0 10px 30px -12px rgba(0,0,0,.7);
   --tile-letter: #ffffff; --tile-mono: #e6e6e6; --dial-add-line: #2b2b2b;
   --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(16,16,16,.93);
   --fav-filter: grayscale(1) brightness(1.5);
@@ -124,7 +133,9 @@
   --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(150,45,95,.14);
   --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
   --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
-  --tile-default: linear-gradient(140deg,rgba(255,255,255,.56),rgba(246,222,233,.5)); --tile-line: rgba(150,45,95,.10);
+  --tile-default: linear-gradient(150deg,rgba(255,255,255,.72),rgba(246,222,233,.42)); --tile-line: rgba(150,45,95,.10);
+  --glass-rim: inset 0 1px 0 rgba(255,255,255,.45);
+  --glass-lift: 0 10px 28px -14px rgba(40,20,40,.35);
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
   --fav-filter: grayscale(1) brightness(.45);
@@ -182,7 +193,9 @@
   --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(18,20,26,.14);
   --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
-  --tile-default: linear-gradient(140deg,rgba(255,255,255,.56),rgba(231,233,238,.5)); --tile-line: rgba(18,20,26,.10);
+  --tile-default: linear-gradient(150deg,rgba(255,255,255,.72),rgba(231,233,238,.42)); --tile-line: rgba(18,20,26,.10);
+  --glass-rim: inset 0 1px 0 rgba(255,255,255,.45);
+  --glass-lift: 0 10px 28px -14px rgba(40,20,40,.35);
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
@@ -765,12 +778,12 @@ button { font-family: inherit; }
    MATERIAL DE VIDRIO (referencia O2 Studio 2026-08-11): blur alto y
    superficie translúcida — se intuye el fondo, no se distingue. Estático:
    backdrop-filter sin animar. */
-.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(64px) saturate(1.4); }
+.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); }
 .w-clock { padding: 30px 24px; }
-.w-shortcuts { background: transparent; backdrop-filter: none; }
+.w-shortcuts { background: transparent; backdrop-filter: none; box-shadow: none; }
 
 /* Widget: reloj */
-.w-clock { text-align: center; background: transparent; border: none; padding: 8px 0; backdrop-filter: none; }
+.w-clock { text-align: center; background: transparent; border: none; padding: 8px 0; backdrop-filter: none; box-shadow: none; }
 /* Jerarquía: el reloj es EL dato grande de la portada (referencias: número
    protagonista + etiqueta pequeña debajo) */
 .w-clock .time { font-family: "Inter Var","Segoe UI Variable Display","Segoe UI",sans-serif; font-size: 68px; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1; text-shadow: 0 2px 22px var(--clock-shadow); }
@@ -780,7 +793,7 @@ button { font-family: inherit; }
 .w-search { grid-column: span 6; }
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
    foco (y en el color de realce) */
-#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: 1px solid transparent; backdrop-filter: blur(64px) saturate(1.4); transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
+#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: none; backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); transition: box-shadow var(--dur-2) var(--ease); }
 #hub-search:hover:not(:focus-within) { border-color: color-mix(in srgb, var(--realce) 30%, transparent); }
 #hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 22%, transparent); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
@@ -812,7 +825,7 @@ button { font-family: inherit; }
 .dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative; }
 /* Tiles de VIDRIO (2026-08-11): translúcidos con blur, como el resto del hub
    — dejan intuir el fondo sin que el icono pierda contraste. */
-.d-tile { width: 92px; height: 92px; border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(64px) saturate(1.4); transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
+.d-tile { width: 92px; height: 92px; border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
 .d-tile img { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); object-fit: contain; position: relative; z-index: 1; }
 /* Favicon del acceso: monocromo y con el brillo del tema (claro en tiles oscuros, oscuro en tiles claros) */
 .d-tile img.d-fav { filter: var(--fav-filter); }
@@ -850,7 +863,7 @@ button { font-family: inherit; }
 /* Esquina superior derecha del hub (como Opera GX): cuenta y clima en pastillas
    de cristal oscuro sobre el fondo del usuario, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(48px) saturate(1.35); }
+.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(48px) saturate(1.5); box-shadow: var(--glass-rim), var(--glass-lift); }
 button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
 button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
 button.hub-pill:active { transform: translateY(0) scale(.97); }
@@ -879,7 +892,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* FAB + paneles del hub */
 .hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
 #hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
-.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(48px) saturate(1.35); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(48px) saturate(1.5); box-shadow: var(--glass-rim), var(--glass-lift); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
