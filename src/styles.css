@@ -72,12 +72,12 @@
   --checker-a: #111111; --checker-b: #0c0c0c;
   /* Superficies del hub: van SOBRE el fondo elegido por el usuario, así que son
      cristales translúcidos y necesitan su propio juego de tokens. */
-  --hub-card: rgba(22,22,22,.20); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: rgba(15,15,15,.26); --hub-input-line: #252525;
-  --hub-fab: rgba(15,15,15,.30); --hub-fab-line: #2b2b2b;
-  --hub-pill: rgba(15,15,15,.30); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
+  --hub-card: rgba(24,24,24,.44); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: rgba(18,18,18,.48); --hub-input-line: #252525;
+  --hub-fab: rgba(18,18,18,.52); --hub-fab-line: #2b2b2b;
+  --hub-pill: rgba(18,18,18,.52); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #737373;
-  --tile-default: linear-gradient(140deg,rgba(40,40,40,.22),rgba(16,16,16,.28)); --tile-line: rgba(255,255,255,.07);
+  --tile-default: linear-gradient(140deg,rgba(44,44,44,.46),rgba(20,20,20,.5)); --tile-line: rgba(255,255,255,.07);
   --tile-letter: #ffffff; --tile-mono: #e6e6e6; --dial-add-line: #2b2b2b;
   --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(16,16,16,.93);
   --fav-filter: grayscale(1) brightness(1.5);
@@ -115,12 +115,12 @@
   --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f4ecfa 60%);
   --checker-a: #f3dae6; --checker-b: #faeff5;
-  --hub-card: rgba(255,255,255,.26); --hub-card-line: rgba(150,45,95,.10);
-  --hub-input: rgba(255,255,255,.34); --hub-input-line: rgba(150,45,95,.14);
-  --hub-fab: rgba(255,255,255,.38); --hub-fab-line: rgba(150,45,95,.14);
-  --hub-pill: rgba(255,255,255,.38); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
+  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(150,45,95,.10);
+  --hub-input: rgba(255,255,255,.55); --hub-input-line: rgba(150,45,95,.14);
+  --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(150,45,95,.14);
+  --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
   --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
-  --tile-default: linear-gradient(140deg,rgba(255,255,255,.34),rgba(246,222,233,.28)); --tile-line: rgba(150,45,95,.10);
+  --tile-default: linear-gradient(140deg,rgba(255,255,255,.56),rgba(246,222,233,.5)); --tile-line: rgba(150,45,95,.10);
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
   --fav-filter: grayscale(1) brightness(.45);
@@ -173,12 +173,12 @@
   --checker-a: #e8eaee; --checker-b: #f4f5f7;
   /* Hub invertido: cristales blancos con hairline oscura y sombra en vez de
      brillo; los tiles sin color propio pasan a gris claro con letra oscura. */
-  --hub-card: rgba(255,255,255,.26); --hub-card-line: rgba(18,20,26,.10);
-  --hub-input: rgba(255,255,255,.34); --hub-input-line: rgba(18,20,26,.14);
-  --hub-fab: rgba(255,255,255,.38); --hub-fab-line: rgba(18,20,26,.14);
-  --hub-pill: rgba(255,255,255,.38); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(18,20,26,.10);
+  --hub-input: rgba(255,255,255,.55); --hub-input-line: rgba(18,20,26,.14);
+  --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(18,20,26,.14);
+  --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
-  --tile-default: linear-gradient(140deg,rgba(255,255,255,.34),rgba(231,233,238,.28)); --tile-line: rgba(18,20,26,.10);
+  --tile-default: linear-gradient(140deg,rgba(255,255,255,.56),rgba(231,233,238,.5)); --tile-line: rgba(18,20,26,.10);
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
   --fav-filter: grayscale(1) brightness(.42);
