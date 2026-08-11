@@ -729,6 +729,10 @@ button { font-family: inherit; }
 #hub .hub-scroll { position: absolute; inset: 0; overflow-y: auto; z-index: 1; }
 /* Fondo degradado genérico, editable por el usuario */
 #hub::before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--hub-bg, linear-gradient(160deg, #24242b 0%, #191920 100%)); background-size: cover; background-position: center; }
+/* GRADIENTE TEXTURIZADO (petición 2026-08-11): grano de ruido estático SOBRE
+   el degradado y BAJO el contenido — la textura de "cristal robusto" de la
+   referencia sin salirse de la paleta del tema. */
+#hub::after { content: ""; position: absolute; inset: 0; z-index: 0; background-image: var(--grain); opacity: .07; pointer-events: none; }
 #hub .hub-scroll { color: var(--text); }
 
 #widget-grid { max-width: 920px; margin: 0 auto; padding: 7vh 26px 96px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 26px; grid-auto-flow: row dense; }

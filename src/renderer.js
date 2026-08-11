@@ -1029,9 +1029,9 @@ els.hubCustomize.addEventListener('click', () => { const show = els.customizePan
 
 // Fondos oscuros pero con tinte de color distinguible (gris oscuro por defecto)
 const BACKGROUNDS = [
-  // Predeterminado: carbón NEUTRO con brillo tenue (la variante cálida se
-  // veía amarillenta y se retiró)
-  'radial-gradient(110% 85% at 70% 8%, #232323 0%, #141414 52%, #0d0d0d 100%)',
+  // Predeterminado: gradiente MORADO profundo y apagado (regla de color:
+  // oscuro = morado). La textura la pone el grano de #hub::after.
+  'radial-gradient(130% 100% at 80% 0%, #322752 0%, #1c1730 45%, #100d17 100%)',
   'linear-gradient(135deg, #2f2f38 0%, #16161b 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #0c0a16 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #132a4a 0%, #080d18 62%)',    // Azul
@@ -1046,7 +1046,8 @@ const BACKGROUNDS = [
 // se sigue identificando por su valor oscuro (canónico) y aquí se traduce según
 // el tema, de modo que cambiar de claro a oscuro conserva el fondo elegido.
 const BACKGROUNDS_LIGHT = [
-  'linear-gradient(160deg, #eceef2 0%, #dfe2e8 100%)',                 // Gris claro (predeterminado)
+  // Predeterminado claro: blanco con tinte coral suave (regla: claro = rojo)
+  'radial-gradient(120% 90% at 75% 5%, #ffe9e6 0%, #f4eef0 45%, #eceef2 100%)',
   'linear-gradient(135deg, #f4f5f8 0%, #dcdfe6 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #ece4fb 0%, #dcd6ea 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #e0ecfb 0%, #d2dcea 62%)',    // Azul
@@ -1088,7 +1089,9 @@ function applyBackground(v) {
   // Identidades viejas del fondo predeterminado (antes de la gama cálida):
   // quien lo tenía elegido pasa al predeterminado nuevo, no a "fondo custom"
   if (v === 'linear-gradient(160deg, #26262d 0%, #191920 100%)' || v === 'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)'
-    || v === 'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)') v = BACKGROUNDS[0];
+    || v === 'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)'
+    || v === 'radial-gradient(110% 85% at 70% 8%, #232323 0%, #141414 52%, #0d0d0d 100%)'
+    || v === 'linear-gradient(160deg, #eceef2 0%, #dfe2e8 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
