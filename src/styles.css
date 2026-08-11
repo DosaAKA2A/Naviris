@@ -228,7 +228,8 @@ button { font-family: inherit; }
 @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
 
 /* Titlebar */
-#titlebar { height: var(--titlebar-h); display: flex; align-items: center; background: var(--bg); padding-left: 14px; flex-shrink: 0; }
+/* Titlebar píldora flotante (las pestañas viven dentro) */
+#titlebar { height: var(--titlebar-h); display: flex; align-items: center; background: var(--bg-2); padding-left: 14px; flex-shrink: 0; margin: 8px 10px 4px; border-radius: 16px; overflow: hidden; }
 .tb-logo { display: flex; align-items: center; margin-right: 12px; -webkit-app-region: drag; }
 /* El hueco de arrastre va DESPUÉS del botón + y se come todo lo que sobre, así
    el + queda siempre pegado a la última pestaña. Cede su espacio a las pestañas
@@ -349,7 +350,7 @@ button { font-family: inherit; }
 /* Sidebar */
 /* Sidebar CÁPSULA FLOTANTE (referencia bee_ui 2026-08-11: el riel despegado
    de los bordes, no una barra de navegador corriente) */
-#sidebar { width: var(--sidebar-w); margin: 10px 6px 10px 10px; border-radius: 26px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0; flex-shrink: 0; }
+#sidebar { width: var(--sidebar-w); margin: 2px 6px 10px 10px; border-radius: 26px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
 /* Botones del riel en CÍRCULO (petición 2026-08-11: "lo más redondos posible") */
@@ -371,7 +372,8 @@ button { font-family: inherit; }
 /* Panel web lateral */
 
 /* Navbar */
-#navbar { height: var(--navbar-h); display: flex; align-items: center; gap: 3px; padding: 0 10px; background: var(--bg-2); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+/* Navbar píldora flotante */
+#navbar { height: var(--navbar-h); display: flex; align-items: center; gap: 3px; padding: 0 8px; background: var(--bg-2); border-radius: 999px; flex-shrink: 0; margin: 2px 10px 6px 4px; }
 /* Botones de la navbar: más presencia. Antes quedaban apagados (gris tenue sobre
    fondo oscuro y sin forma propia); ahora tienen color legible en reposo, una
    superficie definida al pasar por encima y un estado activo con marca. */
@@ -405,7 +407,7 @@ button { font-family: inherit; }
 .sug.sel { background: linear-gradient(100deg, var(--wash-2), var(--wash)); }
 
 /* Barra de marcadores */
-#bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 10px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-bottom: 1px solid var(--line); }
+#bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 12px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-radius: 999px; margin: 0 10px 6px 4px; }
 #bookmarks-bar::-webkit-scrollbar { display: none; }
 #bookmarks-bar.hidden, #bookmarks-bar.empty { display: none !important; }
 .bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--bm-fg); cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background .12s, color .12s; }
@@ -419,7 +421,7 @@ button { font-family: inherit; }
 /* Popups */
 #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
-#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
+#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
 #menu-pop button:hover { background: var(--hover); }
 #menu-pop hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
@@ -438,9 +440,9 @@ button { font-family: inherit; }
 .menu-toggle input:checked { background: var(--track-on); }
 .menu-toggle input:checked::after { transform: translateX(16px); background: var(--track-knob-on); }
 
-#shield-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 84px; width: 292px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#shield-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 84px; width: 292px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 /* Información del sitio: se despliega desde el candado de la barra */
-#site-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); left: calc(var(--sidebar-w) + 158px); width: 310px; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+#site-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); left: calc(var(--sidebar-w) + 158px); width: 310px; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .stp-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; color: var(--text); }
 .stp-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 12.5px; color: var(--text); }
 .stp-row .stp-ic { color: var(--nav-fg); display: inline-flex; }
@@ -525,7 +527,7 @@ button { font-family: inherit; }
 
 /* Paneles laterales derechos */
 /* Panel lateral como cápsula flotante, a juego con el sidebar */
-.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 10px); right: 10px; bottom: 10px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in .2s cubic-bezier(.2,.8,.3,1) both; }
+.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 24px); right: 16px; bottom: 16px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in .2s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes panel-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .mp-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 12px; font-size: 15px; font-weight: 650; letter-spacing: .2px; }
 .mp-tools { display: flex; gap: 4px; }
@@ -676,7 +678,12 @@ button { font-family: inherit; }
 .dl-item.error .dl-kind { color: var(--danger); }
 
 /* Contenido */
-#content { flex: 1; position: relative; background: #fff; min-height: 0; }
+/* ===== Reforma de raíz (2026-08-11): NADA pegado a los bordes =====
+   La página web es una TARJETA flotante redondeada sobre el lienzo, como el
+   visor de las referencias; titlebar y navbar son píldoras flotantes y el
+   sidebar ya era cápsula. El lienzo (--bg) respira entre todas las piezas. */
+#content { flex: 1; position: relative; background: #fff; min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; }
+#content webview.active { border-radius: 18px; }
 #content webview { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 #content webview.active { display: flex; }
 /* Pestañas de AutoLoot inactivas: se mantienen RENDERIZADAS fuera de pantalla
@@ -1025,7 +1032,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #nav-loot { color: #b98cff; }
 #nav-loot.on { color: var(--ok); }
 #nav-loot.hidden { display: none; }
-#loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 4px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 #loot-pop .sp-count { line-height: 1.5; }
 
 /* ===== AutoLoot: botón del sidebar + panel izquierdo ===== */
