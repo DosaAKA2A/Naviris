@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   // filePath usa webUtils porque File.path se retiró en Electron 32+.
   filePath: (f) => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
   setWallpaper: (ruta) => ipcRenderer.invoke('hub:set-wallpaper', ruta),
+  pickWallpaper: () => ipcRenderer.invoke('hub:pick-wallpaper'),
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),

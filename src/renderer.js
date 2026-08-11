@@ -17,7 +17,7 @@ const els = {};
   'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
-  'wp-file', 'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
+  'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -1101,20 +1101,18 @@ function renderBgPresets() {
    apunta a él. Antes se reescalaba a 1920 px y se guardaba como JPEG dentro de
    localStorage (que no aguanta un 4K), y por eso los fondos se veían peor que
    el original — lo detectó Dosa el 2026-08-11. */
-els.wpFile.addEventListener('change', async () => {
-  const f = els.wpFile.files[0]; if (!f) return;
-  const ruta = window.cobalt.filePath ? window.cobalt.filePath(f) : f.path;
-  if (ruta) {
-    const r = await window.cobalt.setWallpaper(ruta);
-    if (r?.ok) { applyBackground(`url("${r.url}") center/cover no-repeat`); toast('Fondo actualizado'); return; }
-    toast(r?.message || 'No se pudo usar esa imagen');
-    return;
-  }
-  // Sin ruta (caso raro): se cae al data URL directo, sin reescalar
-  const rd = new FileReader();
-  rd.onload = () => { applyBackground(`url("${rd.result}") center/cover no-repeat`); toast('Fondo actualizado'); };
-  rd.readAsDataURL(f);
-});
+/* Fondo propio: se abre el diálogo del SISTEMA (el <input type="file"> no
+   disparaba 'change' al reelegir el mismo archivo y el panel se quedaba
+   colgado — lo reportó Dosa el 2026-08-11). Resolución completa: el archivo
+   se copia a userData y el hub apunta a él. */
+async function elegirFondoPropio() {
+  const r = await window.cobalt.pickWallpaper();
+  if (r?.canceled) return;
+  if (r?.ok) { applyBackground(`url("${r.url}") center/cover no-repeat`); toast('Fondo actualizado'); return; }
+  toast(r?.message || 'No se pudo usar esa imagen');
+}
+document.querySelector('.wp-custom')?.addEventListener('click', (e) => { e.preventDefault(); elegirFondoPropio(); });
+
 $('#dial-cancel').addEventListener('click', () => els.dialModal.classList.add('hidden'));
 $('#dial-save').addEventListener('click', () => { const name = els.dialName.value.trim(); const url = toUrl(els.dialUrl.value); if (!name || !url) return; dials.push({ name, url }); store.set('cobalt.dials', dials); renderHub(); els.dialModal.classList.add('hidden'); });
 
@@ -1533,6 +1531,7 @@ function toggleLootPanel(force) {
   const open = force !== undefined ? force : els.lootPanel.classList.contains('hidden');
   if (open) {
     closeRightPanels(); els.lootPanel.classList.remove('hidden'); els.sbLoot.classList.add('open'); renderLootPanel();
+    anclarPanelIzq(els.lootPanel, els.sbLoot); // pegado a SU botón, no arriba del todo
     // Mientras el panel esté abierto, refresca el temporizador de cada sesión.
     if (!lootTimer) lootTimer = setInterval(() => {
       if (els.lootPanel.classList.contains('hidden')) { clearInterval(lootTimer); lootTimer = null; return; }
@@ -1633,6 +1632,13 @@ els.lootTabHist.addEventListener('click', () => { lootView = 'hist'; renderLootP
 /* Ancla un popover de herramienta JUNTO a su botón del sidebar. Antes iban
    clavados abajo por CSS (de cuando sus botones vivían abajo) y se abrían
    lejos del botón — queja del usuario 2026-08-11. */
+function anclarPanelIzq(panel, btn) {
+  const r = btn.getBoundingClientRect();
+  panel.style.top = '0px';
+  const h = panel.offsetHeight;
+  panel.style.top = Math.max(8, Math.min(Math.round(r.top - 8), window.innerHeight - h - 12)) + 'px';
+  panel.style.left = Math.round(r.right + 12) + 'px';
+}
 function anclarPop(pop, btn) {
   const r = btn.getBoundingClientRect();
   pop.style.left = Math.round(r.right + 14) + 'px';
@@ -2533,3 +2539,76 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   }, 1800);
 })();
 
+
+/* ===== Scroll propio de Naviris (2026-08-11) =====
+   El scrollbar nativo rompía las esquinas redondeadas de las piezas flotantes.
+   Este dibuja una barra flotante sobre cada contenedor: aparece al rodar, el
+   pulgar se ESTIRA mientras ruedas y vuelve a su grosor al parar, y se puede
+   arrastrar. Solo anima transform/opacity (regla de rendimiento del proyecto).
+   Se auto-aplica a lo que scrollee y se re-mide con ResizeObserver. */
+(function scrollPropio() {
+  const OCULTAR = 900;   // ms sin rodar -> el pulgar vuelve a su grosor
+  const DESVANECER = 1400; // ms sin rodar -> la barra se va
+  const puestos = new WeakSet();
+
+  function montar(host) {
+    if (puestos.has(host) || !host.isConnected) return;
+    puestos.add(host);
+    host.classList.add('nvs-host');
+    // La barra va dentro del propio contenedor, así hereda su recorte redondeado
+    const pos = getComputedStyle(host).position;
+    if (pos === 'static') host.style.position = 'relative';
+    const bar = document.createElement('div'); bar.className = 'nvs-bar';
+    const thumb = document.createElement('div'); thumb.className = 'nvs-thumb';
+    bar.appendChild(thumb); host.appendChild(bar);
+
+    let tRod = null, tFade = null;
+    const medir = () => {
+      const alto = host.clientHeight, total = host.scrollHeight;
+      if (total <= alto + 1) { bar.classList.remove('visible'); return; }
+      bar.style.height = alto + 'px';
+      bar.style.top = host.scrollTop + 'px'; // la barra viaja con el contenido
+      const h = Math.max(28, Math.round(alto * alto / total));
+      const y = Math.round((alto - h) * (host.scrollTop / (total - alto)));
+      thumb.style.height = h + 'px';
+      thumb.style.top = y + 'px';
+    };
+    const rodando = () => {
+      medir();
+      bar.classList.add('visible', 'rodando');
+      clearTimeout(tRod); clearTimeout(tFade);
+      tRod = setTimeout(() => bar.classList.remove('rodando'), OCULTAR);
+      tFade = setTimeout(() => bar.classList.remove('visible'), DESVANECER);
+    };
+    host.addEventListener('scroll', rodando, { passive: true });
+    host.addEventListener('mouseenter', () => { medir(); if (host.scrollHeight > host.clientHeight + 1) bar.classList.add('visible'); });
+    host.addEventListener('mouseleave', () => { if (!bar.classList.contains('rodando')) bar.classList.remove('visible'); });
+    try { new ResizeObserver(medir).observe(host); } catch { /* navegador viejo */ }
+
+    // Arrastrar el pulgar
+    let arrastre = null;
+    thumb.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      arrastre = { y0: e.clientY, top0: host.scrollTop };
+      bar.classList.add('visible', 'rodando');
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!arrastre) return;
+      const alto = host.clientHeight, total = host.scrollHeight;
+      const h = thumb.offsetHeight;
+      const recorrido = alto - h;
+      if (recorrido <= 0) return;
+      host.scrollTop = arrastre.top0 + (e.clientY - arrastre.y0) * ((total - alto) / recorrido);
+    });
+    window.addEventListener('mouseup', () => { if (arrastre) { arrastre = null; rodando(); } });
+    medir();
+  }
+
+  // Contenedores que scrollean en la UI (los webviews conservan el suyo)
+  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list';
+  const barrer = () => document.querySelectorAll(SEL).forEach(montar);
+  barrer();
+  // Los paneles y páginas se crean al vuelo: se revisan al abrirse
+  document.addEventListener('click', () => setTimeout(barrer, 120), true);
+  window.addEventListener('resize', barrer);
+})();

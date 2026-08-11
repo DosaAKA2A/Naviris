@@ -1386,6 +1386,29 @@ ipcMain.handle('addons:code', soloUI((_e, id) => {
    completa y el hub apunta al archivo. Antes se reescalaba a 1920 px y se
    pasaba a JPEG 82 para meterlo en localStorage — un 4K perdía la mitad de
    resolución (lo notó Dosa el 2026-08-11). El archivo solo se lee. */
+/* Elegir fondo con el diálogo del SISTEMA. El <input type="file"> daba
+   problemas: si elegías el mismo archivo dos veces no disparaba 'change' y el
+   panel se quedaba colgado (2026-08-11). */
+ipcMain.handle('hub:pick-wallpaper', async (e) => {
+  try {
+    const r = await dialog.showOpenDialog(winOf(e), {
+      title: 'Elegir fondo del hub',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'] }]
+    });
+    if (r.canceled || !r.filePaths?.length) return { ok: false, canceled: true };
+    return await guardarFondo(r.filePaths[0]);
+  } catch (err) { return { ok: false, message: String(err.message || err) }; }
+});
+async function guardarFondo(origen) {
+  if (!origen || !fs.existsSync(origen)) return { ok: false, message: 'No se encontró la imagen' };
+  const dir = path.join(app.getPath('userData'), 'fondos');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const viejo of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, viejo)); } catch { /* en uso */ } }
+  const destino = path.join(dir, 'hub-' + Date.now() + path.extname(origen).toLowerCase());
+  fs.copyFileSync(origen, destino);
+  return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
+}
 ipcMain.handle('hub:set-wallpaper', async (e, origen) => {
   try {
     if (!origen || !fs.existsSync(origen)) return { ok: false, message: 'No se encontró la imagen' };
