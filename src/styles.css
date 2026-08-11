@@ -682,8 +682,13 @@ button { font-family: inherit; }
    La página web es una TARJETA flotante redondeada sobre el lienzo, como el
    visor de las referencias; titlebar y navbar son píldoras flotantes y el
    sidebar ya era cápsula. El lienzo (--bg) respira entre todas las piezas. */
-#content { flex: 1; position: relative; background: #fff; min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; }
-#content webview.active { border-radius: 18px; }
+/* OJO (error repetido, señalado por el usuario 2026-08-11): un contenedor
+   RECORTADO nunca lleva fondo de contraste — el antialiasing de la esquina
+   redondeada lo revela como un trazo claro en las cuatro esquinas. El
+   contenedor va del color del lienzo (costura invisible) y el suelo blanco
+   de página lo pone el PROPIO webview, dentro del recorte. */
+#content { flex: 1; position: relative; background: var(--bg); min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; }
+#content webview.active { border-radius: 18px; background: #fff; }
 #content webview { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 #content webview.active { display: flex; }
 /* Pestañas de AutoLoot inactivas: se mantienen RENDERIZADAS fuera de pantalla
