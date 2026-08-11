@@ -1046,8 +1046,9 @@ const BACKGROUNDS = [
 // se sigue identificando por su valor oscuro (canónico) y aquí se traduce según
 // el tema, de modo que cambiar de claro a oscuro conserva el fondo elegido.
 const BACKGROUNDS_LIGHT = [
-  // Predeterminado claro: blanco con tinte coral suave (regla: claro = rojo)
-  'radial-gradient(120% 90% at 75% 5%, #ffe9e6 0%, #f4eef0 45%, #eceef2 100%)',
+  // Predeterminado claro: blanco con tinte rojo-naranja suave (la gama del
+  // logo claro de Naviris)
+  'radial-gradient(120% 90% at 75% 5%, #ffe7dd 0%, #f6efec 45%, #eceef2 100%)',
   'linear-gradient(135deg, #f4f5f8 0%, #dcdfe6 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #ece4fb 0%, #dcd6ea 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #e0ecfb 0%, #d2dcea 62%)',    // Azul
