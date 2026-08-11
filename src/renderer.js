@@ -1095,26 +1095,23 @@ function renderBgPresets() {
   els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
   for (const bg of BACKGROUNDS) { const th = document.createElement('div'); th.className = 'bg-thumb' + (bg === saved ? ' sel' : ''); th.style.background = bgForTheme(bg); th.dataset.bg = bg; th.addEventListener('click', () => applyBackground(bg)); els.bgPresets.appendChild(th); }
 }
-els.wpFile.addEventListener('change', () => {
+/* Fondo propio A RESOLUCIÓN COMPLETA: el archivo se copia a userData y el hub
+   apunta a él. Antes se reescalaba a 1920 px y se guardaba como JPEG dentro de
+   localStorage (que no aguanta un 4K), y por eso los fondos se veían peor que
+   el original — lo detectó Dosa el 2026-08-11. */
+els.wpFile.addEventListener('change', async () => {
   const f = els.wpFile.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => {
-    const img = new Image();
-    img.onload = () => {
-      // Reescala a máx 1920px de ancho y exporta JPEG para no saturar el almacenamiento
-      const maxW = 1920, scale = Math.min(1, maxW / img.width);
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      let data;
-      try { data = c.toDataURL('image/jpeg', 0.82); } catch { data = r.result; }
-      applyBackground(`url("${data}") center/cover no-repeat`);
-      toast('Fondo actualizado');
-    };
-    img.onerror = () => { applyBackground(`url("${r.result}") center/cover no-repeat`); };
-    img.src = r.result;
-  };
-  r.readAsDataURL(f);
+  const ruta = window.cobalt.filePath ? window.cobalt.filePath(f) : f.path;
+  if (ruta) {
+    const r = await window.cobalt.setWallpaper(ruta);
+    if (r?.ok) { applyBackground(`url("${r.url}") center/cover no-repeat`); toast('Fondo actualizado'); return; }
+    toast(r?.message || 'No se pudo usar esa imagen');
+    return;
+  }
+  // Sin ruta (caso raro): se cae al data URL directo, sin reescalar
+  const rd = new FileReader();
+  rd.onload = () => { applyBackground(`url("${rd.result}") center/cover no-repeat`); toast('Fondo actualizado'); };
+  rd.readAsDataURL(f);
 });
 $('#dial-cancel').addEventListener('click', () => els.dialModal.classList.add('hidden'));
 $('#dial-save').addEventListener('click', () => { const name = els.dialName.value.trim(); const url = toUrl(els.dialUrl.value); if (!name || !url) return; dials.push({ name, url }); store.set('cobalt.dials', dials); renderHub(); els.dialModal.classList.add('hidden'); });

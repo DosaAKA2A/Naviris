@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('cobalt', {
   minimize: () => ipcRenderer.send('win:minimize'),
@@ -76,6 +76,10 @@ contextBridge.exposeInMainWorld('cobalt', {
   addonsToggle: (id, on) => ipcRenderer.invoke('addons:toggle', { id, on }),
   addonsCode: (id) => ipcRenderer.invoke('addons:code', id),
   savePng: (dataUrl, suggestedName) => ipcRenderer.invoke('file:save-png', { dataUrl, suggestedName }),
+  // Fondo del hub a resolución completa: copia el archivo a userData.
+  // filePath usa webUtils porque File.path se retiró en Electron 32+.
+  filePath: (f) => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
+  setWallpaper: (ruta) => ipcRenderer.invoke('hub:set-wallpaper', ruta),
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),

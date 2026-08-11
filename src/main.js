@@ -1382,6 +1382,22 @@ ipcMain.handle('addons:code', soloUI((_e, id) => {
 }));
 
 // Guardado de imágenes generado por addons (p. ej. capturas largas)
+/* Fondo del hub elegido por el usuario: se COPIA a userData a resolución
+   completa y el hub apunta al archivo. Antes se reescalaba a 1920 px y se
+   pasaba a JPEG 82 para meterlo en localStorage — un 4K perdía la mitad de
+   resolución (lo notó Dosa el 2026-08-11). El archivo solo se lee. */
+ipcMain.handle('hub:set-wallpaper', async (e, origen) => {
+  try {
+    if (!origen || !fs.existsSync(origen)) return { ok: false, message: 'No se encontró la imagen' };
+    const dir = path.join(app.getPath('userData'), 'fondos');
+    fs.mkdirSync(dir, { recursive: true });
+    // Nombre único: al cambiar de fondo, el anterior se retira
+    for (const viejo of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, viejo)); } catch { /* en uso */ } }
+    const destino = path.join(dir, 'hub-' + Date.now() + path.extname(origen).toLowerCase());
+    fs.copyFileSync(origen, destino);
+    return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
+  } catch (err) { return { ok: false, message: String(err.message || err) }; }
+});
 ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
   try {
     const r = await dialog.showSaveDialog(winOf(e), {
