@@ -1020,9 +1020,9 @@ els.hubCustomize.addEventListener('click', () => { const show = els.customizePan
 
 // Fondos oscuros pero con tinte de color distinguible (gris oscuro por defecto)
 const BACKGROUNDS = [
-  // Predeterminado: CARBÓN con un halo lima muy tenue arriba a la derecha
-  // (referencia Fitme). La textura la pone el grano de #hub::after.
-  'radial-gradient(130% 100% at 80% 0%, #23260f 0%, #141508 42%, #0a0a06 100%)',
+  // Predeterminado: CARBÓN puro. El lima es color de ESTADO (hover, activo),
+  // NO tiñe el fondo. La textura la pone el grano de #hub::after.
+  'radial-gradient(130% 100% at 80% 0%, #1c1c1c 0%, #121212 45%, #0a0a0a 100%)',
   'linear-gradient(135deg, #2f2f38 0%, #16161b 100%)',                 // Grafito claro
   'radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #0c0a16 62%)',    // Violeta
   'radial-gradient(120% 80% at 50% -10%, #132a4a 0%, #080d18 62%)',    // Azul
@@ -1084,7 +1084,8 @@ function applyBackground(v) {
     || v === 'radial-gradient(110% 85% at 70% 8%, #262218 0%, #16140f 52%, #0e0d0b 100%)'
     || v === 'radial-gradient(110% 85% at 70% 8%, #232323 0%, #141414 52%, #0d0d0d 100%)'
     || v === 'linear-gradient(160deg, #eceef2 0%, #dfe2e8 100%)'
-    || v === 'radial-gradient(130% 100% at 80% 0%, #322752 0%, #1c1730 45%, #100d17 100%)') v = BACKGROUNDS[0];
+    || v === 'radial-gradient(130% 100% at 80% 0%, #322752 0%, #1c1730 45%, #100d17 100%)'
+    || v === 'radial-gradient(130% 100% at 80% 0%, #23260f 0%, #141508 42%, #0a0a06 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad

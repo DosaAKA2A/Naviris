@@ -204,6 +204,11 @@
 :root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #d93a2b; }
 :root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ea6a2c; }
 :root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f59a35; }
+/* Logo de Naviris en OSCURO: lima ácido -> verde (2026-08-11), a juego con el
+   acento del tema. El splash queda fuera: es momento de marca. */
+:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #eaff77; }
+:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #a8dc2a; }
+:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #2f8f4f; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
@@ -269,7 +274,7 @@ button { font-family: inherit; }
 .tab.drag-over { box-shadow: inset 2px 0 0 var(--violet, #b98cff); }
 /* Pestaña fijada: comprimida a solo el favicon, en el bloque izquierdo de la barra */
 .tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
-.tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--tab-hover-fg); }
+.tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--realce); }
 /* La pestaña activa remata con un filo de realce arriba, como la tradición
    de los navegadores gamer, pero al 70%: marca sin gritar */
 .tab.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 0 color-mix(in srgb, var(--realce) 70%, transparent); }
@@ -333,7 +338,7 @@ button { font-family: inherit; }
 /* Menú contextual */
 .ctx-menu { position: fixed; z-index: 200; min-width: 190px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; box-shadow: 0 12px 34px var(--shadow-panel); animation: pop-in var(--dur-1) var(--spring) both; }
 .ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
-.ctx-item:hover { background: var(--bg-2); }
+.ctx-item:hover { background: var(--wash); }
 .ctx-item.danger { color: #e57373; }
 .ctx-item.danger:hover { background: rgba(229,115,115,.12); }
 .ctx-ic { display: flex; color: var(--text-dim); }
@@ -372,7 +377,7 @@ button { font-family: inherit; }
    cualquier tinte propio (el naranja del Rat Tool se colaba encima) */
 #sidebar .sb-btn.open { color: var(--grad-fg); }
 .sb-btn svg { width: 17px; height: 17px; }
-.sb-btn:hover { background: var(--sb-hover); color: var(--text-strong); }
+.sb-btn:hover { background: var(--wash-2); color: var(--realce); }
 .sb-btn:active { transform: scale(.94); }
 /* Estado abierto = squircle relleno con el degradado de realce e icono en
    blanco, como el riel de la referencia. El squircle ES el indicador. */
@@ -396,7 +401,7 @@ button { font-family: inherit; }
 #navbar > button { width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--nav-fg); cursor: pointer; transition: background .13s ease, color .13s ease, transform .09s ease; }
 #navbar > button svg { width: 18px; height: 18px; }
 #navbar > button:active:not(:disabled) { transform: scale(.93); }
-#navbar > button:hover:not(:disabled) { background: var(--nav-hover); color: var(--text-strong); }
+#navbar > button:hover:not(:disabled) { background: var(--wash); color: var(--realce); }
 #navbar > button:disabled { opacity: .28; cursor: default; }
 /* Marcador guardado en el color de realce del tema (lima en oscuro) */
 #nav-star.starred { color: var(--realce); }
@@ -405,7 +410,11 @@ button { font-family: inherit; }
 #nav-shield.off { color: var(--dim); }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }
 #urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s; }
-#urlbox:focus-within { border-color: color-mix(in srgb, var(--realce) 45%, var(--line)); box-shadow: 0 0 0 3px var(--wash); }
+/* Foco de la barra: SIN borde de color (cantaba mucho con el lima). Solo un
+   halo tenue del realce y el borde a su gris de siempre. */
+#urlbox:focus-within { border-color: var(--line-3); box-shadow: 0 0 0 3px var(--wash); }
+/* El lima vive en los HOVER: la barra se tiñe al pasar el ratón */
+#urlbox:hover:not(:focus-within) { border-color: color-mix(in srgb, var(--realce) 30%, var(--line)); }
 #url-secure { color: var(--text-dim); }
 #urlbar { flex: 1; border: none; outline: none; background: transparent; color: var(--text); font-size: 13px; }
 #urlbar::placeholder { color: var(--dim); }
@@ -428,7 +437,7 @@ button { font-family: inherit; }
 #bookmarks-bar::-webkit-scrollbar { display: none; }
 #bookmarks-bar.hidden, #bookmarks-bar.empty { display: none !important; }
 .bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--bm-fg); cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background .12s, color .12s; }
-.bookmark:hover, .bm-folder:hover { background: var(--bg-3); color: var(--text); }
+.bookmark:hover, .bm-folder:hover { background: var(--wash); color: var(--realce); }
 .bookmark img { width: 14px; height: 14px; border-radius: 3px; }
 .bm-folder svg { width: 14px; height: 14px; color: var(--text-dim); }
 .bm-folder-pop { position: fixed; z-index: 560; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; min-width: 200px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; }
@@ -440,11 +449,11 @@ button { font-family: inherit; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 #menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
-#menu-pop button:hover { background: var(--hover); }
+#menu-pop button:hover { background: var(--wash); }
 #menu-pop hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
 #menu-pop .kbd { color: var(--dim); font-size: 11px; }
 .menu-toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13px; cursor: pointer; border-radius: 7px; }
-.menu-toggle:hover { background: var(--hover); }
+.menu-toggle:hover { background: var(--wash); }
 .menu-toggle small { color: var(--text-dim); }
 /* Icono en línea junto a un texto (toggle del menú, títulos de modal) */
 .mt-ico { display: inline-flex; vertical-align: -2px; margin-right: 7px; color: var(--text-dim); }
@@ -769,7 +778,8 @@ button { font-family: inherit; }
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
    foco (y en el color de realce) */
 #hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: 1px solid transparent; backdrop-filter: blur(64px) saturate(1.4); transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
-#hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 50%, var(--hub-input-line)); box-shadow: 0 0 0 4px var(--wash); }
+#hub-search:hover:not(:focus-within) { border-color: color-mix(in srgb, var(--realce) 30%, transparent); }
+#hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 22%, transparent); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
 #hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
 #hub-search input::placeholder { color: var(--dim); }
@@ -876,7 +886,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .temas-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 5px; min-width: 168px; border: 1px solid var(--hub-fab-line); background: var(--hub-fab); border-radius: 12px; backdrop-filter: blur(48px) saturate(1.35); box-shadow: 0 12px 30px var(--shadow-pop); }
 .temas-pop.hidden { display: none; }
 .tema-op { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text); font-size: 12.5px; cursor: pointer; text-align: left; }
-.tema-op:hover { background: var(--hover); }
+.tema-op:hover { background: var(--wash); }
 .tema-op.on { color: var(--accent); font-weight: 600; }
 .tema-sw { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--hub-hairline); }
 .sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
