@@ -1091,7 +1091,129 @@ function applyBackground(v) {
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set('cobalt.hubBg', v);
+  // Liquid glass Fase 2: la refracción SVG solo vale la pena sobre una FOTO
+  // (un degradado liso no tiene textura que refractar) → se enciende sola
+  // cuando el fondo es una imagen del usuario (valor url(...)).
+  els.hub.classList.toggle('refract', typeof v === 'string' && v.startsWith('url('));
+  ajustarVidrioAlFondo(v);
+  lgProgramar(); // el motor de lentes pone o quita los filtros por pieza
   document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v));
+}
+/* El tinte del vidrio sigue al FONDO, no al tema (2026-08-11): sobre una foto
+   clara, el cristal ahumado del tema oscuro se veía como manchas negras (lo
+   detectó Dosa con su fondo rojo). Se mide el brillo medio de la foto en un
+   canvas de 32×32 y #hub.bg-claro cambia los tokens del vidrio al juego blanco
+   (definido en styles.css). Con degradados del tema, la clase se quita. */
+function ajustarVidrioAlFondo(v) {
+  const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
+  if (!m) { els.hub.classList.remove('bg-claro', 'bg-lum-claro'); return; }
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const x = c.getContext('2d'); x.drawImage(img, 0, 0, 32, 32);
+      const d = x.getImageData(0, 0, 32, 32).data; let v = 0, lum = 0;
+      // DOS métricas, DOS decisiones (lección de las fotos roja y mármol):
+      // · Brillo HSV (max r/g/b) → TINTE del vidrio (bg-claro): un rojo vivo
+      //   "se ve" claro (V≈.65) aunque su luminancia sea baja (≈.40).
+      // · Luminancia perceptual → TEXTO flotante (bg-lum-claro): sobre el rojo
+      //   (lum .40) el texto blanco se lee bien; sobre mármol (lum≈.75) no.
+      for (let i = 0; i < d.length; i += 4) {
+        v += Math.max(d[i], d[i + 1], d[i + 2]);
+        lum += d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
+      }
+      const n = d.length / 4;
+      els.hub.classList.toggle('bg-claro', v / n / 255 > .48);
+      els.hub.classList.toggle('bg-lum-claro', lum / n / 255 > .55);
+    } catch { /* canvas contaminado u otro fallo: se queda el vidrio del tema */ }
+  };
+  img.onerror = () => els.hub.classList.remove('bg-claro', 'bg-lum-claro');
+  img.src = m[1];
+}
+
+/* ===== MOTOR DE LENTES · liquid glass real (2026-08-11) =====
+   Investigación (kube.io / Liquid Glass de Apple): la refracción de un cristal
+   vive SOLO en la banda del bisel del canto — el interior es plano (gris 128 en
+   el mapa = desplazamiento cero). Desplazar toda la superficie con ruido (lo
+   que hacíamos) da el efecto "derretido". Aquí se genera un mapa de
+   desplazamiento POR FORMA (SDF de rectángulo redondeado, banda con perfil
+   suavizado) y se aplica con backdrop-filter: url(#filtro) — Chromium lo
+   soporta. Solo activo con foto de fondo (#hub.refract); con degradados, las
+   piezas usan su backdrop-filter de CSS (blur + saturate). */
+const LG = { host: null, cache: new Map(), n: 0, mo: null, ro: null, prog: false };
+function lgMapa(w, h, r, band) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); const img = x.createImageData(w, h);
+  const bx = w / 2 - r, by = h / 2 - r;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const px = i + .5 - w / 2, py = j + .5 - h / 2;
+    const qx = Math.abs(px) - bx, qy = Math.abs(py) - by;
+    const ax = Math.max(qx, 0), ay = Math.max(qy, 0);
+    const d = Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - r; // SDF: <0 dentro
+    let vx = 0, vy = 0; const t = -d;
+    if (d <= 0 && t < band) {
+      let nx, ny;
+      if (ax > 0 || ay > 0) { const L = Math.hypot(ax, ay) || 1; nx = Math.sign(px) * ax / L; ny = Math.sign(py) * ay / L; }
+      else if (qx > qy) { nx = Math.sign(px); ny = 0; } else { nx = 0; ny = Math.sign(py); }
+      const u = 1 - t / band; const m = u * u * (3 - 2 * u); // smoothstep hacia el borde
+      vx = nx * m; vy = ny * m; // hacia FUERA: lente convexa (el fondo se comprime en el canto)
+    }
+    const k = (j * w + i) * 4;
+    img.data[k] = 128 + vx * 127; img.data[k + 1] = 128 + vy * 127; img.data[k + 2] = 128; img.data[k + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  return c.toDataURL();
+}
+function lgFiltro(el) {
+  const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight);
+  if (!w || !h) return;
+  let r = parseFloat(getComputedStyle(el).borderRadius) || 12; r = Math.min(r, w / 2, h / 2);
+  const band = Math.max(6, Math.min(14, Math.round(Math.min(w, h) * .22)));
+  const key = w + 'x' + h + 'r' + Math.round(r);
+  let id = LG.cache.get(key);
+  if (!id) {
+    id = 'lg-' + (++LG.n);
+    const SVG = 'http://www.w3.org/2000/svg';
+    const f = document.createElementNS(SVG, 'filter');
+    f.setAttribute('id', id);
+    f.setAttribute('filterUnits', 'userSpaceOnUse');
+    f.setAttribute('x', 0); f.setAttribute('y', 0); f.setAttribute('width', w); f.setAttribute('height', h);
+    // sRGB OBLIGATORIO: en linearRGB el 128 del mapa deja de ser "quieto" y todo se desplaza
+    f.setAttribute('color-interpolation-filters', 'sRGB');
+    f.innerHTML = '<feImage href="' + lgMapa(w, h, Math.round(r), band) + '" x="0" y="0" width="' + w + '" height="' + h + '" result="map"/>'
+      + '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="soft"/>'
+      + '<feDisplacementMap in="soft" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G" result="ref"/>'
+      + '<feColorMatrix in="ref" type="saturate" values="1.6"/>';
+    LG.host.appendChild(f);
+    LG.cache.set(key, id);
+  }
+  el.style.webkitBackdropFilter = 'url(#' + id + ')';
+  el.style.backdropFilter = 'url(#' + id + ')';
+}
+function lgAplicar() {
+  LG.prog = false;
+  if (!LG.host) {
+    const SVG = 'http://www.w3.org/2000/svg';
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('width', 0); s.setAttribute('height', 0);
+    s.setAttribute('aria-hidden', 'true'); s.style.position = 'absolute';
+    LG.host = document.createElementNS(SVG, 'defs'); s.appendChild(LG.host);
+    document.body.appendChild(s);
+    LG.ro = new ResizeObserver(() => lgProgramar());
+    LG.mo = new MutationObserver(() => lgProgramar());
+    LG.mo.observe(els.hub, { childList: true, subtree: true });
+  }
+  const on = els.hub.classList.contains('refract');
+  LG.ro.disconnect();
+  const piezas = els.hub.querySelectorAll('.d-tile, #hub-search, .hub-pill, .hub-fab, #hub-addons, .w-card:not(.w-clock):not(.w-shortcuts)');
+  piezas.forEach((el) => {
+    if (on) { lgFiltro(el); LG.ro.observe(el); }
+    else { el.style.webkitBackdropFilter = ''; el.style.backdropFilter = ''; }
+  });
+}
+function lgProgramar() {
+  if (LG.prog) return; LG.prog = true;
+  requestAnimationFrame(lgAplicar);
 }
 function renderBgPresets() {
   els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
@@ -1756,11 +1878,25 @@ function applyResponsive() {
   wv.style.width = resMode.w + 'px'; wv.style.height = resMode.h + 'px'; wv.style.left = '50%'; wv.style.top = '50%'; wv.style.transform = `translate(-50%,-50%) scale(${k})`;
   els.resLabel.textContent = `${resMode.label} · ${resMode.w}×${resMode.h}` + (k < 1 ? ` · ${Math.round(k * 100)}%` : ''); els.resLabel.classList.remove('hidden');
 }
+/* Resoluciones en REJILLA de fichas (2026-08-11): la lista larga se salía de
+   la pantalla y era un muro de texto. Cada resolución es una ficha compacta
+   con su nombre, medidas y proporción; la activa va en el realce. */
 function renderResList() {
   els.resList.innerHTML = '';
-  for (const r of RESOLUTIONS) { const btn = document.createElement('button'); const sel = resMode ? resMode.w === r.w && resMode.h === r.h : r.w === 0; btn.className = 'rp-item' + (sel ? ' sel' : ''); btn.innerHTML = `<span>${r.label} <span class="rp-note">${r.note}</span></span><span class="rp-dim">${r.w ? r.w + '×' + r.h : '—'}</span>`; btn.addEventListener('click', () => { resMode = r.w ? r : null; applyResponsive(); renderResList(); }); els.resList.appendChild(btn); }
+  for (const r of RESOLUTIONS) {
+    const sel = resMode ? resMode.w === r.w && resMode.h === r.h : r.w === 0;
+    const b = document.createElement('button');
+    b.className = 'rp-card' + (sel ? ' sel' : '');
+    const prop = r.w ? (Math.abs(r.w / r.h - 16 / 9) < 0.02 ? '16:9' : Math.abs(r.w / r.h - 16 / 10) < 0.02 ? '16:10' : Math.abs(r.w / r.h - 4 / 3) < 0.02 ? '4:3' : '') : '';
+    b.innerHTML = `<span class="rp-dim">${r.w ? r.w + '×' + r.h : 'Nativa'}</span>` +
+      `<span class="rp-name">${escapeHtml(r.label)}</span>` +
+      (prop ? `<span class="rp-prop">${prop}</span>` : '');
+    b.title = r.note || r.label;
+    b.addEventListener('click', () => { resMode = r.w ? r : null; applyResponsive(); renderResList(); });
+    els.resList.appendChild(b);
+  }
 }
-els.sbRes.addEventListener('click', (e) => { e.stopPropagation(); const open = els.resPop.classList.contains('hidden'); els.resPop.classList.toggle('hidden'); els.sbRes.classList.toggle('open', open); if (open) { anclarPop(els.resPop, els.sbRes); renderResList(); } });
+els.sbRes.addEventListener('click', (e) => { e.stopPropagation(); const open = els.resPop.classList.contains('hidden'); els.resPop.classList.toggle('hidden'); els.sbRes.classList.toggle('open', open); if (open) { renderResList(); anclarPop(els.resPop, els.sbRes); } });
 window.addEventListener('resize', () => applyResponsive());
 
 /* ============ Sidebar home + ajustes ============ */

@@ -78,18 +78,26 @@
      cristales translúcidos y necesitan su propio juego de tokens. */
   /* Superficie con degradado propio: el vidrio no es plano, se aclara arriba
      a la izquierda (donde le da la luz) — referencia Cryptify */
-  --hub-card: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.34)); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.09), rgba(10,12,10,.38)); --hub-input-line: #252525;
-  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.42)); --hub-fab-line: #2b2b2b;
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.10), rgba(10,12,10,.42)); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
-  --hub-hairline: rgba(255,255,255,.16); --hub-label: #737373;
-  --tile-default: linear-gradient(150deg, rgba(255,255,255,.12), rgba(10,12,10,.38)); --tile-line: rgba(255,255,255,.07);
+  /* GLASS REAL (2026-08-11, tras investigar Liquid Glass/glassmorphism): el
+     vidrio NO se pinta — toma el color del fondo. Tinte con alfa BAJA (≤.25;
+     el blanco al 45-58% parecía pegatina) y la vida la pone saturate(1.8) en
+     el backdrop-filter: el blur promedia hacia gris y la saturación lo repone. */
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(16,16,18,.20); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(14,14,16,.22); --hub-input-line: #252525;
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(14,14,16,.24); --hub-fab-line: #2b2b2b;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(14,14,16,.24); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #ececec;
+  --hub-hairline: rgba(255,255,255,.16); --hub-label: #a8a8a8;
+  --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(16,16,18,.22); --tile-line: rgba(255,255,255,.07);
   /* ===== Canto y volumen del VIDRIO (referencia Cryptify) =====
      rim   = hairline clara del canto + brillo interior superior
      lift  = sombra que despega la pieza del fondo
      Juntos son lo que hace que se lea como cristal y no como un rectángulo
      borroso. Se usan en tarjetas, buscador, tiles, pastillas y FABs. */
-  --glass-rim: inset 0 1px 0 rgba(255,255,255,.10);
+  /* Liquid glass Fase 1 (2026-08-11): blur BAJO (la clave — el blur alto daba
+     aspecto de leche, no de cristal) + rim de luz en dos direcciones (filo
+     superior-izq brillante, inferior-der tenue) como el canto de un vidrio. */
+  --glass-blur: 12px;
+  --glass-rim: inset 1.5px 1.5px 1px 0 rgba(255,255,255,.22), inset -1px -1px 1px 1px rgba(255,255,255,.10);
   --glass-lift: 0 10px 28px -14px rgba(0,0,0,.34);
   --tile-letter: #ffffff; --tile-mono: #e6e6e6; --dial-add-line: #2b2b2b;
   --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(16,16,16,.93);
@@ -128,13 +136,14 @@
   --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f4ecfa 60%);
   --checker-a: #f3dae6; --checker-b: #faeff5;
-  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(150,45,95,.10);
-  --hub-input: rgba(255,255,255,.55); --hub-input-line: rgba(150,45,95,.14);
-  --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(150,45,95,.14);
-  --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.16); --hub-card-line: rgba(150,45,95,.10);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.20); --hub-input-line: rgba(150,45,95,.14);
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-fab-line: rgba(150,45,95,.14);
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
   --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
-  --tile-default: linear-gradient(150deg,rgba(255,255,255,.72),rgba(246,222,233,.42)); --tile-line: rgba(150,45,95,.10);
-  --glass-rim: inset 0 1px 0 rgba(255,255,255,.45);
+  --tile-default: linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.12)), rgba(255,255,255,.18); --tile-line: rgba(150,45,95,.10);
+  --glass-blur: 12px;
+  --glass-rim: inset 1.5px 1.5px 1px 0 rgba(255,255,255,.55), inset -1px -1px 1px 1px rgba(255,255,255,.35);
   --glass-lift: 0 10px 26px -14px rgba(40,20,40,.16);
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
@@ -188,13 +197,14 @@
   --checker-a: #e8eaee; --checker-b: #f4f5f7;
   /* Hub invertido: cristales blancos con hairline oscura y sombra en vez de
      brillo; los tiles sin color propio pasan a gris claro con letra oscura. */
-  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(18,20,26,.10);
-  --hub-input: rgba(255,255,255,.55); --hub-input-line: rgba(18,20,26,.14);
-  --hub-fab: rgba(255,255,255,.58); --hub-fab-line: rgba(18,20,26,.14);
-  --hub-pill: rgba(255,255,255,.58); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.16); --hub-card-line: rgba(18,20,26,.10);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.20); --hub-input-line: rgba(18,20,26,.14);
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-fab-line: rgba(18,20,26,.14);
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
-  --tile-default: linear-gradient(150deg,rgba(255,255,255,.72),rgba(231,233,238,.42)); --tile-line: rgba(18,20,26,.10);
-  --glass-rim: inset 0 1px 0 rgba(255,255,255,.45);
+  --tile-default: linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.12)), rgba(255,255,255,.18); --tile-line: rgba(18,20,26,.10);
+  --glass-blur: 12px;
+  --glass-rim: inset 1.5px 1.5px 1px 0 rgba(255,255,255,.55), inset -1px -1px 1px 1px rgba(255,255,255,.35);
   --glass-lift: 0 10px 26px -14px rgba(40,20,40,.16);
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
@@ -514,10 +524,10 @@ button { font-family: inherit; }
 .sp-item button svg { width: 12px; height: 12px; }
 
 /* res-pop y rat-pop se anclan por JS junto a su botón (anclarPop) */
-#res-pop { left: calc(var(--sidebar-w) + 8px); bottom: 52px; width: 258px; padding: 12px; }
+#res-pop { left: calc(var(--sidebar-w) + 8px); bottom: 52px; width: 320px; padding: 14px; }
 .rp-title { font-size: 13.5px; font-weight: 600; }
 .rp-sub { font-size: 11.5px; color: var(--text-dim); margin: 3px 0 10px; line-height: 1.5; }
-#res-list { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; }
+#res-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: min(52vh, 420px); overflow-y: auto; padding-right: 2px; }
 .rp-item { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border: none; background: transparent; color: var(--text); font-size: 12.5px; text-align: left; padding: 7px 9px; border-radius: 7px; cursor: pointer; transition: background .12s; }
 .rp-item:hover { background: var(--hover); }
 .rp-item.sel { background: var(--active); box-shadow: inset 2px 0 0 var(--accent); }
@@ -778,7 +788,7 @@ button { font-family: inherit; }
    MATERIAL DE VIDRIO (referencia O2 Studio 2026-08-11): blur alto y
    superficie translúcida — se intuye el fondo, no se distingue. Estático:
    backdrop-filter sin animar. */
-.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); }
+.w-card { background: var(--hub-card); border-radius: 26px; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; padding: 24px; height: 100%; backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); }
 .w-clock { padding: 30px 24px; }
 .w-shortcuts { background: transparent; backdrop-filter: none; box-shadow: none; }
 
@@ -793,7 +803,7 @@ button { font-family: inherit; }
 .w-search { grid-column: span 6; }
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
    foco (y en el color de realce) */
-#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: none; backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); transition: box-shadow var(--dur-2) var(--ease); }
+#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: none; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transition: box-shadow var(--dur-2) var(--ease); }
 #hub-search:hover:not(:focus-within) { border-color: color-mix(in srgb, var(--realce) 30%, transparent); }
 #hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 22%, transparent); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
@@ -825,7 +835,7 @@ button { font-family: inherit; }
 .dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative; }
 /* Tiles de VIDRIO (2026-08-11): translúcidos con blur, como el resto del hub
    — dejan intuir el fondo sin que el icono pierda contraste. */
-.d-tile { width: 92px; height: 92px; border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(64px) saturate(1.6); box-shadow: var(--glass-rim), var(--glass-lift); transform: translateZ(0); will-change: transform; backface-visibility: hidden; transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
+.d-tile { width: 92px; height: 92px; border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transform: translateZ(0); backface-visibility: hidden; transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
 .d-tile img { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); object-fit: contain; position: relative; z-index: 1; }
 /* Favicon del acceso: monocromo y con el brillo del tema (claro en tiles oscuros, oscuro en tiles claros) */
 .d-tile img.d-fav { filter: var(--fav-filter); }
@@ -863,7 +873,7 @@ button { font-family: inherit; }
 /* Esquina superior derecha del hub (como Opera GX): cuenta y clima en pastillas
    de cristal oscuro sobre el fondo del usuario, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(48px) saturate(1.5); box-shadow: var(--glass-rim), var(--glass-lift); }
+.hub-pill { display: inline-flex; align-items: center; gap: 8px; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); }
 button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
 button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
 button.hub-pill:active { transform: translateY(0) scale(.97); }
@@ -892,7 +902,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* FAB + paneles del hub */
 .hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
 #hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
-.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(48px) saturate(1.5); box-shadow: var(--glass-rim), var(--glass-lift); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.hub-fab { display: inline-flex; align-items: center; gap: 7px; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }
@@ -1057,20 +1067,19 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #addon-tools { display: contents; }
 #addon-tools .sb-btn.busy { color: var(--ok); pointer-events: none; }
 
-/* Botón Addons del hub: placa inclinada con borde de gradiente animado */
-#hub-addons { position: relative; transform: skewX(-10deg); border: 1px solid transparent; border-radius: 10px;
-  background: linear-gradient(var(--addons-plate), var(--addons-plate)) padding-box,
-              linear-gradient(120deg,#b9aae6,#9dc3e6,#a4d9c2,#e6d6a4,#e6a9b4,#b9aae6) border-box;
+/* Botón Addons del hub: misma placa de VIDRIO que los demás FABs, con el
+   borde de gradiente en la gama del tema (antes era una placa opaca con los
+   colores pastel del tema viejo y cantaba sobre cualquier fondo). */
+#hub-addons { position: relative; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; border: 1px solid transparent; border-radius: var(--r-full);
+  background: var(--hub-fab) padding-box,
+              linear-gradient(120deg, rgba(255,255,255,.45), rgba(255,255,255,.12), rgba(255,255,255,.45)) border-box;
   background-size: auto, 300% 100%;
-  box-shadow: 0 0 16px rgba(185,170,230,.22);
   padding: 9px 16px; font-weight: 600; letter-spacing: .3px; }
 /* El gradiente solo se anima al pasar el ratón: una animación infinita
    mantiene el compositor de la GPU despierto y dispara su memoria */
 #hub-addons:hover { animation: addons-flow 2.5s linear infinite; }
-#hub-addons > span { transform: skewX(10deg); display: inline-flex; align-items: center; }
-#hub-addons svg { width: 16px; height: 16px; color: #cdbdf1; }
-#hub-addons:hover { box-shadow: 0 0 28px rgba(185,170,230,.5); border-color: transparent; color: #fff; }
-#hub-addons:hover svg { color: #fff; }
+#hub-addons svg { width: 16px; height: 16px; color: var(--text); }
+#hub-addons:hover { box-shadow: 0 0 0 1px rgba(255,255,255,.28), 0 8px 22px rgba(0,0,0,.28); color: var(--text-strong); }
 @keyframes addons-flow { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }
 
 /* El logo "vive" al tocarlo: rotación de tono por CSS (las animaciones SMIL
@@ -1168,3 +1177,87 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 :root.light #hub-version, :root.rosa #hub-version,
 :root.light .w-clock .greet, :root.rosa .w-clock .greet,
 :root.light .w-head, :root.rosa .w-head { text-shadow: 0 1px 3px rgba(255,255,255,.6); }
+
+/* Fichas de resolución: rejilla compacta con la medida como dato grande */
+.rp-card { position: relative; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; padding: 10px 11px; border: none; border-radius: 14px; background: var(--btn); color: var(--text); cursor: pointer; text-align: left; transition: background var(--dur-1) var(--ease), transform .09s ease; }
+.rp-card:hover { background: var(--wash); }
+.rp-card:active { transform: scale(.97); }
+.rp-card .rp-dim { font-size: 13.5px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
+.rp-card .rp-name { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rp-card .rp-prop { position: absolute; top: 9px; right: 10px; font-size: 9.5px; letter-spacing: .4px; color: var(--dim); }
+.rp-card.sel { background: var(--grad-realce); color: var(--grad-fg); }
+.rp-card.sel .rp-name, .rp-card.sel .rp-prop { color: color-mix(in srgb, var(--grad-fg) 70%, transparent); }
+/* Botón de imagen propia: el anillo de foco de Windows (color de acento del
+   sistema) lo dejaba con un borde ámbar que parecía un bug */
+.wp-custom { width: 100%; background: transparent; font-family: inherit; }
+.wp-custom:focus { outline: none; }
+.wp-custom:focus-visible { outline: 2px solid var(--realce); outline-offset: 2px; }
+.wp-custom:hover { color: var(--text); border-color: var(--realce); }
+
+/* ===== El HUB es NEUTRO (2026-08-11, regla de Dosa) =====
+   El hub va sobre el fondo del usuario: sus piezas no llevan el color del tema
+   (el lima, el rojo o el rosa) salvo que él lo pida. Vidrio y blancos. */
+#hub .hub-fab.on { background: rgba(255,255,255,.22); color: var(--text-strong); border-color: transparent; box-shadow: var(--glass-rim), var(--glass-lift); }
+#hub-search:hover:not(:focus-within) { border-color: transparent; box-shadow: var(--glass-rim), var(--glass-lift), 0 0 0 1px rgba(255,255,255,.14); }
+#hub-search:focus-within { border-color: transparent; box-shadow: var(--glass-rim), var(--glass-lift), 0 0 0 3px rgba(255,255,255,.16); }
+#hub .tema-op.on { color: var(--text-strong); }
+#hub .bg-thumb.sel, #hub .ts-item.sel { border-color: rgba(255,255,255,.75); }
+#hub .wp-custom:hover { border-color: rgba(255,255,255,.45); }
+#hub .wp-custom:focus-visible { outline-color: rgba(255,255,255,.7); }
+#hub .dial.add .d-tile { border-color: rgba(255,255,255,.28); }
+:root.light #hub .hub-fab.on, :root.rosa #hub .hub-fab.on { background: rgba(255,255,255,.72); color: var(--text-strong); }
+:root.light #hub .bg-thumb.sel, :root.rosa #hub .bg-thumb.sel,
+:root.light #hub .ts-item.sel, :root.rosa #hub .ts-item.sel { border-color: rgba(30,20,30,.55); }
+
+/* Contraste del texto sobre vidrio: las piezas del hub llevan el texto fuerte */
+.hub-fab, .hub-pill { color: var(--text-strong); }
+#hub-addons { color: var(--text-strong); }
+.hub-pill .wxp-city { color: var(--muted); }
+
+/* ===== EL TINTE DEL VIDRIO SIGUE AL FONDO, NO AL TEMA (2026-08-11) =====
+   Fallo que detectó Dosa: en tema oscuro el cristal es ahumado; sobre una FOTO
+   clara se leía como manchas negras. applyBackground mide el brillo medio de
+   la foto y pone #hub.bg-claro si es clara: los tokens del vidrio cambian al
+   juego BLANCO (el mismo del tema claro), solo dentro del hub. Con los
+   degradados del tema no aplica (ya van a juego con su tema). */
+#hub.bg-claro {
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.16); --hub-card-line: rgba(18,20,26,.10);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.20); --hub-input-line: rgba(18,20,26,.14);
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-fab-line: rgba(18,20,26,.14);
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
+  --tile-default: linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.12)), rgba(255,255,255,.18); --tile-line: rgba(18,20,26,.10);
+  --glass-rim: inset 1.5px 1.5px 1px 0 rgba(255,255,255,.55), inset -1px -1px 1px 1px rgba(255,255,255,.35);
+  --glass-lift: 0 10px 26px -14px rgba(40,20,40,.16);
+  --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
+  --wx-ic: #4a4d55;
+  --fav-filter: grayscale(1) brightness(.42);
+}
+/* El texto oscuro va SOLO dentro de las piezas de cristal blanco. El texto que
+   FLOTA sobre la foto (reloj, saludo, nombres de los tiles) sigue blanco con
+   sombra oscura — el primer intento oscureció --text global y el reloj se
+   perdía sobre las zonas rojas de la propia foto. */
+#hub.bg-claro .hub-fab, #hub.bg-claro .hub-pill, #hub.bg-claro #hub-addons { color: #17181c; }
+#hub.bg-claro .hub-pill .wxp-city { color: #5b5e66; }
+#hub.bg-claro #hub-search input { color: #2e3038; }
+#hub.bg-claro #hub-search input::placeholder { color: #8a8d95; }
+#hub.bg-claro #hub-search .g-ico { color: #5b5e66; }
+#hub.bg-claro .w-card:not(.w-clock) { color: #2e3038; }
+#hub.bg-claro .hub-fab.on { background: rgba(255,255,255,.72); }
+/* Texto FLOTANTE sobre foto LUMINOSA (bg-lum-claro, por luminancia — no es lo
+   mismo que bg-claro, que va por brillo HSV para el tinte del vidrio): sobre
+   mármol/nieve el texto blanco se lava aunque lleve sombra → pasa a oscuro con
+   halo claro. Sobre el rojo (luminancia baja) se queda blanco, que ahí se lee. */
+#hub.bg-lum-claro .w-clock .time, #hub.bg-lum-claro .w-clock .greet,
+#hub.bg-lum-claro .d-name, #hub.bg-lum-claro .dial:hover .d-name {
+  color: #26262e; text-shadow: 0 1px 3px rgba(255,255,255,.55);
+}
+#hub.bg-lum-claro .w-clock .time { text-shadow: 0 2px 22px rgba(255,255,255,.55); }
+
+/* ===== LIQUID GLASS · REFRACCIÓN (2026-08-11) =====
+   La aplica el MOTOR DE LENTES de renderer.js (lgAplicar): genera un mapa de
+   desplazamiento por forma (SDF de rectángulo redondeado — refracción solo en
+   la banda del bisel, interior quieto, que es como funciona el Liquid Glass
+   real, sin "derretido") y lo pone como backdrop-filter: url(#lg-N) en línea
+   sobre cada pieza cuando el fondo es una FOTO (#hub.refract). Con degradados
+   del tema rige el backdrop-filter de CSS (blur + saturate). Estático. */
