@@ -70,10 +70,10 @@
   --checker-a: #111111; --checker-b: #0c0c0c;
   /* Superficies del hub: van SOBRE el fondo elegido por el usuario, así que son
      cristales translúcidos y necesitan su propio juego de tokens. */
-  --hub-card: rgba(22,22,22,.55); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: rgba(15,15,15,.8); --hub-input-line: #252525;
-  --hub-fab: rgba(15,15,15,.82); --hub-fab-line: #2b2b2b;
-  --hub-pill: rgba(15,15,15,.82); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
+  --hub-card: rgba(22,22,22,.42); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: rgba(15,15,15,.55); --hub-input-line: #252525;
+  --hub-fab: rgba(15,15,15,.6); --hub-fab-line: #2b2b2b;
+  --hub-pill: rgba(15,15,15,.6); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #d6d6d6;
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #737373;
   --tile-default: linear-gradient(140deg,#222222,#131313); --tile-line: rgba(255,255,255,.07);
   --tile-letter: #ffffff; --tile-mono: #e6e6e6; --dial-add-line: #2b2b2b;
@@ -113,10 +113,10 @@
   --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f4ecfa 60%);
   --checker-a: #f3dae6; --checker-b: #faeff5;
-  --hub-card: rgba(255,255,255,.74); --hub-card-line: rgba(150,45,95,.10);
-  --hub-input: rgba(255,255,255,.88); --hub-input-line: rgba(150,45,95,.14);
-  --hub-fab: rgba(255,255,255,.88); --hub-fab-line: rgba(150,45,95,.14);
-  --hub-pill: rgba(255,255,255,.88); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
+  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(150,45,95,.10);
+  --hub-input: rgba(255,255,255,.62); --hub-input-line: rgba(150,45,95,.14);
+  --hub-fab: rgba(255,255,255,.62); --hub-fab-line: rgba(150,45,95,.14);
+  --hub-pill: rgba(255,255,255,.62); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
   --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
   --tile-default: linear-gradient(140deg,#ffffff,#f6dee9); --tile-line: rgba(150,45,95,.10);
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
@@ -171,10 +171,10 @@
   --checker-a: #e8eaee; --checker-b: #f4f5f7;
   /* Hub invertido: cristales blancos con hairline oscura y sombra en vez de
      brillo; los tiles sin color propio pasan a gris claro con letra oscura. */
-  --hub-card: rgba(255,255,255,.72); --hub-card-line: rgba(18,20,26,.10);
-  --hub-input: rgba(255,255,255,.86); --hub-input-line: rgba(18,20,26,.14);
-  --hub-fab: rgba(255,255,255,.86); --hub-fab-line: rgba(18,20,26,.14);
-  --hub-pill: rgba(255,255,255,.86); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-card: rgba(255,255,255,.5); --hub-card-line: rgba(18,20,26,.10);
+  --hub-input: rgba(255,255,255,.62); --hub-input-line: rgba(18,20,26,.14);
+  --hub-fab: rgba(255,255,255,.62); --hub-fab-line: rgba(18,20,26,.14);
+  --hub-pill: rgba(255,255,255,.62); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
   --tile-default: linear-gradient(140deg,#ffffff,#e7e9ee); --tile-line: rgba(18,20,26,.10);
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
@@ -744,8 +744,11 @@ button { font-family: inherit; }
    ni sombra — separa el espacio, no el trazo. */
 /* Bento (referencias bee_ui/dashboard): tarjetas cápsula de radio generoso.
    El reloj vuelve a su tarjeta como HERO del bento; los accesos siguen
-   flotando (los tiles ya son cápsulas por sí mismos). */
-.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(10px); }
+   flotando (los tiles ya son cápsulas por sí mismos).
+   MATERIAL DE VIDRIO (referencia O2 Studio 2026-08-11): blur alto y
+   superficie translúcida — se intuye el fondo, no se distingue. Estático:
+   backdrop-filter sin animar. */
+.w-card { background: var(--hub-card); border-radius: 26px; padding: 24px; height: 100%; backdrop-filter: blur(26px) saturate(1.25); }
 .w-clock { padding: 30px 24px; }
 .w-shortcuts { background: transparent; backdrop-filter: none; }
 
@@ -760,7 +763,7 @@ button { font-family: inherit; }
 .w-search { grid-column: span 6; }
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
    foco (y en el color de realce) */
-#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: 1px solid transparent; backdrop-filter: blur(10px); transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
+#hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: 1px solid transparent; backdrop-filter: blur(26px) saturate(1.25); transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
 #hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 50%, var(--hub-input-line)); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
 #hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
@@ -796,11 +799,8 @@ button { font-family: inherit; }
 .d-tile .d-letter { font-size: 30px; font-weight: 650; color: var(--letter, var(--tile-letter)); position: relative; z-index: 1; }
 .d-tile .d-mono { width: 40px; height: 40px; color: var(--tile-mono); position: relative; z-index: 1; }
 .d-tile .d-mono svg { width: 40px; height: 40px; }
-/* Logos a color: mismo diseño, color oficial de la marca; los favicons dejan
-   de pasar por el filtro monocromo. GitHub y X no traen --brand-c (son negros)
-   y conservan el tono del tema. */
-:root.color-logos .d-tile .d-mono { color: var(--brand-c, var(--tile-mono)); }
-:root.color-logos .d-tile img.d-fav { filter: none; }
+/* La opción "Logos a color" se ELIMINÓ (2026-08-11): los accesos van siempre
+   monocromos, en el tono del tema. */
 .dial:hover .d-tile { transform: translateY(-6px); box-shadow: 0 14px 30px -10px var(--tile-glow, rgba(0,0,0,.6)); border-color: var(--hub-hairline); }
 .dial:active .d-tile { transform: translateY(-2px) scale(.98); transition-duration: .08s; }
 .d-name { font-size: 11.5px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
@@ -830,7 +830,7 @@ button { font-family: inherit; }
 /* Esquina superior derecha del hub (como Opera GX): cuenta y clima en pastillas
    de cristal oscuro sobre el fondo del usuario, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(8px); }
+.hub-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(18px) saturate(1.2); }
 button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
 button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
 button.hub-pill:active { transform: translateY(0) scale(.97); }
@@ -859,7 +859,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* FAB + paneles del hub */
 .hub-actions { position: absolute; left: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; }
 #hub-version { position: absolute; right: 18px; bottom: 16px; z-index: 3; font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: .5px; color: var(--hub-label); background: var(--hub-card); border-radius: 999px; padding: 5px 11px; pointer-events: none; -webkit-font-smoothing: antialiased; }
-.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(8px); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.hub-fab { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: var(--hub-fab); color: var(--text); font-size: 12.5px; padding: 9px 13px; border-radius: var(--r-full); cursor: pointer; backdrop-filter: blur(18px) saturate(1.2); transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .hub-fab:hover { transform: translateY(-1px); }
 .hub-fab:active { transform: translateY(0) scale(.97); }
 .hub-fab:hover { border-color: var(--focus); }

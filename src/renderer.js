@@ -676,14 +676,9 @@ const DEFAULT_DIALS = [
 let dials = store.get('cobalt.dials', DEFAULT_DIALS);
 function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt.dials', dials); renderHub(); }
 
-// Logos de los dials: monocromos por defecto, o con su color de marca original
-// si "Logos a color" está activo (los diseños son los mismos SVG de siempre;
-// el color va por CSS variable para que el toggle no tenga que repintar a mano).
-const colorLogosOn = () => store.get('cobalt.colorLogos', true);
-function applyColorLogos() {
-  document.documentElement.classList.toggle('color-logos', colorLogosOn());
-  renderHub();
-}
+// Logos de los dials: SIEMPRE monocromos. La opción "Logos a color" se
+// eliminó del producto (decisión del usuario 2026-08-11: rompía la estética
+// de vidrio y paleta única del hub).
 function styleDial(tile, letter, d) {
   const brand = brandOf(d.url);
   // El fondo y el filtro del favicon los pone el CSS (tokens --tile-default y
@@ -691,8 +686,6 @@ function styleDial(tile, letter, d) {
   // tiles negros con iconos aclarados sobre un hub blanco.
   if (brand && window.brandIcon(brand)) {
     const m = document.createElement('span'); m.className = 'd-mono'; m.innerHTML = window.brandIcon(brand);
-    const c = window.brandColor(brand);
-    if (c) m.style.setProperty('--brand-c', c); // .color-logos lo usa; sin la clase, se ignora
     tile.appendChild(m); letter.remove(); return;
   }
   getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.className = 'd-fav'; im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
@@ -867,8 +860,7 @@ function buildSyncData() {
     dials: store.get('cobalt.dials', null),
     widgets: store.get('cobalt.widgets', null),
     notes: store.get('cobalt.notes', ''),
-    hubBg: store.get('cobalt.hubBg', null),
-    colorLogos: store.get('cobalt.colorLogos', true)
+    hubBg: store.get('cobalt.hubBg', null)
   };
 }
 async function applySyncData(d) {
@@ -878,7 +870,6 @@ async function applySyncData(d) {
   if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
   if (d.hubBg) { store.set('cobalt.hubBg', d.hubBg); applyBackground(d.hubBg); }
-  if (typeof d.colorLogos === 'boolean') { store.set('cobalt.colorLogos', d.colorLogos); applyColorLogos(); }
   if (d.settings) {
     settings = await window.cobalt.setSettings(d.settings);
     applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
@@ -2517,10 +2508,6 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
-  document.documentElement.classList.toggle('color-logos', colorLogosOn());
-  const optColor = document.getElementById('opt-colorlogos');
-  optColor.checked = colorLogosOn();
-  optColor.addEventListener('change', () => { store.set('cobalt.colorLogos', optColor.checked); applyColorLogos(); });
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderBookmarksBar(); renderHub();
