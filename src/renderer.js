@@ -53,8 +53,6 @@ function applyTheme(light) {
   const t = temaActual();
   if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
   else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);
-  // las imagenes empaquetadas cambian con el tema
-  if (typeof renderHub === 'function' && els.hub && els.hub.classList.contains('active')) renderHub();
 }
 /* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
    tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
@@ -74,6 +72,12 @@ function aplicaTema(tema) {
   store.set('cobalt.lightMode', tema !== 'oscuro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema());
+  /* Y se REPINTA el hub: las fotos de los contenedores son las del tema activo
+     (imagenDeTema) y se quedaban en las del tema anterior hasta que algo mas
+     redibujaba. Va aqui, el paso unico por el que entra TODO cambio de tema
+     (el menu Temas, el interruptor de modo claro y la cuenta), no solo en
+     applyTheme — el menu llamaba directo a aplicaTema y se saltaba el repinte. */
+  if (typeof renderHub === 'function' && els.hub && els.hub.classList.contains('active')) renderHub();
 }
 (() => {
   // Antes de que cargue nada más, para que no haya fogonazo al cambiar.
