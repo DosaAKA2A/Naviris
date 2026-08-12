@@ -195,8 +195,8 @@
   --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.5); --focus-ring: rgba(232,32,42,.25);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #131317 0%, #08080a 60%);
   --checker-a: #16161a; --checker-b: #0e0e11;
-  --hub-card: #101015; --hub-card-line: rgba(232,32,42,.55);
-  --hub-input: #0b0b0d; --hub-input-line: rgba(232,32,42,.45);
+  --hub-card: #f0f0f2; --hub-card-line: rgba(232,32,42,.55);
+  --hub-input: #f0f0f2; --hub-input-line: rgba(232,32,42,.45);
   --hub-fab: #0b0b0d; --hub-fab-line: rgba(232,32,42,.45);
   --hub-pill: #0b0b0d; --hub-pill-line: rgba(232,32,42,.45); --hub-pill-fg: #ededf0;
   --hub-hairline: rgba(11,11,13,.7); --hub-label: #e8202a;
@@ -211,10 +211,12 @@
   --fav-filter: none;
 }
 /* Las piezas dejan de pintar vidrio: aqui son masas macizas */
-:root.cartel .w-card, :root.cartel .d-tile, :root.cartel #hub-search,
-:root.cartel .hub-pill, :root.cartel .hub-fab, :root.cartel #hub-addons,
+:root.cartel .w-card, :root.cartel #hub-search,
 :root.cartel .w-clock::before, :root.cartel .w-sp::before, :root.cartel .w-user::before {
-  background-color: #101015; background-image: none;
+  background-color: #f0f0f2; background-image: none;
+}
+:root.cartel .d-tile, :root.cartel .hub-pill, :root.cartel .hub-fab, :root.cartel #hub-addons {
+  background-color: #0b0b0d; background-image: none;
 }
 /* NADA REDONDEADO: radio cero y ESQUINA CORTADA en dos esquinas opuestas */
 :root.cartel .w-card, :root.cartel .widget, :root.cartel #hub-search,
@@ -230,6 +232,24 @@
 :root.cartel .hub-fab, :root.cartel #hub-addons, :root.cartel #hub-version {
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
+/* Dentro de la masa BLANCA se invierten los tokens de texto: todo lo que use
+   var(--text) pasa a tinta. Se redefinen las variables en vez de perseguir
+   clase por clase. */
+:root.cartel .w-card {
+  --text: #0b0b0d; --text-strong: #000000; --text-dim: rgba(11,11,13,.62);
+  --muted: rgba(11,11,13,.62); --dim: rgba(11,11,13,.45);
+  --chip: rgba(11,11,13,.07); --chip-hover: rgba(11,11,13,.13); --chip-dim: rgba(11,11,13,.05);
+  --line: rgba(11,11,13,.14); --line-2: rgba(11,11,13,.20);
+  --btn: rgba(11,11,13,.07); --btn-hover: rgba(11,11,13,.13);
+  --cal-hoy-bg: #e8202a; --cal-hoy-fg: #ffffff;
+  color: #0b0b0d;
+}
+:root.cartel .w-card .w-head { color: #e8202a; }
+:root.cartel .w-clock .greet, :root.cartel .w-clock .ck-fecha { color: #0b0b0d; text-shadow: none; }
+:root.cartel .d-name { color: #0b0b0d; text-shadow: none; }
+:root.cartel .dial:hover .d-name { color: #e8202a; }
+/* Las de realce no llevan filo dibujado: su masa ya es el color */
+:root.cartel .w-wx, :root.cartel .w-mail { background-image: none; }
 /* FILO Y DETALLE de cada masa. El borde normal se PARTE contra el chaflan
    (clip-path recorta tambien bordes y sombras), asi que el filo se dibuja con
    capas de fondo: cuatro rectas + las dos diagonales de los cortes. Encima, la
@@ -285,12 +305,14 @@
 :root.cartel .wh-sub, :root.cartel .xt-chip { color: #e8202a; }
 /* Tarjetas de REALCE: la inversion, masa roja con tinta negra */
 :root.cartel .w-wx, :root.cartel .w-mail {
+  background-color: transparent;   /* el color lo pone su ::before, sin masa debajo */
   color: var(--grad-fg);
   --text: var(--grad-fg); --text-strong: var(--grad-fg);
   --text-dim: color-mix(in srgb, var(--grad-fg) 78%, transparent);
   --muted: color-mix(in srgb, var(--grad-fg) 78%, transparent);
   --dim: color-mix(in srgb, var(--grad-fg) 60%, transparent);
 }
+:root.cartel .w-wx::before, :root.cartel .w-mail::before { border-radius: 0; }
 :root.cartel .w-mail .w-head, :root.cartel .w-wx .w-head { color: color-mix(in srgb, var(--grad-fg) 72%, transparent); }
 /* Sobre la masa roja, las filas son BLOQUES NEGROS (traslucidas quedaban rojo
    sobre rojo y no se leia nada). Es el mismo juego del cartel: negro recortado
@@ -311,6 +333,10 @@
 :root.cartel #hub-search input::placeholder { color: #6d6d76; }
 :root.cartel .d-name { color: #ededf0; text-shadow: none; }
 :root.cartel .dial:hover .d-name { color: #e8202a; }
+:root.cartel .u-go, :root.cartel .wx2-go, :root.cartel .mv-play, :root.cartel .sp-play {
+  border-radius: 0; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  background: #0b0b0d; color: #f0f0f2;
+}
 :root.cartel .w-cta, :root.cartel .cta, :root.cartel .btn.red { border-radius: 0; background: #e8202a; color: #0b0b0d; }
 /* ===== EL TEMA LLEGA A TODA LA APP =====
    No basta con el hub: barra de pestanas, sidebar, barra de direcciones,
