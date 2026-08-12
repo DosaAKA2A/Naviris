@@ -52,12 +52,12 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 function applyTheme(light) {
   const t = temaActual();
   if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
-  else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);
+  else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);   // cartel se queda: su cromo ya es oscuro
 }
 /* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
    tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
    lo sincronizaban, y rosa se guarda aparte. */
-const TEMAS = ['oscuro', 'claro', 'rosa'];
+const TEMAS = ['oscuro', 'claro', 'rosa', 'cartel'];
 function temaActual() {
   const t = store.get('cobalt.tema', null);
   if (TEMAS.includes(t)) return t;
@@ -68,6 +68,7 @@ function aplicaTema(tema) {
   const raiz = document.documentElement;
   raiz.classList.toggle('light', tema === 'claro');
   raiz.classList.toggle('rosa', tema === 'rosa');
+  raiz.classList.toggle('cartel', tema === 'cartel');
   store.set('cobalt.tema', tema);
   store.set('cobalt.lightMode', tema !== 'oscuro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
@@ -2820,6 +2821,21 @@ const BACKGROUNDS = [
   'radial-gradient(120% 80% at 50% -10%, #1c2740 0%, #0b0e15 62%)',    // Acero
   'linear-gradient(135deg, #2a1030 0%, #100a1e 45%, #0a0a0d 100%)'     // Aurora
 ];
+/* Los diez del tema CARTEL: el tema es de dos tintas, así que las diez
+   opciones son diez rojos — del vivo del cartel al granate casi negro. Mismo
+   orden que los canónicos para que cambiar de tema conserve tu elección. */
+const BACKGROUNDS_CARTEL = [
+  'radial-gradient(130% 100% at 78% 0%, #f2141f 0%, #d90a17 45%, #a3050f 100%)',  // Cartel
+  'linear-gradient(135deg, #e8141f 0%, #b00711 100%)',                            // Bandera
+  'radial-gradient(120% 80% at 50% -10%, #d21437 0%, #6b0417 62%)',               // Carmín
+  'radial-gradient(120% 80% at 50% -10%, #c01020 0%, #4a0810 62%)',               // Lacre
+  'radial-gradient(120% 80% at 50% -10%, #e03a1a 0%, #7a1405 62%)',               // Cinabrio
+  'radial-gradient(120% 80% at 50% -10%, #9e0a1e 0%, #38040b 62%)',               // Granate
+  'radial-gradient(120% 80% at 50% -10%, #e8541a 0%, #6b1c04 62%)',               // Minio
+  'radial-gradient(120% 80% at 50% -10%, #b3121c 0%, #2e0508 62%)',               // Óxido
+  'radial-gradient(120% 80% at 50% -10%, #8a0f2a 0%, #2a0410 62%)',               // Vino tinta
+  'linear-gradient(135deg, #f2141f 0%, #8f040e 45%, #2a0406 100%)'                // Ocaso
+];
 // Los MISMOS diez fondos en versión clara, en el mismo orden: el fondo guardado
 // se sigue identificando por su valor oscuro (canónico) y aquí se traduce según
 // el tema, de modo que cambiar de claro a oscuro conserva el fondo elegido.
@@ -2882,6 +2898,7 @@ function bgForTheme(v) {
   const i = BACKGROUNDS.indexOf(v);
   if (i < 0) return v;
   const raiz = document.documentElement.classList;
+  if (raiz.contains('cartel')) return BACKGROUNDS_CARTEL[i];
   if (raiz.contains('rosa')) return BACKGROUNDS_ROSA[i];
   return raiz.contains('light') ? BACKGROUNDS_LIGHT[i] : BACKGROUNDS[i];
 }
@@ -2898,6 +2915,7 @@ function applyBackground(v) {
     || v === 'radial-gradient(130% 100% at 80% 0%, #23260f 0%, #141508 42%, #0a0a06 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
+  if (i < 0) i = BACKGROUNDS_CARTEL.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set(bgThemeKey(), v);
