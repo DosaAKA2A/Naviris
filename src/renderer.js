@@ -2091,7 +2091,7 @@ function renderMail(body) {
   const pinta = async () => {
     const tabsHtml = `<div class="ml-tabs">
       <button class="ml-t${prov === 'gmail' ? ' on' : ''}" data-p="gmail" title="Gmail">${window.brandIcon('gmail') || 'G'}</button>
-      <button class="ml-t${prov === 'outlook' ? ' on' : ''}" data-p="outlook" title="Outlook — pronto">${window.brandIcon('outlook') || 'O'}</button>
+      <button class="ml-t${prov === 'outlook' ? ' on' : ''}" data-p="outlook" title="Outlook — pronto">${window.icon('mail')}</button>
       <button class="ml-t${prov === 'mas' ? ' on' : ''}" data-p="mas" title="Otro proveedor — pronto">${window.icon('plus')}</button>
     </div>`;
     let cuerpo = '';

@@ -1806,6 +1806,3 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-deco:hover .dc-b { transform: rotate(-30deg) scale(1.06); opacity: .8; }
 .w-deco:hover .dc-c { transform: rotate(18deg) scale(1.1); opacity: .55; }
 .w-deco:active .dc-a { transform: rotate(45deg) scale(.7); }
-
-/* Logo real de Outlook en la pestana del widget de correo */
-.ml-t svg { width: 18px; height: 18px; }
