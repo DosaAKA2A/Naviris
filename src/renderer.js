@@ -194,7 +194,20 @@ function recordHistory(url, title) {
 }
 
 /* ============ Pestañas ============ */
+/* Pestaña de FONDO (clic con la rueda, "abrir el enlace en una pestaña nueva",
+   target=_blank sin foco): NACE DORMIDA. Nada se carga hasta que entras en
+   ella, así un vídeo de YouTube abierto de fondo no se pone a sonar en una
+   pestaña que ni has mirado (pedido de Dosa, 2026-08-12). Reutiliza tal cual
+   la mecánica de dormidas del ahorro de energía: despertar = poner el src.
+   El título y el icono salen del historial si ya conocemos el sitio. */
 function createTab(url = null, activate = true) {
+  if (url && !activate && /^https?:/i.test(url)) {
+    const conocido = history.find((h) => h.url === url);
+    const tab = crearDormida({ u: url, t: (conocido && conocido.title) || '' });
+    tab.sinCargar = true;   // dormida por no haberse abierto nunca, no por ahorro
+    getTile(url).then((t) => { if (t?.icon) { tab.favicon = t.icon; renderTabs(); } }).catch(() => {});
+    renderTabs(); saveSession(); return tab;
+  }
   const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now() };
   tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
 }
@@ -272,7 +285,7 @@ function attachWebview(tab, url) {
 }
 function activateTab(id) {
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
-  if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; }
+  if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; tab.sinCargar = false; }
   hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => {
@@ -373,7 +386,7 @@ function makeTabEl(tab, mini) {
   const el = document.createElement('div');
   el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (tab.pinned ? ' pinned' : '') + (mini ? ' mini loot-member' : '');
   el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
-    : tab.asleep ? `Pestaña dormida — ${tab.title}\n${tab.sleptUrl || tab.url}`
+    : tab.asleep ? `${tab.sinCargar ? 'Sin cargar — se abre al entrar' : 'Pestaña dormida'} — ${tab.title}\n${tab.sleptUrl || tab.url}`
     : (tab.url || 'Hub de Naviris');
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
