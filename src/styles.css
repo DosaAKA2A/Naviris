@@ -411,7 +411,7 @@ button { font-family: inherit; }
 .tab .t-mute.muted { color: var(--accent-2); }
 
 /* Menú contextual */
-.ctx-menu { position: fixed; z-index: 200; min-width: 190px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; box-shadow: 0 12px 34px var(--shadow-panel); animation: pop-in var(--dur-1) var(--spring) both; }
+.ctx-menu { position: fixed; z-index: 200; min-width: 190px; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; box-shadow: 0 12px 34px var(--shadow-panel); animation: pop-in var(--dur-1) var(--spring) both; }
 .ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
 .ctx-item:hover { background: var(--wash); }
 .ctx-item.danger { color: #e57373; }
@@ -520,12 +520,23 @@ button { font-family: inherit; }
 .bm-folder-pop:empty::after { content: "Carpeta vacía"; color: var(--dim); font-size: 12px; padding: 8px; display: block; }
 
 /* Popups */
-#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; }
+#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(.94); } to { opacity: 1; transform: none; } }
-#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column; }
+/* El menu NO puede pasar de la pantalla (2026-08-13). En una ventana baja se
+   salia por abajo y lo de mas abajo —incluido BUSCAR ACTUALIZACIONES— no habia
+   forma de tocarlo: el usuario se quedaba sin poder actualizar. Ahora se limita
+   al alto disponible y hace scroll dentro. */
+#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column;
+  max-height: calc(100vh - var(--titlebar-h) - var(--navbar-h) - 34px); overflow-y: auto; overscroll-behavior: contain; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
 #menu-pop button:hover { background: var(--wash); }
 #menu-pop hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
+/* Version nueva disponible: punto en el boton del menu y la entrada de
+   actualizar, destacada y la primera de la lista. */
+#nav-menu.hay-update { position: relative; }
+#nav-menu.hay-update::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--realce); box-shadow: 0 0 0 2px var(--bg-2); }
+#menu-pop button.destacado { color: var(--realce); font-weight: 600; }
 #menu-pop .kbd { color: var(--dim); font-size: 11px; }
 .menu-toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13px; cursor: pointer; border-radius: 7px; }
 .menu-toggle:hover { background: var(--wash); }

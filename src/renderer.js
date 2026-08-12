@@ -125,7 +125,9 @@ function showCtxMenu(x, y, items) {
   document.body.appendChild(m);
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(6, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
-  m.style.top = Math.max(6, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+  // Si el menu es MAS ALTO que la ventana, el tope de arriba lo dejaba
+  // asomando por abajo y sus ultimas opciones quedaban fuera de alcance.
+  m.style.top = Math.max(6, Math.min(y, Math.max(6, window.innerHeight - r.height - 8))) + 'px';
   ctxMenuEl = m;
 }
 // Abre una URL en una pestaña de fondo, sin cambiar la pestaña actual
@@ -4402,10 +4404,31 @@ async function chooseLine(line) {
 updBtn.addEventListener('click', showChannels);
 $('#upd-stable-btn').addEventListener('click', () => chooseLine('stable'));
 $('#upd-dev-btn').addEventListener('click', () => chooseLine('dev'));
+/* Aviso persistente de version nueva (2026-08-13). En una ventana baja el menu
+   se salia de la pantalla y "Buscar actualizaciones" quedaba fuera de alcance:
+   ademas de arreglar el menu, conviene que la actualizacion se VEA sin tener
+   que ir a buscarla. */
+function marcaActualizacion(version) {
+  const boton = $('#nav-menu');
+  if (boton) { boton.classList.add('hay-update'); boton.title = 'Menú — hay una versión nueva (' + version + ')'; }
+  const pop = $('#menu-pop'), entrada = $('#menu-update');
+  if (pop && entrada && pop.firstElementChild !== entrada) {
+    entrada.classList.add('destacado');
+    entrada.textContent = 'Actualizar a la ' + version;
+    pop.insertBefore(entrada, pop.firstElementChild);
+  }
+}
 window.cobalt.onUpdateStatus((s) => {
   if (s.state === 'available') {
     // Solo se descarga si el usuario eligió línea; el aviso silencioso de arranque solo notifica
-    if (!updChosen) { if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Acerca de)'); return; }
+    if (!updChosen) {
+      // Un toast se va solo y el usuario se queda sin enterarse. Ademas se
+      // marca el boton del menu con un punto, que no caduca, y la entrada de
+      // actualizar sube ARRIBA del todo mientras haya version nueva.
+      marcaActualizacion(s.version);
+      if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Buscar actualizaciones)');
+      return;
+    }
     setUpd('Descargando ' + UPD_LABEL[updChosen] + ' v' + s.version + '…'); updBar.classList.remove('hidden');
     window.cobalt.updateDownload();
   } else if (s.state === 'latest') {
@@ -4789,7 +4812,11 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   }
 
   // Contenedores que scrollean en la UI (los webviews conservan el suyo)
-  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list';
+  /* REGLA (Dosa, 2026-08-13): NINGUN scroll de Naviris usa la barra del
+     sistema. Todo lo que scrollee en la interfaz entra en esta lista — los
+     menus y popovers se sumaron al limitarlos al alto de la ventana, que es
+     cuando empezaron a scrollear. */
+  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
   const barrer = () => document.querySelectorAll(SEL).forEach(montar);
   barrer();
   // Los paneles y páginas se crean al vuelo: se revisan al abrirse
