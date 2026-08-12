@@ -1,7 +1,7 @@
 {
   "name": "naviris-browser",
   "productName": "Naviris",
-  "version": "2.7.3-dev.64",
+  "version": "2.7.3-dev.65",
   "description": "Naviris",
   "author": "Iris Studio",
   "license": "MIT",
@@ -78,7 +78,8 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
-    }
+    },
+    "afterPack": "build/afterPack.js"
   },
   "dependencies": {
     "adblock-rs": "^0.13.2",

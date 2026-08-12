@@ -1862,7 +1862,7 @@ function armaSpGrip() {
 function toggleSpotifyPanel(force) {
   const panel = document.getElementById('sp-panel');
   const abrir = force !== undefined ? force : panel.classList.contains('hidden');
-  if (abrir) { ensureSpotifyPlayer(); aplicaSpAncho(spAncho()); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
+  if (abrir) { ensureSpotifyPlayer(); spDespierta(false); aplicaSpAncho(spAncho()); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
   else { panel.classList.add('hidden'); els.sbSpotify.classList.remove('open'); }
   actualizaSpotifyVivo();
 }
@@ -1896,12 +1896,54 @@ function spCmd(cmd) {
   setTimeout(actualizaSpotify, 400); // reflejar el nuevo estado enseguida
 }
 let spTimer = null;
+/* ===== SPOTIFY SE DUERME EN PAUSA (2026-08-13, peticion de Dosa) =====
+   El reproductor residente es un webview vivo: su proceso ronda los cientos de
+   MB aunque no suene nada. Si la musica lleva PAUSADA 15 s, se manda a
+   about:blank y se libera; la URL queda guardada y vuelve sola en cuanto pulsas
+   play, abres el panel o eliges una cancion. No se duerme nunca sonando, que
+   seria cortarte la musica. */
+const SP_DORMIR_MS = 15000;
+let spPausaDesde = 0, spDormido = false, spUrlDormida = '';
+function spDuerme() {
+  if (spDormido || !spPlayerWv) return;
+  try { spUrlDormida = spPlayerWv.getURL() || 'https://open.spotify.com'; } catch { spUrlDormida = 'https://open.spotify.com'; }
+  if (/^about:/.test(spUrlDormida)) return;
+  spDormido = true;
+  try { spPlayerWv.src = 'about:blank'; } catch { /* nada */ }
+  document.querySelectorAll('.w-sp').forEach((el) => el.classList.add('sp-dormido'));
+}
+/* Despertar: se restaura la pagina y, si se pidio reproducir, se pulsa play en
+   cuanto carga (Spotify recupera solo la cancion donde la dejaste). */
+function spDespierta(conPlay) {
+  if (!spPlayerWv) { ensureSpotifyPlayer(); return; }
+  if (!spDormido) { if (conPlay) spCmd('play'); return; }
+  spDormido = false; spPausaDesde = 0;
+  document.querySelectorAll('.w-sp').forEach((el) => el.classList.remove('sp-dormido'));
+  const alCargar = () => {
+    spPlayerWv.removeEventListener('dom-ready', alCargar);
+    if (conPlay) setTimeout(() => spCmd('play'), 1800);
+  };
+  spPlayerWv.addEventListener('dom-ready', alCargar);
+  try { spPlayerWv.src = spUrlDormida || 'https://open.spotify.com'; } catch { /* nada */ }
+}
 async function actualizaSpotify() {
   if (!widgets.some((w) => w.type === 'spotify')) { clearInterval(spTimer); spTimer = null; return; }
   const cuerpos = document.querySelectorAll('.w-sp');
   if (!els.hub.classList.contains('active')) return;
   const tab = spTab(); let st = null;
-  if (tab) { try { st = await tab.webview.executeJavaScript(SP_LEE, false); } catch { st = null; } }
+  if (tab && !spDormido) { try { st = await tab.webview.executeJavaScript(SP_LEE, false); } catch { st = null; } }
+  // Cuenta atras de la pausa: solo con el reproductor RESIDENTE (una pestana
+  // normal de Spotify es del usuario y no se toca).
+  // OJO: SP_LEE devuelve on:true con el reproductor VACIO (Spotify deja su
+  // boton en ese estado), asi que sonando exige ademas que haya cancion. De
+  // paso, un reproductor abierto sin nada cargado tambien se duerme: es un
+  // proceso entero gastado en enseniar una portada.
+  const sonando = !!(st && st.on && st.t);
+  if (spPlayerWv && !spDormido) {
+    if (sonando) spPausaDesde = 0;
+    else if (!spPausaDesde) spPausaDesde = Date.now();
+    else if (Date.now() - spPausaDesde > SP_DORMIR_MS) spDuerme();
+  }
   // Usar Spotify en pestaña también revela el dock (además de la cookie de
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
   if (tab) els.sbSpotify.classList.remove('hidden');
@@ -1950,7 +1992,14 @@ function renderSpotify(body) {
       <div class="spl-lista"><div class="w-vacio">Conecta Spotify para ver tus listas</div></div>
     </div>
     <button class="sp-play sp-b" data-cmd="play" title="Reproducir / pausa" data-ic="play">${window.icon('play')}</button>`;
-  body.addEventListener('click', (e) => { const b = e.target.closest('[data-cmd]'); if (b && !b.disabled) { e.stopPropagation(); spCmd(b.dataset.cmd); } });
+  body.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cmd]'); if (!b || b.disabled) return;
+    e.stopPropagation();
+    // Dormido, el play tiene que despertarlo primero (y los demas mandos
+    // tambien, o pulsarian sobre una pagina en blanco).
+    if (spDormido) { spDespierta(b.dataset.cmd === 'play'); return; }
+    spCmd(b.dataset.cmd);
+  });
   // "Abrir Spotify" levanta el reproductor RESIDENTE (no una pestaña): la
   // música sobrevive a la navegación y el botón del dock queda en el sidebar.
   body.querySelector('.sp-abre').addEventListener('click', (e) => { e.stopPropagation(); toggleSpotifyPanel(true); setTimeout(() => llenaListas(body), 5000); });
@@ -1980,6 +2029,7 @@ async function llenaListas(body) {
     '<div class="w-vacio">Abre un álbum o una lista en Spotify y aparecerán sus canciones</div>';
   cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (spDormido) { spDespierta(true); return; }
     const wv = spTab(); if (!wv) return;
     if (b.dataset.h) { splReproduce(b.dataset.h); return; }   // fila de biblioteca: se abre y suena
     wv.webview.executeJavaScript(SPL_TOCA(+b.dataset.i), true).catch(() => {});

@@ -1379,6 +1379,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   -webkit-mask: radial-gradient(circle 33px at calc(100% - 27px) 95px, transparent 32px, #000 33px);
   mask: radial-gradient(circle 33px at calc(100% - 27px) 95px, transparent 32px, #000 33px); }
 .w-sp > * { position: relative; z-index: 1; }
+/* Spotify dormido en pausa: la caratula baja de intensidad y el play invita a
+   volver. No se oculta nada, para que se entienda que sigue ahi. */
+.w-sp.sp-dormido .sp-art, .w-sp.sp-dormido .sp-meta { opacity: .55; }
+.w-sp.sp-dormido .spl-lista { opacity: .5; }
 .sp-art { width: 96px; aspect-ratio: 1; align-self: flex-start; flex-shrink: 0; border-radius: 26px 0 0 0; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; color: var(--dim); background: rgba(255,255,255,.05); }
 .sp-art > svg { width: 26px; height: 26px; }
 .sp-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

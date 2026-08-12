@@ -771,6 +771,22 @@ function atajosDeWebview(contents) {
   });
 }
 
+/* Scrollbar propio para las webs (2026-08-13, peticion de Dosa: seguian
+   saliendo barras por defecto en varias paginas). Gris translucido para que
+   valga en claro y en oscuro, y sin flechas. */
+const SCROLLBAR_CSS = `
+  ::-webkit-scrollbar { width: 11px !important; height: 11px !important; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent !important; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(128,128,132,.42) !important;
+    border: 3px solid transparent !important;
+    border-radius: 999px !important;
+    background-clip: content-box !important;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(128,128,132,.62) !important; background-clip: content-box !important; }
+  ::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; }
+`;
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
@@ -785,6 +801,13 @@ app.on('web-contents-created', (_event, contents) => {
     });
     // Inyecta el saltador de anuncios de YouTube y el revelado de X
     contents.on('dom-ready', () => {
+      // Scrollbar de Naviris en TODAS las paginas. El Fluent de Chromium solo
+      // aplica donde el sitio no trae el suyo, y muchos lo traen: se veian
+      // barras gruesas ajenas a la estetica. Este es fino, redondeado y
+      // TRASLUCIDO EN GRIS, que es lo unico que funciona igual sobre fondo
+      // claro y oscuro sin adivinar el tema de cada web. Va con !important
+      // porque compite con el CSS del sitio.
+      contents.insertCSS(SCROLLBAR_CSS).catch(() => {});
       let host = '';
       try { host = new URL(contents.getURL()).hostname; } catch { return; }
       // Ocultado cosmético + scriptlets de las listas de Brave (como uBlock/Brave)
