@@ -789,7 +789,7 @@ const WIDGET_TYPES = {
 let CELDA_W = 160, CELDA_H = 160;
 const CELDA_GAP = 18;
 const FILAS_LOGICAS = 5;
-let ultimoBucket = 'std', ultimasFilas = FILAS_LOGICAS;
+let ultimoBucket = 'm', ultimasFilas = FILAS_LOGICAS; // 'm' = la unica maqueta
 const TAMANOS = {
   clock: [[2, 1], [2, 2]],
   search: [[4, 1], [6, 1], [3, 1]],
@@ -827,9 +827,9 @@ function altoAccesos(w) {
   return Math.max(1, Math.ceil((altoPx + CELDA_GAP) / (CELDA_H + CELDA_GAP)));
 }
 function ajustaAccesos() {
-  const w = widgets.find((x) => x.type === 'shortcuts' && x.geo && x.geo[ultimoBucket]);
+  const w = widgets.find((x) => x.type === 'shortcuts' && x.geo && x.geo.m);
   if (!w) return;
-  const g = w.geo[ultimoBucket];
+  const g = w.geo.m;
   const nuevo = altoAccesos(g);
   const delta = nuevo - g.h;
   if (!delta) return;
@@ -840,7 +840,7 @@ function ajustaAccesos() {
   const cruza = (gx) => gx.col <= g.col + g.w - 1 && gx.col + gx.w - 1 >= g.col;
   delBucket().forEach((x) => {
     if (x.id === w.id) return;
-    const gx = x.geo[ultimoBucket];
+    const gx = x.geo.m;
     if (!cruza(gx) || gx.row <= finAntes) return;
     const nueva = delta > 0
       ? Math.min(ultimasFilas - gx.h + 1, gx.row + delta)
@@ -859,6 +859,26 @@ function tallaValida(w) {
   if (lista.some(([a, b]) => a === w.w && b === w.h)) return [w.w, w.h];
   return lista[0];
 }
+/* ===== UNA SOLA MAQUETA (2026-08-12) =====
+   Antes había tres composiciones según la forma de la ventana (ultrapanorámica
+   17x7, horizontal 13x7 y una de emergencia) y cada widget SOLO se dibujaba en
+   aquellas donde tenía posición guardada. Consecuencias que sufrió Dosa: abrir
+   en ventana pequeña dejaba el hub EN BLANCO (ningún widget tenía posición en
+   ese modo), la de emergencia montaba 60 filas fijas —10.000px de alto— con el
+   bloque centrado, así que la mitad quedaba por encima del scroll, y encima
+   las recolocaciones automáticas SE GUARDABAN: cambiar el tamaño de la ventana
+   te destrozaba la composición buena.
+
+   Ahora hay UNA maqueta (la tuya) y la ventana solo decide cómo se enseña:
+     · Cabe entera            -> misma maqueta, celda más pequeña.
+     · Cabe a lo ancho pero no a lo alto -> misma maqueta y SCROLL vertical.
+     · No cabe ni a lo ancho (ventana estrecha o vertical) -> REFLUJO: se
+       reordena en orden de lectura en las columnas que quepan.
+   El reflujo NO se guarda nunca: al agrandar la ventana vuelve tu maqueta
+   intacta. Solo se guarda lo que muevas tú en modo edición. */
+const CELDA_MIN = 80;      // por debajo de esto la maqueta ya no se sostiene a lo ancho
+const CELDA_COMODA = 96;   // si el alto aprieta, no encogemos más: preferimos scroll
+let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
   // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
   // daba una celda mas grande de la cuenta (la malla no cabia y aparecia
@@ -868,27 +888,19 @@ function medidasMalla() {
   const anchoUtil = anchoHub * 0.94;
   const csG = getComputedStyle(els.widgetGrid);
   const altoUtil = altoHub - (parseFloat(csG.paddingTop) || 24) - (parseFloat(csG.paddingBottom) || 90);
-  const vertical = anchoHub < altoHub;
-  const esUW = (window.innerWidth / window.innerHeight) > 2;
-  // ULTRAWIDE: malla FIJA de 17x7 (impares: siempre hay celda central). La
-  // celda se calcula para que quepan justas a lo ancho y a lo alto.
-  if (esUW && !vertical) {
-    const C = 17, F = 7;
-    const cw = Math.floor(Math.min((anchoUtil - (C - 1) * CELDA_GAP) / C, (altoUtil - (F - 1) * CELDA_GAP) / F));
-    if (cw >= 120) return { bucket: 'uw', cols: C, cw, filas: F, raro: false };
+  const C = COLS_MAESTRA, F = FILAS_MAESTRA;
+  const cwAncho = Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C);
+  const cwAlto = Math.floor((altoUtil - (F - 1) * CELDA_GAP) / F);
+  if (cwAncho >= CELDA_MIN) {
+    // La maqueta se conserva. Si el alto no da, celda cómoda y scroll: mucho
+    // mejor que reordenar los widgets por una ventana un poco baja.
+    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_COMODA));
+    return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
   }
-  // 16:9 (y cualquier pantalla horizontal normal): malla FIJA de 13x7 — el
-  // ALTO manda (7 filas siempre, como en ultrawide) y 13 columnas dan centro
-  // real; la celda escala con el monitor (1080p -> 4K).
-  if (!vertical) {
-    const C = 13, F = 7;
-    const cw = Math.floor(Math.min((anchoUtil - (C - 1) * CELDA_GAP) / C, (altoUtil - (F - 1) * CELDA_GAP) / F));
-    if (cw >= 90) return { bucket: 'std', cols: C, cw, filas: F, raro: false };
-  }
-  // Ventana rara: flujo con celda base y scroll
-  const cw = 160;
-  const cols = Math.max(2, Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP)));
-  return { bucket: 'flujo', cols, cw, filas: 60, raro: true };
+  // Ventana estrecha o vertical: reflujo en columnas, celda cómoda y scroll.
+  const cw = Math.max(CELDA_MIN, Math.min(150, cwAncho > 0 ? Math.max(cwAncho, 110) : 110));
+  const cols = Math.max(1, Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP)));
+  return { bucket: 'm', cols, cw, filas: 400, reflujo: true, raro: true };
 }
 function libre(occ, col, row, w, h, cols) {
   if (col < 1 || row < 1 || col + w - 1 > cols || row + h - 1 > ultimasFilas) return false;
@@ -899,13 +911,12 @@ function libre(occ, col, row, w, h, cols) {
 // se han colocado en este bucket son invisibles y no deben estorbar (bug de
 // "Ahi no cabe" en huecos claramente libres).
 function delBucket() {
-  if (ultimoBucket === 'flujo') return widgets;
-  return widgets.filter((x) => x.geo && x.geo[ultimoBucket]);
+  return widgets.filter((x) => x.geo && x.geo.m);
 }
 function ocupa(occ, wd) { for (let r = wd.row; r < wd.row + wd.h; r++) for (let c = wd.col; c < wd.col + wd.w; c++) occ.add(r + ':' + c); }
 // Toda mutacion (mover/estirar/talla) debe escribir en el bucket ACTIVO:
 // el render lee geo[cols] primero, y sin esto restauraba la posicion vieja.
-function fijaGeo(w) { if (ultimoBucket === 'flujo') return; (w.geo = w.geo || {})[ultimoBucket] = { col: w.col, row: w.row, w: w.w, h: w.h }; }
+function fijaGeo(w) { (w.geo = w.geo || {}).m = { col: w.col, row: w.row, w: w.w, h: w.h }; }
 function primerHueco(occ, w, h, cols) {
   for (let row = 1; row <= ultimasFilas - h + 1; row++) for (let col = 1; col <= cols - w + 1; col++) {
     if (libre(occ, col, row, w, h, cols)) return { col, row };
@@ -1348,7 +1359,7 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
    adopta la composicion de fabrica. */
 function migraMaquetaVieja(lista) {
   if (!Array.isArray(lista) || !lista.length) return DEFAULT_WIDGETS();
-  if (lista.some((w) => w && w.geo && (w.geo.std || w.geo.uw))) return lista;
+  if (lista.some((w) => w && w.geo && (w.geo.m || w.geo.std || w.geo.uw))) return lista;
   store.set('cobalt.widgets.pre-grilla', lista);
   const nueva = DEFAULT_WIDGETS();
   store.set('cobalt.widgets', nueva);
@@ -1359,6 +1370,28 @@ let widgets = migraMaquetaVieja(store.get('cobalt.widgets', null));
 widgets.forEach((w) => {
   if (!w.geo && w.col >= 1 && w.row >= 1) w.geo = { std: { col: w.col, row: w.row, w: w.w, h: w.h } };
 });
+/* De TRES composiciones por forma de ventana a UNA (2026-08-12): se adopta la
+   que más widgets tenga (la ultrapanorámica manda si estaba compuesta ahí,
+   porque es donde Dosa colocó todo) y pasa a ser LA maqueta. Las viejas
+   geo.std/geo.uw se dejan intactas en disco como respaldo: si algún día hay
+   que volver atrás, siguen ahí. */
+(function migraAMaquetaUnica() {
+  const guardada = store.get('cobalt.maqueta', null);
+  if (guardada && guardada.cols) { COLS_MAESTRA = guardada.cols; FILAS_MAESTRA = guardada.filas || 7; }
+  if (widgets.some((w) => w.geo && w.geo.m)) return;
+  const cuenta = (k) => widgets.filter((w) => w.geo && w.geo[k]).length;
+  const fuente = cuenta('uw') >= cuenta('std') && cuenta('uw') ? 'uw' : (cuenta('std') ? 'std' : null);
+  if (fuente) { COLS_MAESTRA = fuente === 'uw' ? 17 : 13; FILAS_MAESTRA = 7; }
+  widgets.forEach((w) => {
+    const g = (w.geo && (w.geo[fuente] || w.geo.uw || w.geo.std)) || { col: w.col, row: w.row, w: w.w, h: w.h };
+    (w.geo = w.geo || {}).m = {
+      col: Math.max(1, g.col || 1), row: Math.max(1, g.row || 1),
+      w: Math.max(1, g.w || w.w || 2), h: Math.max(1, g.h || w.h || 1)
+    };
+  });
+  store.set('cobalt.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
+  store.set('cobalt.widgets', widgets);
+})();
 const saveWidgets = () => store.set('cobalt.widgets', widgets);
 let widgetSeq = 100;
 
@@ -1367,33 +1400,43 @@ function renderHub() {
   els.widgetGrid.innerHTML = '';
   const m = medidasMalla();
   ultimoBucket = m.bucket; ultimasFilas = m.filas;
+  const reflujo = !!m.reflujo;
   els.hub.classList.toggle('con-scroll', !!m.raro);
+  els.hub.classList.toggle('reflujo', reflujo);
+  if (reflujo) els.hub.classList.remove('editing');   // sin sitio no se compone
   const cols = m.cols; ultimoCols = cols;
   CELDA_W = m.cw; CELDA_H = m.cw; // celda cuadrada que ESCALA con el monitor
   els.widgetGrid.style.gridTemplateColumns = `repeat(${cols}, ${CELDA_W}px)`;
   // Filas SIEMPRE explicitas: si la grilla solo creaba las usadas, el bloque
-  // centrado quedaba desplazado respecto a la malla de guias.
-  els.widgetGrid.style.gridTemplateRows = `repeat(${m.filas}, ${CELDA_H}px)`;
+  // centrado quedaba desplazado respecto a la malla de guias. En reflujo van
+  // implicitas: las filas las pone el contenido, no un numero fijo (las 60 de
+  // antes creaban 10.000px de vacio con la mitad fuera del scroll).
+  els.widgetGrid.style.gridTemplateRows = reflujo ? 'none' : `repeat(${m.filas}, ${CELDA_H}px)`;
   els.widgetGrid.style.gridAutoRows = `${CELDA_H}px`;
   els.widgetGrid.style.gap = `${CELDA_GAP}px`;
   ajustaAccesos();
   const occ = new Set();
-  for (const w of widgets) {
-    // COMPOSICION POR ANCHO (2026-08-11): cada bucket de columnas guarda su
-    // propia geometria (w.geo[cols]) — componer en FHD no toca el ultrawide.
-    // DOS composiciones (std/uw) con MEMBRESIA propia: un widget vive en las
-    // composiciones donde tiene geo. En flujo todo se recoloca temporalmente.
-    const enOtra = w.geo && (w.geo.std || w.geo.uw);
-    const g = m.bucket !== 'flujo' && w.geo && w.geo[m.bucket];
-    if (m.bucket !== 'flujo' && !g && enOtra) continue; // no pertenece a ESTA composicion
+  // En REFLUJO se recolocan todos en ORDEN DE LECTURA de tu maqueta (arriba
+  // a abajo, izquierda a derecha): el resultado es previsible y reconocible.
+  const enOrden = !reflujo ? widgets : [...widgets].sort((a, b) => {
+    const ga = (a.geo && a.geo.m) || a, gb = (b.geo && b.geo.m) || b;
+    return (ga.row - gb.row) || (ga.col - gb.col);
+  });
+  for (const w of enOrden) {
+    // UNA sola maqueta: geo.m. Ya no hay membresia por forma de ventana, así
+    // que ningun widget puede "no pertenecer" y desaparecer.
+    const g = w.geo && w.geo.m;
     if (g) { w.col = g.col; w.row = g.row; w.w = g.w; w.h = g.h; }
     let [tw, th] = tallaValida(w); if (tw > cols) tw = cols; w.w = tw; w.h = th;
-    let cc = (m.bucket === 'flujo') ? 0 : w.col, rr = (m.bucket === 'flujo') ? 0 : w.row;
+    let cc = reflujo ? 0 : w.col, rr = reflujo ? 0 : w.row;
     if (!(cc >= 1 && rr >= 1) || !libre(occ, cc, rr, tw, th, cols)) {
       const pos = primerHueco(occ, tw, th, cols);
       if (!pos) continue; // sin sitio visible: oculto hasta liberar celdas
       cc = pos.col; rr = pos.row;
-      if (m.bucket !== 'flujo') { w.col = cc; w.row = rr; fijaGeo(w); }
+      // Lo que se recoloca por el TAMAÑO DE LA VENTANA no se guarda jamás:
+      // era exactamente lo que le destrozaba la maqueta a Dosa al abrir en
+      // ventana pequeña. Solo persiste lo que se mueve en modo edición.
+      if (!reflujo) { w.col = cc; w.row = rr; fijaGeo(w); }
     }
     ocupa(occ, { col: cc, row: rr, w: tw, h: th });
     const el = document.createElement('div'); el.className = 'widget'; el.dataset.id = w.id;
@@ -1444,8 +1487,9 @@ function renderHub() {
     });
     const rm = document.createElement('button'); rm.className = 'rm'; rm.title = 'Quitar widget'; rm.innerHTML = window.icon('x-mark'); rm.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (ultimoBucket !== 'flujo' && w.geo) { delete w.geo[ultimoBucket]; }
-      if (!w.geo || (!w.geo.std && !w.geo.uw)) widgets = widgets.filter((x) => x.id !== w.id);
+      // Con una sola maqueta, quitar es quitar (antes solo lo sacaba de la
+      // composicion activa y seguia vivo en las otras).
+      widgets = widgets.filter((x) => x.id !== w.id);
       saveWidgets(); renderHub();
     });
     tools.append(grip, size, rm); el.appendChild(tools);
@@ -1468,10 +1512,13 @@ function renderHub() {
   // superpuesta (no son items de la grilla, asi no anaden filas ni mueven
   // nada al entrar en Editar). El centro tine las dos centrales si el numero
   // es par, para que quede el mismo numero de celdas a cada lado.
+  // En reflujo no hay guias: no se puede componer (y con las filas del
+  // contenido serian miles de celdas dibujadas para nada).
   const malla = document.createElement('div'); malla.className = 'gmalla';
+  const filasGuia = reflujo ? 0 : ultimasFilas;
   const midCols = cols % 2 ? [(cols + 1) / 2] : [cols / 2, cols / 2 + 1];
-  const midFilas = ultimasFilas % 2 ? [(ultimasFilas + 1) / 2] : [ultimasFilas / 2, ultimasFilas / 2 + 1];
-  for (let r = 1; r <= ultimasFilas; r++) for (let c = 1; c <= cols; c++) {
+  const midFilas = filasGuia % 2 ? [(filasGuia + 1) / 2] : [filasGuia / 2, filasGuia / 2 + 1];
+  for (let r = 1; r <= filasGuia; r++) for (let c = 1; c <= cols; c++) {
     const g = document.createElement('div'); g.className = 'gcelda';
     if (midCols.includes(c) || midFilas.includes(r)) g.classList.add('gc-centro');
     g.style.left = ((c - 1) * (CELDA_W + CELDA_GAP)) + 'px';
@@ -1485,7 +1532,7 @@ function renderHub() {
     const padL = parseFloat(cs.paddingLeft) || 0, padT = parseFloat(cs.paddingTop) || 0;
     const padR = parseFloat(cs.paddingRight) || 0, padB = parseFloat(cs.paddingBottom) || 0;
     const anchoCeldas = cols * CELDA_W + (cols - 1) * CELDA_GAP;
-    const altoCeldas = ultimasFilas * CELDA_H + (ultimasFilas - 1) * CELDA_GAP;
+    const altoCeldas = Math.max(0, filasGuia * CELDA_H + (filasGuia - 1) * CELDA_GAP);
     const dispW = els.widgetGrid.clientWidth - padL - padR;
     const dispH = els.widgetGrid.clientHeight - padT - padB;
     malla.style.left = (padL + Math.max(0, (dispW - anchoCeldas) / 2)) + 'px';
@@ -1536,7 +1583,7 @@ function empuja(w, tw, th) {
   const row = Math.max(1, Math.min(w.row, ultimasFilas - th + 1));
   if (col + tw - 1 > ultimoCols || row + th - 1 > ultimasFilas) return false;
   const rect = { col, row, w: tw, h: th };
-  const vive = (x) => x.geo && x.geo[ultimoBucket];
+  const vive = (x) => x.geo && x.geo.m;
   const desplazados = delBucket().filter((x) => x.id !== w.id && vive(x) &&
     rect.col < x.col + x.w && rect.col + tw - 1 >= x.col && rect.row < x.row + x.h && rect.row + th - 1 >= x.row);
   const occ = new Set();
@@ -1722,16 +1769,39 @@ const SP_SEL = {
    El botón aparece si hay sesión de Spotify (cookie sp_dc, IPC spotify:logged)
    o si el dock ya se usó alguna vez (cobalt.spotifyDock). */
 let spPlayerWv = null;
-// UA movil para el panel: la web de escritorio de Spotify se ve fatal a 392px
-// (biblioteca gigante, banners); la version movil esta disenada para ese ancho.
-const SP_UA_MOVIL = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+/* PANEL DE SPOTIFY (rehecho 2026-08-12).
+   Antes el panel medía 392px fijos y forzaba USER AGENT DE MÓVIL, porque a esa
+   anchura la web de escritorio se veía apretada. El precio era grave y no se
+   había visto: en su web móvil, Spotify CAPA "Tu biblioteca" y te manda a
+   instalar la aplicación. Por eso Dosa no podía entrar a su biblioteca.
+   Ahora: user agent normal (de escritorio), panel más ancho y ajustable
+   arrastrando, y un zoom calculado para que la página crea que tiene al menos
+   VIEWPORT_DESKTOP píxeles de ancho — así sirve la interfaz completa aunque el
+   panel sea estrecho. */
+const SP_VIEWPORT = 900;   // ancho de página mínimo para que Spotify dé la UI de escritorio
+const SP_ANCHO_DEF = 720, SP_ANCHO_MIN = 380, SP_ANCHO_MAX = 1280;
+function spAncho() {
+  const v = +store.get('cobalt.spPanelW', SP_ANCHO_DEF) || SP_ANCHO_DEF;
+  return Math.max(SP_ANCHO_MIN, Math.min(SP_ANCHO_MAX, v));
+}
+function aplicaSpAncho(px) {
+  const ancho = Math.max(SP_ANCHO_MIN, Math.min(SP_ANCHO_MAX, Math.round(px)));
+  const panel = document.getElementById('sp-panel');
+  if (panel) panel.style.width = ancho + 'px';
+  // Zoom < 1 = la página se cree más ancha de lo que es: con 720px reales y
+  // zoom 0.8 ve 900, que es lo que necesita para no caer en la vista móvil.
+  if (spPlayerWv) { try { spPlayerWv.setZoomFactor(Math.max(0.5, Math.min(1, ancho / SP_VIEWPORT))); } catch { /* aún no listo */ } }
+  return ancho;
+}
 function ensureSpotifyPlayer() {
   if (spPlayerWv) return spPlayerWv;
   const wv = document.createElement('webview');
   wv.setAttribute('partition', PARTITION);
-  wv.setAttribute('useragent', SP_UA_MOVIL);
   // sin scrollbar dentro del panel (el scroll por rueda/gesto sigue vivo)
-  wv.addEventListener('dom-ready', () => { wv.insertCSS('::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}').catch(() => {}); });
+  wv.addEventListener('dom-ready', () => {
+    wv.insertCSS('::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}').catch(() => {});
+    aplicaSpAncho(spAncho());
+  });
   wv.src = 'https://open.spotify.com';
   document.getElementById('sp-holder').appendChild(wv);
   spPlayerWv = wv;
@@ -1739,10 +1809,28 @@ function ensureSpotifyPlayer() {
   els.sbSpotify.classList.remove('hidden');
   return wv;
 }
+/* Tirador del canto derecho, como el de los paneles web laterales. */
+function armaSpGrip() {
+  const panel = document.getElementById('sp-panel');
+  const asa = document.getElementById('sp-grip');
+  if (!panel || !asa) return;
+  asa.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = panel.getBoundingClientRect().width;
+    document.body.style.cursor = 'ew-resize';
+    const mueve = (ev) => { panel.style.width = Math.max(SP_ANCHO_MIN, Math.min(SP_ANCHO_MAX, w0 + (ev.clientX - x0))) + 'px'; };
+    const suelta = () => {
+      document.removeEventListener('mousemove', mueve); document.removeEventListener('mouseup', suelta);
+      document.body.style.cursor = '';
+      store.set('cobalt.spPanelW', aplicaSpAncho(panel.getBoundingClientRect().width));
+    };
+    document.addEventListener('mousemove', mueve); document.addEventListener('mouseup', suelta);
+  });
+}
 function toggleSpotifyPanel(force) {
   const panel = document.getElementById('sp-panel');
   const abrir = force !== undefined ? force : panel.classList.contains('hidden');
-  if (abrir) { ensureSpotifyPlayer(); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
+  if (abrir) { ensureSpotifyPlayer(); aplicaSpAncho(spAncho()); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
   else { panel.classList.add('hidden'); els.sbSpotify.classList.remove('open'); }
   actualizaSpotifyVivo();
 }
@@ -1763,6 +1851,7 @@ function spTab() {
 /* Arranque del dock: glifo de marca, clic, y visibilidad por sesión o uso previo */
 els.sbSpotify.innerHTML = window.brandIcon('spotify') || window.icon('musical-note');
 els.sbSpotify.addEventListener('click', () => toggleSpotifyPanel());
+armaSpGrip();
 document.getElementById('sp-p-x').addEventListener('click', () => toggleSpotifyPanel(false));
 (async () => {
   if (store.get('cobalt.spotifyDock', false)) { els.sbSpotify.classList.remove('hidden'); return; }
@@ -1845,6 +1934,11 @@ async function llenaListas(body) {
   cont.innerHTML = listas.map((l) => `<button class="spl-i" data-h="${escapeHtml(l.h)}"><span>${escapeHtml(l.t)}</span>${window.icon('play')}</button>`).join('') ||
     '<div class="w-vacio">Aún no veo tu biblioteca — abre Spotify un momento</div>';
   cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); splReproduce(b.dataset.h); }));
+  // Sin barra de scroll: lo que no cabe se oculta (criterio de Correo y Descargas)
+  requestAnimationFrame(() => {
+    const tope = cont.clientHeight;
+    cont.querySelectorAll('.spl-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope + 2) f.style.display = 'none'; });
+  });
 }
 
 /* ============ Widget Cuenta (2026-08-11) ============
@@ -1937,14 +2031,31 @@ function renderCalendar(body) {
    Lee las playlists/álbumes de la biblioteca del webview de Spotify (los
    enlaces reales de su sidebar) y al clicar navega el reproductor a la lista
    y pulsa su play grande. Sin API ni claves: es TU sesión. */
+/* "Tu música" leía TODOS los enlaces de lista/álbum de la página, y la página
+   que hay abierta es la PORTADA: lo que salía eran las radios que Spotify
+   recomienda ("Radio KAROL G", "Radio Bad Bunny"), no la música de Dosa.
+   Ahora se lee solo de la BARRA DE TU BIBLIOTECA, y si no está a la vista, de
+   la sección de escuchado recientemente. Si no hay ninguna, se dice y ya:
+   mejor vacío que enseñar recomendaciones ajenas como si fueran tuyas. */
 const SPL_LEE = `(() => {
-  const out = []; const vis = new Set();
-  document.querySelectorAll('a[href^="/playlist/"], a[href^="/album/"]').forEach((a) => {
-    const t = (a.getAttribute('aria-label') || a.textContent || '').trim().split('\\n')[0];
-    const h = a.getAttribute('href');
-    if (t && h && !vis.has(h) && t.length > 1) { vis.add(h); out.push({ t: t.slice(0, 60), h }); }
-  });
-  return out.slice(0, 10);
+  const limpia = (s) => (s || '').trim().split('\\n')[0].slice(0, 60);
+  const saca = (raiz) => {
+    const out = []; const vis = new Set();
+    raiz.querySelectorAll('a[href^="/playlist/"], a[href^="/album/"], a[href^="/artist/"], a[href^="/collection/"]').forEach((a) => {
+      const t = limpia(a.getAttribute('aria-label') || a.textContent);
+      const h = a.getAttribute('href');
+      if (t && h && t.length > 1 && !vis.has(h)) { vis.add(h); out.push({ t, h }); }
+    });
+    return out;
+  };
+  const bib = document.querySelector('[data-testid="library-container"], nav[aria-label*="iblioteca"], nav[aria-label*="ibrary"], aside [data-testid="library"]');
+  let l = bib ? saca(bib) : [];
+  if (!l.length) {
+    const rec = [...document.querySelectorAll('section')].find((s) =>
+      /vuelve a escuchar|escuchado recientemente|recently played|tus me gusta|liked songs/i.test(s.textContent || ''));
+    if (rec) l = saca(rec);
+  }
+  return l.slice(0, 12);
 })()`;
 function splReproduce(h) {
   const wv = ensureSpotifyPlayer();
@@ -2617,6 +2728,12 @@ function cierraMenusHub(excepto) {
 })();
 
 els.hubEdit.addEventListener('click', () => {
+  // En reflujo lo que se ve NO es tu maqueta, sino una recolocación temporal
+  // por falta de ancho: componer ahí guardaría posiciones sin sentido.
+  if (els.hub.classList.contains('reflujo')) {
+    toast('Agranda la ventana para componer el hub');
+    return;
+  }
   const on = els.hub.classList.toggle('editing'); els.hubEdit.classList.toggle('on', on);
   els.widgetPalette.classList.toggle('hidden', !on); cierraMenusHub();
   els.hubEdit.querySelector('.lbl').textContent = on ? 'Listo' : 'Editar';
@@ -2635,14 +2752,8 @@ function renderPalette() {
       const occ = new Set(); delBucket().forEach((x) => ocupa(occ, x));
       const pos = primerHueco(occ, tw, th, ultimoCols);
       if (!pos) { toast(`No hay un hueco de ${tw}×${th} libre para ${w.name} — libera celdas`); return; }
-      const suelta = widgets.find((x) => x.type === key && x.geo && !x.geo[ultimoBucket]);
-      if (suelta && ultimoBucket !== 'flujo') {
-        suelta.col = pos.col; suelta.row = pos.row; suelta.w = tw; suelta.h = th; fijaGeo(suelta);
-      } else {
-        const nuevo = { id: 'w' + (++widgetSeq) + Date.now(), type: key, col: pos.col, row: pos.row, w: tw, h: th };
-        widgets.push(nuevo);
-        if (ultimoBucket !== 'flujo') fijaGeo(nuevo);
-      }
+      const nuevo = { id: 'w' + (++widgetSeq) + Date.now(), type: key, col: pos.col, row: pos.row, w: tw, h: th };
+      widgets.push(nuevo); fijaGeo(nuevo);
       saveWidgets(); renderHub();
     });
     els.paletteList.appendChild(b);
@@ -2834,7 +2945,7 @@ let granoTimer = null;
 window.addEventListener('resize', () => { clearTimeout(granoTimer); granoTimer = setTimeout(() => {
   pintaGrano(); generaFondoBlur();
   const m = medidasMalla();
-  if (m.bucket !== ultimoBucket || m.cw !== CELDA_W || m.filas !== ultimasFilas) renderHub();
+  if (m.cw !== CELDA_W || m.cols !== ultimoCols || !!m.reflujo !== els.hub.classList.contains('reflujo')) renderHub();
 }, 250); });
 pintaGrano();
 generaFondoBlur();

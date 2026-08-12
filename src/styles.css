@@ -782,7 +782,7 @@ button { font-family: inherit; }
 /* Pagina FIJA en horizontal (sin scroll); en ventana rara (vertical o
    aplastada), el scroll vuelve como salvavidas (#hub.con-scroll). */
 #hub .hub-scroll { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
-#hub.con-scroll .hub-scroll { overflow-y: auto; }
+#hub.con-scroll .hub-scroll { overflow-y: auto; overflow-x: hidden; }
 /* Fondo degradado genérico, editable por el usuario */
 /* FONDO + GRANO EN UNA SOLA CAPA (2026-08-11, fix definitivo de las lineas):
    el grano como overlay compuesto aparte obligaba a cada cristal a desenfocar
@@ -1333,7 +1333,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-sp { position: relative; background: transparent; backdrop-filter: none; box-shadow: none; padding: 0; display: flex; flex-direction: column; min-height: 118px; height: 100%; overflow: visible; }
 .sp-player { display: flex; align-items: stretch; gap: 14px; height: 96px; flex-shrink: 0; }
 .sp-bib { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 2px 16px 12px; }
-.sp-bib .spl-lista { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; }
+.sp-bib .spl-lista { flex: 1; min-height: 0; overflow: hidden; margin-top: 8px; }
 
 .w-sp::before { content: ''; position: absolute; inset: 0; z-index: 0; border-radius: 26px; background: var(--hub-card);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.8); backdrop-filter: blur(var(--glass-blur)) saturate(1.8);
@@ -1456,7 +1456,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    Cápsula flotante junto al sidebar, bajo el home. Cerrarla oculta el webview
    pero NO lo destruye: el audio sigue (mismo comportamiento probado de los
    webviews ocultos de las pestañas). Entra con el muelle de los paneles. */
-#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h) + 14px); width: 392px; height: min(72vh, 640px); z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; }
+#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h) + 14px); width: 720px; height: min(78vh, 760px); z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; }
+/* Tirador del canto derecho (mismo gesto que los paneles web laterales) */
+#sp-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 3; }
+#sp-grip:hover { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--realce) 45%, transparent)); }
 #sp-panel.hidden { display: flex !important; visibility: hidden; pointer-events: none; animation: none; }
 /* OJO: display:none destruiría el render del webview en algunos estados; con
    visibility:hidden el guest sigue exactamente igual y el audio no se corta. */
@@ -1475,7 +1478,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-cta:hover { transform: translateY(-1px); }
 
 /* ===== Widget "Tu música" (el rojo del mock): filas-pastilla nítidas ===== */
-.spl-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 168px; overflow-y: auto; }
+/* Sin barras de scroll (quedaban dos, vertical y horizontal, cruzando la
+   tarjeta): las filas que no caben se ocultan, igual que en Correo. */
+.spl-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; overflow: hidden; }
 .spl-i { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-family: inherit; font-size: 12px; font-weight: 550; text-align: left; padding: 9px 14px; cursor: pointer; transition: transform var(--dur-1) var(--spring); }
 .spl-i span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spl-i svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0; transition: opacity var(--dur-1) var(--ease); }
