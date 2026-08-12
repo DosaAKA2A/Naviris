@@ -429,6 +429,19 @@ function setupSession(ses) {
   });
 
   ses.on('will-download', (_e, item) => registerDownloadItem(item));
+  /* SESIONES QUE NO SE PIERDEN (2026-08-13). Chromium guarda las cookies en
+     memoria y las vuelca al disco cuando le parece: si el proceso muere de
+     golpe (cierre forzado, cuelgue, corte de luz) se pierde lo escrito desde
+     el ultimo volcado — y eso se ve como "me ha cerrado la sesion" en sitios
+     donde acababas de entrar. Se fuerza el volcado cada pocos minutos y al
+     salir, que es barato y evita justo ese susto. */
+  const vuelca = () => { try { ses.cookies.flushStore(); } catch { /* nada */ } };
+  setInterval(vuelca, 3 * 60 * 1000);
+  app.on('before-quit', vuelca);
+  ses.cookies.on('changed', (() => {
+    let t = null;
+    return () => { clearTimeout(t); t = setTimeout(vuelca, 20000); };   // agrupado: no en cada cookie
+  })());
   setupPermissions(ses);
 }
 

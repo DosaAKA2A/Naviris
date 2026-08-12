@@ -2274,12 +2274,27 @@ function renderXTrends(body) {
   };
   if (xtCache.items.length && Date.now() - xtCache.t < 20 * 60 * 1000) { pinta(xtCache.items); return; }
   pinta([], true);
-  // primero TU algoritmo (sesion de X); si no hay, las mundiales publicas
-  scrapeOculto('https://x.com/explore', XT_LEE_X).then((tuyas) => {
-    if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; pinta(tuyas); return null; }
-    return scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
-      if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
-      pinta(xtCache.items);
+  /* De donde salen tus tendencias, por orden (2026-08-13):
+     1. TU PESTANA de X. Es la unica que tiene tu sesion de verdad.
+     2. Un webview oculto en x.com/explore. Se queda como segundo intento
+        porque, comprobado, X lo trata como visitante y lo manda al login —
+        por eso salian las mundiales aunque tuvieras X abierto.
+     3. trends24.in: las mundiales publicas, el ultimo recurso honesto. */
+  const deTuPestana = () => {
+    const t = tabs.find((x) => x.kind === 'web' && !x.asleep && x.webview &&
+      /(^|\.)(x|twitter)\.com$/.test(hostOf(x.url) || ''));
+    if (!t) return Promise.resolve(null);
+    return t.webview.executeJavaScript(XT_LEE_X, false).catch(() => null);
+  };
+  const mundiales = () => scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
+    if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
+    pinta(xtCache.items);
+  });
+  deTuPestana().then((mias) => {
+    if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; pinta(mias); return null; }
+    return scrapeOculto('https://x.com/explore', XT_LEE_X).then((tuyas) => {
+      if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; pinta(tuyas); return null; }
+      return mundiales();
     });
   });
 }
