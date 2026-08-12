@@ -876,8 +876,14 @@ function tallaValida(w) {
        reordena en orden de lectura en las columnas que quepan.
    El reflujo NO se guarda nunca: al agrandar la ventana vuelve tu maqueta
    intacta. Solo se guarda lo que muevas tú en modo edición. */
-const CELDA_MIN = 80;      // por debajo de esto la maqueta ya no se sostiene a lo ancho
-const CELDA_COMODA = 96;   // si el alto aprieta, no encogemos más: preferimos scroll
+/* Las celdas NO bajan de estos tamaños: los widgets están dibujados para una
+   celda de ~150px y por debajo de ~118 se les rompe el contenido (el Monitor
+   se corta, el reproductor se aplasta, las filas de Correo se parten). Antes
+   se encogía hasta 66px con tal de que la maqueta cupiera, y eso era lo que
+   se veía roto. Ahora se prefiere reordenar y hacer scroll antes que encoger. */
+const CELDA_DISENO = 150;  // tamaño para el que están hechos los widgets
+const CELDA_MIN = 118;     // mínimo con el que aún se leen; por debajo, reflujo
+const CELDA_COMODA = 132;  // si el alto aprieta, no encogemos más: preferimos scroll
 let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
   // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
@@ -897,9 +903,12 @@ function medidasMalla() {
     const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_COMODA));
     return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
   }
-  // Ventana estrecha o vertical: reflujo en columnas, celda cómoda y scroll.
-  const cw = Math.max(CELDA_MIN, Math.min(150, cwAncho > 0 ? Math.max(cwAncho, 110) : 110));
-  const cols = Math.max(1, Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP)));
+  // Ventana estrecha o vertical: reflujo en columnas, con la celda de DISEÑO
+  // (los widgets se ven como deben) y scroll. Solo se encoge por debajo si la
+  // ventana es tan estrecha que no cabrían ni dos columnas.
+  let cw = CELDA_DISENO;
+  let cols = Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP));
+  if (cols < 2) { cols = 2; cw = Math.max(96, Math.floor((anchoUtil - CELDA_GAP) / 2)); }
   return { bucket: 'm', cols, cw, filas: 400, reflujo: true, raro: true };
 }
 function libre(occ, col, row, w, h, cols) {
@@ -1414,13 +1423,19 @@ function renderHub() {
   els.widgetGrid.style.gridTemplateRows = reflujo ? 'none' : `repeat(${m.filas}, ${CELDA_H}px)`;
   els.widgetGrid.style.gridAutoRows = `${CELDA_H}px`;
   els.widgetGrid.style.gap = `${CELDA_GAP}px`;
-  ajustaAccesos();
+  // OJO: ajustaAccesos GUARDA (crece la tarjeta y empuja a los de abajo). En
+  // reflujo no debe tocarse nada de la maqueta real.
+  if (!reflujo) ajustaAccesos();
   const occ = new Set();
-  // En REFLUJO se recolocan todos en ORDEN DE LECTURA de tu maqueta (arriba
-  // a abajo, izquierda a derecha): el resultado es previsible y reconocible.
+  /* En REFLUJO manda el orden de lectura de tu maqueta (arriba a abajo,
+     izquierda a derecha), PERO el buscador y los accesos van SIEMPRE los
+     primeros y a todo lo ancho: son lo primero que se usa del hub y tienen
+     que quedar arriba y en el centro, caiga la ventana como caiga. */
+  const MANDAN = { search: 0, shortcuts: 1 };
+  const rango = (x) => (x.type in MANDAN ? MANDAN[x.type] : 2);
   const enOrden = !reflujo ? widgets : [...widgets].sort((a, b) => {
     const ga = (a.geo && a.geo.m) || a, gb = (b.geo && b.geo.m) || b;
-    return (ga.row - gb.row) || (ga.col - gb.col);
+    return (rango(a) - rango(b)) || (ga.row - gb.row) || (ga.col - gb.col);
   });
   for (const w of enOrden) {
     // UNA sola maqueta: geo.m. Ya no hay membresia por forma de ventana, así
@@ -1428,6 +1443,15 @@ function renderHub() {
     const g = w.geo && w.geo.m;
     if (g) { w.col = g.col; w.row = g.row; w.w = g.w; w.h = g.h; }
     let [tw, th] = tallaValida(w); if (tw > cols) tw = cols; w.w = tw; w.h = th;
+    // Buscador y accesos, a todo el ancho en reflujo (no se guarda: es solo
+    // como se muestran mientras la ventana no da para la maqueta real).
+    if (reflujo && (w.type === 'search' || w.type === 'shortcuts')) {
+      tw = cols;
+      // A todo lo ancho los accesos caben en menos filas: se recalcula el alto
+      // SOLO para pintar (guardarlo sería tocar la maqueta real), si no queda
+      // un boquete debajo del tamaño que tienen en tu composición.
+      if (w.type === 'shortcuts') th = altoAccesos({ w: tw });
+    }
     let cc = reflujo ? 0 : w.col, rr = reflujo ? 0 : w.row;
     if (!(cc >= 1 && rr >= 1) || !libre(occ, cc, rr, tw, th, cols)) {
       const pos = primerHueco(occ, tw, th, cols);
