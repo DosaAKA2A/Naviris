@@ -279,28 +279,22 @@ button { font-family: inherit; }
    esos mismos colores y NUNCA el acento del tema (con el tema verde salía todo
    verde y parecía otra cosa). */
 #splash { --iris-1: #b9aae6; --iris-2: #9dc3e6; --iris-3: #a4d9c2; --iris-4: #e6d6a4; --iris-5: #e6a9b4;
-  position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse at 50% 42%, #121215 0%, #060607 72%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .55s ease, visibility .55s, transform .55s cubic-bezier(.4,0,.6,1), filter .55s ease; }
+  position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse at 50% 42%, #121215 0%, #060607 72%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .55s ease, visibility .55s, transform .55s cubic-bezier(.4,0,.6,1); }
 #splash::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .05; pointer-events: none; }
-#splash.gone { opacity: 0; visibility: hidden; transform: scale(1.08); filter: blur(8px); }
+#splash.gone { opacity: 0; visibility: hidden; transform: scale(1.06); }
 /* Aura: un solo florecimiento detrás de la marca */
 .splash-aura { position: absolute; width: 430px; height: 430px; border-radius: 50%; pointer-events: none;
   background: conic-gradient(from 200deg, var(--iris-1), var(--iris-2), var(--iris-3), var(--iris-4), var(--iris-5), var(--iris-1));
   filter: blur(58px); mask-image: radial-gradient(circle, #000 34%, transparent 70%);
   animation: sp-aura 1.9s cubic-bezier(.22,.9,.3,1) both; }
 @keyframes sp-aura { 0% { transform: scale(.55) rotate(-24deg); opacity: 0; } 38% { opacity: .62; } 100% { transform: scale(1.45) rotate(16deg); opacity: 0; } }
-/* Marca: entra con muelle desde el desenfoque */
+/* EL LOGO NO SE TOCA (regla de Dosa, 2026-08-12): la animación pasa alrededor
+   de la marca, nunca sobre ella. Nada de escalarlo, desenfocarlo, teñirlo ni
+   rodearlo de anillos: entra apareciendo y subiendo, y se queda exactamente
+   como es. Todo el movimiento lo pone el aura de detrás. */
 .splash-mark { position: relative; display: flex; align-items: center; justify-content: center; width: 120px; height: 120px;
-  animation: sp-mark .85s cubic-bezier(.2,1.15,.35,1) both; }
-@keyframes sp-mark { 0% { transform: scale(.62); opacity: 0; filter: blur(10px); } 60% { opacity: 1; } 100% { transform: scale(1); opacity: 1; filter: blur(0); } }
-.splash-iris { animation: sp-tono 1.9s ease-out both; }
-/* Nada de hue-rotate: giraría los colores de la marca. Solo un realce que se
-   apaga, para que el iris entre encendido y se asiente en su color real. */
-@keyframes sp-tono { 0% { filter: saturate(1.55) brightness(1.18); } 100% { filter: none; } }
-/* Anillo trazado una vez alrededor del logo */
-.splash-ring { position: absolute; inset: 0; width: 120px; height: 120px; transform: rotate(-90deg); pointer-events: none; }
-.splash-ring circle { fill: none; stroke: url(#sp-arco); stroke-width: 1.6; stroke-linecap: round;
-  stroke-dasharray: 346; animation: sp-anillo 1.15s cubic-bezier(.3,.8,.3,1) .18s both; }
-@keyframes sp-anillo { 0% { stroke-dashoffset: 346; } 100% { stroke-dashoffset: 0; } }
+  animation: sp-marca .8s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes sp-marca { 0% { transform: translateY(14px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 /* Nombre letra a letra */
 .splash-name { display: flex; font-family: "Inter Var", "Segoe UI Variable Display", "Segoe UI", sans-serif; font-size: 30px; font-weight: 650; letter-spacing: 14px; text-indent: 14px; margin-top: 16px; color: #e6e7ea; }
 .splash-name span { display: inline-block; animation: sp-letra .6s cubic-bezier(.2,.9,.3,1.1) both; animation-delay: calc(.42s + var(--i) * .055s); }
