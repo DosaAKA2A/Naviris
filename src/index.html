@@ -20,10 +20,17 @@
        renderer.js (lgAplicar): filtros SVG por forma en un <defs> propio. -->
 
   <!-- ===== Splash ===== -->
+  <!-- Coreografía de arranque (2026-08-12): aura que florece UNA vez, anillo
+       que se dibuja alrededor del logo, nombre letra a letra y barra que se
+       llena de verdad. Todo finito: al acabar no queda nada animándose. -->
   <div id="splash">
-    <span class="iris-slot splash-iris" data-iris="92"></span>
-    <div class="splash-name">NAVIRIS</div>
-    <div class="splash-sub">by Iris Studio</div>
+    <div class="splash-aura"></div>
+    <div class="splash-mark">
+      <svg class="splash-ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="55" /></svg>
+      <span class="iris-slot splash-iris" data-iris="92"></span>
+    </div>
+    <div class="splash-name" aria-label="NAVIRIS"><span style="--i:0">N</span><span style="--i:1">A</span><span style="--i:2">V</span><span style="--i:3">I</span><span style="--i:4">R</span><span style="--i:5">I</span><span style="--i:6">S</span></div>
+    <div class="splash-sub">by IRIS Studio</div>
     <div class="splash-bar"><div class="splash-bar-fill"></div></div>
   </div>
 

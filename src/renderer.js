@@ -1525,6 +1525,8 @@ function renderHub() {
     grip.addEventListener('mousedown', () => { el.draggable = true; });
     el.addEventListener('dragstart', (e) => { el.classList.add('dragging'); dragId = w.id; els.hub.classList.add('arrastrando'); e.dataTransfer.setData('text/plain', w.id); });
     el.addEventListener('dragend', () => { el.classList.remove('dragging'); el.draggable = false; dragId = null; els.hub.classList.remove('arrastrando'); document.getElementById('celda-fantasma')?.remove(); });
+    // Orden de entrada para el escalonado del arranque (#hub.estrenando)
+    el.style.setProperty('--i', els.widgetGrid.childElementCount);
     els.widgetGrid.appendChild(el);
   }
   // Guias de la grilla (visibles solo en modo Editar): todas las celdas con
@@ -1564,6 +1566,12 @@ function renderHub() {
     malla.style.width = anchoCeldas + 'px'; malla.style.height = altoCeldas + 'px';
   });
   armaDnd();
+  /* AL TOPE en cada recomposición. Si venías con la ventana pequeña y el hub
+     desplazado, al maximizar la maqueta entera NO lleva scroll: el contenedor
+     conservaba el desplazamiento viejo y te quedabas mirando el final, sin
+     forma de subir (overflow hidden). Recomponer = empezar arriba. */
+  const scr = els.hub.querySelector('.hub-scroll');
+  if (scr && scr.scrollTop) scr.scrollTop = 0;
   // Si al medir de verdad la celda sale distinta (primer render sin layout),
   // se repinta UNA vez con la medida buena.
   if (!renderHub._ajustando) {
@@ -4581,9 +4589,13 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   // animaciones infinitas seguían corriendo toda la sesión en el compositor.
   setTimeout(() => {
     els.splash.classList.add('gone');
+    // El hub entra escalonado POR DEBAJO mientras el splash se va: el relevo
+    // se solapa, que es lo que hace que parezca una sola secuencia.
+    els.hub.classList.add('estrenando');
     if (els.hub.classList.contains('active')) focusUrlbar();
     setTimeout(() => els.splash.remove(), 600);
-  }, 1800);
+    setTimeout(() => els.hub.classList.remove('estrenando'), 1700);
+  }, 1950);
 })();
 
 
