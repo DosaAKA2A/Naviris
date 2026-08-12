@@ -73,7 +73,7 @@ function aplicaTema(tema) {
   store.set('cobalt.tema', tema);
   store.set('cobalt.lightMode', tema !== 'oscuro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
-  applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema(tema));
+  applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema());
 }
 (() => {
   // Antes de que cargue nada más, para que no haya fogonazo al cambiar.
@@ -2025,10 +2025,14 @@ function renderXTrends(body) {
    comia a la primera — el arranque preguntaba el tema ANTES de poner esas
    clases, asi que siempre respondia 'oscuro' (fogonazo oscuro al abrir en
    claro/rosa y fondo del tema equivocado). */
+/* Manda el SLOT (2026-08-12): un contenedor con slot ensena la foto del tema
+   activo y cambia con el. `img` es solo para la imagen que elija el usuario, y
+   al elegirla se retira el slot para que su foto mande. Antes era al reves, y
+   los contenedores que apuntaban a un archivo suelto del disco se quedaban
+   clavados en el juego de un tema (y solo existian en ese equipo). */
 function imagenDeTema(w) {
-  if (w.img) return w.img;
-  if (!w.slot) return '';
-  return `temas/${temaActual()}/${w.slot}.jpg`;
+  if (w.slot) return `temas/${temaActual()}/${w.slot}.jpg`;
+  return w.img || '';
 }
 function renderImagen(body, w) {
   const elige = () => {
@@ -2040,7 +2044,7 @@ function renderImagen(body, w) {
       // GIF animado permitido: es contenido DEL USUARIO y la optimizacion es
       // decision suya (la regla anti-animacion-infinita es para NUESTRA UI).
       if (/\.gif$/i.test(ruta)) toast('GIF en bucle: se ve genial, pero consume mas GPU. Decision tuya.');
-      w.img = 'file:///' + ruta.replace(/\\/g, '/'); saveWidgets(); pinta();
+      w.img = 'file:///' + ruta.replace(/\\/g, '/'); w.slot = 0; saveWidgets(); pinta();
     };
     inp.click();
   };
@@ -2402,7 +2406,7 @@ async function applySyncData(d) {
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
   if (d.hubBgs && typeof d.hubBgs === 'object') for (const t of TEMAS) if (d.hubBgs[t]) store.set(bgThemeKey(t), d.hubBgs[t]);
   if (d.hubBg && !(d.hubBgs && d.hubBgs[temaActual()])) applyBackground(d.hubBg);
-  else if (d.hubBgs) applyBackground(store.get(bgThemeKey(), defaultBgTema(temaActual())));
+  else if (d.hubBgs) applyBackground(store.get(bgThemeKey(), defaultBgTema()));
   if (d.settings) {
     settings = await window.cobalt.setSettings(d.settings);
     applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
@@ -2624,12 +2628,15 @@ const BACKGROUNDS_ROSA = [
   'radial-gradient(120% 80% at 50% -10%, #e7ebf5 0%, #dcdfeb 62%)',    // Gris perla
   'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)'     // Aurora rosa
 ];
-// Fondo por defecto para cada tema (foto holo empaquetada o degradado rosa).
-function defaultBgTema(tema) {
-  if (tema === 'oscuro') return 'url("temas/oscuro/1.jpg") center/cover no-repeat';
-  if (tema === 'claro')  return 'url("temas/claro/1.jpg") center/cover no-repeat';
-  return BACKGROUNDS_ROSA[0]; // Aurora rosa para el tema rosa
-}
+/* Fondo por defecto: SIEMPRE el degradado plano del tema (2026-08-12, Dosa).
+   Las fotos de src/temas/<tema>/ NO son fondos y nunca lo fueron: son el
+   material de los WIDGETS DE IMAGEN, que cargan la del tema activo por su
+   `slot` (ver imagenDeTema). Se devuelve la identidad canonica y bgForTheme
+   la traduce al juego del tema (grafito en oscuro, gris claro, Aurora rosa). */
+function defaultBgTema() { return BACKGROUNDS[0]; }
+// Un fondo de temas/ guardado como fondo del hub es de la version que se
+// equivoco: se descarta y el tema vuelve a su degradado.
+const esFotoDeTema = (v) => typeof v === 'string' && /url\("?temas\//.test(v);
 // Clave de store por tema: cada tema recuerda su propio fondo.
 function bgThemeKey(tema) { return 'cobalt.hubBg.' + (tema || temaActual()); }
 /* Hasta dev.48 el fondo era UNO para toda la app (cobalt.hubBg). El fondo que
@@ -2637,10 +2644,11 @@ function bgThemeKey(tema) { return 'cobalt.hubBg.' + (tema || temaActual()); }
    con su predeterminado. Tiene que correr ANTES del primer applyTheme(), que
    ya escribe la clave del tema activo. */
 function migraFondoPorTema() {
+  for (const t of TEMAS) if (esFotoDeTema(store.get(bgThemeKey(t), null))) store.del(bgThemeKey(t));
   const viejo = store.get('cobalt.hubBg', null);
   if (viejo == null) return;
   const t = temaActual();
-  if (store.get(bgThemeKey(t), null) == null) store.set(bgThemeKey(t), viejo);
+  if (!esFotoDeTema(viejo) && store.get(bgThemeKey(t), null) == null) store.set(bgThemeKey(t), viejo);
   store.del('cobalt.hubBg');
 }
 
@@ -2656,6 +2664,7 @@ function bgForTheme(v) {
 }
 function applyBackground(v) {
   if (v === 'transparent') v = BACKGROUNDS[0]; // el modo transparente se retiró (creaba capas de sombra)
+  if (esFotoDeTema(v)) v = BACKGROUNDS[0];     // las fotos de los widgets no son fondo (ni llegando por sincronización)
   // Identidades viejas del fondo predeterminado (antes de la gama cálida):
   // quien lo tenía elegido pasa al predeterminado nuevo, no a "fondo custom"
   if (v === 'linear-gradient(160deg, #26262d 0%, #191920 100%)' || v === 'linear-gradient(160deg, #fdf1f6 0%, #f6dde9 100%)'
@@ -2715,7 +2724,7 @@ function ajustarVidrioAlFondo(v) {
    copia ya desenfocada (canvas) y los cristales la muestran alineada por
    viewport (background-attachment: fixed). Cero blur en vivo. */
 function generaFondoBlur() {
-  const v = store.get(bgThemeKey(), defaultBgTema(temaActual()));
+  const v = store.get(bgThemeKey(), defaultBgTema());
   const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
   if (!m) { els.hub.style.setProperty('--hub-bg-blur', bgForTheme(v)); return; } // un degradado ya es suave
   const img = new Image();
@@ -2841,21 +2850,9 @@ function lgProgramar() {
 }
 function renderBgPresets() {
   els.bgPresets.innerHTML = '';
-  const tema = temaActual();
-  const saved = store.get(bgThemeKey(tema), defaultBgTema(tema));
-  // Fotos del tema (slots 1-3)
-  [1, 2, 3].forEach((slot) => {
-    const url = `url("temas/${tema}/${slot}.jpg") center/cover no-repeat`;
-    const th = document.createElement('div');
-    th.className = 'bg-thumb img-thumb' + (saved === url ? ' sel' : '');
-    const img = new Image(); img.src = `temas/${tema}/${slot}.jpg`;
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;';
-    th.appendChild(img); th.dataset.bg = url;
-    th.addEventListener('click', () => applyBackground(url));
-    els.bgPresets.appendChild(th);
-  });
-  const sep = document.createElement('div'); sep.className = 'bg-sep'; els.bgPresets.appendChild(sep);
-  // Degradados del tema
+  // Solo degradados: el aspecto del hub es plano. Las fotos de src/temas/ son
+  // de los widgets de imagen y no se ofrecen aqui.
+  const saved = store.get(bgThemeKey(), defaultBgTema());
   for (const bg of BACKGROUNDS) {
     const th = document.createElement('div');
     th.className = 'bg-thumb' + (saved === bg ? ' sel' : '');
