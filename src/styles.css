@@ -1096,6 +1096,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* ===== Addons ===== */
 .adp-sub { color: var(--muted, #8b8d94); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
+/* Addons NO es una lista estrecha como Marcadores: encajonarla en los 760px de
+   .bmp-inner dejaba dos tarjetas por fila, media pantalla muerta a los lados y
+   scroll para ver el resto. Con el ancho suelto caben todas de una (Dosa). */
+#addons-page .bmp-inner { max-width: 1500px; padding-bottom: 40px; }
 .adp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .adp-loading, .adp-error { color: var(--muted, #8b8d94); font-size: 13px; padding: 24px 0; }
 .adp-card { background: var(--bg-3, #17171b); border: 1px solid var(--line, #232327); border-radius: var(--r-l); padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }

@@ -2510,6 +2510,20 @@ setInterval(() => {
 renderAccountPill();
 
 /* Edición / personalización del hub */
+/* Los menús de la barra del hub son EXCLUYENTES (2026-08-12, Dosa): abrir uno
+   cierra los demás, para saltar de Temas a Aspecto con un solo clic en vez de
+   cerrar a mano. Devuelve si habia algo abierto (lo usa Escape). */
+function cierraMenusHub(excepto) {
+  let habia = false;
+  const pop = document.getElementById('temas-pop'), bt = document.getElementById('hub-temas');
+  if (excepto !== 'temas' && pop && !pop.classList.contains('hidden')) {
+    pop.classList.add('hidden'); if (bt) bt.classList.remove('on'); habia = true;
+  }
+  if (excepto !== 'aspecto' && els.customizePanel && !els.customizePanel.classList.contains('hidden')) {
+    els.customizePanel.classList.add('hidden'); habia = true;
+  }
+  return habia;
+}
 /* Selector de tema del hub, al lado de Editar */
 (() => {
   const boton = document.getElementById('hub-temas');
@@ -2522,6 +2536,7 @@ renderAccountPill();
   boton.addEventListener('click', (e) => {
     e.stopPropagation();
     const abrir = pop.classList.contains('hidden');
+    cierraMenusHub('temas');
     pop.classList.toggle('hidden', !abrir);
     boton.classList.toggle('on', abrir);
     if (abrir) pinta();
@@ -2546,7 +2561,7 @@ renderAccountPill();
 
 els.hubEdit.addEventListener('click', () => {
   const on = els.hub.classList.toggle('editing'); els.hubEdit.classList.toggle('on', on);
-  els.widgetPalette.classList.toggle('hidden', !on); els.customizePanel.classList.add('hidden');
+  els.widgetPalette.classList.toggle('hidden', !on); cierraMenusHub();
   els.hubEdit.querySelector('.lbl').textContent = on ? 'Listo' : 'Editar';
   if (on) renderPalette();
 });
@@ -2576,7 +2591,19 @@ function renderPalette() {
     els.paletteList.appendChild(b);
   }
 }
-els.hubCustomize.addEventListener('click', () => { const show = els.customizePanel.classList.contains('hidden'); els.customizePanel.classList.toggle('hidden', !show); els.widgetPalette.classList.add('hidden'); if (show) renderBgPresets(); });
+els.hubCustomize.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const show = els.customizePanel.classList.contains('hidden');
+  cierraMenusHub('aspecto');
+  els.customizePanel.classList.toggle('hidden', !show);
+  els.widgetPalette.classList.add('hidden');
+  if (show) renderBgPresets();
+});
+// Clic fuera: el panel de aspecto se cierra como el de temas.
+document.addEventListener('click', (e) => {
+  if (els.customizePanel.classList.contains('hidden')) return;
+  if (!els.customizePanel.contains(e.target) && !els.hubCustomize.contains(e.target)) els.customizePanel.classList.add('hidden');
+});
 
 // Fondos oscuros pero con tinte de color distinguible (gris oscuro por defecto)
 const BACKGROUNDS = [
@@ -2639,16 +2666,12 @@ function defaultBgTema() { return BACKGROUNDS[0]; }
 const esFotoDeTema = (v) => typeof v === 'string' && /url\("?temas\//.test(v);
 // Clave de store por tema: cada tema recuerda su propio fondo.
 function bgThemeKey(tema) { return 'cobalt.hubBg.' + (tema || temaActual()); }
-/* Hasta dev.48 el fondo era UNO para toda la app (cobalt.hubBg). El fondo que
-   hubiera elegido pasa al tema con el que lo eligio; los demas temas arrancan
-   con su predeterminado. Tiene que correr ANTES del primer applyTheme(), que
-   ya escribe la clave del tema activo. */
+/* Hasta dev.48 el fondo era UNO para toda la app (cobalt.hubBg). Esa clave se
+   retira sin heredarla: cada tema arranca con SU predeterminado (el primero de
+   su paleta, el mas oscuro en el tema oscuro) y desde ahi se elige. Tiene que
+   correr ANTES del primer applyTheme(), que ya escribe la clave del tema. */
 function migraFondoPorTema() {
   for (const t of TEMAS) if (esFotoDeTema(store.get(bgThemeKey(t), null))) store.del(bgThemeKey(t));
-  const viejo = store.get('cobalt.hubBg', null);
-  if (viejo == null) return;
-  const t = temaActual();
-  if (!esFotoDeTema(viejo) && store.get(bgThemeKey(t), null) == null) store.set(bgThemeKey(t), viejo);
   store.del('cobalt.hubBg');
 }
 
@@ -2853,10 +2876,16 @@ function renderBgPresets() {
   // Solo degradados: el aspecto del hub es plano. Las fotos de src/temas/ son
   // de los widgets de imagen y no se ofrecen aqui.
   const saved = store.get(bgThemeKey(), defaultBgTema());
+  // Sin repetidos: en rosa, el primero y el ultimo son la misma Aurora, y se
+  // veian dos miniaturas identicas. Se pinta la primera vez que aparece.
+  const vistos = new Set();
   for (const bg of BACKGROUNDS) {
+    const pintado = bgForTheme(bg);
+    if (vistos.has(pintado)) continue;
+    vistos.add(pintado);
     const th = document.createElement('div');
     th.className = 'bg-thumb' + (saved === bg ? ' sel' : '');
-    th.style.background = bgForTheme(bg); th.dataset.bg = bg;
+    th.style.background = pintado; th.dataset.bg = bg;
     th.addEventListener('click', () => applyBackground(bg));
     els.bgPresets.appendChild(th);
   }
@@ -4145,7 +4174,16 @@ window.addEventListener('keydown', (e) => {
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); irAtras(); return; }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); irAdelante(); return; }
   if (e.altKey && e.key === 'Home') { e.preventDefault(); els.sbHome.click(); return; }
-  if (e.key === 'Escape' && !escribiendo) { pararCarga(); return; }
+  if (e.key === 'Escape') {
+    // Escape sale de lo que este abierto ANTES de parar la carga: primero los
+    // menus del hub, luego la pagina de Addons (se vuelve al hub). Cerrar lo
+    // que estorba no depende de donde este el foco — al abrir una pestaña el
+    // foco va a la barra de direcciones y, con el filtro de "escribiendo",
+    // Escape no cerraba nada.
+    if (cierraMenusHub()) return;
+    if (adEls.page.classList.contains('active')) { hideAddonsPage(); els.hub.classList.add('active'); return; }
+    if (!escribiendo) { pararCarga(); return; }
+  }
 
   // --- Barra de direcciones ---
   if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
