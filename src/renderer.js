@@ -9,7 +9,8 @@ document.querySelectorAll('.iris-slot').forEach((el) => { el.innerHTML = window.
 
 const store = {
   get(k, f) { try { const v = localStorage.getItem(k); return v == null ? f : JSON.parse(v); } catch { return f; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); return true; } catch { return false; } }
 };
 
 const els = {};
@@ -72,7 +73,7 @@ function aplicaTema(tema) {
   store.set('cobalt.tema', tema);
   store.set('cobalt.lightMode', tema !== 'oscuro');
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
-  applyBackground(store.get('cobalt.hubBg', null) || BACKGROUNDS[0]);
+  applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema(tema));
 }
 (() => {
   // Antes de que cargue nada más, para que no haya fogonazo al cambiar.
@@ -1319,7 +1320,24 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
     "slot": 3
   }
 ]));
-let widgets = store.get('cobalt.widgets', DEFAULT_WIDGETS());
+/* MIGRACION A LA GRILLA (2026-08-12) — lo que descuadro la maqueta de Dosa:
+   las maquetas de antes de la grilla de celdas guardaban SOLO `span` (el ancho
+   en doceavos de una fila), sin col/row ni geo. La grilla no tiene nada que
+   traducir de ahi, asi que renderHub las recolocaba una a una con primerHueco:
+   todo apelotonado en la fila 1 y el resto de la pantalla vacio. Ademas la
+   composicion de fabrica no llegaba nunca, porque solo se usa cuando NO hay
+   nada guardado. Ahora una maqueta sin `geo` se reconoce como vieja, se guarda
+   tal cual en cobalt.widgets.pre-grilla (por si hiciera falta volver) y se
+   adopta la composicion de fabrica. */
+function migraMaquetaVieja(lista) {
+  if (!Array.isArray(lista) || !lista.length) return DEFAULT_WIDGETS();
+  if (lista.some((w) => w && w.geo && (w.geo.std || w.geo.uw))) return lista;
+  store.set('cobalt.widgets.pre-grilla', lista);
+  const nueva = DEFAULT_WIDGETS();
+  store.set('cobalt.widgets', nueva);
+  return nueva;
+}
+let widgets = migraMaquetaVieja(store.get('cobalt.widgets', null));
 // migracion: la geometria plana (col/row) se convierte en geo.std
 widgets.forEach((w) => {
   if (!w.geo && w.col >= 1 && w.row >= 1) w.geo = { std: { col: w.col, row: w.row, w: w.w, h: w.h } };
@@ -2001,11 +2019,12 @@ function renderXTrends(body) {
    tarjeta (cover). La ruta se guarda EN el widget (cobalt.widgets). */
 /* Imagenes POR TEMA (2026-08-12): cada tema trae su juego empaquetado en
    src/temas/<tema>/<slot>.jpg. El widget guarda un `slot` (1..3) y solo usa
-   ruta propia si el usuario elige una imagen suya (w.img manda siempre). */
-function temaActual() {
-  const r = document.documentElement.classList;
-  return r.contains('rosa') ? 'rosa' : r.contains('light') ? 'claro' : 'oscuro';
-}
+   ruta propia si el usuario elige una imagen suya (w.img manda siempre).
+   El tema lo da temaActual() (arriba, lee el ajuste guardado): aqui habia una
+   SEGUNDA definicion que lo deducia de las clases de <html> y, por izado, se
+   comia a la primera — el arranque preguntaba el tema ANTES de poner esas
+   clases, asi que siempre respondia 'oscuro' (fogonazo oscuro al abrir en
+   claro/rosa y fondo del tema equivocado). */
 function imagenDeTema(w) {
   if (w.img) return w.img;
   if (!w.slot) return '';
@@ -2369,7 +2388,10 @@ function buildSyncData() {
     dials: store.get('cobalt.dials', null),
     widgets: store.get('cobalt.widgets', null),
     notes: store.get('cobalt.notes', ''),
-    hubBg: store.get('cobalt.hubBg', null)
+    // Un fondo por tema (dev.49). `hubBg` se mantiene para las versiones que
+    // aun sincronizan el fondo unico: viaja el del tema activo.
+    hubBg: store.get(bgThemeKey(), null),
+    hubBgs: Object.fromEntries(TEMAS.map((t) => [t, store.get(bgThemeKey(t), null)]).filter(([, v]) => v != null))
   };
 }
 async function applySyncData(d) {
@@ -2378,7 +2400,9 @@ async function applySyncData(d) {
   if (Array.isArray(d.dials)) { store.set('cobalt.dials', d.dials); dials = d.dials; }
   if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
-  if (d.hubBg) { store.set('cobalt.hubBg', d.hubBg); applyBackground(d.hubBg); }
+  if (d.hubBgs && typeof d.hubBgs === 'object') for (const t of TEMAS) if (d.hubBgs[t]) store.set(bgThemeKey(t), d.hubBgs[t]);
+  if (d.hubBg && !(d.hubBgs && d.hubBgs[temaActual()])) applyBackground(d.hubBg);
+  else if (d.hubBgs) applyBackground(store.get(bgThemeKey(), defaultBgTema(temaActual())));
   if (d.settings) {
     settings = await window.cobalt.setSettings(d.settings);
     applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
@@ -2600,6 +2624,26 @@ const BACKGROUNDS_ROSA = [
   'radial-gradient(120% 80% at 50% -10%, #e7ebf5 0%, #dcdfeb 62%)',    // Gris perla
   'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)'     // Aurora rosa
 ];
+// Fondo por defecto para cada tema (foto holo empaquetada o degradado rosa).
+function defaultBgTema(tema) {
+  if (tema === 'oscuro') return 'url("temas/oscuro/1.jpg") center/cover no-repeat';
+  if (tema === 'claro')  return 'url("temas/claro/1.jpg") center/cover no-repeat';
+  return BACKGROUNDS_ROSA[0]; // Aurora rosa para el tema rosa
+}
+// Clave de store por tema: cada tema recuerda su propio fondo.
+function bgThemeKey(tema) { return 'cobalt.hubBg.' + (tema || temaActual()); }
+/* Hasta dev.48 el fondo era UNO para toda la app (cobalt.hubBg). El fondo que
+   hubiera elegido pasa al tema con el que lo eligio; los demas temas arrancan
+   con su predeterminado. Tiene que correr ANTES del primer applyTheme(), que
+   ya escribe la clave del tema activo. */
+function migraFondoPorTema() {
+  const viejo = store.get('cobalt.hubBg', null);
+  if (viejo == null) return;
+  const t = temaActual();
+  if (store.get(bgThemeKey(t), null) == null) store.set(bgThemeKey(t), viejo);
+  store.del('cobalt.hubBg');
+}
+
 // Traduce el fondo canónico (oscuro) al del tema activo. Las imágenes propias
 // del usuario se dejan intactas: son suyas y no se reinterpretan.
 function bgForTheme(v) {
@@ -2624,7 +2668,7 @@ function applyBackground(v) {
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
-  store.set('cobalt.hubBg', v);
+  store.set(bgThemeKey(), v);
   // Liquid glass Fase 2: la refracción SVG solo vale la pena sobre una FOTO
   // (un degradado liso no tiene textura que refractar) → se enciende sola
   // cuando el fondo es una imagen del usuario (valor url(...)).
@@ -2671,7 +2715,7 @@ function ajustarVidrioAlFondo(v) {
    copia ya desenfocada (canvas) y los cristales la muestran alineada por
    viewport (background-attachment: fixed). Cero blur en vivo. */
 function generaFondoBlur() {
-  const v = store.get('cobalt.hubBg', BACKGROUNDS[0]);
+  const v = store.get(bgThemeKey(), defaultBgTema(temaActual()));
   const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
   if (!m) { els.hub.style.setProperty('--hub-bg-blur', bgForTheme(v)); return; } // un degradado ya es suave
   const img = new Image();
@@ -2796,8 +2840,29 @@ function lgProgramar() {
   requestAnimationFrame(lgAplicar);
 }
 function renderBgPresets() {
-  els.bgPresets.innerHTML = ''; const saved = store.get('cobalt.hubBg', BACKGROUNDS[0]);
-  for (const bg of BACKGROUNDS) { const th = document.createElement('div'); th.className = 'bg-thumb' + (bg === saved ? ' sel' : ''); th.style.background = bgForTheme(bg); th.dataset.bg = bg; th.addEventListener('click', () => applyBackground(bg)); els.bgPresets.appendChild(th); }
+  els.bgPresets.innerHTML = '';
+  const tema = temaActual();
+  const saved = store.get(bgThemeKey(tema), defaultBgTema(tema));
+  // Fotos del tema (slots 1-3)
+  [1, 2, 3].forEach((slot) => {
+    const url = `url("temas/${tema}/${slot}.jpg") center/cover no-repeat`;
+    const th = document.createElement('div');
+    th.className = 'bg-thumb img-thumb' + (saved === url ? ' sel' : '');
+    const img = new Image(); img.src = `temas/${tema}/${slot}.jpg`;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;';
+    th.appendChild(img); th.dataset.bg = url;
+    th.addEventListener('click', () => applyBackground(url));
+    els.bgPresets.appendChild(th);
+  });
+  const sep = document.createElement('div'); sep.className = 'bg-sep'; els.bgPresets.appendChild(sep);
+  // Degradados del tema
+  for (const bg of BACKGROUNDS) {
+    const th = document.createElement('div');
+    th.className = 'bg-thumb' + (saved === bg ? ' sel' : '');
+    th.style.background = bgForTheme(bg); th.dataset.bg = bg;
+    th.addEventListener('click', () => applyBackground(bg));
+    els.bgPresets.appendChild(th);
+  }
 }
 /* Fondo propio A RESOLUCIÓN COMPLETA: el archivo se copia a userData y el hub
    apunta a él. Antes se reescalaba a 1920 px y se guardaba como JPEG dentro de
@@ -4216,6 +4281,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
 
 /* Arranque */
 (async function init() {
+  migraFondoPorTema(); // antes de applyTheme(): el es quien aplica el fondo del tema
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
@@ -4229,7 +4295,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optPasskeys.checked = settings.blockPasskeys !== false;
   const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
-  applyBackground(store.get('cobalt.hubBg', BACKGROUNDS[0]));
+  // (el fondo ya lo puso applyTheme: cada tema recuerda el suyo)
   window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderBookmarksBar(); renderHub();
