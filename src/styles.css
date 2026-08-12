@@ -1518,7 +1518,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .ml-t:hover { transform: translateY(-1px); opacity: .9; }
 .ml-t svg { width: 18px; height: 18px; }
 .ml-cnt { font-size: 11px; font-weight: 650; color: color-mix(in srgb, var(--grad-fg) 75%, transparent); margin-bottom: 6px; }
-.ml-lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 0; }
+/* overflow-x: hidden explicito. Con overflow-y:auto el otro eje pasa de
+   'visible' a 'auto' por regla del propio CSS, y en cuanto sale la barra
+   vertical los .ml-i al 100% desbordan unos pixeles: aparecia una barra
+   HORIZONTAL cruzando el widget. A lo ancho no hay nada que desplazar. */
+.ml-lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; }
 .ml-i { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: none; border-radius: 14px; background: rgba(255,255,255,.85); color: #17181c; font-family: inherit; text-align: left; padding: 9px 12px; cursor: pointer; transition: transform var(--dur-1) var(--spring); width: 100%; }
 .ml-i:hover { transform: translateX(2px); }
 .ml-de { font-size: 11px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
