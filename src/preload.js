@@ -84,6 +84,11 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),
+  spotifyLogged: () => ipcRenderer.invoke('spotify:logged'),
+  gmailFeed: () => ipcRenderer.invoke('gmail:feed'),
+  sysStats: () => ipcRenderer.invoke('sys:stats'),
+  clipRead: () => ipcRenderer.invoke('clip:read'),
+  clipWrite: (t) => ipcRenderer.invoke('clip:write', t),
 
   onPermAsk: (cb) => ipcRenderer.on('perm:ask', (_e, req) => cb(req)),
   permRespond: (id, decision, remember) => ipcRenderer.send('perm:respond', { id, decision, remember }),

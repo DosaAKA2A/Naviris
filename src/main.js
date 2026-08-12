@@ -851,6 +851,45 @@ ipcMain.handle('site:data', soloUI(async (_e, { url, partition }) => {
     return { ok: true, cookies: cookies.length };
   } catch { return { ok: false }; }
 }));
+// ¿Hay sesión de Spotify iniciada? Se mira la cookie de login real (sp_dc) en
+// la partición normal — las cookies de consentimiento no cuentan. Lo usa el
+// dock de Spotify del sidebar para mostrarse solo a quien tiene cuenta.
+// Bandeja de Gmail para el widget de correo: el feed atom nativo de Gmail
+// responde con las cookies de la sesión del usuario. Se pide desde MAIN con la
+// sesión de la partición normal — sin CORS ni CSP del renderer de por medio.
+ipcMain.handle('gmail:feed', soloUI(async () => {
+  try {
+    const ses = session.fromPartition('persist:cobalt');
+    const r = await ses.fetch('https://mail.google.com/mail/feed/atom', { credentials: 'include' });
+    if (!r.ok) return { ok: false, status: r.status };
+    return { ok: true, xml: await r.text() };
+  } catch (e) { return { ok: false, error: String(e && e.message) }; }
+}));
+// Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris
+// (app.getAppMetrics agrega todos los procesos del navegador).
+ipcMain.handle('sys:stats', soloUI(async () => {
+  try {
+    const mem = process.getSystemMemoryInfo();               // KB
+    const mets = app.getAppMetrics();
+    let cpu = 0, rssKb = 0;
+    for (const p of mets) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; rssKb += (p.memory && p.memory.workingSetSize) || 0; }
+    cpu = Math.round(cpu * 10) / 10; // un decimal: redondear a entero daba siempre 0
+    return {
+      ramTotal: mem.total, ramLibre: mem.free,
+      ramUso: Math.round((1 - mem.free / mem.total) * 100),
+      appMb: Math.round(rssKb / 1024), appCpu: cpu,
+      procesos: mets.length
+    };
+  } catch { return null; }
+}));
+ipcMain.handle('clip:read', soloUI(async () => { try { return clipboard.readText() || ''; } catch { return ''; } }));
+ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
+ipcMain.handle('spotify:logged', soloUI(async () => {
+  try {
+    const cookies = await session.fromPartition('persist:cobalt').cookies.get({ domain: '.spotify.com', name: 'sp_dc' });
+    return cookies.length > 0;
+  } catch { return false; }
+}));
 ipcMain.handle('site:clear', soloUI(async (_e, { url, partition }) => {
   try {
     if (!PARTICIONES_VALIDAS.has(partition)) return { ok: false };

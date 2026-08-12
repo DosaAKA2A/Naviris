@@ -19,7 +19,7 @@ const els = {};
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
-  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat',
+  'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat', 'sb-spotify',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
@@ -52,6 +52,8 @@ function applyTheme(light) {
   const t = temaActual();
   if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
   else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);
+  // las imagenes empaquetadas cambian con el tema
+  if (typeof renderHub === 'function' && els.hub && els.hub.classList.contains('active')) renderHub();
 }
 /* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
    tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
@@ -134,7 +136,7 @@ function linkMenu(url, onRemove) {
 }
 
 /* ============ Marcas → icono monocromo ============ */
-const BRAND_BY_HOST = { 'youtube.com': 'youtube', 'youtu.be': 'youtube', 'twitch.tv': 'twitch', 'discord.com': 'discord', 'whatsapp.com': 'whatsapp', 'github.com': 'github', 'x.com': 'x', 'twitter.com': 'x', 'crunchyroll.com': 'crunchyroll', 'spotify.com': 'spotify', 'reddit.com': 'reddit', 'claude.ai': 'claude', 'mail.google.com': 'gmail', 'instagram.com': 'instagram' };
+const BRAND_BY_HOST = { 'youtube.com': 'youtube', 'youtu.be': 'youtube', 'twitch.tv': 'twitch', 'discord.com': 'discord', 'whatsapp.com': 'whatsapp', 'github.com': 'github', 'x.com': 'x', 'twitter.com': 'x', 'crunchyroll.com': 'crunchyroll', 'spotify.com': 'spotify', 'reddit.com': 'reddit', 'claude.ai': 'claude', 'mail.google.com': 'gmail', 'instagram.com': 'instagram', 'pinterest.com': 'pinterest', 'pinterest.es': 'pinterest' };
 function brandOf(url) { const h = hostOf(url); for (const dom in BRAND_BY_HOST) if (h === dom || h.endsWith('.' + dom)) return BRAND_BY_HOST[dom]; return null; }
 
 /* ============ Favicons + color ============ */
@@ -671,7 +673,8 @@ const DEFAULT_DIALS = [
   { name: 'YouTube', url: 'https://www.youtube.com' }, { name: 'Twitch', url: 'https://www.twitch.tv' },
   { name: 'Discord', url: 'https://discord.com/app' }, { name: 'WhatsApp', url: 'https://web.whatsapp.com' },
   { name: 'Crunchyroll', url: 'https://www.crunchyroll.com' }, { name: 'GitHub', url: 'https://github.com' },
-  { name: 'Gmail', url: 'https://mail.google.com' }
+  { name: 'Gmail', url: 'https://mail.google.com' },
+  { name: 'Pinterest', url: 'https://www.pinterest.com' }, { name: 'IRIS', url: 'https://iris.it.com' }
 ];
 let dials = store.get('cobalt.dials', DEFAULT_DIALS);
 function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt.dials', dials); renderHub(); }
@@ -681,6 +684,14 @@ function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt
 // de vidrio y paleta única del hub).
 function styleDial(tile, letter, d) {
   const brand = brandOf(d.url);
+  // iris.it.com lleva SU logo oficial (nunca una inicial ni el favicon)
+  try {
+    if (/(^|\.)iris\.it\.com$/.test(new URL(d.url).hostname)) {
+      const m = document.createElement('span'); m.className = 'd-mono d-iris';
+      m.innerHTML = window.irisFlat(40); // monocromo, como el resto de marcas
+      tile.appendChild(m); letter.remove(); return;
+    }
+  } catch { /* url rara: sigue el camino normal */ }
   // El fondo y el filtro del favicon los pone el CSS (tokens --tile-default y
   // --fav-filter): antes se fijaban aquí en línea y en modo claro quedaban
   // tiles negros con iconos aclarados sobre un hub blanco.
@@ -690,8 +701,27 @@ function styleDial(tile, letter, d) {
   }
   getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.className = 'd-fav'; im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
 }
+let dialDrag = null;
 function makeDialEl(d) {
   const el = document.createElement('div'); el.className = 'dial'; el.title = d.url;
+  // En modo Editar, los tiles se reordenan arrastrando DENTRO del contenedor
+  el.addEventListener('mousedown', () => { if (els.hub.classList.contains('editing')) el.draggable = true; });
+  el.addEventListener('dragstart', (e) => {
+    if (!els.hub.classList.contains('editing')) { e.preventDefault(); return; }
+    e.stopPropagation(); dialDrag = d; els.hub.classList.add('arrastrando'); e.dataTransfer.setData('text/dial', d.url);
+  });
+  el.addEventListener('dragover', (e) => { if (dialDrag && dialDrag !== d) { e.preventDefault(); e.stopPropagation(); el.classList.add('dial-dest'); } });
+  el.addEventListener('dragleave', () => el.classList.remove('dial-dest'));
+  el.addEventListener('drop', (e) => {
+    el.classList.remove('dial-dest');
+    if (!dialDrag || dialDrag === d) return;
+    e.preventDefault(); e.stopPropagation();
+    const desde = dials.indexOf(dialDrag), hasta = dials.indexOf(d);
+    if (desde < 0 || hasta < 0) return;
+    dials.splice(desde, 1); dials.splice(hasta, 0, dialDrag);
+    dialDrag = null; store.set('cobalt.dials', dials); renderHub();
+  });
+  el.addEventListener('dragend', () => { el.draggable = false; dialDrag = null; els.hub.classList.remove('arrastrando'); document.querySelectorAll('.dial-dest').forEach((x) => x.classList.remove('dial-dest')); });
   const tile = document.createElement('div'); tile.className = 'd-tile';
   const letter = document.createElement('span'); letter.className = 'd-letter'; letter.textContent = (d.name[0] || '·').toUpperCase(); tile.appendChild(letter);
   styleDial(tile, letter, d);
@@ -712,53 +742,841 @@ const WIDGET_TYPES = {
   date: { name: 'Fecha', icon: 'clock', span: 2 },
   weather: { name: 'Clima', icon: 'cloud', span: 2 },
   region: { name: 'Región', icon: 'map-pin', span: 2 },
-  notes: { name: 'Notas', icon: 'pencil-square', span: 3 }
+  notes: { name: 'Notas', icon: 'pencil-square', span: 3 },
+  spotify: { name: 'Spotify', icon: 'musical-note', span: 3 },
+  calendar: { name: 'Calendario', icon: 'calendar', span: 3 },
+  user: { name: 'Cuenta', icon: 'user-circle', span: 2 },
+  xtrends: { name: 'Tendencias X', icon: 'hash', span: 2, rspan: 2 },
+  imagen: { name: 'Imagen', icon: 'photo', span: 2 },
+  mail: { name: 'Correo', icon: 'inbox', span: 2, rspan: 2 },
+  descargas: { name: 'Descargas', icon: 'download' },
+  privada: { name: 'Ventana privada', icon: 'hat-glasses' },
+  monitor: { name: 'Monitor', icon: 'res-scale' },
+  moovin: { name: 'Moovin', icon: 'tv-minimal' },
+  clip: { name: 'Portapapeles', icon: 'clipboard' },
+  deco: { name: 'Adorno', icon: 'star' },
+  wallet: { name: 'Tarjetas', icon: 'credit-card' }
 };
-let widgets = store.get('cobalt.widgets', [
-  { id: 'w1', type: 'clock', span: 6 }, { id: 'w2', type: 'search', span: 6 }, { id: 'w3', type: 'shortcuts', span: 6 }
-]);
+/* ===== GRILLA UNIVERSAL DE CELDAS (2026-08-11, pedido de Dosa) =====
+   Como la pantalla de un movil: celda base 160x160 (el RELOJ es la referencia,
+   2x1), cada widget ocupa un rectangulo de celdas {col,row,w,h} y se arrastra
+   a cualquier hueco libre. Cada tipo declara sus TALLAS (algunas cambian la
+   estructura). Sustituye a los mapas por tramo (span/col8/lienzo). */
+/* UNA SOLA COMPOSICION (2026-08-11, logica de Dosa: "un UWQHD es un QHD mas
+   largo"). La celda se deriva del ALTO (5 filas fijas en horizontal): a misma
+   altura, mismas celdas. El ancho solo anade COLUMNAS: 16:9 usa 10, ultrawide
+   13 (las 3 extra son largo, no otra maqueta). Cada widget tiene UNA geometria
+   {col,row,w,h}; si en una pantalla estrecha no cabe, se recoloca TEMPORALMENTE
+   sin tocar la composicion. Ventana rara (vertical): modo flujo con scroll. */
+let CELDA_W = 160, CELDA_H = 160;
+const CELDA_GAP = 18;
+const FILAS_LOGICAS = 5;
+let ultimoBucket = 'std', ultimasFilas = FILAS_LOGICAS;
+const TAMANOS = {
+  clock: [[2, 1], [2, 2]],
+  search: [[4, 1], [6, 1], [3, 1]],
+  shortcuts: [[6, 1], [4, 2], [6, 2], [5, 1]],
+  date: [[2, 1]],
+  weather: [[2, 1], [1, 1], [2, 2]],
+  region: [[2, 1]],
+  notes: [[2, 2], [2, 1], [3, 2]],
+  spotify: [[2, 2], [2, 3], [4, 2]],
+  calendar: [[2, 2], [1, 1], [3, 3], [3, 2]],
+  user: [[2, 1], [1, 1], [2, 2]],
+  xtrends: [[2, 3], [2, 2], [2, 4]],
+  imagen: [[2, 2], [4, 2], [2, 1], [3, 3]],
+  mail: [[2, 3], [2, 4], [3, 3]],
+  descargas: [[2, 2], [1, 1], [2, 1], [2, 3]],
+  privada: [[1, 1], [2, 1]],
+  monitor: [[2, 1], [1, 1], [1, 2], [2, 2]],
+  moovin: [[2, 2], [1, 1], [2, 1], [4, 2]],
+  clip: [[2, 2], [1, 1], [2, 3], [3, 2]],
+  deco: [[1, 1], [2, 1], [2, 2]],
+  wallet: [[2, 1], [1, 1], [2, 2]]
+};
+// Tallas LIBRES: estas cajas se estiran por los bordes a cualquier rectangulo
+// de celdas (las imagenes se adaptan por cover; los accesos reorganizan tiles).
+const LIBRES = new Set(['imagen', 'shortcuts', 'search']);
+/* Los ACCESOS crecen con los marcadores: se calcula cuantas filas de tiles
+   caben en su ancho y la tarjeta gana alto; los widgets de ABAJO se desplazan
+   hacia abajo sin descuadrar (peticion de Dosa 2026-08-12). */
+function altoAccesos(w) {
+  const TILE = 92, GAP_T = 16, ETIQ = 26, PAD = 26;
+  const anchoPx = w.w * CELDA_W + (w.w - 1) * CELDA_GAP - PAD;
+  const porFila = Math.max(1, Math.floor((anchoPx + GAP_T) / (TILE + GAP_T)));
+  const filas = Math.ceil((dials.length + 1) / porFila);
+  const altoPx = filas * (TILE + ETIQ) + (filas - 1) * GAP_T + PAD;
+  return Math.max(1, Math.ceil((altoPx + CELDA_GAP) / (CELDA_H + CELDA_GAP)));
+}
+function ajustaAccesos() {
+  const w = widgets.find((x) => x.type === 'shortcuts' && x.geo && x.geo[ultimoBucket]);
+  if (!w) return;
+  const g = w.geo[ultimoBucket];
+  const nuevo = altoAccesos(g);
+  const delta = nuevo - g.h;
+  if (!delta) return;
+  const finAntes = g.row + g.h - 1;
+  g.h = nuevo; w.h = nuevo; w.row = g.row;
+  // Empuje SOLO en las columnas que ocupan los accesos: los laterales no se
+  // tocan (antes subia/bajaba toda la fila y descuadraba el bento).
+  const cruza = (gx) => gx.col <= g.col + g.w - 1 && gx.col + gx.w - 1 >= g.col;
+  delBucket().forEach((x) => {
+    if (x.id === w.id) return;
+    const gx = x.geo[ultimoBucket];
+    if (!cruza(gx) || gx.row <= finAntes) return;
+    const nueva = delta > 0
+      ? Math.min(ultimasFilas - gx.h + 1, gx.row + delta)
+      : Math.max(g.row + g.h, gx.row + delta); // al encoger, vuelven a su sitio
+    gx.row = nueva; x.row = nueva;
+  });
+  saveWidgets();
+}
+function tallaValida(w) {
+  if (LIBRES.has(w.type)) {
+    const def = (TAMANOS[w.type] || [[2, 2]])[0];
+    w.w = Math.max(1, w.w || def[0]); w.h = Math.max(1, w.h || def[1]);
+    return [w.w, w.h];
+  }
+  const lista = TAMANOS[w.type] || [[2, 1]];
+  if (lista.some(([a, b]) => a === w.w && b === w.h)) return [w.w, w.h];
+  return lista[0];
+}
+function medidasMalla() {
+  // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
+  // daba una celda mas grande de la cuenta (la malla no cabia y aparecia
+  // scroll). 116px = titlebar + navbar.
+  const anchoHub = els.hub.clientWidth || (window.innerWidth - 48);
+  const altoHub = els.hub.clientHeight || (window.innerHeight - 116);
+  const anchoUtil = anchoHub * 0.94;
+  const csG = getComputedStyle(els.widgetGrid);
+  const altoUtil = altoHub - (parseFloat(csG.paddingTop) || 24) - (parseFloat(csG.paddingBottom) || 90);
+  const vertical = anchoHub < altoHub;
+  const esUW = (window.innerWidth / window.innerHeight) > 2;
+  // ULTRAWIDE: malla FIJA de 17x7 (impares: siempre hay celda central). La
+  // celda se calcula para que quepan justas a lo ancho y a lo alto.
+  if (esUW && !vertical) {
+    const C = 17, F = 7;
+    const cw = Math.floor(Math.min((anchoUtil - (C - 1) * CELDA_GAP) / C, (altoUtil - (F - 1) * CELDA_GAP) / F));
+    if (cw >= 120) return { bucket: 'uw', cols: C, cw, filas: F, raro: false };
+  }
+  // 16:9 (y cualquier pantalla horizontal normal): malla FIJA de 13x7 — el
+  // ALTO manda (7 filas siempre, como en ultrawide) y 13 columnas dan centro
+  // real; la celda escala con el monitor (1080p -> 4K).
+  if (!vertical) {
+    const C = 13, F = 7;
+    const cw = Math.floor(Math.min((anchoUtil - (C - 1) * CELDA_GAP) / C, (altoUtil - (F - 1) * CELDA_GAP) / F));
+    if (cw >= 90) return { bucket: 'std', cols: C, cw, filas: F, raro: false };
+  }
+  // Ventana rara: flujo con celda base y scroll
+  const cw = 160;
+  const cols = Math.max(2, Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP)));
+  return { bucket: 'flujo', cols, cw, filas: 60, raro: true };
+}
+function libre(occ, col, row, w, h, cols) {
+  if (col < 1 || row < 1 || col + w - 1 > cols || row + h - 1 > ultimasFilas) return false;
+  for (let r = row; r < row + h; r++) for (let c = col; c < col + w; c++) if (occ.has(r + ':' + c)) return false;
+  return true;
+}
+// Solo los widgets de la composicion ACTIVA ocupan celdas: los que aun no
+// se han colocado en este bucket son invisibles y no deben estorbar (bug de
+// "Ahi no cabe" en huecos claramente libres).
+function delBucket() {
+  if (ultimoBucket === 'flujo') return widgets;
+  return widgets.filter((x) => x.geo && x.geo[ultimoBucket]);
+}
+function ocupa(occ, wd) { for (let r = wd.row; r < wd.row + wd.h; r++) for (let c = wd.col; c < wd.col + wd.w; c++) occ.add(r + ':' + c); }
+// Toda mutacion (mover/estirar/talla) debe escribir en el bucket ACTIVO:
+// el render lee geo[cols] primero, y sin esto restauraba la posicion vieja.
+function fijaGeo(w) { if (ultimoBucket === 'flujo') return; (w.geo = w.geo || {})[ultimoBucket] = { col: w.col, row: w.row, w: w.w, h: w.h }; }
+function primerHueco(occ, w, h, cols) {
+  for (let row = 1; row <= ultimasFilas - h + 1; row++) for (let col = 1; col <= cols - w + 1; col++) {
+    if (libre(occ, col, row, w, h, cols)) return { col, row };
+  }
+  return null; // no cabe: el widget se oculta hasta que haya sitio
+}
+
+/* Disposicion de FABRICA: la composicion de Dosa (2026-08-11) en el sistema
+   de COMPOSICION UNICA (celda por alto, 10 col en 16:9, 13 en ultrawide).
+   Las imagenes van vacias: el usuario pone las suyas. */
+const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
+  {
+    "id": "wse",
+    "type": "search",
+    "col": 5,
+    "row": 1,
+    "w": 5,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 5,
+        "row": 1,
+        "w": 5,
+        "h": 1
+      },
+      "uw": {
+        "col": 7,
+        "row": 1,
+        "w": 5,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wck",
+    "type": "clock",
+    "col": 5,
+    "row": 2,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 5,
+        "row": 2,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 7,
+        "row": 2,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wi1",
+    "type": "imagen",
+    "col": 7,
+    "row": 2,
+    "w": 3,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 7,
+        "row": 2,
+        "w": 3,
+        "h": 1
+      },
+      "uw": {
+        "col": 16,
+        "row": 5,
+        "w": 2,
+        "h": 2
+      }
+    },
+    "slot": 1
+  },
+  {
+    "id": "wus",
+    "type": "user",
+    "col": 12,
+    "row": 2,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 12,
+        "row": 2,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 16,
+        "row": 2,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wsc",
+    "type": "shortcuts",
+    "col": 5,
+    "row": 3,
+    "w": 5,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 5,
+        "row": 3,
+        "w": 5,
+        "h": 1
+      },
+      "uw": {
+        "col": 7,
+        "row": 3,
+        "w": 5,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wdescargas1786480816361",
+    "type": "descargas",
+    "col": 12,
+    "row": 6,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 12,
+        "row": 6,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 1,
+        "row": 5,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "w1011786484898580",
+    "type": "calendar",
+    "col": 12,
+    "row": 4,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 12,
+        "row": 4,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 14,
+        "row": 2,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "w1071786484934841",
+    "type": "privada",
+    "col": 7,
+    "row": 4,
+    "w": 1,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 7,
+        "row": 4,
+        "w": 1,
+        "h": 1
+      },
+      "uw": {
+        "col": 10,
+        "row": 4,
+        "w": 1,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "w1081786484952003",
+    "type": "wallet",
+    "col": 5,
+    "row": 4,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 5,
+        "row": 4,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 7,
+        "row": 4,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "w1091786484963058",
+    "type": "spotify",
+    "col": 1,
+    "row": 2,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 1,
+        "row": 2,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 16,
+        "row": 3,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "w1021786485486556",
+    "type": "imagen",
+    "col": 1,
+    "row": 6,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 1,
+        "row": 6,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 9,
+        "row": 2,
+        "w": 3,
+        "h": 1
+      }
+    },
+    "slot": 2
+  },
+  {
+    "id": "wweather1786486269253",
+    "type": "weather",
+    "col": 12,
+    "row": 3,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 12,
+        "row": 3,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 3,
+        "row": 2,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "w1011786486744553",
+    "type": "mail",
+    "col": 14,
+    "row": 4,
+    "w": 2,
+    "h": 3,
+    "geo": {
+      "uw": {
+        "col": 14,
+        "row": 4,
+        "w": 2,
+        "h": 3
+      }
+    }
+  },
+  {
+    "id": "wxt1786486762568",
+    "type": "xtrends",
+    "col": 1,
+    "row": 4,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 1,
+        "row": 4,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 1,
+        "row": 2,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "wmonitor1786495950984",
+    "type": "monitor",
+    "col": 12,
+    "row": 7,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 12,
+        "row": 7,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 1,
+        "row": 4,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wclip1786495950984",
+    "type": "clip",
+    "col": 3,
+    "row": 3,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "uw": {
+        "col": 3,
+        "row": 3,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "wnotes1786495950984",
+    "type": "notes",
+    "col": 8,
+    "row": 4,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 8,
+        "row": 4,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 3,
+        "row": 5,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "wmoov1786496464075",
+    "type": "moovin",
+    "col": 5,
+    "row": 5,
+    "w": 1,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 5,
+        "row": 5,
+        "w": 1,
+        "h": 1
+      },
+      "uw": {
+        "col": 11,
+        "row": 4,
+        "w": 1,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wdeco1786498510113",
+    "type": "deco",
+    "col": 9,
+    "row": 4,
+    "w": 1,
+    "h": 1,
+    "geo": {
+      "uw": {
+        "col": 9,
+        "row": 4,
+        "w": 1,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "w1011786501277856",
+    "type": "imagen",
+    "col": 6,
+    "row": 5,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 6,
+        "row": 5,
+        "w": 2,
+        "h": 1
+      }
+    },
+    "slot": 3
+  }
+]));
+let widgets = store.get('cobalt.widgets', DEFAULT_WIDGETS());
+// migracion: la geometria plana (col/row) se convierte en geo.std
+widgets.forEach((w) => {
+  if (!w.geo && w.col >= 1 && w.row >= 1) w.geo = { std: { col: w.col, row: w.row, w: w.w, h: w.h } };
+});
 const saveWidgets = () => store.set('cobalt.widgets', widgets);
 let widgetSeq = 100;
 
+let ultimoCols = 0, dragId = null;
 function renderHub() {
   els.widgetGrid.innerHTML = '';
+  const m = medidasMalla();
+  ultimoBucket = m.bucket; ultimasFilas = m.filas;
+  els.hub.classList.toggle('con-scroll', !!m.raro);
+  const cols = m.cols; ultimoCols = cols;
+  CELDA_W = m.cw; CELDA_H = m.cw; // celda cuadrada que ESCALA con el monitor
+  els.widgetGrid.style.gridTemplateColumns = `repeat(${cols}, ${CELDA_W}px)`;
+  // Filas SIEMPRE explicitas: si la grilla solo creaba las usadas, el bloque
+  // centrado quedaba desplazado respecto a la malla de guias.
+  els.widgetGrid.style.gridTemplateRows = `repeat(${m.filas}, ${CELDA_H}px)`;
+  els.widgetGrid.style.gridAutoRows = `${CELDA_H}px`;
+  els.widgetGrid.style.gap = `${CELDA_GAP}px`;
+  ajustaAccesos();
+  const occ = new Set();
   for (const w of widgets) {
-    const el = document.createElement('div'); el.className = 'widget'; el.style.setProperty('--span', w.span); el.dataset.id = w.id;
+    // COMPOSICION POR ANCHO (2026-08-11): cada bucket de columnas guarda su
+    // propia geometria (w.geo[cols]) — componer en FHD no toca el ultrawide.
+    // DOS composiciones (std/uw) con MEMBRESIA propia: un widget vive en las
+    // composiciones donde tiene geo. En flujo todo se recoloca temporalmente.
+    const enOtra = w.geo && (w.geo.std || w.geo.uw);
+    const g = m.bucket !== 'flujo' && w.geo && w.geo[m.bucket];
+    if (m.bucket !== 'flujo' && !g && enOtra) continue; // no pertenece a ESTA composicion
+    if (g) { w.col = g.col; w.row = g.row; w.w = g.w; w.h = g.h; }
+    let [tw, th] = tallaValida(w); if (tw > cols) tw = cols; w.w = tw; w.h = th;
+    let cc = (m.bucket === 'flujo') ? 0 : w.col, rr = (m.bucket === 'flujo') ? 0 : w.row;
+    if (!(cc >= 1 && rr >= 1) || !libre(occ, cc, rr, tw, th, cols)) {
+      const pos = primerHueco(occ, tw, th, cols);
+      if (!pos) continue; // sin sitio visible: oculto hasta liberar celdas
+      cc = pos.col; rr = pos.row;
+      if (m.bucket !== 'flujo') { w.col = cc; w.row = rr; fijaGeo(w); }
+    }
+    ocupa(occ, { col: cc, row: rr, w: tw, h: th });
+    const el = document.createElement('div'); el.className = 'widget'; el.dataset.id = w.id;
+    el.style.gridColumn = `${cc} / span ${tw}`;
+    el.style.gridRow = `${rr} / span ${th}`;
     const body = document.createElement('div');
-    if (w.type === 'clock') { el.classList.add('w-search'); body.className = 'w-card w-clock'; body.innerHTML = `<div class="time" id="w-time"></div><div class="greet" id="w-greet"></div>`; }
-    else if (w.type === 'search') { el.classList.add('w-search'); body.appendChild(buildSearch()); }
+    if (w.type === 'clock') {
+      // Reloj-TARJETA del bento (2026-08-11): texto a la izquierda y chip del
+      // día FUNDIDO en la esquina (scoop). Deja de ser un texto suelto centrado.
+      body.className = 'w-card w-clock';
+      body.innerHTML = `<div class="ck-chip" title="Hoy"><span id="w-dnum"></span></div><div class="time" id="w-time"></div><div class="greet" id="w-greet"></div><div class="ck-fecha" id="w-fecha"></div>`;
+    }
+    else if (w.type === 'search') { body.className = 'w-searchwrap'; body.appendChild(buildSearch()); }
     else if (w.type === 'shortcuts') { body.className = 'w-card w-shortcuts'; const g = document.createElement('div'); g.className = 'sc-grid'; dials.forEach((d) => g.appendChild(makeDialEl(d))); const add = document.createElement('div'); add.className = 'dial add'; add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir</div>`; add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); }); g.appendChild(add); body.appendChild(g); }
     else if (w.type === 'date') { body.className = 'w-card w-date'; renderDate(body); }
-    else if (w.type === 'weather') { body.className = 'w-card w-weather'; body.innerHTML = '<div class="w-loading">Cargando clima…</div>'; loadWeather(body, 'weather'); }
+    else if (w.type === 'weather') { body.className = 'w-card w-wx'; body.innerHTML = '<div class="w-loading">Cargando clima…</div>'; loadWeather(body, 'weather'); }
     else if (w.type === 'region') { body.className = 'w-card w-weather'; body.innerHTML = '<div class="w-loading">Cargando región…</div>'; loadWeather(body, 'region'); }
-    else if (w.type === 'notes') { body.className = 'w-card w-notes'; body.innerHTML = `<div class="w-head">${window.icon('pencil-square')} Notas</div><textarea placeholder="Escribe algo…">${escapeHtml(store.get('cobalt.notes', ''))}</textarea>`; body.querySelector('textarea').addEventListener('input', (e) => store.set('cobalt.notes', e.target.value)); }
+    else if (w.type === 'notes') { body.className = 'w-card w-notes'; renderNotasW(body); }
+    else if (w.type === 'spotify') { body.className = 'w-card w-sp sp-vacio'; renderSpotify(body); }
+    else if (w.type === 'calendar') { body.className = 'w-card w-cal'; renderCalendar(body); }
+    else if (w.type === 'user') { body.className = 'w-card w-user'; renderUserCard(body); }
+    else if (w.type === 'xtrends') { body.className = 'w-card w-xt'; renderXTrends(body); }
+    else if (w.type === 'imagen') { body.className = 'w-card w-img'; renderImagen(body, w); }
+    else if (w.type === 'mail') { body.className = 'w-card w-mail'; renderMail(body); }
+    else if (w.type === 'descargas') { body.className = 'w-card w-dlw'; renderDescargasW(body); }
+    else if (w.type === 'privada') { body.className = 'w-card w-priv'; renderPrivadaW(body); }
+    else if (w.type === 'monitor') { body.className = 'w-card w-mon'; renderMonitorW(body); }
+    else if (w.type === 'moovin') { body.className = 'w-card w-moov'; renderMoovinW(body); }
+    else if (w.type === 'clip') { body.className = 'w-card w-clip'; renderClipW(body); }
+    else if (w.type === 'deco') { body.className = 'w-card w-deco'; body.innerHTML = '<span class="dc-a"></span><span class="dc-b"></span><span class="dc-c"></span>'; }
+    else if (w.type === 'wallet') { body.className = 'w-card w-wallet'; renderWalletW(body); }
+    body.classList.add('t-' + tw + 'x' + th); // talla para CSS estructural
     if (body.parentNode !== el) el.appendChild(body);
 
     // Herramientas de edición
     const tools = document.createElement('div'); tools.className = 'w-tools';
     const grip = document.createElement('button'); grip.title = 'Arrastra para mover'; grip.innerHTML = window.icon('grip');
-    const size = document.createElement('button'); size.title = 'Cambiar tamaño'; size.innerHTML = window.icon('arrows-pointing-out'); size.addEventListener('click', (e) => { e.stopPropagation(); const steps = [2, 3, 4, 6]; w.span = steps[(steps.indexOf(w.span) + 1) % steps.length]; saveWidgets(); renderHub(); });
-    const rm = document.createElement('button'); rm.className = 'rm'; rm.title = 'Quitar widget'; rm.innerHTML = window.icon('x-mark'); rm.addEventListener('click', (e) => { e.stopPropagation(); widgets = widgets.filter((x) => x.id !== w.id); saveWidgets(); renderHub(); });
+    const size = document.createElement('button'); size.title = 'Cambiar tamaño'; size.innerHTML = window.icon('arrows-pointing-out'); size.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lista = TAMANOS[w.type] || [[2, 1]];
+      const i = lista.findIndex(([a, b]) => a === w.w && b === w.h);
+      const sig = lista[(i + 1) % lista.length];
+      const tw = Math.min(sig[0], ultimoCols), th = sig[1];
+      // validar ANTES de cambiar: sin sitio para la talla nueva, se avisa y no
+      // se toca nada (antes el widget se quedaba oculto por no caber)
+      if (!empuja(w, tw, th)) { toast(`No hay sitio para ${tw}×${th} — ni empujando vecinos`); return; }
+      saveWidgets(); renderHub();
+    });
+    const rm = document.createElement('button'); rm.className = 'rm'; rm.title = 'Quitar widget'; rm.innerHTML = window.icon('x-mark'); rm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (ultimoBucket !== 'flujo' && w.geo) { delete w.geo[ultimoBucket]; }
+      if (!w.geo || (!w.geo.std && !w.geo.uw)) widgets = widgets.filter((x) => x.id !== w.id);
+      saveWidgets(); renderHub();
+    });
     tools.append(grip, size, rm); el.appendChild(tools);
+    if (LIBRES.has(w.type)) { armaRedim(el, w, 'r'); armaRedim(el, w, 'b'); armaRedim(el, w, 'rb'); }
 
-    // Drag & drop
+    // Drag: el widget solo se declara arrastrable; la celda destino la
+    // resuelve la GRILLA (armaDnd), como mover iconos en un movil.
     el.draggable = false;
     grip.addEventListener('mousedown', () => { el.draggable = true; });
-    el.addEventListener('dragstart', (e) => { el.classList.add('dragging'); e.dataTransfer.setData('text/plain', w.id); });
-    el.addEventListener('dragend', () => { el.classList.remove('dragging'); el.draggable = false; document.querySelectorAll('.drop-target').forEach((x) => x.classList.remove('drop-target')); });
-    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drop-target'); });
-    el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drop-target'); const from = e.dataTransfer.getData('text/plain'); reorderWidget(from, w.id); });
+    el.addEventListener('dragstart', (e) => { el.classList.add('dragging'); dragId = w.id; els.hub.classList.add('arrastrando'); e.dataTransfer.setData('text/plain', w.id); });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); el.draggable = false; dragId = null; els.hub.classList.remove('arrastrando'); document.getElementById('celda-fantasma')?.remove(); });
     els.widgetGrid.appendChild(el);
   }
+  // Guias de la grilla (visibles solo en modo Editar): todas las celdas con
+  // contorno suave y el EJE CENTRAL (columna/fila del medio) tintado leve.
+  // Guias como CAPA SUPERPUESTA (2026-08-12): antes eran items de la grilla y
+  // anadian filas — al entrar en Editar todo saltaba hacia arriba. Ahora no
+  // ocupan layout: se dibujan con gradientes sobre la malla real.
+  // Guias: las CELDAS punteadas de siempre, pero dentro de una capa
+  // superpuesta (no son items de la grilla, asi no anaden filas ni mueven
+  // nada al entrar en Editar). El centro tine las dos centrales si el numero
+  // es par, para que quede el mismo numero de celdas a cada lado.
+  const malla = document.createElement('div'); malla.className = 'gmalla';
+  const midCols = cols % 2 ? [(cols + 1) / 2] : [cols / 2, cols / 2 + 1];
+  const midFilas = ultimasFilas % 2 ? [(ultimasFilas + 1) / 2] : [ultimasFilas / 2, ultimasFilas / 2 + 1];
+  for (let r = 1; r <= ultimasFilas; r++) for (let c = 1; c <= cols; c++) {
+    const g = document.createElement('div'); g.className = 'gcelda';
+    if (midCols.includes(c) || midFilas.includes(r)) g.classList.add('gc-centro');
+    g.style.left = ((c - 1) * (CELDA_W + CELDA_GAP)) + 'px';
+    g.style.top = ((r - 1) * (CELDA_H + CELDA_GAP)) + 'px';
+    g.style.width = CELDA_W + 'px'; g.style.height = CELDA_H + 'px';
+    malla.appendChild(g);
+  }
+  els.widgetGrid.appendChild(malla);
+  requestAnimationFrame(() => {
+    const cs = getComputedStyle(els.widgetGrid);
+    const padL = parseFloat(cs.paddingLeft) || 0, padT = parseFloat(cs.paddingTop) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0, padB = parseFloat(cs.paddingBottom) || 0;
+    const anchoCeldas = cols * CELDA_W + (cols - 1) * CELDA_GAP;
+    const altoCeldas = ultimasFilas * CELDA_H + (ultimasFilas - 1) * CELDA_GAP;
+    const dispW = els.widgetGrid.clientWidth - padL - padR;
+    const dispH = els.widgetGrid.clientHeight - padT - padB;
+    malla.style.left = (padL + Math.max(0, (dispW - anchoCeldas) / 2)) + 'px';
+    malla.style.top = (padT + Math.max(0, (dispH - altoCeldas) / 2)) + 'px';
+    malla.style.width = anchoCeldas + 'px'; malla.style.height = altoCeldas + 'px';
+  });
+  armaDnd();
+  // Si al medir de verdad la celda sale distinta (primer render sin layout),
+  // se repinta UNA vez con la medida buena.
+  if (!renderHub._ajustando) {
+    requestAnimationFrame(() => {
+      const m2 = medidasMalla();
+      if (m2.cw !== CELDA_W || m2.cols !== ultimoCols || m2.filas !== ultimasFilas) {
+        renderHub._ajustando = true; renderHub(); renderHub._ajustando = false;
+      }
+    });
+  }
   tickClock();
+  // Las pastillas de la esquina DUPLICAN widgets: con el widget presente en el
+  // hub, su pastilla sobra (y en pantallas normales chocaba con la columna
+  // derecha). El conmutador de tema, que no tiene widget, se queda.
+  const tipos = new Set(widgets.map((x) => x.type));
+  document.getElementById('hub-account')?.classList.toggle('hidden', tipos.has('user'));
+  document.getElementById('hub-weather')?.classList.toggle('hidden', tipos.has('weather'));
 }
-function reorderWidget(fromId, toId) {
-  if (fromId === toId) return;
-  const fi = widgets.findIndex((w) => w.id === fromId), ti = widgets.findIndex((w) => w.id === toId);
-  if (fi < 0 || ti < 0) return;
-  const [m] = widgets.splice(fi, 1); widgets.splice(widgets.findIndex((w) => w.id === toId), 0, m);
-  saveWidgets(); renderHub();
+/* Motor de arrastre de la grilla: fantasma verde/rojo bajo el cursor; soltar
+   coloca si el area esta libre, intercambia si cae sobre otro y AMBOS caben,
+   y avisa si no hay sitio. */
+function celdaDe(e) {
+  const r = els.widgetGrid.getBoundingClientRect();
+  const cs = getComputedStyle(els.widgetGrid);
+  const anchoMalla = ultimoCols * CELDA_W + (ultimoCols - 1) * CELDA_GAP;
+  const x0 = r.left + (r.width - anchoMalla) / 2; // la malla va centrada
+  const y0 = r.top + parseFloat(cs.paddingTop);
+  return {
+    col: Math.max(1, Math.floor((e.clientX - x0) / (CELDA_W + CELDA_GAP)) + 1),
+    row: Math.max(1, Math.floor((e.clientY - y0) / (CELDA_H + CELDA_GAP)) + 1)
+  };
+}
+/* Estirar por los BORDES (modo Editar, tallas libres): arrastras el asa y la
+   caja crece/encoge por celdas con vista previa; si el rectangulo final pisa
+   a otro, se revierte con aviso. */
+/* EMPUJE al redimensionar (como un movil): la talla nueva se queda donde
+   esta y los vecinos que estorben se recolocan al primer hueco; solo se
+   niega si fisicamente no caben todos. */
+function empuja(w, tw, th) {
+  const col = Math.max(1, Math.min(w.col, ultimoCols - tw + 1));
+  const row = Math.max(1, Math.min(w.row, ultimasFilas - th + 1));
+  if (col + tw - 1 > ultimoCols || row + th - 1 > ultimasFilas) return false;
+  const rect = { col, row, w: tw, h: th };
+  const vive = (x) => x.geo && x.geo[ultimoBucket];
+  const desplazados = delBucket().filter((x) => x.id !== w.id && vive(x) &&
+    rect.col < x.col + x.w && rect.col + tw - 1 >= x.col && rect.row < x.row + x.h && rect.row + th - 1 >= x.row);
+  const occ = new Set();
+  delBucket().forEach((x) => { if (x.id !== w.id && vive(x) && !desplazados.includes(x)) ocupa(occ, x); });
+  ocupa(occ, rect);
+  const plan = [];
+  for (const d of desplazados) {
+    const pos = primerHueco(occ, d.w, d.h, ultimoCols);
+    if (!pos) return false;
+    plan.push([d, pos]); ocupa(occ, { col: pos.col, row: pos.row, w: d.w, h: d.h });
+  }
+  plan.forEach(([d, pos]) => { d.col = pos.col; d.row = pos.row; fijaGeo(d); });
+  w.col = col; w.row = row; w.w = tw; w.h = th; fijaGeo(w);
+  return true;
+}
+function armaRedim(el, w, dir) {
+  const asa = document.createElement('div'); asa.className = 'w-redim ' + dir;
+  asa.addEventListener('mousedown', (e) => {
+    if (!els.hub.classList.contains('editing')) return;
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, y0 = e.clientY, w0 = w.w, h0 = w.h;
+    const occ = new Set(); delBucket().forEach((x) => { if (x.id !== w.id) ocupa(occ, x); });
+    const mueve = (ev) => {
+      let nw = w0, nh = h0;
+      if (dir.includes('r')) nw = Math.max(1, w0 + Math.round((ev.clientX - x0) / (CELDA_W + CELDA_GAP)));
+      if (dir.includes('b')) nh = Math.max(1, h0 + Math.round((ev.clientY - y0) / (CELDA_H + CELDA_GAP)));
+      nw = Math.min(nw, ultimoCols - w.col + 1);
+      el.style.gridColumn = w.col + ' / span ' + nw;
+      el.style.gridRow = w.row + ' / span ' + nh;
+      el.classList.toggle('redim-mal', !libre(occ, w.col, w.row, nw, nh, ultimoCols));
+      el.dataset.nw = nw; el.dataset.nh = nh;
+    };
+    const suelta = () => {
+      window.removeEventListener('mousemove', mueve); window.removeEventListener('mouseup', suelta);
+      const nw = +el.dataset.nw || w0, nh = +el.dataset.nh || h0;
+      if ((nw !== w0 || nh !== h0) && !empuja(w, nw, nh)) toast('Ahí no cabe ni empujando vecinos');
+      saveWidgets(); renderHub();
+    };
+    window.addEventListener('mousemove', mueve); window.addEventListener('mouseup', suelta);
+  });
+  el.appendChild(asa);
+}
+function armaDnd() {
+  if (els.widgetGrid.dataset.dnd) return; els.widgetGrid.dataset.dnd = '1';
+  els.widgetGrid.addEventListener('dragover', (e) => {
+    if (!dragId) return; e.preventDefault();
+    const wd = widgets.find((x) => x.id === dragId); if (!wd) return;
+    const pos = celdaDe(e);
+    const occ = new Set(); delBucket().forEach((x) => { if (x.id !== dragId) ocupa(occ, x); });
+    let g = document.getElementById('celda-fantasma');
+    if (!g) { g = document.createElement('div'); g.id = 'celda-fantasma'; els.widgetGrid.appendChild(g); }
+    g.style.gridColumn = pos.col + ' / span ' + wd.w;
+    g.style.gridRow = pos.row + ' / span ' + wd.h;
+    g.classList.toggle('mal', !libre(occ, pos.col, pos.row, wd.w, wd.h, ultimoCols));
+  });
+  els.widgetGrid.addEventListener('drop', (e) => {
+    e.preventDefault(); document.getElementById('celda-fantasma')?.remove();
+    const wd = widgets.find((x) => x.id === dragId); if (!wd) return;
+    const pos = celdaDe(e);
+    const occ = new Set(); delBucket().forEach((x) => { if (x.id !== wd.id) ocupa(occ, x); });
+    if (libre(occ, pos.col, pos.row, wd.w, wd.h, ultimoCols)) { wd.col = pos.col; wd.row = pos.row; fijaGeo(wd); }
+    else {
+      // cae sobre otro: intercambio de posiciones si AMBOS caben tras el cambio
+      const b = delBucket().find((x) => x.id !== wd.id && pos.col < x.col + x.w && pos.col + wd.w - 1 >= x.col && pos.row < x.row + x.h && pos.row + wd.h - 1 >= x.row);
+      if (b) {
+        const occ2 = new Set(); delBucket().forEach((x) => { if (x.id !== wd.id && x.id !== b.id) ocupa(occ2, x); });
+        const cabeA = libre(occ2, b.col, b.row, wd.w, wd.h, ultimoCols);
+        const t = new Set(occ2); if (cabeA) ocupa(t, { col: b.col, row: b.row, w: wd.w, h: wd.h });
+        const cabeB = cabeA && libre(t, wd.col, wd.row, b.w, b.h, ultimoCols);
+        if (cabeA && cabeB) { const pa = { col: b.col, row: b.row }; b.col = wd.col; b.row = wd.row; wd.col = pa.col; wd.row = pa.row; fijaGeo(wd); fijaGeo(b); }
+        else toast('Ahí no cabe');
+      } else toast('Ahí no cabe');
+    }
+    saveWidgets(); renderHub();
+  });
 }
 function buildSearch() {
   const form = document.createElement('form'); form.id = 'hub-search';
@@ -775,6 +1593,9 @@ function tickClock() {
   const now = new Date(); const t = document.getElementById('w-time'); const g = document.getElementById('w-greet');
   if (t) t.textContent = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   if (g) { if (IS_PRIVATE) g.textContent = 'Ventana privada — nada se guarda'; else { const h = now.getHours(); g.textContent = (h < 6 ? 'Buenas noches' : h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches') + ' — listo para navegar'; } }
+  const dn = document.getElementById('w-dnum'); if (dn) dn.textContent = now.getDate();
+  const fe = document.getElementById('w-fecha');
+  if (fe) { const f = now.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }); fe.textContent = f.charAt(0).toUpperCase() + f.slice(1); }
 }
 setInterval(tickClock, 10000);
 
@@ -826,13 +1647,701 @@ async function loadWeather(el, kind) {
     if (kind === 'region') { el.innerHTML = `<div class="wx-ic">${window.icon('map-pin')}</div><div><div class="wx-temp" style="font-size:20px">${escapeHtml(geo.city || '—')}</div><div class="wx-desc">${escapeHtml(geo.region || '')}, ${escapeHtml(geo.country_name || '')}</div><div class="wx-city">${escapeHtml(geo.timezone || '')}</div></div>`; return; }
     if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=${WX_QUERY}`); wxCache = (await r.json()).current; }
     const [desc, ic] = WMO(wxCache);
-    el.innerHTML = `<div class="wx-ic">${window.icon(ic)}</div><div><div class="wx-temp">${Math.round(wxCache.temperature_2m)}°</div><div class="wx-desc">${desc}</div><div class="wx-city">${window.icon('map-pin')} ${escapeHtml(geo.city || '')}</div></div>`;
+    // Tarjeta VERDE del bento (2026-08-11): dato grande a la izquierda, icono
+    // arriba a la derecha, chips de viento/humedad y ↗ fundido en el scoop.
+    el.innerHTML = `
+      <div class="wx2-top"><div class="wx2-temp">${Math.round(wxCache.temperature_2m)}°</div><div class="wx2-ic">${window.icon(ic)}</div></div>
+      <div class="wx2-desc">${desc}</div>
+      <div class="wx2-chips">
+        <span class="wx2-chip">${Math.round(wxCache.wind_speed_10m || 0)} km/h</span>
+        <span class="wx2-chip">${Math.round(wxCache.relative_humidity_2m || 0)}% hum.</span>
+      </div>
+      <div class="wx2-city">${escapeHtml(geo.city || '')}</div>
+      <button class="wx2-go" title="Pronóstico completo">${window.icon('arrow-up-right')}</button>`;
+    el.querySelector('.wx2-go').addEventListener('click', (e) => { e.stopPropagation(); navigateActive(`https://www.google.com/search?q=clima+${encodeURIComponent(geo.city || '')}`); });
   } catch { el.innerHTML = '<div class="w-loading">Clima no disponible (sin conexión)</div>'; }
 }
+
+/* ============ Widget Spotify (2026-08-11) ============
+   Controla la pestaña ABIERTA de open.spotify.com — sin API ni claves: se lee
+   navigator.mediaSession.metadata (título/artista/carátula, lo alimenta el
+   propio player web) y se clican los botones reales por data-testid. El sondeo
+   (3 s) solo trabaja con el hub visible y se apaga solo al quitar el widget. */
+const SP_LEE = `(() => {
+  const m = navigator.mediaSession; const md = m && m.metadata;
+  const b = document.querySelector('[data-testid="control-button-playpause"]');
+  const on = (m && m.playbackState === 'playing') || !!(b && /pausa|pause/i.test(b.getAttribute('aria-label') || ''));
+  const art = md && md.artwork && md.artwork.length ? md.artwork[md.artwork.length - 1].src : '';
+  return { t: md ? md.title : '', a: md ? md.artist : '', art, on };
+})()`;
+const SP_SEL = {
+  play: ['[data-testid="control-button-playpause"]', 'button[aria-label*="Pausar"]', 'button[aria-label*="Pause"]', 'button[aria-label*="Reproducir"]', 'button[aria-label*="Play"]'],
+  next: ['[data-testid="control-button-skip-forward"]', 'button[aria-label*="Siguiente"]', 'button[aria-label*="Next"]'],
+  prev: ['[data-testid="control-button-skip-back"]', 'button[aria-label*="Anterior"]', 'button[aria-label*="Previous"]']
+};
+
+/* ===== Spotify RESIDENTE (2026-08-11, petición de Dosa) =====
+   Webview propio FUERA del sistema de pestañas: no lo duerme el ahorro de
+   energía y el audio sigue al navegar por otros sitios. El botón del sidebar
+   (bajo el home) abre un panel cápsula; CERRAR el panel solo lo oculta.
+   El botón aparece si hay sesión de Spotify (cookie sp_dc, IPC spotify:logged)
+   o si el dock ya se usó alguna vez (cobalt.spotifyDock). */
+let spPlayerWv = null;
+// UA movil para el panel: la web de escritorio de Spotify se ve fatal a 392px
+// (biblioteca gigante, banners); la version movil esta disenada para ese ancho.
+const SP_UA_MOVIL = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+function ensureSpotifyPlayer() {
+  if (spPlayerWv) return spPlayerWv;
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', PARTITION);
+  wv.setAttribute('useragent', SP_UA_MOVIL);
+  // sin scrollbar dentro del panel (el scroll por rueda/gesto sigue vivo)
+  wv.addEventListener('dom-ready', () => { wv.insertCSS('::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}').catch(() => {}); });
+  wv.src = 'https://open.spotify.com';
+  document.getElementById('sp-holder').appendChild(wv);
+  spPlayerWv = wv;
+  store.set('cobalt.spotifyDock', true);
+  els.sbSpotify.classList.remove('hidden');
+  return wv;
+}
+function toggleSpotifyPanel(force) {
+  const panel = document.getElementById('sp-panel');
+  const abrir = force !== undefined ? force : panel.classList.contains('hidden');
+  if (abrir) { ensureSpotifyPlayer(); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
+  else { panel.classList.add('hidden'); els.sbSpotify.classList.remove('open'); }
+  actualizaSpotifyVivo();
+}
+async function actualizaSpotifyVivo() {
+  // La etiqueta "Sonando de fondo" del panel solo si de verdad suena
+  const vivo = document.getElementById('sp-p-vivo'); if (!vivo || !spPlayerWv) return;
+  try { const st = await spPlayerWv.executeJavaScript(SP_LEE, false); vivo.classList.toggle('hidden', !st.on); }
+  catch { vivo.classList.add('hidden'); }
+}
+function spTab() {
+  // El reproductor residente manda; si no existe, vale una pestaña abierta
+  if (spPlayerWv) return { webview: spPlayerWv, asleep: false };
+  return tabs.find((t) => {
+    if (t.asleep || !t.webview) return false;
+    try { return new URL(t.url).host === 'open.spotify.com'; } catch { return false; }
+  });
+}
+/* Arranque del dock: glifo de marca, clic, y visibilidad por sesión o uso previo */
+els.sbSpotify.innerHTML = window.brandIcon('spotify') || window.icon('musical-note');
+els.sbSpotify.addEventListener('click', () => toggleSpotifyPanel());
+document.getElementById('sp-p-x').addEventListener('click', () => toggleSpotifyPanel(false));
+(async () => {
+  if (store.get('cobalt.spotifyDock', false)) { els.sbSpotify.classList.remove('hidden'); return; }
+  try { if (await window.cobalt.spotifyLogged()) els.sbSpotify.classList.remove('hidden'); } catch { /* sin IPC: se queda oculto */ }
+})();
+function spCmd(cmd) {
+  const tab = spTab(); if (!tab) return;
+  const sels = JSON.stringify(SP_SEL[cmd]);
+  tab.webview.executeJavaScript(`(function(){ for (const s of ${sels}) { const b = document.querySelector(s); if (b) { b.click(); return; } } })()`, true).catch(() => {});
+  setTimeout(actualizaSpotify, 400); // reflejar el nuevo estado enseguida
+}
+let spTimer = null;
+async function actualizaSpotify() {
+  if (!widgets.some((w) => w.type === 'spotify')) { clearInterval(spTimer); spTimer = null; return; }
+  const cuerpos = document.querySelectorAll('.w-sp');
+  if (!els.hub.classList.contains('active')) return;
+  const tab = spTab(); let st = null;
+  if (tab) { try { st = await tab.webview.executeJavaScript(SP_LEE, false); } catch { st = null; } }
+  // Usar Spotify en pestaña también revela el dock (además de la cookie de
+  // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
+  if (tab) els.sbSpotify.classList.remove('hidden');
+  cuerpos.forEach((el) => pintaSpotify(el, st, !!tab));
+}
+function pintaSpotify(el, st, hayTab) {
+  const img = el.querySelector('.sp-art img'), tit = el.querySelector('.sp-tit'), sub = el.querySelector('.sp-sub');
+  const abre = el.querySelector('.sp-abre'), play = el.querySelector('.sp-play');
+  const hay = !!(st && st.t);
+  el.classList.toggle('sp-vacio', !hay);
+  abre.classList.toggle('hidden', hay || hayTab);
+  // Con pestaña de Spotify los controles SIEMPRE sirven (clican los botones
+  // reales del player), haya o no metadatos — sin pestaña, se apagan.
+  el.querySelectorAll('.sp-b').forEach((b) => { b.disabled = !hayTab; });
+  if (!hay) {
+    tit.textContent = 'Spotify';
+    sub.textContent = hayTab ? 'Spotify está abierto — reproduce algo para verlo aquí' : 'Abre open.spotify.com y controla la música desde aquí';
+    img.removeAttribute('src'); return;
+  }
+  if (tit.textContent !== st.t) { tit.textContent = st.t; tit.title = st.t; }
+  if (sub.textContent !== (st.a || '')) sub.textContent = st.a || '';
+  if (st.art && img.getAttribute('src') !== st.art) img.src = st.art;
+  const icono = st.on ? 'pause' : 'play';
+  if (play.dataset.ic !== icono) { play.dataset.ic = icono; play.innerHTML = window.icon(icono); }
+}
+function renderSpotify(body) {
+  // Reproductor + "Tu música" en UNA tarjeta (mock de Dosa: van juntos):
+  // arriba el player con su FAB fundido al canto; debajo, tus listas.
+  body.innerHTML = `
+    <div class="sp-player">
+      <div class="sp-art">${window.icon('musical-note')}<img alt="" /></div>
+      <div class="sp-meta">
+        <div class="sp-tit">Spotify</div>
+        <div class="sp-sub">Abre open.spotify.com y controla la música desde aquí</div>
+        <div class="sp-ctr">
+          <button class="sp-b" data-cmd="prev" title="Anterior" disabled>${window.icon('skip-back')}</button>
+          <button class="sp-b" data-cmd="next" title="Siguiente" disabled>${window.icon('skip-forward')}</button>
+          <button class="sp-abre">Abrir Spotify</button>
+        </div>
+      </div>
+    </div>
+    <div class="sp-bib">
+      <div class="w-head">Tu música<button class="wh-btn spl-rf" title="Actualizar">${window.icon('arrow-path')}</button></div>
+      <div class="spl-lista"><div class="w-vacio">Conecta Spotify para ver tus listas</div></div>
+    </div>
+    <button class="sp-play sp-b" data-cmd="play" title="Reproducir / pausa" data-ic="play">${window.icon('play')}</button>`;
+  body.addEventListener('click', (e) => { const b = e.target.closest('[data-cmd]'); if (b && !b.disabled) { e.stopPropagation(); spCmd(b.dataset.cmd); } });
+  // "Abrir Spotify" levanta el reproductor RESIDENTE (no una pestaña): la
+  // música sobrevive a la navegación y el botón del dock queda en el sidebar.
+  body.querySelector('.sp-abre').addEventListener('click', (e) => { e.stopPropagation(); toggleSpotifyPanel(true); setTimeout(() => llenaListas(body), 5000); });
+  body.querySelector('.spl-rf').addEventListener('click', (e) => { e.stopPropagation(); llenaListas(body); });
+  clearInterval(spTimer); spTimer = setInterval(actualizaSpotify, 3000);
+  actualizaSpotify();
+  llenaListas(body);
+}
+async function llenaListas(body) {
+  const cont = body.querySelector('.spl-lista'); if (!cont) return;
+  const t = spTab();
+  if (!t) { cont.innerHTML = '<div class="w-vacio">Conecta Spotify para ver tus listas</div>'; return; }
+  let listas = [];
+  try { listas = await t.webview.executeJavaScript(SPL_LEE, false) || []; } catch { /* aún cargando */ }
+  cont.innerHTML = listas.map((l) => `<button class="spl-i" data-h="${escapeHtml(l.h)}"><span>${escapeHtml(l.t)}</span>${window.icon('play')}</button>`).join('') ||
+    '<div class="w-vacio">Aún no veo tu biblioteca — abre Spotify un momento</div>';
+  cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); splReproduce(b.dataset.h); }));
+}
+
+/* ============ Widget Cuenta (2026-08-11) ============
+   Dos estados: sin sesión (invita a crearla) y con sesión (quién eres y cuándo
+   sincronizó). El FAB ↗ vive fundido en la esquina (scoop) y abre el modal de
+   cuenta que ya existe. Se repinta desde renderAccountPill al cambiar el estado. */
+function renderUserCard(body) {
+  const logged = !!(account && account.token);
+  body.classList.toggle('u-on', logged);
+  if (logged) {
+    const nombre = account.email.split('@')[0];
+    const st = store.get('cobalt.syncStamp', 0);
+    body.innerHTML = `
+      <div class="u-ava">${escapeHtml(nombre.charAt(0).toUpperCase())}</div>
+      <div class="u-nom">${escapeHtml(nombre)}</div>
+      <div class="u-mail">${escapeHtml(account.email)}</div>
+      <div class="u-sync">${st ? 'Sincronizada · ' + new Date(st).toLocaleDateString('es') : 'Aún sin sincronizar aquí'}</div>
+      <button class="u-go" title="Gestionar cuenta">${window.icon('arrow-up-right')}</button>`;
+  } else {
+    body.innerHTML = `
+      <div class="u-ava u-ava-off">${window.icon('user-circle')}</div>
+      <div class="u-nom">Tu cuenta</div>
+      <div class="u-mail">Tema, fondo y ajustes en la nube, en cualquier equipo</div>
+      <div class="u-sync">Sin sesión iniciada</div>
+      <button class="u-go" title="Iniciar sesión">${window.icon('arrow-up-right')}</button>`;
+  }
+  body.onclick = () => showAccountModal(); // onclick y no addEventListener: se repinta y no acumula
+}
+function refrescaUserCards() { document.querySelectorAll('.w-user').forEach((b) => renderUserCard(b)); }
+
+/* ============ Widget Calendario con recordatorios (2026-08-11) ============ */
+const recordatorios = () => store.get('cobalt.reminders', []);
+const guardaRecordatorios = (l) => store.set('cobalt.reminders', l);
+function renderCalendar(body) {
+  const vista = new Date(); vista.setDate(1);
+  const pinta = () => {
+    const y = vista.getFullYear(), m = vista.getMonth(); const hoy = new Date();
+    // Mayúscula solo inicial ("Agosto de 2026"): el capitalize de CSS pondría "Agosto De 2026"
+    const bruto = vista.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+    const nombre = bruto.charAt(0).toUpperCase() + bruto.slice(1);
+    const marca = new Set(recordatorios().map((r) => r.fecha));
+    const hueco = (vista.getDay() + 6) % 7; // semana empieza en lunes
+    const dias = new Date(y, m + 1, 0).getDate();
+    let celdas = '';
+    for (let i = 0; i < hueco; i++) celdas += '<span></span>';
+    for (let d = 1; d <= dias; d++) {
+      const f = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const esHoy = hoy.getFullYear() === y && hoy.getMonth() === m && hoy.getDate() === d;
+      celdas += `<button class="cal-d${esHoy ? ' hoy' : ''}${marca.has(f) ? ' con' : ''}" data-f="${f}">${d}</button>`;
+    }
+    body.innerHTML = `
+      <div class="cal-top">
+        <button class="cal-nav" data-d="-1">${window.icon('chevron-left')}</button>
+        <div class="cal-mes">${nombre}</div>
+        <button class="cal-nav" data-d="1">${window.icon('chevron-right')}</button>
+      </div>
+      <div class="cal-sem"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+      <div class="cal-grid">${celdas}</div>`;
+    body.querySelectorAll('.cal-nav').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); vista.setMonth(vista.getMonth() + +b.dataset.d); pinta(); }));
+    body.querySelectorAll('.cal-d').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); formulario(b.dataset.f); }));
+  };
+  const formulario = (f) => {
+    const diaBruto = new Date(f + 'T00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+    const dia = diaBruto.charAt(0).toUpperCase() + diaBruto.slice(1);
+    const lista = recordatorios().filter((r) => r.fecha === f).sort((a, b) => a.hora.localeCompare(b.hora));
+    body.innerHTML = `
+      <div class="cal-top">
+        <button class="cal-nav cal-volver">${window.icon('chevron-left')}</button>
+        <div class="cal-mes">${dia}</div><span></span>
+      </div>
+      <div class="cal-lista">${lista.map((r) => `<div class="cal-r"><span class="cal-r-h">${r.hora}</span><span class="cal-r-t">${escapeHtml(r.texto)}</span><button class="cal-r-x" data-id="${r.id}" title="Quitar">${window.icon('x-mark')}</button></div>`).join('') || '<div class="cal-nada">Sin recordatorios</div>'}</div>
+      <div class="cal-form">
+        <input type="time" class="cal-hora" value="09:00" />
+        <input type="text" class="cal-texto" placeholder="Recordatorio…" maxlength="80" />
+        <button class="cal-add" title="Añadir">${window.icon('plus')}</button>
+      </div>`;
+    body.querySelector('.cal-volver').addEventListener('click', (e) => { e.stopPropagation(); pinta(); });
+    body.querySelectorAll('.cal-r-x').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); guardaRecordatorios(recordatorios().filter((r) => String(r.id) !== b.dataset.id)); formulario(f); }));
+    const alta = () => {
+      const texto = body.querySelector('.cal-texto').value.trim(); if (!texto) return;
+      const l = recordatorios(); l.push({ id: Date.now(), fecha: f, hora: body.querySelector('.cal-hora').value || '09:00', texto, avisado: false });
+      guardaRecordatorios(l); formulario(f);
+    };
+    body.querySelector('.cal-add').addEventListener('click', (e) => { e.stopPropagation(); alta(); });
+    body.querySelector('.cal-texto').addEventListener('keydown', (e) => { if (e.key === 'Enter') alta(); });
+  };
+  pinta();
+}
+/* ============ Widget "Tu música": listas del Spotify residente ============
+   Lee las playlists/álbumes de la biblioteca del webview de Spotify (los
+   enlaces reales de su sidebar) y al clicar navega el reproductor a la lista
+   y pulsa su play grande. Sin API ni claves: es TU sesión. */
+const SPL_LEE = `(() => {
+  const out = []; const vis = new Set();
+  document.querySelectorAll('a[href^="/playlist/"], a[href^="/album/"]').forEach((a) => {
+    const t = (a.getAttribute('aria-label') || a.textContent || '').trim().split('\\n')[0];
+    const h = a.getAttribute('href');
+    if (t && h && !vis.has(h) && t.length > 1) { vis.add(h); out.push({ t: t.slice(0, 60), h }); }
+  });
+  return out.slice(0, 10);
+})()`;
+function splReproduce(h) {
+  const wv = ensureSpotifyPlayer();
+  const alCargar = () => {
+    wv.removeEventListener('dom-ready', alCargar);
+    // El play grande de la lista tarda en montarse (SPA): reintenta hasta 8 s
+    wv.executeJavaScript(`(function(){ let n = 0; const t = setInterval(() => {
+      const b = document.querySelector('[data-testid="action-bar-row"] [data-testid="play-button"], button[aria-label^="Reproducir"], button[aria-label^="Play"]');
+      if (b) { b.click(); clearInterval(t); } else if (++n > 16) clearInterval(t);
+    }, 500); })()`, true).catch(() => {});
+  };
+  wv.addEventListener('dom-ready', alCargar);
+  wv.src = 'https://open.spotify.com' + h;
+  toggleSpotifyPanel(true);
+}
+
+/* ============ Widget Tendencias de X (mundial) ============
+   Sin API: se lee trends24.in (recopila las tendencias mundiales públicas) en
+   un webview OCULTO que se destruye al terminar; caché de 20 min. Clic = buscar
+   el tema en X. */
+let xtCache = { t: 0, items: [], src: 'mundial' };
+function scrapeOculto(url, code, timeoutMs = 15000) {
+  return new Promise((res) => {
+    const wv = document.createElement('webview');
+    wv.setAttribute('partition', PARTITION);
+    wv.style.cssText = 'position:absolute;left:-9999px;top:0;width:1000px;height:800px;';
+    let fin = false;
+    const acaba = (v) => { if (fin) return; fin = true; try { wv.remove(); } catch { } res(v); };
+    setTimeout(() => acaba(null), timeoutMs);
+    wv.addEventListener('dom-ready', () => {
+      setTimeout(() => { wv.executeJavaScript(code, false).then(acaba).catch(() => acaba(null)); }, 1500);
+    });
+    wv.src = url; document.body.appendChild(wv);
+  });
+}
+const XT_LEE = `(() => {
+  const out = [];
+  const tarjeta = document.querySelector('.trend-card');
+  if (tarjeta) tarjeta.querySelectorAll('.trend-card__list a').forEach((a) => out.push(a.textContent.trim()));
+  if (!out.length) document.querySelectorAll('ol li a').forEach((a) => { if (out.length < 12) out.push(a.textContent.trim()); });
+  return out.filter(Boolean).slice(0, 9);
+})()`;
+// x.com/explore con TU sesion: tendencias "Para ti" (el algoritmo del propio
+// usuario). Sin sesion, X no pinta [data-testid=trend] y caemos a mundiales.
+const XT_LEE_X = `(() => {
+  const out = [];
+  document.querySelectorAll('[data-testid="trend"]').forEach((t) => {
+    const lineas = (t.innerText || '').split('
+').map((x) => x.trim()).filter(Boolean);
+    const tag = lineas.find((l) => l.startsWith('#')) || lineas[1] || lineas[0];
+    if (tag && tag.length > 1 && !out.includes(tag)) out.push(tag);
+  });
+  return out.slice(0, 9);
+})()`;
+function renderXTrends(body) {
+  const pinta = (items, cargando) => {
+    const fuente = xtCache.src === 'ti' ? 'Para ti' : 'Mundial';
+    body.innerHTML = `<div class="w-head">${window.brandIcon('x') || window.icon('hash')} Tendencias<span class="xt-chip">${fuente} · X</span></div>` +
+      `<div class="xt-lista">` +
+      (cargando ? '<div class="w-vacio">Leyendo tendencias…</div>'
+        : (items.map((t, i) => `<button class="xt-i"><span class="xt-n">${i + 1}</span><bdi class="xt-t">${escapeHtml(t)}</bdi>${window.icon('arrow-up-right')}</button>`).join('') ||
+          '<div class="w-vacio">No se pudieron leer las tendencias</div>')) + `</div>`;
+    body.querySelectorAll('.xt-i').forEach((b, i) => b.addEventListener('click', (e) => {
+      e.stopPropagation(); navigateActive('https://x.com/search?q=' + encodeURIComponent(items[i]));
+    }));
+    // Sin scrollbar: solo las filas que CABEN completas en la talla actual
+    requestAnimationFrame(() => {
+      const cont = body.querySelector('.xt-lista'); if (!cont) return;
+      const tope = cont.clientHeight;
+      cont.querySelectorAll('.xt-i').forEach((f) => {
+        if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none';
+      });
+    });
+  };
+  if (xtCache.items.length && Date.now() - xtCache.t < 20 * 60 * 1000) { pinta(xtCache.items); return; }
+  pinta([], true);
+  // primero TU algoritmo (sesion de X); si no hay, las mundiales publicas
+  scrapeOculto('https://x.com/explore', XT_LEE_X).then((tuyas) => {
+    if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; pinta(tuyas); return null; }
+    return scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
+      if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
+      pinta(xtCache.items);
+    });
+  });
+}
+
+/* ============ Widget Imagen (los huecos "violeta" del bento) ============
+   Un marco para la imagen que el usuario quiera: se elige de disco y llena la
+   tarjeta (cover). La ruta se guarda EN el widget (cobalt.widgets). */
+/* Imagenes POR TEMA (2026-08-12): cada tema trae su juego empaquetado en
+   src/temas/<tema>/<slot>.jpg. El widget guarda un `slot` (1..3) y solo usa
+   ruta propia si el usuario elige una imagen suya (w.img manda siempre). */
+function temaActual() {
+  const r = document.documentElement.classList;
+  return r.contains('rosa') ? 'rosa' : r.contains('light') ? 'claro' : 'oscuro';
+}
+function imagenDeTema(w) {
+  if (w.img) return w.img;
+  if (!w.slot) return '';
+  return `temas/${temaActual()}/${w.slot}.jpg`;
+}
+function renderImagen(body, w) {
+  const elige = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      const ruta = window.cobalt.filePath(f);
+      if (!ruta) return;
+      // GIF animado permitido: es contenido DEL USUARIO y la optimizacion es
+      // decision suya (la regla anti-animacion-infinita es para NUESTRA UI).
+      if (/\.gif$/i.test(ruta)) toast('GIF en bucle: se ve genial, pero consume mas GPU. Decision tuya.');
+      w.img = 'file:///' + ruta.replace(/\\/g, '/'); saveWidgets(); pinta();
+    };
+    inp.click();
+  };
+  const pinta = () => {
+    const src = imagenDeTema(w);
+    body.classList.toggle('con-img', !!src);
+    if (src) {
+      body.innerHTML = `<img src="${escapeHtml(src)}" alt="" onerror="this.style.display='none'" /><button class="wi-cambia" title="Cambiar imagen">${window.icon('photo')}</button>`;
+      body.querySelector('.wi-cambia').addEventListener('click', (e) => { e.stopPropagation(); elige(); });
+      body.onclick = null;
+    } else {
+      body.innerHTML = `<div class="wi-vacio">${window.icon('photo')}<span>Elegir imagen</span></div>`;
+      body.onclick = elige;
+    }
+  };
+  pinta();
+}
+
+/* ============ Widget Correo (Gmail hoy; Outlook y "+" en camino) ============
+   Gmail se lee por su feed atom nativo con TUS cookies (lo pide main, sin
+   CORS). Outlook no ofrece feed sin OAuth: pestaña "pronto" honesta. */
+let mailCache = { t: 0, entradas: null, total: '0', err: null };
+async function cargaGmail(force) {
+  if (!force && mailCache.entradas && Date.now() - mailCache.t < 5 * 60 * 1000) return mailCache;
+  try {
+    const r = await window.cobalt.gmailFeed();
+    if (!r.ok) { mailCache = { t: Date.now(), entradas: null, total: '0', err: (r.status === 401 || r.status === 403) ? 'sin-sesion' : 'error' }; return mailCache; }
+    const doc = new DOMParser().parseFromString(r.xml, 'text/xml');
+    const entradas = [...doc.querySelectorAll('entry')].slice(0, 6).map((e) => ({
+      asunto: e.querySelector('title')?.textContent || '(sin asunto)',
+      de: e.querySelector('author > name')?.textContent || '',
+      link: e.querySelector('link')?.getAttribute('href') || 'https://mail.google.com'
+    }));
+    mailCache = { t: Date.now(), entradas, total: doc.querySelector('fullcount')?.textContent || '0', err: null };
+  } catch { mailCache = { t: Date.now(), entradas: null, total: '0', err: 'error' }; }
+  return mailCache;
+}
+function renderMail(body) {
+  let prov = 'gmail';
+  const pinta = async () => {
+    const tabsHtml = `<div class="ml-tabs">
+      <button class="ml-t${prov === 'gmail' ? ' on' : ''}" data-p="gmail" title="Gmail">${window.brandIcon('gmail') || 'G'}</button>
+      <button class="ml-t${prov === 'outlook' ? ' on' : ''}" data-p="outlook" title="Outlook — pronto">${window.brandIcon('outlook') || 'O'}</button>
+      <button class="ml-t${prov === 'mas' ? ' on' : ''}" data-p="mas" title="Otro proveedor — pronto">${window.icon('plus')}</button>
+    </div>`;
+    let cuerpo = '';
+    if (prov === 'gmail') {
+      body.innerHTML = tabsHtml + '<div class="w-vacio">Leyendo bandeja…</div>'; ata();
+      const m = await cargaGmail();
+      if (m.err === 'sin-sesion') cuerpo = `<div class="w-vacio">Inicia sesión en Gmail para ver tu bandeja<button class="w-cta ml-abre">Abrir Gmail</button></div>`;
+      else if (m.err || !m.entradas) cuerpo = '<div class="w-vacio">No se pudo leer la bandeja</div>';
+      else cuerpo = `<div class="ml-cnt">${m.total} sin leer</div><div class="ml-lista">` +
+        (m.entradas.map((e, i) => `<button class="ml-i" data-i="${i}"><span class="ml-de">${escapeHtml(e.de)}</span><span class="ml-asunto">${escapeHtml(e.asunto)}</span></button>`).join('') ||
+          '<div class="w-vacio">Nada sin leer — bandeja limpia</div>') + '</div>';
+    } else {
+      cuerpo = `<div class="w-vacio">${prov === 'outlook' ? 'Outlook' : 'Más proveedores'}, muy pronto</div>`;
+    }
+    body.innerHTML = tabsHtml + cuerpo; ata();
+    function ata() {
+      body.querySelectorAll('.ml-t').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); prov = b.dataset.p; pinta(); }));
+      body.querySelector('.ml-abre')?.addEventListener('click', (e) => { e.stopPropagation(); navigateActive('https://mail.google.com'); });
+      body.querySelectorAll('.ml-i').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation(); const ent = mailCache.entradas?.[+b.dataset.i]; if (ent) navigateActive(ent.link);
+      }));
+    }
+  };
+  pinta();
+}
+
+/* ============ Widget DESCARGAS (2026-08-11) ============
+   Diseño propio: ANILLO de progreso (SVG, avanza por eventos — nada infinito)
+   con la descarga activa, y las últimas completadas como filas. Bebe de los
+   mismos eventos download:new/update del panel. */
+const dlVivo = new Map();
+function anilloSVG() {
+  return `<svg class="dlw-anillo" viewBox="0 0 72 72">
+    <circle class="dlw-riel" cx="36" cy="36" r="31" />
+    <circle class="dlw-avance" cx="36" cy="36" r="31" pathLength="100" />
+  </svg>`;
+}
+function renderDescargasW(body) {
+  body.innerHTML = `
+    <div class="dlw-activa hidden">
+      <div class="dlw-aro">${anilloSVG()}<div class="dlw-centro">${window.icon('download')}<span class="dlw-pct hidden"></span></div></div>
+      <div class="dlw-meta"><div class="dlw-nombre"></div><div class="dlw-sub"></div></div>
+    </div>
+    <div class="w-head">${window.icon('download')} Hoy<span class="wh-sub dlw-cnt"></span></div>
+    <div class="dlw-lista"><div class="w-vacio">Leyendo descargas…</div></div>
+    <button class="w-cta dlw-ir">Panel de descargas</button>`;
+  body.querySelector('.dlw-ir').addEventListener('click', (e) => { e.stopPropagation(); toggleDownloadsPage(); });
+  llenaHoyDescargas(body);
+  actualizaDescargasW();
+}
+/* Todas las descargas DE HOY (no solo la activa): filas que quepan, sin
+   scrollbar; clic abre el archivo. */
+function llenaHoyDescargas(body) {
+  const cont = body.querySelector('.dlw-lista'); if (!cont) return;
+  window.cobalt.listDownloadFiles().then((files) => {
+    const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0);
+    const hoy = (files || []).filter((f) => f.mtime >= hoy0.getTime());
+    const cnt = body.querySelector('.dlw-cnt'); if (cnt) cnt.textContent = hoy.length ? String(hoy.length) : '';
+    cont.innerHTML = hoy.map((f) => {
+      const ext = (f.name.split('.').pop() || 'doc').slice(0, 4);
+      return `<button class="dlw-r" data-n="${escapeHtml(f.name)}"><span class="dlw-r-k">${escapeHtml(ext)}</span><span class="dlw-r-n">${escapeHtml(f.name)}</span></button>`;
+    }).join('') || '<div class="w-vacio">Hoy no has descargado nada</div>';
+    cont.querySelectorAll('.dlw-r').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.openDownloadFile(b.dataset.n); }));
+    requestAnimationFrame(() => {
+      const tope = cont.clientHeight;
+      cont.querySelectorAll('.dlw-r').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none'; });
+    });
+  }).catch(() => { cont.innerHTML = '<div class="w-vacio">No se pudo leer la carpeta</div>'; });
+}
+function actualizaDescargasW() {
+  const activa = [...dlVivo.values()].reverse().find((m) => m.state === 'progressing' || m.state === 'started');
+  document.querySelectorAll('.w-dlw').forEach((el) => {
+    const caja = el.querySelector('.dlw-activa'); if (!caja) return;
+    caja.classList.toggle('hidden', !activa);
+    if (!activa) return;
+    const p = activa.total ? Math.round(activa.received / activa.total * 100) : null;
+    el.querySelector('.dlw-nombre').textContent = activa.name || 'Descargando…';
+    el.querySelector('.dlw-sub').textContent = p == null ? 'Descargando…' : p + '% — en curso';
+    const pct = el.querySelector('.dlw-pct');
+    pct.textContent = p == null ? '…' : p + '%';
+    pct.classList.remove('hidden');
+    el.querySelector('.dlw-centro svg').classList.add('hidden');
+    const av = el.querySelector('.dlw-avance');
+    if (av) av.style.strokeDashoffset = String(100 - (p ?? 30));
+  });
+}
+
+
+/* ============ Widget MOOVIN (2026-08-12) ============
+   Acceso a la biblioteca privada de IRIS (antes "Cine de IRIS"): Naviris ya
+   pone el pase solo al entrar (cine:pase en main), asi que el widget es la
+   puerta — cartel con play y entrada directa. */
+function renderMoovinW(body) {
+  body.innerHTML = `
+    <div class="mv-cartel">${window.icon('tv-minimal')}</div>
+    <div class="mv-meta"><div class="mv-tit">Moovin</div><div class="mv-sub">Tu biblioteca privada</div></div>
+    <button class="mv-play" title="Entrar">${window.icon('play')}</button>`;
+  const abre = (e) => { e?.stopPropagation(); navigateActive('https://iris.it.com/cine/'); };
+  body.querySelector('.mv-play').addEventListener('click', abre);
+  body.addEventListener('click', abre);
+}
+
+/* ============ Widget MONITOR (2026-08-12) ============
+   RAM del sistema y consumo de Naviris (CPU/RAM), en barras. Sondeo cada 3 s
+   solo con el hub visible; se apaga solo si el widget desaparece. */
+let monTimer = null;
+function renderMonitorW(body) {
+  body.innerHTML = `
+    <div class="w-head">${window.icon('res-scale')} Monitor</div>
+    <div class="mon-fila"><span class="mon-k">RAM</span><div class="mon-riel"><i class="mon-ram"></i></div><span class="mon-v mon-ram-v">—</span></div>
+    <div class="mon-fila"><span class="mon-k">CPU</span><div class="mon-riel"><i class="mon-cpu"></i></div><span class="mon-v mon-cpu-v">—</span></div>
+    <div class="mon-pie"><span class="mon-app">Naviris —</span><span class="mon-proc"></span></div>
+    <div class="mon-acc">
+      <button class="mon-b mon-juego" title="Duerme pestañas de fondo y silencia el ruido">${window.icon('play')}<span>Modo juego</span></button>
+      <button class="mon-b mon-limpia" title="Liberar memoria de pestañas dormidas">${window.icon('arrow-path')}<span>Liberar</span></button>
+    </div>`;
+  body.querySelector('.mon-juego').addEventListener('click', (e) => { e.stopPropagation(); modoJuego(); });
+  body.querySelector('.mon-limpia').addEventListener('click', (e) => { e.stopPropagation(); liberaMemoria(); });
+  clearInterval(monTimer); monTimer = setInterval(actualizaMonitor, 3000); // fresco: un tick durante el re-render lo apagaba
+  requestAnimationFrame(actualizaMonitor); // el body aun no esta en el DOM
+}
+async function actualizaMonitor() {
+  if (!widgets.some((w) => w.type === 'monitor')) { clearInterval(monTimer); monTimer = null; return; }
+  const cajas = document.querySelectorAll('.w-mon');
+  if (!els.hub.classList.contains('active')) return;
+  const st = await window.cobalt.sysStats().catch(() => null); if (!st) return;
+  const gbApp = st.appMb >= 1024 ? (st.appMb / 1024).toFixed(1) + ' GB' : st.appMb + ' MB';
+  cajas.forEach((el) => {
+    el.querySelector('.mon-ram').style.width = st.ramUso + '%';
+    el.querySelector('.mon-ram-v').textContent = st.ramUso + '%';
+    el.querySelector('.mon-cpu').style.width = Math.min(100, st.appCpu) + '%';
+    el.querySelector('.mon-cpu-v').textContent = (st.appCpu < 10 ? st.appCpu.toFixed(1) : Math.round(st.appCpu)) + '%';
+    el.querySelector('.mon-app').textContent = 'Naviris ' + gbApp;
+    el.querySelector('.mon-proc').textContent = st.procesos + ' procesos';
+  });
+}
+
+/* Modo juego: duerme TODAS las pestañas de fondo (libera su renderer) y
+   silencia lo que suene. La activa se respeta. Reversible: al volver a una
+   pestaña, se recarga sola (mecanica de "dormida" que ya existia). */
+function modoJuego() {
+  let n = 0;
+  for (const t of tabs) {
+    if (t.id === activeId || t.asleep || !t.webview) continue;
+    try { t.webview.setAudioMuted(true); } catch { }
+    t.sleptUrl = t.url; t.asleep = true;
+    try { t.webview.src = 'about:blank'; } catch { }
+    n++;
+  }
+  renderTabs(); saveSession();
+  toast(n ? `Modo juego: ${n} pestaña${n > 1 ? 's' : ''} dormida${n > 1 ? 's' : ''}` : 'Modo juego: no había pestañas de fondo');
+  actualizaMonitor();
+}
+function liberaMemoria() {
+  for (const t of tabs) if (t.asleep && t.webview) { try { t.webview.src = 'about:blank'; } catch { } }
+  toast('Memoria liberada');
+  setTimeout(actualizaMonitor, 800);
+}
+
+/* ============ Widget PORTAPAPELES (2026-08-12) ============
+   Historial de lo copiado (solo texto, local, max 20). Clic vuelve a copiar;
+   se vigila el portapapeles cada 1,5 s mientras el hub esta visible. */
+let clipTimer = null, clipUltimo = '';
+const clipHist = () => store.get('cobalt.clip', []);
+function renderClipW(body) {
+  body.innerHTML = `
+    <div class="w-head">${window.icon('clipboard')} Portapapeles<button class="wh-btn clip-x" title="Vaciar">${window.icon('x-mark')}</button></div>
+    <div class="clip-lista"></div>`;
+  body.querySelector('.clip-x').addEventListener('click', (e) => { e.stopPropagation(); store.set('cobalt.clip', []); pintaClip(); });
+  clearInterval(clipTimer); clipTimer = setInterval(vigilaClip, 1500);
+  requestAnimationFrame(vigilaClip);
+}
+async function vigilaClip() {
+  if (!widgets.some((w) => w.type === 'clip')) { clearInterval(clipTimer); clipTimer = null; return; }
+  if (!els.hub.classList.contains('active')) return;
+  const t = (await window.cobalt.clipRead().catch(() => '') || '').trim();
+  if (t && t !== clipUltimo) {
+    clipUltimo = t;
+    const l = clipHist().filter((x) => x !== t); l.unshift(t);
+    store.set('cobalt.clip', l.slice(0, 20));
+  }
+  pintaClip();
+}
+function pintaClip() {
+  const l = clipHist();
+  document.querySelectorAll('.w-clip .clip-lista').forEach((cont) => {
+    cont.innerHTML = l.map((t, i) => `<button class="clip-i" data-i="${i}"><span>${escapeHtml(t.slice(0, 90))}</span></button>`).join('') ||
+      '<div class="w-vacio">Lo que copies aparecera aqui</div>';
+    cont.querySelectorAll('.clip-i').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation(); const t = l[+b.dataset.i]; clipUltimo = t;
+      window.cobalt.clipWrite(t); toast('Copiado de nuevo');
+    }));
+    requestAnimationFrame(() => {
+      const tope = cont.clientHeight;
+      cont.querySelectorAll('.clip-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none'; });
+    });
+  });
+}
+
+/* ============ Widget NOTAS mejorado (2026-08-12) ============
+   Lista de tareas con tachado + texto libre debajo; todo local. */
+const notasLista = () => store.get('cobalt.notas2', []);
+function renderNotasW(body) {
+  const pinta = () => {
+    const l = notasLista();
+    body.innerHTML = `
+      <div class="w-head">${window.icon('pencil-square')} Notas<span class="wh-sub">${l.filter((x) => !x.ok).length || ''}</span></div>
+      <div class="nt-lista">${l.map((x, i) => `
+        <label class="nt-i${x.ok ? ' ok' : ''}"><input type="checkbox" data-i="${i}"${x.ok ? ' checked' : ''} /><span class="nt-box">${window.icon('check')}</span><span class="nt-t">${escapeHtml(x.t)}</span><button class="nt-x" data-i="${i}" title="Quitar">${window.icon('x-mark')}</button></label>`).join('')}</div>
+      <div class="nt-add"><input type="text" placeholder="Nueva tarea…" maxlength="120" /><button title="Añadir">${window.icon('plus')}</button></div>`;
+    const alta = () => {
+      const inp = body.querySelector('.nt-add input'); const t = inp.value.trim(); if (!t) return;
+      const l2 = notasLista(); l2.push({ t, ok: false }); store.set('cobalt.notas2', l2); pinta();
+      body.querySelector('.nt-add input').focus();
+    };
+    body.querySelector('.nt-add button').addEventListener('click', (e) => { e.stopPropagation(); alta(); });
+    body.querySelector('.nt-add input').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') alta(); });
+    body.querySelectorAll('.nt-i input').forEach((ch) => ch.addEventListener('change', (e) => {
+      e.stopPropagation(); const l2 = notasLista(); l2[+ch.dataset.i].ok = ch.checked; store.set('cobalt.notas2', l2); pinta();
+    }));
+    body.querySelectorAll('.nt-x').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault(); const l2 = notasLista(); l2.splice(+b.dataset.i, 1); store.set('cobalt.notas2', l2); pinta();
+    }));
+  };
+  pinta();
+}
+
+/* ============ Widget VENTANA PRIVADA (2026-08-11) ============
+   Un solo boton, como icono de app: cuadrado 1x1 en violeta con el candado
+   grande. Clic = ventana privada nueva. */
+function renderPrivadaW(body) {
+  body.innerHTML = `<div class="pv-ico">${window.icon('hat-glasses')}</div><span class="pv-t">Privada</span>`;
+  body.addEventListener('click', () => window.cobalt.newPrivateWindow());
+}
+
+/* ============ Widget TARJETAS / WALLET (2026-08-11) ============
+   Una mini TARJETA de crédito con el degradado del realce: chip, puntos y el
+   candado de Windows Hello. No muestra NINGÚN dato real (los datos viven
+   cifrados y detrás de Hello); el botón abre el gestor del panel. */
+function renderWalletW(body) {
+  body.innerHTML = `
+    <div class="wl-tarjeta">
+      <div class="wl-chip"></div>
+      <div class="wl-puntos"><span>••••</span><span>••••</span><span>••••</span></div>
+      <div class="wl-marca">Naviris</div>
+    </div>
+    <div class="wl-pie">
+      <span class="wl-hello">${window.icon('key')} Windows Hello</span>
+      <button class="wl-ver">Ver tarjetas</button>
+    </div>`;
+  const abre = (e) => {
+    e?.stopPropagation();
+    els.sbPasswords.click();           // abre el panel de contraseñas…
+    setTimeout(() => switchPwTab(true), 60); // …y salta a la pestaña Tarjetas
+  };
+  body.querySelector('.wl-ver').addEventListener('click', abre);
+  body.addEventListener('click', abre);
+}
+
+/* Aviso de recordatorios: chequeo cada 30 s; toast siempre y notificación si se puede */
+setInterval(() => {
+  const l = recordatorios(); const ahora = new Date(); let toca = false;
+  for (const r of l) {
+    if (r.avisado) continue;
+    if (new Date(`${r.fecha}T${r.hora || '09:00'}`) <= ahora) {
+      r.avisado = true; toca = true;
+      toast(`Recordatorio: ${r.texto}`);
+      try { new Notification('Naviris — Recordatorio', { body: r.texto }); } catch { /* sin permiso: queda el toast */ }
+    }
+  }
+  if (toca) guardaRecordatorios(l);
+}, 30000);
 
 /* ============ Pastilla de clima (esquina del hub, como Opera GX) ============ */
 async function loadWeatherPill() {
   const el = document.getElementById('hub-weather'); if (!el) return;
+  if (widgets.some((x) => x.type === 'weather')) { el.classList.add('hidden'); return; }
   try {
     const geo = await getGeo();
     if (!wxCache) { const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=${WX_QUERY}`); wxCache = (await r.json()).current; }
@@ -892,6 +2401,7 @@ function renderAccountPill() {
   accEls.pill.classList.toggle('logged', logged);
   accEls.pillLabel.textContent = logged ? account.email.split('@')[0] : 'Iniciar sesión';
   accEls.pill.title = logged ? `Cuenta Naviris — ${account.email}` : 'Cuenta Naviris: guarda tus preferencias en la nube';
+  refrescaUserCards(); // el widget de cuenta del hub refleja el mismo estado
 }
 function accError(msg) { accEls.error.textContent = msg || ''; accEls.error.classList.toggle('hidden', !msg); }
 function showAccountModal() {
@@ -1014,7 +2524,29 @@ els.hubEdit.addEventListener('click', () => {
 });
 function renderPalette() {
   els.paletteList.innerHTML = '';
-  for (const key in WIDGET_TYPES) { const w = WIDGET_TYPES[key]; const b = document.createElement('button'); b.className = 'pal-item'; b.innerHTML = `${window.icon(w.icon)}<span>${w.name}</span>`; b.addEventListener('click', () => { widgets.push({ id: 'w' + (++widgetSeq) + Date.now(), type: key, span: w.span }); saveWidgets(); renderHub(); }); els.paletteList.appendChild(b); }
+  for (const key in WIDGET_TYPES) {
+    const w = WIDGET_TYPES[key]; const b = document.createElement('button'); b.className = 'pal-item';
+    b.innerHTML = `${window.icon(w.icon)}<span>${w.name}</span>`;
+    b.addEventListener('click', () => {
+      // comprobar HUECO antes de crear: sin sitio se avisa (antes se creaba
+      // una copia invisible en silencio por cada clic)
+      const def = (TAMANOS[key] || [[2, 1]])[0];
+      const tw = Math.min(def[0], ultimoCols), th = def[1];
+      const occ = new Set(); delBucket().forEach((x) => ocupa(occ, x));
+      const pos = primerHueco(occ, tw, th, ultimoCols);
+      if (!pos) { toast(`No hay un hueco de ${tw}×${th} libre para ${w.name} — libera celdas`); return; }
+      const suelta = widgets.find((x) => x.type === key && x.geo && !x.geo[ultimoBucket]);
+      if (suelta && ultimoBucket !== 'flujo') {
+        suelta.col = pos.col; suelta.row = pos.row; suelta.w = tw; suelta.h = th; fijaGeo(suelta);
+      } else {
+        const nuevo = { id: 'w' + (++widgetSeq) + Date.now(), type: key, col: pos.col, row: pos.row, w: tw, h: th };
+        widgets.push(nuevo);
+        if (ultimoBucket !== 'flujo') fijaGeo(nuevo);
+      }
+      saveWidgets(); renderHub();
+    });
+    els.paletteList.appendChild(b);
+  }
 }
 els.hubCustomize.addEventListener('click', () => { const show = els.customizePanel.classList.contains('hidden'); els.customizePanel.classList.toggle('hidden', !show); els.widgetPalette.classList.add('hidden'); if (show) renderBgPresets(); });
 
@@ -1054,8 +2586,10 @@ const BACKGROUNDS_LIGHT = [
 // rosados, conservando un matiz propio para que el selector siga ofreciendo
 // variedad. Mismo orden y misma identidad canónica (el valor oscuro).
 const BACKGROUNDS_ROSA = [
-  // Predeterminado: la malla luminosa lavanda->rosa->coral de la referencia
-  'radial-gradient(55% 45% at 22% 22%, #cdbcf7 0%, rgba(205,188,247,0) 62%), radial-gradient(50% 42% at 78% 26%, #f7a8ce 0%, rgba(247,168,206,0) 62%), radial-gradient(58% 52% at 55% 82%, #f9ab90 0%, rgba(249,171,144,0) 65%), linear-gradient(160deg, #efe8fb 0%, #f8e3ee 100%)',
+  // El primer fondo rosa (malla luminosa) se retiro por decision de Dosa
+  // (2026-08-12): este slot toma el ULTIMO fondo (Aurora rosa), que pasa a ser
+  // el predeterminado del tema rosa.
+  'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)',
   'linear-gradient(135deg, #fef6fa 0%, #f2dbe7 100%)',                 // Porcelana
   'radial-gradient(120% 80% at 50% -10%, #f3e6fb 0%, #ecd9ef 62%)',    // Lila
   'radial-gradient(120% 80% at 50% -10%, #e6e9fb 0%, #e0d7ec 62%)',    // Celeste
@@ -1096,6 +2630,7 @@ function applyBackground(v) {
   // cuando el fondo es una imagen del usuario (valor url(...)).
   els.hub.classList.toggle('refract', typeof v === 'string' && v.startsWith('url('));
   ajustarVidrioAlFondo(v);
+  generaFondoBlur();
   lgProgramar(); // el motor de lentes pone o quita los filtros por pieza
   document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v));
 }
@@ -1106,30 +2641,70 @@ function applyBackground(v) {
    (definido en styles.css). Con degradados del tema, la clase se quita. */
 function ajustarVidrioAlFondo(v) {
   const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
-  if (!m) { els.hub.classList.remove('bg-claro', 'bg-lum-claro'); return; }
+  if (!m) { els.hub.classList.remove('bg-claro'); return; }
   const img = new Image();
   img.onload = () => {
     try {
       const c = document.createElement('canvas'); c.width = c.height = 32;
       const x = c.getContext('2d'); x.drawImage(img, 0, 0, 32, 32);
-      const d = x.getImageData(0, 0, 32, 32).data; let v = 0, lum = 0;
-      // DOS métricas, DOS decisiones (lección de las fotos roja y mármol):
-      // · Brillo HSV (max r/g/b) → TINTE del vidrio (bg-claro): un rojo vivo
-      //   "se ve" claro (V≈.65) aunque su luminancia sea baja (≈.40).
-      // · Luminancia perceptual → TEXTO flotante (bg-lum-claro): sobre el rojo
-      //   (lum .40) el texto blanco se lee bien; sobre mármol (lum≈.75) no.
-      for (let i = 0; i < d.length; i += 4) {
-        v += Math.max(d[i], d[i + 1], d[i + 2]);
-        lum += d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
-      }
-      const n = d.length / 4;
-      els.hub.classList.toggle('bg-claro', v / n / 255 > .48);
-      els.hub.classList.toggle('bg-lum-claro', lum / n / 255 > .55);
+      const d = x.getImageData(0, 0, 32, 32).data; let v = 0;
+      // Brillo HSV (max r/g/b) → TINTE del vidrio (bg-claro): un rojo vivo
+      // "se ve" claro (V≈.65) aunque su luminancia sea baja. El texto flotante
+      // ya no mide nada: lleva halo oscuro que funciona sobre cualquier foto.
+      for (let i = 0; i < d.length; i += 4) v += Math.max(d[i], d[i + 1], d[i + 2]);
+      els.hub.classList.toggle('bg-claro', v / (d.length / 4) / 255 > .48);
     } catch { /* canvas contaminado u otro fallo: se queda el vidrio del tema */ }
   };
-  img.onerror = () => els.hub.classList.remove('bg-claro', 'bg-lum-claro');
+  img.onerror = () => els.hub.classList.remove('bg-claro');
   img.src = m[1];
 }
+
+/* ===== GRANO SIN COSTURAS (2026-08-11) =====
+   El grano era un mosaico SVG de 120px: sus juntas, invisibles a pelo, se
+   convierten en LINEAS al pasar por el blur del vidrio (lo vio Dosa varias
+   veces). Ahora el ruido se genera AL TAMANO EXACTO del hub — una sola pieza,
+   nada que empalmar. El data-URI es minusculo (solo cambian W/H). */
+/* ===== VIDRIO SIN backdrop-filter (2026-08-11, fin de las lineas) =====
+   En la GPU de este equipo, el blur en vivo de Chromium trocea el backdrop en
+   teselas y sus juntas aparecen como lineas blancas en cada cristal (+lag).
+   Solucion definitiva: el fondo del hub es NUESTRO y estatico — se genera UNA
+   copia ya desenfocada (canvas) y los cristales la muestran alineada por
+   viewport (background-attachment: fixed). Cero blur en vivo. */
+function generaFondoBlur() {
+  const v = store.get('cobalt.hubBg', BACKGROUNDS[0]);
+  const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
+  if (!m) { els.hub.style.setProperty('--hub-bg-blur', bgForTheme(v)); return; } // un degradado ya es suave
+  const img = new Image();
+  img.onload = () => {
+    const W = Math.max(640, Math.round(window.innerWidth / 2));
+    const H = Math.max(360, Math.round(window.innerHeight / 2));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.filter = 'blur(22px) saturate(1.6)';
+    const r = Math.max(W / img.width, H / img.height);
+    const dw = img.width * r, dh = img.height * r;
+    x.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    els.hub.style.setProperty('--hub-bg-blur', `url("${c.toDataURL('image/jpeg', 0.72)}")`);
+  };
+  img.onerror = () => els.hub.style.setProperty('--hub-bg-blur', 'none');
+  img.src = m[1];
+}
+
+function pintaGrano() {
+  const w = Math.ceil(window.innerWidth);
+  const h = Math.ceil(window.innerHeight);
+  if (!w || !h) return;
+  const svg = `%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='${w}' height='${h}' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E`;
+  els.hub.style.setProperty('--grano-vivo', `url("data:image/svg+xml,${svg}")`);
+}
+let granoTimer = null;
+window.addEventListener('resize', () => { clearTimeout(granoTimer); granoTimer = setTimeout(() => {
+  pintaGrano(); generaFondoBlur();
+  const m = medidasMalla();
+  if (m.bucket !== ultimoBucket || m.cw !== CELDA_W || m.filas !== ultimasFilas) renderHub();
+}, 250); });
+pintaGrano();
+generaFondoBlur();
 
 /* ===== MOTOR DE LENTES · liquid glass real (2026-08-11) =====
    Investigación (kube.io / Liquid Glass de Apple): la refracción de un cristal
@@ -1203,12 +2778,17 @@ function lgAplicar() {
     LG.mo = new MutationObserver(() => lgProgramar());
     LG.mo.observe(els.hub, { childList: true, subtree: true });
   }
-  const on = els.hub.classList.contains('refract');
+  // El motor ya no aplica filtros (backdrop-filter troceaba en esta GPU):
+  // ahora ANCLA la capa desenfocada de cada cristal a coordenadas de viewport
+  // (--vidrio-pos = -x -y del elemento). Determinista en cualquier compositor.
+  els.hub.style.setProperty('--vidrio-tam', `${window.innerWidth}px ${window.innerHeight}px`);
   LG.ro.disconnect();
-  const piezas = els.hub.querySelectorAll('.d-tile, #hub-search, .hub-pill, .hub-fab, #hub-addons, .w-card:not(.w-clock):not(.w-shortcuts)');
+  const piezas = els.hub.querySelectorAll('.d-tile, #hub-search, .hub-pill, .hub-fab, #hub-addons, .w-clock, .w-sp, .w-user, .w-card:not(.w-shortcuts):not(.w-wx):not(.w-mail)');
   piezas.forEach((el) => {
-    if (on) { lgFiltro(el); LG.ro.observe(el); }
-    else { el.style.webkitBackdropFilter = ''; el.style.backdropFilter = ''; }
+    el.style.webkitBackdropFilter = ''; el.style.backdropFilter = ''; // restos del motor viejo
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--vidrio-pos', `${-Math.round(r.left)}px ${-Math.round(r.top)}px`);
+    LG.ro.observe(el);
   });
 }
 function lgProgramar() {
@@ -1308,8 +2888,8 @@ async function openDownloadInBrowser(id) {
   const p = await window.cobalt.downloadPath(id); if (!p) return;
   if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.cobalt.openDownload(id);
 }
-window.cobalt.onDownloadNew((m) => upsertDownload(m));
-window.cobalt.onDownloadUpdate((m) => { upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
+window.cobalt.onDownloadNew((m) => { dlVivo.set(m.id, m); upsertDownload(m); actualizaDescargasW(); });
+window.cobalt.onDownloadUpdate((m) => { dlVivo.set(m.id, m); actualizaDescargasW(); if (m.state === 'completed') document.querySelectorAll('.w-dlw').forEach((el) => llenaHoyDescargas(el)); upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
 function toggleDownloads(force) { const open = force !== undefined ? force : els.dlPanel.classList.contains('hidden'); if (open) { closeRightPanels(); els.dlPanel.classList.remove('hidden'); els.sbDownloads.classList.add('open'); } else { els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); } }
 els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));

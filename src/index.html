@@ -46,6 +46,10 @@
     <!-- ===== Sidebar ===== -->
     <aside id="sidebar">
       <button class="sb-btn" id="sb-home" title="Hub de inicio" data-ico="home"></button>
+      <!-- Dock de Spotify (2026-08-11): visible solo con sesión de Spotify o si
+           ya se usó; el webview del reproductor vive FUERA de las pestañas y
+           sigue sonando con el panel cerrado. -->
+      <button class="sb-btn hidden" id="sb-spotify" title="Spotify — tu música mientras navegas"></button>
       <div class="sb-sep"></div>
       <div class="sb-spacer"></div>
       <!-- Herramientas -->
@@ -220,6 +224,17 @@
 
   <!-- ===== AutoLoot (herramienta independiente, aparece solo en Twitch) ===== -->
   <!-- ===== AutoLoot (panel del sidebar izquierdo) ===== -->
+  <!-- Panel del reproductor de Spotify: cerrar NO detiene la música (el
+       webview sigue vivo oculto); solo el botón del sidebar lo gobierna. -->
+  <aside id="sp-panel" class="hidden">
+    <div class="lp-head">
+      <span class="lp-title" id="sp-p-tit">Spotify</span>
+      <span id="sp-p-vivo" class="hidden">Sonando de fondo</span>
+      <button id="sp-p-x" class="lp-x" data-ico="x-mark" title="Cerrar (la música sigue)"></button>
+    </div>
+    <div id="sp-holder"></div>
+  </aside>
+
   <aside id="loot-panel" class="hidden side-panel-left">
     <div class="lp-head">
       <span class="lp-title"><span data-ico="twitch"></span> AutoClaim</span>

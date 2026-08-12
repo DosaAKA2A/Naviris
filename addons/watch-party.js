@@ -105,7 +105,13 @@
     '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube):not(.nvp-iris){color:#9ee2b8}',
     /* Panel: columna acoplada al borde derecho, altura completa (el contenido
        se encoge; nada queda tapado, como la barra de Teleparty) */
-    '#nvp-panel{flex:0 0 302px;width:302px;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg-2,#121217);border-left:1px solid var(--line,#26262d)}',
+    '#nvp-panel{flex:0 0 302px;width:302px;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg-2,#121217);border-left:1px solid var(--line,#26262d);overflow:hidden;transition:flex-basis .45s cubic-bezier(.3,1.22,.4,1),width .45s cubic-bezier(.3,1.22,.4,1),border-left-width .45s ease}',
+    '#nvp-panel.nvp-plegado{flex-basis:0!important;width:0!important;border-left-width:0!important}',
+    /* El contenido se maqueta UNA VEZ al ancho final y anclado a la derecha:
+       el pliegue solo lo recorta (overflow hidden) — sin remaquetado del texto
+       durante la animacion (el "temblor" que señalo Dosa). */
+    '#nvp-panel{align-items:flex-end}',
+    '#nvp-panel>*{width:301px;flex-shrink:0}',
     '#nvp-panel.hidden{display:none!important}',
     '.nvp-head{display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--line,#26262d);flex:none}',
     '.nvp-head .ico{display:inline-flex;width:16px;height:16px;color:var(--violet,#b98cff)}',
@@ -640,10 +646,21 @@
 
   // Panel acoplado: se abre y se cierra solo desde su botón o la X (nada de
   // cerrarse al hacer clic fuera: el chat convive con el video, como Teleparty).
+  // Empuje VISCOSO (2026-08-11): el panel comprime la página al abrirse, así
+  // que el ancho se anima (flex-basis 0 -> 302) con una curva con rebote en
+  // vez de aparecer de golpe. Al cerrar, primero se pliega y luego se oculta;
+  // si el usuario reabre a mitad de pliegue, el temporizador lo respeta.
   function togglePanel(force) {
     var open = force !== undefined ? force : panel.classList.contains('hidden');
-    if (open) { panel.classList.remove('hidden'); render(true); }
-    else panel.classList.add('hidden');
+    if (open) {
+      panel.classList.remove('hidden');
+      panel.classList.add('nvp-plegado');
+      requestAnimationFrame(function () { requestAnimationFrame(function () { panel.classList.remove('nvp-plegado'); }); });
+      render(true);
+    } else {
+      panel.classList.add('nvp-plegado');
+      setTimeout(function () { if (panel.classList.contains('nvp-plegado')) { panel.classList.add('hidden'); panel.classList.remove('nvp-plegado'); } }, 470);
+    }
   }
   panel.querySelector('#nvp-close').addEventListener('click', function () { togglePanel(false); });
 
