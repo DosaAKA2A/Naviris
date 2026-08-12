@@ -703,6 +703,14 @@ function menuContextual(contents) {
       sep();
     }
     if (p.mediaType === 'image' && p.srcURL) {
+      // Se sube la imagen a Lens (ver el handler lens:buscar). Las blob: se
+      // quedan fuera: viven solo dentro de la página y aquí no se pueden leer.
+      if (/^(https?|data):/i.test(p.srcURL)) {
+        items.push({
+          label: 'Buscar la imagen con Google Lens',
+          click: () => aRenderer('lens', { src: p.srcURL, pagina: contents.getURL() })
+        });
+      }
       items.push({ label: 'Copiar la imagen', click: () => contents.copyImageAt(p.x, p.y) });
       items.push({ label: 'Copiar la dirección de la imagen', click: () => clipboard.writeText(p.srcURL) });
       items.push({ label: 'Guardar la imagen como…', click: () => contents.downloadURL(p.srcURL) });
@@ -863,6 +871,46 @@ ipcMain.handle('gmail:feed', soloUI(async () => {
     const r = await ses.fetch('https://mail.google.com/mail/feed/atom', { credentials: 'include' });
     if (!r.ok) return { ok: false, status: r.status };
     return { ok: true, xml: await r.text() };
+  } catch (e) { return { ok: false, error: String(e && e.message) }; }
+}));
+/* ---------- Google Lens (2026-08-12) ----------
+   Aquí SOLO se consiguen los bytes de la imagen; la subida la hace el
+   renderer desde una página de Google (ver buscarConLens en renderer.js).
+
+   Por qué así, que costó averiguarlo:
+   · Pasarle la URL a Lens (lens.google.com/uploadbyurl) YA NO FUNCIONA:
+     responde "no hay ninguna imagen en la URL" hasta con imágenes públicas.
+     Comprobado también en Chrome, no es cosa de Naviris. Chrome y Opera GX
+     suben los bytes, no la dirección.
+   · Subirlos desde el proceso principal tampoco vale: sin un origen real,
+     Chromium trata la petición como de otro sitio, no manda las cookies de
+     Google y Lens contesta con consent.google.com; y poner Origin a mano la
+     tumba directamente (ERR_FAILED, es cabecera prohibida).
+   Bajar la imagen sí tiene que ser aquí: con la sesión del navegador van las
+   cookies del sitio y el referer, así funcionan también las imágenes que solo
+   se sirven con sesión iniciada, y no hay CORS que valga. */
+ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
+  try {
+    if (!src) return { ok: false, error: 'sin imagen' };
+    let bytes, tipo = 'image/jpeg';
+    if (/^data:/i.test(src)) {
+      const m = src.match(/^data:([^;,]+)?[^,]*,(.*)$/s);
+      if (!m) return { ok: false, error: 'imagen ilegible' };
+      tipo = m[1] || tipo;
+      bytes = Buffer.from(decodeURIComponent(m[2]), /;base64/i.test(src) ? 'base64' : 'utf8');
+    } else {
+      const ses = session.fromPartition('persist:cobalt');
+      const pide = (headers) => ses.fetch(src, { credentials: 'include', headers });
+      let img;
+      try { img = await pide(pagina ? { Referer: pagina } : {}); }
+      catch { img = await pide({}); }   // algunos sitios rechazan el referer
+      if (!img.ok) return { ok: false, error: 'no se pudo descargar la imagen' };
+      tipo = (img.headers.get('content-type') || tipo).split(';')[0].trim();
+      bytes = Buffer.from(await img.arrayBuffer());
+    }
+    if (!bytes || !bytes.length) return { ok: false, error: 'la imagen vino vacía' };
+    if (!/^image\//i.test(tipo)) return { ok: false, error: 'el enlace no devolvió una imagen' };
+    return { ok: true, b64: bytes.toString('base64'), tipo };
   } catch (e) { return { ok: false, error: String(e && e.message) }; }
 }));
 // Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris

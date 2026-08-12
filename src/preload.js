@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),
   spotifyLogged: () => ipcRenderer.invoke('spotify:logged'),
   gmailFeed: () => ipcRenderer.invoke('gmail:feed'),
+  lensImagen: (datos) => ipcRenderer.invoke('lens:imagen', datos),
   sysStats: () => ipcRenderer.invoke('sys:stats'),
   clipRead: () => ipcRenderer.invoke('clip:read'),
   clipWrite: (t) => ipcRenderer.invoke('clip:write', t),

@@ -4340,10 +4340,48 @@ window.cobalt.onTabstripMenu(({ x, y }) => {
   ]);
 });
 window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
+/* ===== Buscar la imagen con Google Lens (2026-08-12) =====
+   Lens ya no acepta que le pasen la URL de la imagen (ver el comentario de
+   lens:imagen en main.js), hay que SUBIRLA, y la subida solo trae resultados
+   si sale de una página de Google: desde ahí las cookies de la cuenta y del
+   consentimiento viajan como en cualquier navegación normal.
+   Así que: main baja los bytes → se abre una pestaña en Lens → cuando carga,
+   se monta un formulario de subida con la imagen y se envía. El POST navega
+   esa misma pestaña a los resultados, igual que en Chrome u Opera GX. */
+function buscarConLens({ src, pagina }) {
+  toast('Buscando la imagen con Google Lens…');
+  window.cobalt.lensImagen({ src, pagina }).then((r) => {
+    if (!r || !r.ok) { toast('Google Lens: ' + ((r && r.error) || 'no se pudo leer la imagen')); return; }
+    const tab = createTab('https://lens.google.com/', true);
+    const wv = tab.webview; if (!wv) return;
+    let enviado = false;
+    const enviar = () => {
+      if (enviado) return; enviado = true;
+      // El fichero se arma con DataTransfer porque input.files no se puede
+      // rellenar de otra forma; f.submit() es una navegación de verdad.
+      wv.executeJavaScript(`(() => {
+        const bin = atob(${JSON.stringify(r.b64)});
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const dt = new DataTransfer();
+        dt.items.add(new File([u8], 'imagen', { type: ${JSON.stringify(r.tipo)} }));
+        const f = document.createElement('form');
+        f.method = 'POST'; f.enctype = 'multipart/form-data';
+        f.action = 'https://lens.google.com/v3/upload?re=df&stcs=' + Date.now() * 1000;
+        const i = document.createElement('input');
+        i.type = 'file'; i.name = 'encoded_image';
+        f.appendChild(i); document.body.appendChild(f);
+        i.files = dt.files; f.submit();
+      })()`).catch(() => toast('Google Lens: no se pudo enviar la imagen'));
+    };
+    wv.addEventListener('dom-ready', enviar, { once: true });
+  }).catch(() => toast('Google Lens: no se pudo buscar la imagen'));
+}
 /* Lo que el menú contextual de la página no puede hacer desde el proceso
    principal: cosas de la interfaz (pestañas, marcadores, hub, Rat Tool). */
 window.cobalt.onContextAction(({ tipo, datos }) => {
   if (tipo === 'buscar') { const u = toUrl(datos); if (u) createTab(u); return; }
+  if (tipo === 'lens') { buscarConLens(datos); return; }
   if (tipo === 'pantalla-completa') { window.cobalt.toggleFullscreen(); return; }
   if (tipo === 'pip') { miniReproductor(); return; }
   if (tipo === 'marcador') {
