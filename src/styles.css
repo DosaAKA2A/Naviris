@@ -158,152 +158,149 @@
   --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
   --fav-filter: grayscale(1) brightness(.45);
 }
-/* ===== TEMA CARTEL (2026-08-12) =====
-   Nace de un cartel japonés de dos tintas que trajo Dosa: rojo saturado en
-   degradado y un hueso cálido que NUNCA es blanco puro. Reglas del tema:
-   · Tres valores y ninguno más: ROJO (el suelo), HUESO (las masas) y TINTA
-     (el cromo y los realces). Sin colores de apoyo.
-   · Todo PLANO. Este es el único tema sin vidrio: nada de blur, ni de brillos
-     de canto, ni de elevación. Es tinta sobre papel, no cristal.
-   · Mobiliario técnico: marcas de registro en las esquinas, reglas de un pelo
-     y etiquetas monoespaciadas. Es lo que hace que se sienta el cartel.
-   Los colores viven aquí y solo aquí: cambiar la paleta es cambiar este bloque. */
+/* ===== TEMA CARTEL (2026-08-12, rehecho) =====
+   Lenguaje: cartel tecno japones - ROJO y NEGRO, sin terceros colores. Lo que
+   lo define, leido de las referencias de Dosa (GAME OVER, PSEUDO-LIVING
+   SYSTEMS, NM0::redux):
+   - Dos tintas: rojo de suelo y masas NEGRAS recortadas sobre el (y la
+     inversion: masas rojas con tinta negra encima).
+   - NADA REDONDEADO. Radio cero y esquinas CORTADAS en chaflan, que es lo que
+     hace que las piezas se lean como recortes que encajan unos en otros.
+   - Muchisimo detalle: corchetes de encuadre, tramas diagonales, tics y
+     rotulos monoespaciados en rojo.
+   Los colores viven solo aqui: cambiar la paleta es cambiar este bloque. */
 :root.cartel {
-  --rojo: #d90a17; --rojo-vivo: #f2141f; --rojo-hondo: #8f040e;
-  --hueso: #e9e4d9; --hueso-2: #f2eee6; --tinta: #150809; --tinta-2: #241011;
-  --bg: #150809; --bg-2: #1d0d0e; --bg-3: #271315; --line: #3a1c1e;
-  --line-2: #4a2124; --line-3: #5d2a2d; --focus: var(--rojo-vivo);
-  --hover: #2a1315; --active: #35181a; --btn: #24100f; --btn-hover: #331618; --track: #4a2124;
-  --accent: #d90a17; --accent-2: #f2141f; --accent-fg: #f2eee6; --accent-hover: #f2141f;
-  --text: #e9e4d9; --text-strong: #f7f4ee; --text-dim: #b8a89f; --muted: #b8a89f; --dim: #8c7a75;
-  --violet: #c2708f; --danger: #ff4d4d; --ok: #6fbf8a;
-  --realce: #d90a17;
-  /* El realce es TINTA, no rojo: sobre el suelo rojo del hub, una tarjeta roja
-     desaparecería. Rojo abajo, hueso en medio, tinta arriba. */
-  --grad-realce: linear-gradient(145deg, #1d0d0e 0%, #0d0405 100%);
-  --grad-medida: linear-gradient(90deg, #d90a17 0%, #f2141f 100%);
-  --grad-fg: #ece7dc;
-  --sb-chip: rgba(233,228,217,.06);
-  --tab-fg: #b8a89f; --tab-hover-bg: #2a1315; --tab-hover-fg: #f2eee6;
-  --tab-asleep-fg: #7d6c68; --fav-dot: #8c7a75;
-  --winctl-fg: #c9bcb4; --winctl-hover: #2a1315; --winctl-active: #35181a;
-  --sb-border: #2c1416; --sb-fg: #b8a89f; --sb-hover: #2a1315; --sb-open: #35181a; --sb-sep: #2c1416; --sb-div: #4a2124;
-  --sb-capsule: #1d0d0e;
-  --nav-fg: #c9bcb4; --nav-hover: #2a1315; --bm-fg: #d8cec6;
-  --chip: rgba(21,8,9,.10); --chip-hover: rgba(21,8,9,.17); --chip-dim: rgba(21,8,9,.06);
-  --track-knob: #e9e4d9; --track-on: #d90a17; --track-knob-on: #f7f4ee;
-  --bar-from: #f2141f; --bar-to: #8f040e; --backdrop: rgba(21,8,9,.55);
-  --shadow-pop: rgba(0,0,0,.45); --shadow-panel: rgba(0,0,0,.38); --focus-ring: rgba(217,10,23,.22);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #1d0d0e 0%, #120607 60%);
-  --checker-a: #2a1315; --checker-b: #1d0d0e;
-  /* Las masas del cartel: HUESO plano, sin degradados ni transparencias */
-  --hub-card: #e7e2d7; --hub-card-line: rgba(21,8,9,.20);
-  --hub-input: #e7e2d7; --hub-input-line: rgba(21,8,9,.24);
-  --hub-fab: #e7e2d7; --hub-fab-line: rgba(21,8,9,.24);
-  --hub-pill: #e7e2d7; --hub-pill-line: rgba(21,8,9,.24); --hub-pill-fg: #150809;
-  --hub-hairline: rgba(233,228,217,.55); --hub-label: rgba(21,8,9,.55);
-  --tile-default: #e7e2d7; --tile-line: rgba(21,8,9,.20);
-  /* SIN VIDRIO: es el único tema plano y esto es lo que lo apaga */
+  --rojo: #e8202a; --rojo-vivo: #ff2f3a; --rojo-hondo: #a5111a;
+  --negro: #0b0b0d; --negro-2: #131317; --claro: #ededf0;
+  --bg: #0b0b0d; --bg-2: #121216; --bg-3: #1a1a1f; --line: #26262c;
+  --line-2: #32323a; --line-3: #42424c; --focus: #e8202a;
+  --hover: #1a1a20; --active: #22222a; --btn: #16161a; --btn-hover: #22222a; --track: #32323a;
+  --accent: #e8202a; --accent-2: #ff2f3a; --accent-fg: #0b0b0d; --accent-hover: #ff2f3a;
+  --text: #ededf0; --text-strong: #ffffff; --text-dim: #9a9aa4; --muted: #9a9aa4; --dim: #6d6d76;
+  --violet: #d0457c; --danger: #ff2f3a; --ok: #35c07a;
+  --realce: #e8202a;
+  --grad-realce: linear-gradient(135deg, #ff2f3a 0%, #d0141d 100%);
+  --grad-medida: linear-gradient(90deg, #ff2f3a 0%, #a5111a 100%);
+  --grad-fg: #0b0b0d;
+  --sb-chip: rgba(232,32,42,.10);
+  --tab-fg: #9a9aa4; --tab-hover-bg: #1a1a20; --tab-hover-fg: #ededf0;
+  --tab-asleep-fg: #63636c; --fav-dot: #6d6d76;
+  --winctl-fg: #b9b9c1; --winctl-hover: #1a1a20; --winctl-active: #22222a;
+  --sb-border: #1c1c22; --sb-fg: #9a9aa4; --sb-hover: #1a1a20; --sb-open: #22222a; --sb-sep: #1c1c22; --sb-div: #32323a;
+  --sb-capsule: #121216;
+  --nav-fg: #b9b9c1; --nav-hover: #1a1a20; --bm-fg: #cfcfd6;
+  --chip: rgba(237,237,240,.07); --chip-hover: rgba(237,237,240,.13); --chip-dim: rgba(237,237,240,.04);
+  --track-knob: #ededf0; --track-on: #e8202a; --track-knob-on: #ffffff;
+  --bar-from: #ff2f3a; --bar-to: #a5111a; --backdrop: rgba(6,6,7,.62);
+  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.5); --focus-ring: rgba(232,32,42,.25);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #131317 0%, #08080a 60%);
+  --checker-a: #16161a; --checker-b: #0e0e11;
+  --hub-card: #0b0b0d; --hub-card-line: rgba(232,32,42,.35);
+  --hub-input: #0b0b0d; --hub-input-line: rgba(232,32,42,.45);
+  --hub-fab: #0b0b0d; --hub-fab-line: rgba(232,32,42,.45);
+  --hub-pill: #0b0b0d; --hub-pill-line: rgba(232,32,42,.45); --hub-pill-fg: #ededf0;
+  --hub-hairline: rgba(11,11,13,.7); --hub-label: #e8202a;
+  --tile-default: #0b0b0d; --tile-line: rgba(232,32,42,.35);
   --glass-blur: 0px;
-  --vidrio-tinte: linear-gradient(#e7e2d7, #e7e2d7);
-  --glass-rim: inset 0 0 0 1px rgba(21,8,9,.16);
+  --vidrio-tinte: linear-gradient(#0b0b0d, #0b0b0d);
+  --glass-rim: none;
   --glass-lift: none;
-  --cal-hoy-bg: #d90a17; --cal-hoy-fg: #f7f4ee;
-  --tile-letter: #150809; --tile-mono: #150809; --dial-add-line: rgba(21,8,9,.35);
-  --clock-shadow: rgba(21,8,9,.18); --wx-ic: #8f040e; --addons-plate: #e7e2d7;
+  --cal-hoy-bg: #e8202a; --cal-hoy-fg: #0b0b0d;
+  --tile-letter: #ededf0; --tile-mono: #ededf0; --dial-add-line: rgba(232,32,42,.5);
+  --clock-shadow: rgba(0,0,0,.5); --wx-ic: #0b0b0d; --addons-plate: #0b0b0d;
   --fav-filter: none;
 }
-/* Cantos duros: el cartel es geometría recortada, no pastillas. Se rebajan los
-   radios de las piezas grandes; los botones redondos siguen redondos. */
-:root.cartel .w-card, :root.cartel .d-tile, :root.cartel #hub-search,
-:root.cartel .widget, :root.cartel #sp-panel, :root.cartel .lp, :root.cartel .side-panel-left { border-radius: 6px; }
-:root.cartel .hub-fab, :root.cartel .hub-pill, :root.cartel #hub-addons { border-radius: 4px; }
-/* Texto sobre las masas de hueso */
-:root.cartel .w-card { color: #150809; }
-:root.cartel .w-card .w-head { color: rgba(21,8,9,.62); text-shadow: none; }
-:root.cartel .w-vacio, :root.cartel .wh-sub { color: rgba(21,8,9,.55); }
-:root.cartel .wh-btn { color: rgba(21,8,9,.5); }
-:root.cartel .wh-btn:hover { background: rgba(21,8,9,.08); color: #150809; }
-/* Este tema NO es de vidrio: las piezas dejan de pintar el tinte translúcido
-   y la copia desenfocada del fondo, y pasan a ser masas de hueso macizo.
-   (Sin esto, las marcas de registro pisaban esa capa y las tarjetas se
-   quedaban transparentes: rojo sobre rojo.) */
+/* Las piezas dejan de pintar vidrio: aqui son masas macizas */
 :root.cartel .w-card, :root.cartel .d-tile, :root.cartel #hub-search,
 :root.cartel .hub-pill, :root.cartel .hub-fab, :root.cartel #hub-addons,
 :root.cartel .w-clock::before, :root.cartel .w-sp::before, :root.cartel .w-user::before {
-  background-color: #e7e2d7; background-image: none;
+  background-color: #0b0b0d; background-image: none;
 }
-/* Los pseudoelementos de superficie siguen al canto duro del tema */
-:root.cartel .w-card::before { border-radius: 6px; }
-/* MARCAS DE REGISTRO en las cuatro esquinas de cada tarjeta (dos trazos de un
-   pelo por esquina, dibujados como capas de fondo: no gastan pseudoelementos,
-   que muchos widgets ya usan para lo suyo). */
-:root.cartel .w-card {
-  background-image:
-    linear-gradient(rgba(21,8,9,.42) 0 0), linear-gradient(rgba(21,8,9,.42) 0 0),
-    linear-gradient(rgba(21,8,9,.42) 0 0), linear-gradient(rgba(21,8,9,.42) 0 0),
-    linear-gradient(rgba(21,8,9,.42) 0 0), linear-gradient(rgba(21,8,9,.42) 0 0),
-    linear-gradient(rgba(21,8,9,.42) 0 0), linear-gradient(rgba(21,8,9,.42) 0 0);
-  background-size: 9px 1px, 1px 9px, 9px 1px, 1px 9px, 9px 1px, 1px 9px, 9px 1px, 1px 9px;
-  background-position:
-    7px 7px, 7px 7px,
-    calc(100% - 7px) 7px, calc(100% - 7px) 7px,
-    7px calc(100% - 7px), 7px calc(100% - 7px),
-    calc(100% - 7px) calc(100% - 7px), calc(100% - 7px) calc(100% - 7px);
-  background-repeat: no-repeat;
-}
-/* Y las mismas marcas, más grandes, en las esquinas de la página */
-:root.cartel #hub::after {
-  content: ""; position: absolute; inset: 26px; z-index: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(233,228,217,.5) 0 0), linear-gradient(rgba(233,228,217,.5) 0 0),
-    linear-gradient(rgba(233,228,217,.5) 0 0), linear-gradient(rgba(233,228,217,.5) 0 0),
-    linear-gradient(rgba(233,228,217,.5) 0 0), linear-gradient(rgba(233,228,217,.5) 0 0),
-    linear-gradient(rgba(233,228,217,.5) 0 0), linear-gradient(rgba(233,228,217,.5) 0 0);
-  background-size: 16px 1px, 1px 16px, 16px 1px, 1px 16px, 16px 1px, 1px 16px, 16px 1px, 1px 16px;
-  background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
-  background-repeat: no-repeat;
-}
-/* CONTEXTO DE TINTA SOBRE HUESO. Los tokens de texto del tema son claros
-   (el cromo es oscuro), pero dentro de una tarjeta de hueso hay que invertirlos
-   o el texto desaparece. En vez de perseguir clase por clase, se REDEFINEN las
-   variables dentro de la tarjeta: todo lo que use var(--text) hereda tinta. */
-:root.cartel .w-card {
-  --text: #150809; --text-strong: #0d0405; --text-dim: rgba(21,8,9,.62);
-  --muted: rgba(21,8,9,.62); --dim: rgba(21,8,9,.45);
-  --chip: rgba(21,8,9,.08); --chip-hover: rgba(21,8,9,.15); --chip-dim: rgba(21,8,9,.05);
-  --line: rgba(21,8,9,.14); --line-2: rgba(21,8,9,.20); --btn: rgba(21,8,9,.08); --btn-hover: rgba(21,8,9,.14);
-}
-/* Las tarjetas de REALCE son de tinta, no de hueso: ahí el texto vuelve a ser
-   claro (si no, heredarían la inversión de arriba y quedarían negro sobre negro). */
-:root.cartel .w-wx, :root.cartel .w-mail {
-  color: var(--grad-fg);   /* gana a la tinta de .w-card: estas son de tinta, no de hueso */
-  --text: var(--grad-fg); --text-strong: var(--grad-fg);
-  --text-dim: color-mix(in srgb, var(--grad-fg) 80%, transparent);
-  --muted: color-mix(in srgb, var(--grad-fg) 80%, transparent);
-  --dim: color-mix(in srgb, var(--grad-fg) 62%, transparent);
-}
-:root.cartel .w-clock .greet, :root.cartel .w-clock .ck-fecha { color: #150809; text-shadow: none; }
-:root.cartel .w-mail .w-head, :root.cartel .w-wx .w-head { color: color-mix(in srgb, var(--grad-fg) 66%, transparent); }
-/* Botonera del hub y píldoras: masas de hueso con tinta encima */
+/* NADA REDONDEADO: radio cero y ESQUINA CORTADA en dos esquinas opuestas */
+:root.cartel .w-card, :root.cartel .widget, :root.cartel #hub-search,
 :root.cartel .hub-fab, :root.cartel .hub-pill, :root.cartel #hub-addons,
-:root.cartel #hub-version, :root.cartel #hub-search input { color: #150809; }
-:root.cartel #hub-version { background: #e7e2d7; text-shadow: none; }
-:root.cartel .hub-pill, :root.cartel .hub-pill .wxp-city { text-shadow: none; }
-:root.cartel #hub-search input::placeholder { color: rgba(21,8,9,.45); }
-:root.cartel .hub-fab.on { background: var(--grad-realce); color: var(--grad-fg); }
-/* Los nombres de los accesos caen DENTRO de la tarjeta de hueso: van en tinta
-   (en el tema oscuro van sobre el fondo, de ahí el color claro y la sombra). */
-:root.cartel .d-name { color: rgba(21,8,9,.78); text-shadow: none; }
-:root.cartel .dial:hover .d-name { color: #150809; }
-/* Etiquetas de cabecera en monoespaciada con marca técnica delante */
-:root.cartel .w-head { font-family: "Geist Mono", ui-monospace, Consolas, monospace; letter-spacing: 1.6px; font-size: 10px; }
-:root.cartel .w-head::before { content: "// "; opacity: .5; }
-/* Logo sobre suelo rojo: el gradiente pastel se apaga contra el rojo, así que
-   pasa a hueso macizo. El del splash no se toca (es momento de marca). */
+:root.cartel #sp-panel, :root.cartel .side-panel-left { border-radius: 0; }
+:root.cartel .w-card, :root.cartel .w-card::before {
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+:root.cartel .d-tile {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+:root.cartel .hub-fab, :root.cartel #hub-addons, :root.cartel #hub-version {
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+/* DETALLE TECNICO en cada masa: corchetes en las dos esquinas rectas y un
+   bloque de trama diagonal junto al corte */
+:root.cartel .w-card {
+  background-image:
+    repeating-linear-gradient(45deg, #e8202a 0 2px, transparent 2px 5px),
+    linear-gradient(#e8202a 0 0), linear-gradient(#e8202a 0 0),
+    linear-gradient(#e8202a 0 0), linear-gradient(#e8202a 0 0);
+  background-size: 34px 5px, 12px 1px, 1px 12px, 12px 1px, 1px 12px;
+  background-position:
+    calc(100% - 28px) 10px,
+    9px 9px, 9px 9px,
+    calc(100% - 9px) calc(100% - 9px), calc(100% - 9px) calc(100% - 9px);
+  background-repeat: no-repeat;
+}
+/* Encuadre de la pagina: corchetes grandes y una regla de tics arriba */
+:root.cartel #hub::after {
+  content: ""; position: absolute; inset: 22px; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(#0b0b0d 0 0), linear-gradient(#0b0b0d 0 0),
+    linear-gradient(#0b0b0d 0 0), linear-gradient(#0b0b0d 0 0),
+    linear-gradient(#0b0b0d 0 0), linear-gradient(#0b0b0d 0 0),
+    linear-gradient(#0b0b0d 0 0), linear-gradient(#0b0b0d 0 0),
+    repeating-linear-gradient(90deg, #0b0b0d 0 1px, transparent 1px 13px);
+  background-size:
+    22px 2px, 2px 22px, 22px 2px, 2px 22px,
+    22px 2px, 2px 22px, 22px 2px, 2px 22px,
+    170px 6px;
+  background-position:
+    0 0, 0 0, 100% 0, 100% 0,
+    0 100%, 0 100%, 100% 100%, 100% 100%,
+    46px 0;
+  background-repeat: no-repeat;
+}
+/* Rotulos: monoespaciada ROJA entre corchetes */
+:root.cartel .w-head { font-family: "Geist Mono", ui-monospace, Consolas, monospace; letter-spacing: 2px; font-size: 9.5px; color: #e8202a; text-shadow: none; }
+:root.cartel .w-head::before { content: "[ "; }
+:root.cartel .wh-sub, :root.cartel .xt-chip { color: #e8202a; }
+/* Tarjetas de REALCE: la inversion, masa roja con tinta negra */
+:root.cartel .w-wx, :root.cartel .w-mail {
+  color: var(--grad-fg);
+  --text: var(--grad-fg); --text-strong: var(--grad-fg);
+  --text-dim: color-mix(in srgb, var(--grad-fg) 78%, transparent);
+  --muted: color-mix(in srgb, var(--grad-fg) 78%, transparent);
+  --dim: color-mix(in srgb, var(--grad-fg) 60%, transparent);
+}
+:root.cartel .w-mail .w-head, :root.cartel .w-wx .w-head { color: color-mix(in srgb, var(--grad-fg) 72%, transparent); }
+/* Sobre la masa roja, las filas son BLOQUES NEGROS (traslucidas quedaban rojo
+   sobre rojo y no se leia nada). Es el mismo juego del cartel: negro recortado
+   sobre rojo, y dentro del negro el texto claro. */
+:root.cartel .w-mail .ml-i, :root.cartel .w-mail .ml-pie { background: #0b0b0d; border-radius: 0; color: #ededf0; }
+:root.cartel .w-mail .ml-i:hover { background: #16161a; }
+:root.cartel .w-mail .ml-de { color: #ededf0; }
+:root.cartel .w-mail .ml-asunto, :root.cartel .w-mail .ml-resumen { color: #9a9aa4; }
+:root.cartel .w-mail .ml-hora { color: #e8202a; }
+:root.cartel .w-mail .ml-pie svg { color: #e8202a; }
+/* Pildoras y botonera: masas negras con filo rojo */
+:root.cartel .hub-fab, :root.cartel .hub-pill, :root.cartel #hub-addons, :root.cartel #hub-version {
+  color: #ededf0; text-shadow: none; box-shadow: inset 0 0 0 1px rgba(232,32,42,.45);
+}
+:root.cartel #hub-version { background: #0b0b0d; color: #e8202a; }
+:root.cartel .hub-fab.on { background: var(--grad-realce); color: var(--grad-fg); box-shadow: none; }
+:root.cartel #hub-search input { color: #ededf0; }
+:root.cartel #hub-search input::placeholder { color: #6d6d76; }
+:root.cartel .d-name { color: #ededf0; text-shadow: none; }
+:root.cartel .dial:hover .d-name { color: #e8202a; }
+:root.cartel .w-cta, :root.cartel .cta, :root.cartel .btn.red { border-radius: 0; background: #e8202a; color: #0b0b0d; }
+/* Logo de la interfaz macizo (el gradiente pastel se apaga contra el rojo).
+   El del splash NO se toca: es momento de marca. */
 :root.cartel .iris-slot:not(.splash-iris) .iris-logo stop.i-a,
 :root.cartel .iris-slot:not(.splash-iris) .iris-logo stop.i-b,
-:root.cartel .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #e9e4d9; }
+:root.cartel .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #ededf0; }
 
 /* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
    con un halo suave, que le da el toque más femenino sin tocar el resto. */
@@ -1155,7 +1152,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
 .sw-claro { background: linear-gradient(140deg, #ffffff, #dcdee4); }
 .sw-rosa { background: linear-gradient(140deg, #f48fc0, #fdeff5); }
-.sw-cartel { background: linear-gradient(140deg, #f2141f 55%, #e9e4d9 55%); }
+.sw-cartel { background: linear-gradient(140deg, #e8202a 52%, #0b0b0d 52%); }
 /* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */
