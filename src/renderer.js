@@ -1939,12 +1939,14 @@ function renderSpotify(body) {
         <div class="sp-ctr">
           <button class="sp-b" data-cmd="prev" title="Anterior" disabled>${window.icon('skip-back')}</button>
           <button class="sp-b" data-cmd="next" title="Siguiente" disabled>${window.icon('skip-forward')}</button>
+          <button class="sp-b sp-vol" data-vol="-0.1" title="Bajar volumen">${window.icon('speaker-x-mark')}</button>
+          <button class="sp-b sp-vol" data-vol="0.1" title="Subir volumen">${window.icon('speaker-wave')}</button>
           <button class="sp-abre">Abrir Spotify</button>
         </div>
       </div>
     </div>
     <div class="sp-bib">
-      <div class="w-head">Tu música<button class="wh-btn spl-rf" title="Actualizar">${window.icon('arrow-path')}</button></div>
+      <div class="w-head"><span class="spl-rotulo">Tu música</span><button class="wh-btn spl-rf" title="Actualizar">${window.icon('arrow-path')}</button></div>
       <div class="spl-lista"><div class="w-vacio">Conecta Spotify para ver tus listas</div></div>
     </div>
     <button class="sp-play sp-b" data-cmd="play" title="Reproducir / pausa" data-ic="play">${window.icon('play')}</button>`;
@@ -1953,6 +1955,13 @@ function renderSpotify(body) {
   // música sobrevive a la navegación y el botón del dock queda en el sidebar.
   body.querySelector('.sp-abre').addEventListener('click', (e) => { e.stopPropagation(); toggleSpotifyPanel(true); setTimeout(() => llenaListas(body), 5000); });
   body.querySelector('.spl-rf').addEventListener('click', (e) => { e.stopPropagation(); llenaListas(body); });
+  body.querySelectorAll('.sp-vol').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const t = spTab(); if (!t) { toast('Abre Spotify para controlar el volumen'); return; }
+    t.webview.executeJavaScript(SPL_VOL(+b.dataset.vol), true)
+      .then((v) => toast(v == null ? 'Spotify no muestra su barra de volumen ahora mismo' : `Volumen ${v}%`))
+      .catch(() => {});
+  }));
   clearInterval(spTimer); spTimer = setInterval(actualizaSpotify, 3000);
   actualizaSpotify();
   llenaListas(body);
@@ -1960,12 +1969,22 @@ function renderSpotify(body) {
 async function llenaListas(body) {
   const cont = body.querySelector('.spl-lista'); if (!cont) return;
   const t = spTab();
-  if (!t) { cont.innerHTML = '<div class="w-vacio">Conecta Spotify para ver tus listas</div>'; return; }
-  let listas = [];
-  try { listas = await t.webview.executeJavaScript(SPL_LEE, false) || []; } catch { /* aún cargando */ }
-  cont.innerHTML = listas.map((l) => `<button class="spl-i" data-h="${escapeHtml(l.h)}"><span>${escapeHtml(l.t)}</span>${window.icon('play')}</button>`).join('') ||
-    '<div class="w-vacio">Aún no veo tu biblioteca — abre Spotify un momento</div>';
-  cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); splReproduce(b.dataset.h); }));
+  const rotulo = body.querySelector('.spl-rotulo');
+  if (!t) { cont.innerHTML = '<div class="w-vacio">Conecta Spotify para ver lo que suena</div>'; return; }
+  let r = null;
+  try { r = await t.webview.executeJavaScript(SPL_LEE, false); } catch { /* aún cargando */ }
+  const items = (r && r.items) || [];
+  if (rotulo) rotulo.textContent = r && r.fuente === 'cola' ? 'A continuación'
+    : r && r.fuente === 'biblioteca' ? 'Tu biblioteca' : 'Lista abierta';
+  cont.innerHTML = items.map((l) => `<button class="spl-i" data-i="${l.i}" data-h="${escapeHtml(l.h || '')}"><span class="spl-t">${escapeHtml(l.t)}</span>${l.sub ? `<span class="spl-sub">${escapeHtml(l.sub)}</span>` : ''}${window.icon('play')}</button>`).join('') ||
+    '<div class="w-vacio">Abre un álbum o una lista en Spotify y aparecerán sus canciones</div>';
+  cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const wv = spTab(); if (!wv) return;
+    if (b.dataset.h) { splReproduce(b.dataset.h); return; }   // fila de biblioteca: se abre y suena
+    wv.webview.executeJavaScript(SPL_TOCA(+b.dataset.i), true).catch(() => {});
+    setTimeout(actualizaSpotify, 600);
+  }));
   // Sin barra de scroll: lo que no cabe se oculta (criterio de Correo y Descargas)
   requestAnimationFrame(() => {
     const tope = cont.clientHeight;
@@ -2063,31 +2082,67 @@ function renderCalendar(body) {
    Lee las playlists/álbumes de la biblioteca del webview de Spotify (los
    enlaces reales de su sidebar) y al clicar navega el reproductor a la lista
    y pulsa su play grande. Sin API ni claves: es TU sesión. */
-/* "Tu música" leía TODOS los enlaces de lista/álbum de la página, y la página
-   que hay abierta es la PORTADA: lo que salía eran las radios que Spotify
-   recomienda ("Radio KAROL G", "Radio Bad Bunny"), no la música de Dosa.
-   Ahora se lee solo de la BARRA DE TU BIBLIOTECA, y si no está a la vista, de
-   la sección de escuchado recientemente. Si no hay ninguna, se dice y ya:
-   mejor vacío que enseñar recomendaciones ajenas como si fueran tuyas. */
+/* La lista del widget ya no es "tu biblioteca": lo util mientras suena algo es
+   VER LO QUE VIENE. Se lee, por este orden, la lista que tengas abierta en el
+   reproductor (album, playlist, artista), y si no hay ninguna, la COLA. Antes
+   leia todos los enlaces de la pagina, que estando en la portada eran las
+   radios recomendadas de Spotify — nada tuyo. */
 const SPL_LEE = `(() => {
-  const limpia = (s) => (s || '').trim().split('\\n')[0].slice(0, 60);
-  const saca = (raiz) => {
-    const out = []; const vis = new Set();
-    raiz.querySelectorAll('a[href^="/playlist/"], a[href^="/album/"], a[href^="/artist/"], a[href^="/collection/"]').forEach((a) => {
-      const t = limpia(a.getAttribute('aria-label') || a.textContent);
+  const lim = (x) => (x || '').trim().replace(/\\s+/g, ' ').slice(0, 70);
+  const deFilas = (filas) => [...filas].slice(0, 14).map((f, i) => {
+    const enlace = f.querySelector('[data-testid="internal-track-link"], a[href^="/track"]');
+    const lineas = (f.innerText || '').split('\\n').map((x) => x.trim()).filter(Boolean);
+    const t = lim(enlace ? enlace.textContent : (lineas[1] || lineas[0]));
+    const sub = lim((lineas.find((l) => l !== t && !/^\\d+$/.test(l) && l.length > 1 && !/^\\d+:\\d\\d$/.test(l)) || ''));
+    return t ? { t, sub: sub === t ? '' : sub, i } : null;
+  }).filter(Boolean);
+
+  const filas = document.querySelectorAll('[data-testid="tracklist-row"]');
+  if (filas.length) return { fuente: 'lista', items: deFilas(filas) };
+  const cola = document.querySelectorAll('[aria-label*="ola"] [data-testid="tracklist-row"], [data-testid="queue"] li');
+  if (cola.length) return { fuente: 'cola', items: deFilas(cola) };
+  // Respaldo: si Spotify cambiara ese identificador, se cae a las filas de
+  // cualquier tabla de pistas y, en ultimo caso, a los enlaces de la BARRA DE
+  // TU BIBLIOTECA (nunca a la portada, que son recomendaciones suyas).
+  const genericas = document.querySelectorAll('[role="row"]:not([aria-rowindex="1"])');
+  if (genericas.length > 1) return { fuente: 'lista', items: deFilas(genericas) };
+  const bib = document.querySelector('[data-testid="library-container"], nav[aria-label*="iblioteca"], nav[aria-label*="ibrary"]');
+  if (bib) {
+    const vis = new Set(); const out = [];
+    bib.querySelectorAll('a[href^="/playlist/"], a[href^="/album/"], a[href^="/collection/"]').forEach((a) => {
+      const t = lim(a.getAttribute('aria-label') || a.textContent);
       const h = a.getAttribute('href');
-      if (t && h && t.length > 1 && !vis.has(h)) { vis.add(h); out.push({ t, h }); }
+      if (t && h && !vis.has(h)) { vis.add(h); out.push({ t, sub: '', h }); }
     });
-    return out;
-  };
-  const bib = document.querySelector('[data-testid="library-container"], nav[aria-label*="iblioteca"], nav[aria-label*="ibrary"], aside [data-testid="library"]');
-  let l = bib ? saca(bib) : [];
-  if (!l.length) {
-    const rec = [...document.querySelectorAll('section')].find((s) =>
-      /vuelve a escuchar|escuchado recientemente|recently played|tus me gusta|liked songs/i.test(s.textContent || ''));
-    if (rec) l = saca(rec);
+    if (out.length) return { fuente: 'biblioteca', items: out.slice(0, 12) };
   }
-  return l.slice(0, 12);
+  return { fuente: 'nada', items: [] };
+})()`;
+/* Reproducir la pista N de esa misma lista: Spotify no expone enlace de
+   reproduccion, asi que se pulsa el boton de play de la fila y, si no lo
+   encuentra (solo aparece al pasar el raton), se le manda un doble clic, que
+   es como se reproduce una fila en su reproductor. */
+const SPL_TOCA = (i) => `(() => {
+  const f = document.querySelectorAll('[data-testid="tracklist-row"]')[${i}];
+  if (!f) return false;
+  const b = f.querySelector('button[data-testid="play-button"], button[aria-label*="Reproducir"], button[aria-label*="Play"]');
+  if (b) { b.click(); return true; }
+  f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+  return true;
+})()`;
+/* VOLUMEN (peticion de Dosa): se mueve la barra del propio Spotify, asi el
+   cambio se ve en su interfaz y sobrevive a los cambios de cancion. React
+   ignora un value asignado a pelo: hay que usar el setter nativo y avisar. */
+const SPL_VOL = (paso) => `(() => {
+  const inp = document.querySelector('[data-testid="volume-bar"] input[type=range]');
+  if (!inp) return null;
+  const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  const max = parseFloat(inp.max || '1');
+  const v = Math.max(0, Math.min(max, parseFloat(inp.value) + (${paso}) * max));
+  set.call(inp, String(v));
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+  return Math.round((v / max) * 100);
 })()`;
 function splReproduce(h) {
   const wv = ensureSpotifyPlayer();
@@ -2145,11 +2200,16 @@ const XT_LEE_X = `(() => {
 function renderXTrends(body) {
   const pinta = (items, cargando) => {
     const fuente = xtCache.src === 'ti' ? 'Para ti' : 'Mundial';
+    const sinSesion = !cargando && xtCache.src !== 'ti';
     body.innerHTML = `<div class="w-head">${window.brandIcon('x') || window.icon('hash')} Tendencias<span class="xt-chip">${fuente} · X</span></div>` +
       `<div class="xt-lista">` +
       (cargando ? '<div class="w-vacio">Leyendo tendencias…</div>'
         : (items.map((t, i) => `<button class="xt-i"><span class="xt-n">${i + 1}</span><bdi class="xt-t">${escapeHtml(t)}</bdi>${window.icon('arrow-up-right')}</button>`).join('') ||
-          '<div class="w-vacio">No se pudieron leer las tendencias</div>')) + `</div>`;
+          '<div class="w-vacio">No se pudieron leer las tendencias</div>')) + `</div>` +
+      // Las "Para ti" salen de TU sesión de X. Sin ella solo hay mundiales, y
+      // callarlo hacía pensar que el widget estaba roto.
+      (sinSesion ? `<button class="xt-login">Inicia sesión en X para ver las tuyas</button>` : '');
+    body.querySelector('.xt-login')?.addEventListener('click', (e) => { e.stopPropagation(); navigateActive('https://x.com/login'); });
     body.querySelectorAll('.xt-i').forEach((b, i) => b.addEventListener('click', (e) => {
       e.stopPropagation(); navigateActive('https://x.com/search?q=' + encodeURIComponent(items[i]));
     }));
