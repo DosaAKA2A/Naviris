@@ -1512,21 +1512,35 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   background-size: 120px 120px, auto; background-blend-mode: soft-light, normal;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.45), var(--glass-lift); }
 .w-mail > * { position: relative; z-index: 1; }
-.ml-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-.ml-t { width: 40px; height: 40px; border: none; border-radius: 999px; background: rgba(255,255,255,.85); color: #17181c; font-family: inherit; font-size: 15px; font-weight: 650; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: .55; transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
-.ml-t.on { opacity: 1; }
-.ml-t:hover { transform: translateY(-1px); opacity: .9; }
-.ml-t svg { width: 18px; height: 18px; }
-.ml-cnt { font-size: 11px; font-weight: 650; color: color-mix(in srgb, var(--grad-fg) 75%, transparent); margin-bottom: 6px; }
-/* overflow-x: hidden explicito. Con overflow-y:auto el otro eje pasa de
-   'visible' a 'auto' por regla del propio CSS, y en cuanto sale la barra
-   vertical los .ml-i al 100% desbordan unos pixeles: aparecia una barra
-   HORIZONTAL cruzando el widget. A lo ancho no hay nada que desplazar. */
-.ml-lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; }
-.ml-i { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: none; border-radius: 14px; background: rgba(255,255,255,.85); color: #17181c; font-family: inherit; text-align: left; padding: 9px 12px; cursor: pointer; transition: transform var(--dur-1) var(--spring); width: 100%; }
-.ml-i:hover { transform: translateX(2px); }
-.ml-de { font-size: 11px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.ml-asunto { font-size: 11px; color: #454851; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* La cabecera comun se tinta con el frente de la tarjeta (la regla global le
+   pone el color del hub y una sombra pensada para el fondo, no para esto). */
+.w-mail .w-head { color: color-mix(in srgb, var(--grad-fg) 68%, transparent); text-shadow: none; margin-bottom: 2px; }
+.w-mail .w-head svg { width: 14px; height: 14px; }
+.w-mail .wh-btn { color: color-mix(in srgb, var(--grad-fg) 55%, transparent); }
+.w-mail .wh-btn:hover { background: color-mix(in srgb, var(--grad-fg) 12%, transparent); color: var(--grad-fg); }
+.ml-ocupado { opacity: .45; }
+/* El dato grande: numero de no leidos con la etiqueta pegada a su linea base */
+.ml-hero { display: flex; align-items: baseline; gap: 7px; margin: 2px 0 12px; }
+.ml-n { font-size: 34px; font-weight: 600; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ml-lbl { font-size: 11.5px; color: color-mix(in srgb, var(--grad-fg) 62%, transparent); }
+/* Sin scroll: lo que no cabe se oculta en JS, asi que la lista solo recorta */
+.ml-lista { display: flex; flex-direction: column; gap: 6px; overflow: hidden; flex: 1; min-height: 0; }
+/* Las filas se reparten el alto sobrante (con tope): al ocultar la que no
+   cabe quedaba un hueco muerto del tamaño de una fila al pie de la tarjeta. */
+.ml-i { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-height: 44px; max-height: 58px; border: none; border-radius: 14px; background: rgba(255,255,255,.86); color: #17181c; font-family: inherit; text-align: left; padding: 8px 13px; cursor: pointer; transition: transform var(--dur-1) var(--spring), background var(--dur-1) var(--ease); width: 100%; }
+.ml-i:hover { transform: translateX(2px); background: #fff; }
+.ml-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.ml-de { font-size: 11.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-asunto { font-size: 11px; color: #454851; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-resumen { display: none; font-size: 10.5px; color: #6b6f79; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-hora { flex-shrink: 0; align-self: flex-start; font-size: 10px; color: #7b7f88; font-variant-numeric: tabular-nums; }
+/* Ancha (3 celdas): cabe el adelanto del mensaje */
+.w-mail.t-3x3 .ml-resumen { display: block; }
+.ml-limpia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; justify-content: center; font-size: 12.5px; color: color-mix(in srgb, var(--grad-fg) 80%, transparent); }
+.ml-limpia svg { width: 22px; height: 22px; }
+.ml-pie { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; border: none; border-radius: 999px; background: color-mix(in srgb, var(--grad-fg) 10%, transparent); color: var(--grad-fg); font-family: inherit; font-size: 11px; font-weight: 600; padding: 7px 12px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.ml-pie:hover { background: color-mix(in srgb, var(--grad-fg) 18%, transparent); }
+.ml-pie svg { width: 12px; height: 12px; }
 .w-mail .w-vacio { color: color-mix(in srgb, var(--grad-fg) 80%, transparent); }
 
 /* ===== VIDRIO SIN backdrop-filter (2026-08-11, FIN DE LAS LINEAS) =====

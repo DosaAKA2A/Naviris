@@ -753,7 +753,7 @@ const WIDGET_TYPES = {
   user: { name: 'Cuenta', icon: 'user-circle', span: 2 },
   xtrends: { name: 'Tendencias X', icon: 'hash', span: 2, rspan: 2 },
   imagen: { name: 'Imagen', icon: 'photo', span: 2 },
-  mail: { name: 'Correo', icon: 'inbox', span: 2, rspan: 2 },
+  mail: { name: 'Gmail', icon: 'inbox', span: 2, rspan: 2 },
   descargas: { name: 'Descargas', icon: 'download' },
   privada: { name: 'Ventana privada', icon: 'hat-glasses' },
   monitor: { name: 'Monitor', icon: 'res-scale' },
@@ -2067,19 +2067,40 @@ function renderImagen(body, w) {
   pinta();
 }
 
-/* ============ Widget Correo (Gmail hoy; Outlook y "+" en camino) ============
+/* ============ Widget Correo — SOLO GMAIL (2026-08-12) ============
    Gmail se lee por su feed atom nativo con TUS cookies (lo pide main, sin
-   CORS). Outlook no ofrece feed sin OAuth: pestaña "pronto" honesta. */
+   CORS). Se retiraron las pestañas de Outlook y "+": Outlook no publica feed
+   y montar su OAuth (registro en Entra, PKCE, token en disco) no compensa
+   para una pestaña de widget — decisión de Dosa, 2026-08-12.
+   El widget pasa a leerse como una bandeja de verdad: cabecera con la marca,
+   el número de no leídos como dato grande, y filas con inicial del remitente,
+   asunto y hora. Sin barras de scroll: las filas que no caben se ocultan
+   (mismo criterio que el widget de Descargas). */
 let mailCache = { t: 0, entradas: null, total: '0', err: null };
+function mlHora(ts) {
+  if (!ts) return '';
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return min + ' min';
+  const hor = Math.round(min / 60);
+  if (hor < 24) return hor + ' h';
+  const dias = Math.round(hor / 24);
+  if (dias === 1) return 'ayer';
+  if (dias < 7) return dias + ' d';
+  return new Date(ts).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+}
 async function cargaGmail(force) {
   if (!force && mailCache.entradas && Date.now() - mailCache.t < 5 * 60 * 1000) return mailCache;
   try {
     const r = await window.cobalt.gmailFeed();
     if (!r.ok) { mailCache = { t: Date.now(), entradas: null, total: '0', err: (r.status === 401 || r.status === 403) ? 'sin-sesion' : 'error' }; return mailCache; }
     const doc = new DOMParser().parseFromString(r.xml, 'text/xml');
-    const entradas = [...doc.querySelectorAll('entry')].slice(0, 6).map((e) => ({
-      asunto: e.querySelector('title')?.textContent || '(sin asunto)',
-      de: e.querySelector('author > name')?.textContent || '',
+    const entradas = [...doc.querySelectorAll('entry')].slice(0, 8).map((e) => ({
+      asunto: (e.querySelector('title')?.textContent || '').trim() || '(sin asunto)',
+      de: (e.querySelector('author > name')?.textContent || '').trim() ||
+          (e.querySelector('author > email')?.textContent || '').trim() || 'Desconocido',
+      resumen: (e.querySelector('summary')?.textContent || '').trim(),
+      fecha: Date.parse(e.querySelector('issued')?.textContent || e.querySelector('modified')?.textContent || '') || 0,
       link: e.querySelector('link')?.getAttribute('href') || 'https://mail.google.com'
     }));
     mailCache = { t: Date.now(), entradas, total: doc.querySelector('fullcount')?.textContent || '0', err: null };
@@ -2087,31 +2108,50 @@ async function cargaGmail(force) {
   return mailCache;
 }
 function renderMail(body) {
-  let prov = 'gmail';
-  const pinta = async () => {
-    const tabsHtml = `<div class="ml-tabs">
-      <button class="ml-t${prov === 'gmail' ? ' on' : ''}" data-p="gmail" title="Gmail">${window.brandIcon('gmail') || 'G'}</button>
-      <button class="ml-t${prov === 'outlook' ? ' on' : ''}" data-p="outlook" title="Outlook — pronto">${window.icon('mail')}</button>
-      <button class="ml-t${prov === 'mas' ? ' on' : ''}" data-p="mas" title="Otro proveedor — pronto">${window.icon('plus')}</button>
-    </div>`;
-    let cuerpo = '';
-    if (prov === 'gmail') {
-      body.innerHTML = tabsHtml + '<div class="w-vacio">Leyendo bandeja…</div>'; ata();
-      const m = await cargaGmail();
-      if (m.err === 'sin-sesion') cuerpo = `<div class="w-vacio">Inicia sesión en Gmail para ver tu bandeja<button class="w-cta ml-abre">Abrir Gmail</button></div>`;
-      else if (m.err || !m.entradas) cuerpo = '<div class="w-vacio">No se pudo leer la bandeja</div>';
-      else cuerpo = `<div class="ml-cnt">${m.total} sin leer</div><div class="ml-lista">` +
-        (m.entradas.map((e, i) => `<button class="ml-i" data-i="${i}"><span class="ml-de">${escapeHtml(e.de)}</span><span class="ml-asunto">${escapeHtml(e.asunto)}</span></button>`).join('') ||
-          '<div class="w-vacio">Nada sin leer — bandeja limpia</div>') + '</div>';
+  const cabecera = (girando) => `<div class="w-head">${window.brandIcon('gmail') || window.icon('inbox')}<span>Bandeja</span>
+    <button class="wh-btn ml-recarga${girando ? ' ml-ocupado' : ''}" title="Actualizar">${window.icon('arrow-path')}</button></div>`;
+  const fila = (e, i) => `<button class="ml-i" data-i="${i}" title="${escapeHtml(e.asunto)}">
+      <span class="ml-txt">
+        <span class="ml-de">${escapeHtml(e.de)}</span>
+        <span class="ml-asunto">${escapeHtml(e.asunto)}</span>
+        <span class="ml-resumen">${escapeHtml(e.resumen.slice(0, 90))}</span>
+      </span>
+      <span class="ml-hora">${escapeHtml(mlHora(e.fecha))}</span>
+    </button>`;
+  const pinta = async (force) => {
+    body.innerHTML = cabecera(true) + '<div class="ml-hero"><span class="ml-n">·</span><span class="ml-lbl">leyendo bandeja</span></div>';
+    ata();
+    const m = await cargaGmail(force);
+    let cuerpo;
+    if (m.err === 'sin-sesion') {
+      cuerpo = `<div class="w-vacio">Inicia sesión en Gmail para ver tu bandeja<button class="w-cta ml-abre">Abrir Gmail</button></div>`;
+    } else if (m.err || !m.entradas) {
+      cuerpo = `<div class="w-vacio">No se pudo leer la bandeja<button class="w-cta ml-recarga">Reintentar</button></div>`;
+    } else if (!m.entradas.length) {
+      cuerpo = `<div class="ml-limpia">${window.icon('check')}<span>Bandeja limpia</span></div>` +
+        `<button class="ml-pie">Abrir Gmail ${window.icon('arrow-up-right')}</button>`;
     } else {
-      cuerpo = `<div class="w-vacio">${prov === 'outlook' ? 'Outlook' : 'Más proveedores'}, muy pronto</div>`;
+      const n = m.total || String(m.entradas.length);
+      cuerpo = `<div class="ml-hero"><span class="ml-n">${escapeHtml(n)}</span><span class="ml-lbl">sin leer</span></div>` +
+        `<div class="ml-lista">${m.entradas.map(fila).join('')}</div>` +
+        `<button class="ml-pie">Abrir Gmail ${window.icon('arrow-up-right')}</button>`;
     }
-    body.innerHTML = tabsHtml + cuerpo; ata();
+    body.innerHTML = cabecera(false) + cuerpo;
+    ata();
+    recorta();
+    function recorta() {
+      const cont = body.querySelector('.ml-lista'); if (!cont) return;
+      requestAnimationFrame(() => {
+        const tope = cont.clientHeight;
+        cont.querySelectorAll('.ml-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope + 2) f.style.display = 'none'; });
+      });
+    }
     function ata() {
-      body.querySelectorAll('.ml-t').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); prov = b.dataset.p; pinta(); }));
-      body.querySelector('.ml-abre')?.addEventListener('click', (e) => { e.stopPropagation(); navigateActive('https://mail.google.com'); });
-      body.querySelectorAll('.ml-i').forEach((b) => b.addEventListener('click', (e) => {
-        e.stopPropagation(); const ent = mailCache.entradas?.[+b.dataset.i]; if (ent) navigateActive(ent.link);
+      body.querySelectorAll('.ml-recarga').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); pinta(true); }));
+      body.querySelector('.ml-abre')?.addEventListener('click', (ev) => { ev.stopPropagation(); navigateActive('https://mail.google.com'); });
+      body.querySelector('.ml-pie')?.addEventListener('click', (ev) => { ev.stopPropagation(); navigateActive('https://mail.google.com'); });
+      body.querySelectorAll('.ml-i').forEach((b) => b.addEventListener('click', (ev) => {
+        ev.stopPropagation(); const ent = mailCache.entradas?.[+b.dataset.i]; if (ent) navigateActive(ent.link);
       }));
     }
   };
