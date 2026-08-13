@@ -1926,7 +1926,17 @@ let spTimer = null;
    about:blank y se libera; la URL queda guardada y vuelve sola en cuanto pulsas
    play, abres el panel o eliges una cancion. No se duerme nunca sonando, que
    seria cortarte la musica. */
-const SP_DORMIR_MS = 15000;
+/* DESACTIVADO (2026-08-13). A Dosa se le cerraba la sesión de Spotify y SOLO
+   la de Spotify: comprobado en disco que falta su cookie de sesión (sp_dc)
+   mientras las de X y YouTube siguen ahí y persistentes. Se descartó una por
+   una: no hay nada en Naviris que borre cookies salvo el botón manual de
+   borrar datos del sitio, el adblock no inyecta scriptlets en Spotify y no hay
+   ningún addon suyo instalado. Lo único específico de Spotify que hacíamos era
+   ESTO: mandar su página a about:blank para liberar memoria. Al destruir la
+   página viva, su reproductor puede cerrar sesión al descargarse.
+   Se apaga hasta confirmar. Cuesta memoria, pero una sesión que se cae vale
+   más que unos MB. Para reactivarlo, poner SP_DORMIR_MS a 15000. */
+const SP_DORMIR_MS = 0;
 const SP_GRACIA_MS = 60000;   // margen desde el último uso: cerrar el panel no es dejar de usarlo
 let spPausaDesde = 0, spDormido = false, spUrlDormida = '', spUltimoUso = 0, spListaSucia = false, spTicks = 0;
 function spDuerme() {
@@ -1975,7 +1985,7 @@ async function actualizaSpotify() {
   if (spPlayerWv && !spDormido) {
     if (sonando || mirando) spPausaDesde = 0;
     else if (!spPausaDesde) spPausaDesde = Date.now();
-    else if (Date.now() - spPausaDesde > SP_DORMIR_MS && Date.now() - spUltimoUso > SP_GRACIA_MS) spDuerme();
+    else if (SP_DORMIR_MS > 0 && Date.now() - spPausaDesde > SP_DORMIR_MS && Date.now() - spUltimoUso > SP_GRACIA_MS) spDuerme();
   }
   // Usar Spotify en pestaña también revela el dock (además de la cookie de
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
