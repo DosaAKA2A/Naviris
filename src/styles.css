@@ -1427,12 +1427,22 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .sp-abre:hover { background: var(--chip-hover); }
 /* FAB de play: pastilla blanca nítida (como los círculos de las referencias),
    asentada en el scoop de la esquina */
-/* Play en VERDE con el icono blanco (petición de Dosa): es el botón de
-   Spotify, y su verde lo identifica en cualquier tema. */
-.w-sp .sp-play { position: absolute; right: 4px; top: 72px; width: 46px; height: 46px; background: #1db954; color: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.32); }
+/* Play con el REALCE DEL TEMA (2026-08-13). Estuvo un rato con el verde de
+   Spotify a pelo: se salía de la paleta y era el único botón de la interfaz
+   que no cambiaba al cambiar de tema. Ahora usa el mismo par que el resto de
+   superficies de acento (--grad-realce sobre --grad-fg), así que es verde en
+   el tema oscuro, rosa en el rosa y cálido en el claro. */
+.w-sp .sp-play { position: absolute; right: 4px; top: 72px; width: 46px; height: 46px; background: var(--grad-realce); color: var(--grad-fg); box-shadow: 0 6px 18px rgba(0,0,0,.32); }
 .w-sp .sp-play svg { width: 17px; height: 17px; }
-.w-sp .sp-play:hover { background: #1ed760; transform: scale(1.06); }
+.w-sp .sp-play:hover { background: var(--grad-realce); transform: scale(1.06); filter: brightness(1.08); }
 .w-sp .sp-play:disabled { opacity: .55; }
+/* El anillo dorado que salía al pulsarlo era el FOCO POR DEFECTO de Chromium,
+   que en Windows se pinta con el color de acento del sistema — por eso no
+   seguía la paleta ni cambiaba con el tema. Se sustituye por el nuestro, y
+   solo cuando el foco viene del teclado (con el ratón no se dibuja). */
+.w-sp .sp-b:focus, .w-sp .sp-play:focus, .w-sp .sp-vol-sl:focus { outline: none; }
+.w-sp .sp-b:focus-visible, .w-sp .sp-play:focus-visible, .w-sp .sp-vol-sl:focus-visible {
+  outline: 2px solid var(--realce); outline-offset: 3px; }
 
 /* ===== Widget CALENDARIO con recordatorios (2026-08-11) ===== */
 /* Caja FIJA (2026-08-11): cambiar de mes (5-6 semanas) o entrar al dia
