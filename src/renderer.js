@@ -2178,30 +2178,47 @@ function renderCalendar(body) {
    Lee las playlists/álbumes de la biblioteca del webview de Spotify (los
    enlaces reales de su sidebar) y al clicar navega el reproductor a la lista
    y pulsa su play grande. Sin API ni claves: es TU sesión. */
-/* La lista del widget ya no es "tu biblioteca": lo util mientras suena algo es
-   VER LO QUE VIENE. Se lee, por este orden, la lista que tengas abierta en el
-   reproductor (album, playlist, artista), y si no hay ninguna, la COLA. Antes
-   leia todos los enlaces de la pagina, que estando en la portada eran las
-   radios recomendadas de Spotify — nada tuyo. */
-const SPL_LEE = `(() => {
+/* LA LISTA DEL WIDGET = LO QUE VIENE DESPUÉS (reescrito 2026-08-13 con el DOM
+   real de Spotify delante, gracias a que Dosa abrió el CDP con su cuenta).
+   Comprobado en una playlist de verdad: las pistas son [data-testid=
+   "tracklist-row"] y el título vive en [data-testid="internal-track-link"];
+   el resto de la fila trae el número, la duración y el artista.
+   ANTES fallaba por dos cosas: se leía la PORTADA (si no hay lista abierta no
+   hay pistas) y había un respaldo genérico por [role="row"] que en la portada
+   casaba con sus rejillas e inventaba filas — de ahí que salieran "Título" y
+   una sola canción. Ese respaldo se retira: mejor decir que no hay lista que
+   enseñar basura. */
+const SPL_LEE = `(async () => {
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Al abrir una lista, sus filas tardan un momento en montarse
+  for (let i = 0; i < 4; i++) {
+    if (document.querySelectorAll('[data-testid="tracklist-row"]').length) break;
+    await esperar(500);
+  }
   const lim = (x) => (x || '').trim().replace(/\\s+/g, ' ').slice(0, 70);
-  const deFilas = (filas) => [...filas].slice(0, 14).map((f, i) => {
-    const enlace = f.querySelector('[data-testid="internal-track-link"], a[href^="/track"]');
-    const lineas = (f.innerText || '').split('\\n').map((x) => x.trim()).filter(Boolean);
-    const t = lim(enlace ? enlace.textContent : (lineas[1] || lineas[0]));
-    const sub = lim((lineas.find((l) => l !== t && !/^\\d+$/.test(l) && l.length > 1 && !/^\\d+:\\d\\d$/.test(l)) || ''));
-    return t ? { t, sub: sub === t ? '' : sub, i } : null;
-  }).filter(Boolean);
-
-  const filas = document.querySelectorAll('[data-testid="tracklist-row"], [data-testid="playlist-tracklist"] [role="row"], [data-testid="track-list"] [role="row"]');
-  if (filas.length) return { fuente: 'lista', items: deFilas(filas) };
-  const cola = document.querySelectorAll('[aria-label*="ola"] [data-testid="tracklist-row"], [data-testid="queue"] li');
-  if (cola.length) return { fuente: 'cola', items: deFilas(cola) };
-  // Respaldo: si Spotify cambiara ese identificador, se cae a las filas de
-  // cualquier tabla de pistas y, en ultimo caso, a los enlaces de la BARRA DE
-  // TU BIBLIOTECA (nunca a la portada, que son recomendaciones suyas).
-  const genericas = document.querySelectorAll('[role="row"]:not([aria-rowindex="1"])');
-  if (genericas.length > 1) return { fuente: 'lista', items: deFilas(genericas) };
+  const filas = [...document.querySelectorAll('[data-testid="tracklist-row"]')];
+  if (filas.length) {
+    /* Se exige el ENLACE REAL de la pista (con href). Leyendo a media carga
+       entraban la fila de cabecera ("Título/Álbum") y esqueletos repetidos:
+       ninguno tiene href, así que con esto se caen solos. El href sirve además
+       para quitar duplicados de la lista virtualizada. */
+    const vistos = new Set();
+    const items = filas.slice(0, 24).map((f, i) => {
+      const enlace = f.querySelector('[data-testid="internal-track-link"]');
+      const href = enlace && enlace.getAttribute('href');
+      if (!href || vistos.has(href)) return null;
+      vistos.add(href);
+      const t = lim(enlace.textContent);
+      if (!t) return null;
+      const lineas = (f.innerText || '').split('\\n').map((x) => x.trim()).filter(Boolean);
+      // Se descartan el número de pista, la duración y la marca de explícito
+      const sub = lim(lineas.find((l) => l !== t && l !== 'E' && l.length > 1 &&
+        !/^\\d+$/.test(l) && !/^\\d+:\\d\\d$/.test(l)) || '');
+      return { t, sub, i };
+    }).filter(Boolean);
+    if (items.length) return { fuente: 'lista', items: items.slice(0, 20) };
+  }
+  // La barra de TU BIBLIOTECA, cuando no hay lista abierta pero sí barra
   const bib = document.querySelector('[data-testid="library-container"], nav[aria-label*="iblioteca"], nav[aria-label*="ibrary"]');
   if (bib) {
     const vis = new Set(); const out = [];
@@ -2212,9 +2229,6 @@ const SPL_LEE = `(() => {
     });
     if (out.length) return { fuente: 'biblioteca', items: out.slice(0, 12) };
   }
-  // Si estas DENTRO de una lista y aun asi no se saco nada, no es que no haya
-  // lista: es que no supimos leerla. Se dice distinto para no mandar a Dosa a
-  // abrir algo que ya tiene abierto.
   const dentro = /\\/(playlist|album|artist|collection)\\//.test(location.pathname);
   return { fuente: dentro ? 'ilegible' : 'nada', items: [] };
 })()`;
