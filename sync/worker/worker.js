@@ -11,6 +11,7 @@
  *   acct:<email>      -> { salt, hash, created }
  *   tok:<sha256(tok)> -> email            (expirationTtl 90 dias)
  *   sync:<email>      -> { data, updatedAt }
+ *   av:<email>        -> foto de perfil (data URI, <= 64 KB)
  *   rl:<ip>:<ventana> -> intentos fallidos de login
  *
  * El token se guarda HASHEADO: quien leyera el KV no podria usarlo para
@@ -20,6 +21,10 @@
 
 const TOKEN_TTL = 90 * 24 * 3600;
 const MAX_BLOB = 300 * 1024; // 300 KB de datos por cuenta: de sobra para preferencias
+/* La foto va en SU PROPIA clave, no dentro del blob de sync: ahí competiría
+   con marcadores y widgets por esos 300 KB. Se guarda ya reducida a 128x128
+   desde el cliente, que son unos 10 KB; el tope de 64 KB es margen de sobra. */
+const MAX_FOTO = 64 * 1024;
 const ITER = 100000;
 const RL_MAX = 10;           // intentos fallidos por IP y ventana
 const RL_WINDOW = 900;       // ventana de 15 minutos
@@ -29,7 +34,7 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 });
@@ -125,6 +130,32 @@ export default {
         const h = (req.headers.get('Authorization') || '').match(/^Bearer ([0-9a-f]{64})$/);
         if (h) await env.SYNC.delete('tok:' + (await sha256Hex(h[1])));
         return json({ ok: true });
+      }
+
+      /* FOTO DE PERFIL. Solo la sube el dueño de la cuenta y solo se sirve a
+         quien tiene su token: no hay URL pública, así que la foto de nadie
+         queda expuesta a quien adivine un correo. */
+      if (url.pathname === '/avatar') {
+        const em = await auth(env, req);
+        if (!em) return json({ ok: false, error: 'Sesión caducada: vuelve a entrar' }, 401);
+        if (req.method === 'GET') {
+          const img = await env.SYNC.get('av:' + em);
+          return json({ ok: true, img: img || null });
+        }
+        if (req.method === 'PUT') {
+          const body = await req.text();
+          if (body.length > MAX_FOTO) return json({ ok: false, error: 'La imagen es demasiado grande' }, 413);
+          const { img } = JSON.parse(body);
+          if (typeof img !== 'string' || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(img)) {
+            return json({ ok: false, error: 'Eso no es una imagen' }, 400);
+          }
+          await env.SYNC.put('av:' + em, img);
+          return json({ ok: true });
+        }
+        if (req.method === 'DELETE') {
+          await env.SYNC.delete('av:' + em);
+          return json({ ok: true });
+        }
       }
 
       if (url.pathname === '/sync') {

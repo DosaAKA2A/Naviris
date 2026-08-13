@@ -2116,7 +2116,7 @@ function renderUserCard(body) {
     const nombre = account.email.split('@')[0];
     const st = store.get('cobalt.syncStamp', 0);
     body.innerHTML = `
-      <div class="u-ava">${escapeHtml(nombre.charAt(0).toUpperCase())}</div>
+      <div class="u-ava${fotoLocal() ? ' con-foto' : ''}"${fotoLocal() ? ` style="background-image:url('${fotoLocal()}')"` : ''}>${escapeHtml(nombre.charAt(0).toUpperCase())}</div>
       <div class="u-nom">${escapeHtml(nombre)}</div>
       <div class="u-mail">${escapeHtml(account.email)}</div>
       <div class="u-sync">${st ? 'Sincronizada · ' + new Date(st).toLocaleDateString('es') : 'Aún sin sincronizar aquí'}</div>
@@ -2131,7 +2131,7 @@ function renderUserCard(body) {
   }
   body.onclick = () => showAccountModal(); // onclick y no addEventListener: se repinta y no acumula
 }
-function refrescaUserCards() { document.querySelectorAll('.w-user').forEach((b) => renderUserCard(b)); }
+function refrescaUserCards() { document.querySelectorAll('.w-user').forEach((b) => renderUserCard(b)); pintaFoto(); }
 
 /* ============ Widget Calendario con recordatorios (2026-08-11) ============ */
 const recordatorios = () => store.get('cobalt.reminders', []);
@@ -2861,6 +2861,7 @@ async function applySyncData(d) {
 const accEls = {
   modal: $('#account-modal'), loginView: $('#acc-login-view'), userView: $('#acc-user-view'),
   email: $('#acc-email'), pass: $('#acc-pass'), error: $('#acc-error'), who: $('#acc-who'), last: $('#acc-last'),
+  foto: $('#acc-foto'), fotoSet: $('#acc-foto-set'), fotoDel: $('#acc-foto-del'),
   pill: $('#hub-account'), pillLabel: $('#hub-account-label')
 };
 function renderAccountPill() {
@@ -2877,6 +2878,7 @@ function showAccountModal() {
   accEls.userView.classList.toggle('hidden', !logged);
   if (logged) {
     accEls.who.textContent = account.email;
+    cargaFoto();
     const st = store.get('cobalt.syncStamp', 0);
     accEls.last.textContent = st ? 'Última sincronización: ' + new Date(st).toLocaleString('es') : 'Aún sin sincronizar en este equipo.';
   } else { accError(''); accEls.pass.value = ''; }
@@ -2884,9 +2886,75 @@ function showAccountModal() {
   if (!logged) accEls.email.focus();
 }
 accEls.pill.addEventListener('click', showAccountModal);
+accEls.foto?.addEventListener('click', eligeFoto);
+accEls.fotoSet?.addEventListener('click', eligeFoto);
+accEls.fotoDel?.addEventListener('click', quitaFoto);
 $('#acc-cancel').addEventListener('click', () => accEls.modal.classList.add('hidden'));
 $('#acc-close2').addEventListener('click', () => accEls.modal.classList.add('hidden'));
 
+/* ===== FOTO DE PERFIL DE LA CUENTA (2026-08-13) =====
+   Vive en el worker, en su propia clave (av:<correo>), no dentro del blob de
+   sincronización: ahí competiría con marcadores y widgets por sus 300 KB. Se
+   reduce SIEMPRE en el equipo a 128x128 antes de subirla —unos 10 KB— porque
+   subir una foto de móvil de 4 MB para verla a 40 píxeles no tiene sentido.
+   Se guarda además una copia local para que aparezca al instante al abrir,
+   sin esperar a la red. */
+const FOTO_LADO = 128;
+function fotoLocal() { return store.get('cobalt.account.foto', null); }
+function pintaFoto(img) {
+  const url = img || fotoLocal();
+  if (accEls.foto) {
+    accEls.foto.style.backgroundImage = url ? `url("${url}")` : '';
+    accEls.foto.classList.toggle('con-foto', !!url);
+    accEls.foto.textContent = url ? '' : ((account && account.email) ? account.email.charAt(0).toUpperCase() : '');
+    accEls.fotoDel?.classList.toggle('hidden', !url);
+  }
+  document.querySelectorAll('.w-user .u-ava').forEach((a) => {
+    a.style.backgroundImage = url ? `url("${url}")` : '';
+    a.classList.toggle('con-foto', !!url);
+  });
+}
+async function cargaFoto() {
+  pintaFoto();                                   // primero lo local, sin esperar
+  if (!(account && account.token)) return;
+  const r = await accRequest('/avatar');
+  if (r && r.ok) { store.set('cobalt.account.foto', r.img || null); pintaFoto(r.img); }
+}
+/* Reducción en el cliente: se recorta al cuadrado central y se escala a 128,
+   así una foto apaisada no sale deformada. */
+function reduceImagen(ruta) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => {
+      const lado = Math.min(im.naturalWidth, im.naturalHeight);
+      const c = document.createElement('canvas'); c.width = c.height = FOTO_LADO;
+      const g = c.getContext('2d');
+      g.drawImage(im, (im.naturalWidth - lado) / 2, (im.naturalHeight - lado) / 2, lado, lado, 0, 0, FOTO_LADO, FOTO_LADO);
+      res(c.toDataURL('image/jpeg', 0.85));
+    };
+    im.onerror = () => rej(new Error('no se pudo leer la imagen'));
+    im.src = 'file:///' + String(ruta).replace(/\\/g, '/');
+  });
+}
+async function eligeFoto() {
+  if (!(account && account.token)) { toast('Entra en tu cuenta para poner foto'); return; }
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const ruta = window.cobalt.filePath(f); if (!ruta) return;
+    try {
+      const img = await reduceImagen(ruta);
+      const r = await accRequest('/avatar', { method: 'PUT', body: JSON.stringify({ img }) });
+      if (r && r.ok) { store.set('cobalt.account.foto', img); pintaFoto(img); toast('Foto de perfil actualizada'); }
+      else toast('No se pudo guardar la foto: ' + ((r && r.error) || 'error del servidor'));
+    } catch { toast('No se pudo leer esa imagen'); }
+  };
+  inp.click();
+}
+async function quitaFoto() {
+  const r = await accRequest('/avatar', { method: 'DELETE' });
+  if (r && r.ok) { store.set('cobalt.account.foto', null); pintaFoto(null); toast('Foto quitada'); }
+}
 async function accRequest(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   if (account && account.token) headers.Authorization = 'Bearer ' + account.token;
@@ -2916,6 +2984,7 @@ $('#acc-register').addEventListener('click', () => accAuth('/register'));
 accEls.pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') accAuth('/login'); });
 $('#acc-logout').addEventListener('click', async () => {
   await accRequest('/logout', { method: 'POST' });
+  store.set('cobalt.account.foto', null);   // la foto es de la cuenta, no del equipo
   account = null; store.set('cobalt.account', null); store.set('cobalt.syncStamp', 0);
   renderAccountPill(); showAccountModal();
 });

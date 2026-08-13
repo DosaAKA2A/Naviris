@@ -380,8 +380,17 @@
         <div class="modal-actions"><button id="acc-cancel" type="button">Cancelar</button><button id="acc-register" type="button">Crear cuenta</button><button id="acc-login" type="button" class="primary">Entrar</button></div>
       </div>
       <div id="acc-user-view" class="hidden">
-        <p>Sesión iniciada como <b id="acc-who"></b>.</p>
-        <p id="acc-last" class="acc-last"></p>
+        <div class="acc-perfil">
+          <div id="acc-foto" class="acc-foto" title="Tu foto de perfil"></div>
+          <div class="acc-perfil-txt">
+            <p>Sesión iniciada como <b id="acc-who"></b>.</p>
+            <p id="acc-last" class="acc-last"></p>
+            <div class="acc-foto-btns">
+              <button id="acc-foto-set" type="button">Cambiar foto</button>
+              <button id="acc-foto-del" type="button" class="hidden">Quitar</button>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions"><button id="acc-close2" type="button">Cerrar</button><button id="acc-logout" type="button">Cerrar sesión</button><button id="acc-sync" type="button" class="primary">Sincronizar ahora</button></div>
       </div>
     </div>

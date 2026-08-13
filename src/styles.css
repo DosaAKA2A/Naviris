@@ -1530,6 +1530,21 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   background: var(--grad-realce); color: var(--grad-fg); font-size: 17px; font-weight: 650;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.4); margin-bottom: 10px; }
 .u-ava-off { background: var(--chip); color: var(--text-dim); }
+/* La foto llena el círculo de la tarjeta de cuenta y tapa la inicial */
+.u-ava.con-foto { background-size: cover; background-position: center; color: transparent; }
+/* Foto de perfil en el modal de cuenta */
+.acc-perfil { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
+.acc-perfil-txt { min-width: 0; }
+.acc-foto { width: 68px; height: 68px; border-radius: 999px; flex-shrink: 0; cursor: pointer;
+  background: var(--grad-realce); background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--grad-fg); font-size: 26px; font-weight: 650;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.acc-foto.con-foto { color: transparent; }
+.acc-foto-btns { display: flex; gap: 8px; margin-top: 8px; }
+.acc-foto-btns button { border: none; border-radius: 999px; background: var(--chip); color: var(--text);
+  font-family: inherit; font-size: 11.5px; padding: 6px 12px; cursor: pointer; }
+.acc-foto-btns button:hover { background: var(--chip-hover); }
 .u-ava-off svg { width: 22px; height: 22px; }
 .u-nom { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .u-mail { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 40px; }
