@@ -641,6 +641,19 @@ function createWindow(isPrivate = false) {
     webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
     webPreferences.backgroundThrottling = false; // AutoLoot: NO frenar timers/vídeo en segundo plano (el tiempo de drops debe seguir contando)
+    /* NADA DE alert/confirm/prompt EN LAS WEBS (2026-08-13). Esos diálogos son
+       modales NATIVOS colgados de nuestra ventana: mientras uno está abierto,
+       la ventana entera deja de aceptar clics. Y en una ventana sin marco como
+       la de Naviris el modal a veces ni se dibuja donde debería, así que el
+       navegador simplemente parecía congelado — el fallo que reportó Dosa al
+       abrir enlaces desde X, que suelen acabar en páginas basura que abusan de
+       alert(). Con esto la web se queda sin ellos: alert no hace nada, confirm
+       devuelve false y prompt null.
+       PRECIO: una web legítima que pregunte "¿seguro que quieres borrar?" se
+       comporta como si dijeras que no, y al cerrar una pestaña ya no salta el
+       aviso de "puede que los cambios no se guarden". A cambio, ninguna página
+       puede volver a bloquear el navegador. */
+    webPreferences.disableDialogs = true;
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
   win.once('ready-to-show', () => win.show());
