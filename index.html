@@ -4,10 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Naviris — El navegador que trabaja por ti</title>
-  <meta name="description" content="Naviris: navegador con las herramientas dentro. Descarga video y audio, reclama drops de Twitch, mira series en compañía y bloquea anuncios sin instalar extensiones. Gratis, para Windows y Android." />
+  <meta name="description" content="Naviris: navegador con las herramientas dentro. Descarga vídeo y audio, reclama drops de Twitch, mira series en compañía, busca imágenes con Google Lens y bloquea anuncios sin instalar extensiones. Gratis, para Windows y Android." />
+  <!-- PREVISUALIZACIÓN DEL ENLACE (2026-08-13). Sin og:image, al pegar
+       naviris.site en Discord, WhatsApp, X o Slack salía un enlace pelado: la
+       imagen es obligatoria para que se pinte la tarjeta. Debe ser ABSOLUTA;
+       las rutas relativas no las resuelve ningún bot. La genera
+       build/render-og.js con el isotipo real. -->
+  <link rel="canonical" href="https://naviris.site/" />
+  <meta name="theme-color" content="#08080a" />
+  <meta property="og:site_name" content="Naviris" />
+  <meta property="og:locale" content="es_ES" />
   <meta property="og:title" content="Naviris — El navegador que trabaja por ti" />
-  <meta property="og:description" content="Descargas, drops de Twitch, watch parties y adblock — sin extensiones. Gratis, para Windows y Android." />
+  <meta property="og:description" content="Descargas, drops de Twitch, watch parties, Google Lens y adblock — sin instalar una sola extensión. Gratis, para Windows y Android." />
   <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://naviris.site/" />
+  <meta property="og:image" content="https://naviris.site/assets/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Naviris — el navegador que trae las herramientas dentro" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Naviris — El navegador que trabaja por ti" />
+  <meta name="twitter:description" content="Descargas, drops de Twitch, watch parties, Google Lens y adblock — sin extensiones." />
+  <meta name="twitter:image" content="https://naviris.site/assets/og.png" />
   <link rel="icon" href="./assets/iris-favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,6 +44,12 @@
     a{color:inherit;text-decoration:none}
     .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
     .label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    /* Capturas reales de la app (2026-08-13) */
+    .tiras{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:26px}
+    .tira{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+    .tira img{display:block;width:100%;height:auto}
+    .tira figcaption{padding:14px 18px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+    @media(max-width:760px){.tiras{grid-template-columns:1fr}}
     ::selection{background:rgba(185,140,255,.28)}
     :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:6px}
 
@@ -400,6 +424,28 @@
     </section>
 
     <!-- ===== Rejilla de características ===== -->
+    <!-- ===== Capturas ===== -->
+    <section id="pantallas" style="padding-top:16px">
+      <div class="wrap">
+        <div class="sec-head">
+          <span class="label">Por dentro</span>
+          <h2>Así se ve.</h2>
+        </div>
+        <div class="tiras">
+          <figure class="tira">
+            <img src="./assets/captura-hub.jpg" width="1600" height="900" loading="lazy"
+                 alt="El hub de Naviris: reloj, clima, tendencias, calendario y accesos rápidos en tarjetas" />
+            <figcaption>El hub. Los widgets los colocas tú y la maqueta se adapta a la ventana sin descuadrarse.</figcaption>
+          </figure>
+          <figure class="tira">
+            <img src="./assets/captura-addons.jpg" width="1600" height="900" loading="lazy"
+                 alt="Catálogo de addons de Naviris con Minireproductor, Sound Booster y Watch Party" />
+            <figcaption>El catálogo de addons. Crece sin que tengas que actualizar el navegador.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
     <section id="features">
       <div class="wrap">
         <div class="sec-head">
@@ -421,6 +467,21 @@
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
             <h3>Watch Party</h3>
             <p>Salas sincronizadas en Crunchyroll, Netflix, Disney+ y YouTube.</p>
+          </div>
+          <div class="card hl">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><circle cx="11" cy="11" r="2.6"/></svg></div>
+            <h3>Google Lens</h3>
+            <p>Clic derecho en cualquier imagen y búscala. Como en Chrome, sin Chrome.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
+            <h3>Tu bandeja en el hub</h3>
+            <p>Los correos sin leer de Gmail, con remitente y asunto, en una tarjeta.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4.5v10.2a3 3 0 1 1-2-2.83V7.6l-6 1.3v7.9a3 3 0 1 1-2-2.83V6.3z"/></svg></div>
+            <h3>Spotify al lado</h3>
+            <p>Panel propio que sigue sonando, con lo que viene después y su volumen.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
@@ -449,13 +510,13 @@
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
-            <h3>Hub personalizable</h3>
-            <p>Widgets, fondos y accesos a tu gusto.</p>
+            <h3>Hub que se adapta</h3>
+            <p>Veinte widgets, fondos y temas. Cambia el tamaño de la ventana y tu maqueta sigue intacta.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
             <h3>Ligero</h3>
-            <p>La mitad de RAM. Duerme las pestañas que no usas.</p>
+            <p>Duerme las pestañas que no usas, y las que abres de fondo ni siquiera cargan: nada se pone a sonar solo.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
