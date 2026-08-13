@@ -1788,7 +1788,9 @@ const SP_LEE = `(() => {
   const b = document.querySelector('[data-testid="control-button-playpause"]');
   const on = (m && m.playbackState === 'playing') || !!(b && /pausa|pause/i.test(b.getAttribute('aria-label') || ''));
   const art = md && md.artwork && md.artwork.length ? md.artwork[md.artwork.length - 1].src : '';
-  return { t: md ? md.title : '', a: md ? md.artist : '', art, on };
+  const vb = document.querySelector('[data-testid="volume-bar"] input[type=range]');
+  const vol = vb ? Math.round((parseFloat(vb.value) / (parseFloat(vb.max) || 1)) * 100) : null;
+  return { t: md ? md.title : '', a: md ? md.artist : '', art, on, vol };
 })()`;
 const SP_SEL = {
   play: ['[data-testid="control-button-playpause"]', 'button[aria-label*="Pausar"]', 'button[aria-label*="Pause"]', 'button[aria-label*="Reproducir"]', 'button[aria-label*="Play"]'],
@@ -1845,6 +1847,13 @@ function ensureSpotifyPlayer() {
   const usando = () => { spUltimoUso = Date.now(); };
   wv.addEventListener('focus', usando);
   wv.addEventListener('did-navigate', usando);
+  /* Al abrir una lista o un album, el widget tiene que ENTERARSE. Antes solo
+     se leia al pintar el widget: si abrias la lista despues, se quedaba con
+     "abre un album o una lista" para siempre. Aqui solo se marca sucia; el
+     repaso de cada 3 s hace la lectura. */
+  const cambio = () => { spListaSucia = true; };
+  wv.addEventListener('did-navigate', cambio);
+  wv.addEventListener('did-navigate-in-page', cambio);
   wv.src = 'https://open.spotify.com';
   document.getElementById('sp-holder').appendChild(wv);
   spPlayerWv = wv;
@@ -1916,7 +1925,7 @@ let spTimer = null;
    seria cortarte la musica. */
 const SP_DORMIR_MS = 15000;
 const SP_GRACIA_MS = 60000;   // margen desde el último uso: cerrar el panel no es dejar de usarlo
-let spPausaDesde = 0, spDormido = false, spUrlDormida = '', spUltimoUso = 0;
+let spPausaDesde = 0, spDormido = false, spUrlDormida = '', spUltimoUso = 0, spListaSucia = false, spTicks = 0;
 function spDuerme() {
   if (spDormido || !spPlayerWv) return;
   try { spUrlDormida = spPlayerWv.getURL() || 'https://open.spotify.com'; } catch { spUrlDormida = 'https://open.spotify.com'; }
@@ -1969,8 +1978,17 @@ async function actualizaSpotify() {
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
   if (tab) els.sbSpotify.classList.remove('hidden');
   cuerpos.forEach((el) => pintaSpotify(el, st, !!tab));
+  // Relectura de la lista: al navegar por Spotify, y de todos modos cada 15 s
+  // como red de seguridad (su reproductor no avisa de todo lo que cambia).
+  spTicks++;
+  if (tab && !spDormido && (spListaSucia || spTicks % 5 === 0)) {
+    spListaSucia = false;
+    cuerpos.forEach((el) => llenaListas(el));
+  }
 }
 function pintaSpotify(el, st, hayTab) {
+  const sl = el.querySelector('.sp-vol-sl');
+  if (sl && st && st.vol != null && !sl.dataset.tocando) sl.value = String(st.vol);
   const img = el.querySelector('.sp-art img'), tit = el.querySelector('.sp-tit'), sub = el.querySelector('.sp-sub');
   const abre = el.querySelector('.sp-abre'), play = el.querySelector('.sp-play');
   const hay = !!(st && st.t);
@@ -2002,8 +2020,8 @@ function renderSpotify(body) {
         <div class="sp-ctr">
           <button class="sp-b" data-cmd="prev" title="Anterior" disabled>${window.icon('skip-back')}</button>
           <button class="sp-b" data-cmd="next" title="Siguiente" disabled>${window.icon('skip-forward')}</button>
-          <button class="sp-b sp-vol" data-vol="-0.1" title="Bajar volumen">${window.icon('speaker-x-mark')}</button>
-          <button class="sp-b sp-vol" data-vol="0.1" title="Subir volumen">${window.icon('speaker-wave')}</button>
+          <span class="sp-vol-ic" title="Volumen">${window.icon('speaker-wave')}</span>
+          <input type="range" class="sp-vol-sl" min="0" max="100" value="70" title="Volumen" />
           <button class="sp-abre">Abrir Spotify</button>
         </div>
       </div>
@@ -2025,13 +2043,18 @@ function renderSpotify(body) {
   // música sobrevive a la navegación y el botón del dock queda en el sidebar.
   body.querySelector('.sp-abre').addEventListener('click', (e) => { e.stopPropagation(); toggleSpotifyPanel(true); setTimeout(() => llenaListas(body), 5000); });
   body.querySelector('.spl-rf').addEventListener('click', (e) => { e.stopPropagation(); llenaListas(body); });
-  body.querySelectorAll('.sp-vol').forEach((b) => b.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const t = spTab(); if (!t) { toast('Abre Spotify para controlar el volumen'); return; }
-    t.webview.executeJavaScript(SPL_VOL(+b.dataset.vol), true)
-      .then((v) => toast(v == null ? 'Spotify no muestra su barra de volumen ahora mismo' : `Volumen ${v}%`))
-      .catch(() => {});
-  }));
+  const desliz = body.querySelector('.sp-vol-sl');
+  if (desliz) {
+    // Mientras lo arrastras, el repaso de cada 3 s NO debe pisarte el valor.
+    const marca = () => { desliz.dataset.tocando = '1'; clearTimeout(desliz._t); desliz._t = setTimeout(() => { delete desliz.dataset.tocando; }, 1200); };
+    ['pointerdown', 'input'].forEach((ev) => desliz.addEventListener(ev, marca));
+    desliz.addEventListener('click', (e) => e.stopPropagation());
+    desliz.addEventListener('input', () => {
+      const t = spTab(); if (!t) return;
+      t.webview.executeJavaScript(SPL_VOL(+desliz.value), true).catch(() => {});
+      spUltimoUso = Date.now();
+    });
+  }
   clearInterval(spTimer); spTimer = setInterval(actualizaSpotify, 3000);
   actualizaSpotify();
   llenaListas(body);
@@ -2047,7 +2070,9 @@ async function llenaListas(body) {
   if (rotulo) rotulo.textContent = r && r.fuente === 'cola' ? 'A continuación'
     : r && r.fuente === 'biblioteca' ? 'Tu biblioteca' : 'Lista abierta';
   cont.innerHTML = items.map((l) => `<button class="spl-i" data-i="${l.i}" data-h="${escapeHtml(l.h || '')}"><span class="spl-t">${escapeHtml(l.t)}</span>${l.sub ? `<span class="spl-sub">${escapeHtml(l.sub)}</span>` : ''}${window.icon('play')}</button>`).join('') ||
-    '<div class="w-vacio">Abre un álbum o una lista en Spotify y aparecerán sus canciones</div>';
+    (r && r.fuente === 'ilegible'
+      ? '<div class="w-vacio">Tienes una lista abierta pero no pude leer sus canciones — pulsa actualizar</div>'
+      : '<div class="w-vacio">Abre un álbum o una lista en Spotify y aparecerán sus canciones</div>');
   cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
     if (spDormido) { spDespierta(true); return; }
@@ -2168,7 +2193,7 @@ const SPL_LEE = `(() => {
     return t ? { t, sub: sub === t ? '' : sub, i } : null;
   }).filter(Boolean);
 
-  const filas = document.querySelectorAll('[data-testid="tracklist-row"]');
+  const filas = document.querySelectorAll('[data-testid="tracklist-row"], [data-testid="playlist-tracklist"] [role="row"], [data-testid="track-list"] [role="row"]');
   if (filas.length) return { fuente: 'lista', items: deFilas(filas) };
   const cola = document.querySelectorAll('[aria-label*="ola"] [data-testid="tracklist-row"], [data-testid="queue"] li');
   if (cola.length) return { fuente: 'cola', items: deFilas(cola) };
@@ -2187,7 +2212,11 @@ const SPL_LEE = `(() => {
     });
     if (out.length) return { fuente: 'biblioteca', items: out.slice(0, 12) };
   }
-  return { fuente: 'nada', items: [] };
+  // Si estas DENTRO de una lista y aun asi no se saco nada, no es que no haya
+  // lista: es que no supimos leerla. Se dice distinto para no mandar a Dosa a
+  // abrir algo que ya tiene abierto.
+  const dentro = /\\/(playlist|album|artist|collection)\\//.test(location.pathname);
+  return { fuente: dentro ? 'ilegible' : 'nada', items: [] };
 })()`;
 /* Reproducir la pista N de esa misma lista: Spotify no expone enlace de
    reproduccion, asi que se pulsa el boton de play de la fila y, si no lo
@@ -2204,12 +2233,16 @@ const SPL_TOCA = (i) => `(() => {
 /* VOLUMEN (peticion de Dosa): se mueve la barra del propio Spotify, asi el
    cambio se ve en su interfaz y sobrevive a los cambios de cancion. React
    ignora un value asignado a pelo: hay que usar el setter nativo y avisar. */
-const SPL_VOL = (paso) => `(() => {
+/* VOLUMEN. Se mueve la barra del propio Spotify (asi el cambio se ve en su
+   interfaz y sobrevive al cambio de cancion). React ignora un value asignado a
+   pelo: hay que usar el setter nativo y avisar con input/change. El deslizador
+   manda un porcentaje ABSOLUTO, no pasos. */
+const SPL_VOL = (pct) => `(() => {
   const inp = document.querySelector('[data-testid="volume-bar"] input[type=range]');
   if (!inp) return null;
   const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-  const max = parseFloat(inp.max || '1');
-  const v = Math.max(0, Math.min(max, parseFloat(inp.value) + (${paso}) * max));
+  const max = parseFloat(inp.max) || 1;
+  const v = Math.max(0, Math.min(max, (${pct} / 100) * max));
   set.call(inp, String(v));
   inp.dispatchEvent(new Event('input', { bubbles: true }));
   inp.dispatchEvent(new Event('change', { bubbles: true }));
