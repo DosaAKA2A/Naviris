@@ -1836,6 +1836,15 @@ function ensureSpotifyPlayer() {
     wv.insertCSS('::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}').catch(() => {});
     aplicaSpAncho(spAncho());
   });
+  /* Señales de que lo estás USANDO. Solo marcan la HORA del último uso: si
+     además reiniciaban la cuenta atrás no se dormía jamás, porque el propio
+     Spotify dispara navegaciones internas solo. Tampoco se escucha
+     did-navigate-in-page por lo mismo — y no hace falta: para navegar por
+     Spotify tienes que tener el panel abierto, y con el panel abierto no se
+     duerme nunca. */
+  const usando = () => { spUltimoUso = Date.now(); };
+  wv.addEventListener('focus', usando);
+  wv.addEventListener('did-navigate', usando);
   wv.src = 'https://open.spotify.com';
   document.getElementById('sp-holder').appendChild(wv);
   spPlayerWv = wv;
@@ -1864,7 +1873,7 @@ function armaSpGrip() {
 function toggleSpotifyPanel(force) {
   const panel = document.getElementById('sp-panel');
   const abrir = force !== undefined ? force : panel.classList.contains('hidden');
-  if (abrir) { ensureSpotifyPlayer(); spDespierta(false); aplicaSpAncho(spAncho()); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
+  if (abrir) { spUltimoUso = Date.now(); ensureSpotifyPlayer(); spDespierta(false); aplicaSpAncho(spAncho()); panel.classList.remove('hidden'); els.sbSpotify.classList.add('open'); }
   else { panel.classList.add('hidden'); els.sbSpotify.classList.remove('open'); }
   actualizaSpotifyVivo();
 }
@@ -1892,6 +1901,7 @@ document.getElementById('sp-p-x').addEventListener('click', () => toggleSpotifyP
   try { if (await window.cobalt.spotifyLogged()) els.sbSpotify.classList.remove('hidden'); } catch { /* sin IPC: se queda oculto */ }
 })();
 function spCmd(cmd) {
+  spUltimoUso = Date.now();
   const tab = spTab(); if (!tab) return;
   const sels = JSON.stringify(SP_SEL[cmd]);
   tab.webview.executeJavaScript(`(function(){ for (const s of ${sels}) { const b = document.querySelector(s); if (b) { b.click(); return; } } })()`, true).catch(() => {});
@@ -1905,7 +1915,8 @@ let spTimer = null;
    play, abres el panel o eliges una cancion. No se duerme nunca sonando, que
    seria cortarte la musica. */
 const SP_DORMIR_MS = 15000;
-let spPausaDesde = 0, spDormido = false, spUrlDormida = '';
+const SP_GRACIA_MS = 60000;   // margen desde el último uso: cerrar el panel no es dejar de usarlo
+let spPausaDesde = 0, spDormido = false, spUrlDormida = '', spUltimoUso = 0;
 function spDuerme() {
   if (spDormido || !spPlayerWv) return;
   try { spUrlDormida = spPlayerWv.getURL() || 'https://open.spotify.com'; } catch { spUrlDormida = 'https://open.spotify.com'; }
@@ -1941,10 +1952,18 @@ async function actualizaSpotify() {
   // paso, un reproductor abierto sin nada cargado tambien se duerme: es un
   // proceso entero gastado en enseniar una portada.
   const sonando = !!(st && st.on && st.t);
+  /* CUANDO PUEDE DORMIRSE (corregido 2026-08-13). La primera version solo
+     miraba si sonaba algo, y se moria en las narices de Dosa mientras elegia
+     musica: navegar por Spotify no es reproducir. Ahora hacen falta TRES
+     cosas: que no suene nada, que el panel este CERRADO (con el abierto lo
+     estas mirando) y que hayan pasado 60 s desde el ultimo uso — cerrar el
+     panel no es dejar de usarlo. */
+  const panel = document.getElementById('sp-panel');
+  const mirando = panel && !panel.classList.contains('hidden');
   if (spPlayerWv && !spDormido) {
-    if (sonando) spPausaDesde = 0;
+    if (sonando || mirando) spPausaDesde = 0;
     else if (!spPausaDesde) spPausaDesde = Date.now();
-    else if (Date.now() - spPausaDesde > SP_DORMIR_MS) spDuerme();
+    else if (Date.now() - spPausaDesde > SP_DORMIR_MS && Date.now() - spUltimoUso > SP_GRACIA_MS) spDuerme();
   }
   // Usar Spotify en pestaña también revela el dock (además de la cookie de
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
@@ -4754,6 +4773,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
    arrastrar. Solo anima transform/opacity (regla de rendimiento del proyecto).
    Se auto-aplica a lo que scrollee y se re-mide con ResizeObserver. */
 (function scrollPropio() {
+  const MARGEN = 12;     // px que el pulgar NUNCA invade arriba y abajo
   const OCULTAR = 900;   // ms sin rodar -> el pulgar vuelve a su grosor
   const DESVANECER = 1400; // ms sin rodar -> la barra se va
   const puestos = new WeakSet();
@@ -4775,8 +4795,13 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
       if (total <= alto + 1) { bar.classList.remove('visible'); return; }
       bar.style.height = alto + 'px';
       bar.style.top = host.scrollTop + 'px'; // la barra viaja con el contenido
-      const h = Math.max(28, Math.round(alto * alto / total));
-      const y = Math.round((alto - h) * (host.scrollTop / (total - alto)));
+      /* El pulgar NO llega a los extremos (2026-08-13). Al tocar techo o suelo
+         quedaba pegado al canto del contenedor —y contra su esquina redondeada—
+         y se veia como un pegote. Se le reserva un margen arriba y abajo, y el
+         recorrido se reparte dentro de ese hueco. */
+      const util = Math.max(40, alto - MARGEN * 2);
+      const h = Math.max(28, Math.round(util * alto / total));
+      const y = MARGEN + Math.round((util - h) * (host.scrollTop / (total - alto)));
       thumb.style.height = h + 'px';
       thumb.style.top = y + 'px';
     };
@@ -4803,7 +4828,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
       if (!arrastre) return;
       const alto = host.clientHeight, total = host.scrollHeight;
       const h = thumb.offsetHeight;
-      const recorrido = alto - h;
+      const recorrido = Math.max(40, alto - MARGEN * 2) - h;   // el mismo hueco que usa medir()
       if (recorrido <= 0) return;
       host.scrollTop = arrastre.top0 + (e.clientY - arrastre.y0) * ((total - alto) / recorrido);
     });
