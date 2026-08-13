@@ -104,9 +104,10 @@
     /* ===== Mockup del navegador: panel recostado hacia atrás, centrado ===== */
     .stage{perspective:1700px;perspective-origin:50% 0%;width:min(880px,100%)}
     /* OJO nitidez: nada de scale() aquí — ampliar el rasterizado emborrona el texto. */
-    .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10.6;
+    .mock{position:relative;border-radius:15px;background:#0a0a0c;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/9;
       transform:rotateX(16deg);will-change:transform;backface-visibility:hidden;
       box-shadow:0 46px 84px rgba(0,0,0,.62),0 2px 0 rgba(255,255,255,.04)}
+    .mock img{display:block;width:100%;height:100%;object-fit:cover}
     .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
     .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
@@ -247,7 +248,7 @@
     @media (max-width:560px){
       .grid{grid-template-columns:1fr}
       /* El interior del mockup no cabe en 16/10.6 a este ancho: más alto y compacto */
-      .mock{aspect-ratio:5/4}
+      .mock{aspect-ratio:16/9}
       .m-clock{font-size:32px}
       .m-tiles{grid-template-columns:repeat(4,44px)}
       .m-tile:nth-child(n+5){display:none}
@@ -313,34 +314,13 @@
       </div>
 
       <div class="stage">
-      <div class="mock" aria-label="Vista previa de Naviris">
-        <div class="m-bar">
-          <div class="m-tab farm"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg>Canal en farmeo</div>
-          <div class="m-tab"><span class="tdot"></span>Nueva pestaña</div>
-        </div>
-        <div class="m-nav">
-          <span>←</span><span>→</span><span>↻</span>
-          <div class="m-url">Busca en Google o escribe una dirección</div>
-        </div>
-        <div class="m-side">
-          <i class="on"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></i>
-          <i><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></i>
-          <i><svg viewBox="0 0 489 489" fill="currentColor"><use href="#icoDownload"/></svg></i>
-          <i><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></i>
-        </div>
-        <div class="m-body">
-          <div class="m-clock" id="mockclock">21:47</div>
-          <div class="m-greet">Buenas tardes — listo para navegar</div>
-          <div class="m-search">Buscar en Google</div>
-          <div class="m-tiles">
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></div>
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg></div>
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.055c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418Z"/></svg></div>
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 3.314 1.343 6.314 3.515 8.485l-2.286 2.286C.775 23.225 1.097 24 1.738 24H12c6.627 0 12-5.373 12-12S18.627 0 12 0Zm4.388 3.199c1.104 0 1.999.895 1.999 1.999s-.895 2-1.999 2c-.946 0-1.739-.657-1.947-1.539-1.147.162-2.032 1.15-2.032 2.348 1.776.067 3.4.567 4.686 1.363.473-.363 1.064-.58 1.707-.58 1.547 0 2.802 1.254 2.802 2.802 0 1.117-.655 2.081-1.601 2.531-.088 2.256-2.786 4.071-6.106 4.071-3.319 0-6.017-1.815-6.105-4.071-.947-.45-1.602-1.414-1.602-2.531 0-1.548 1.255-2.802 2.802-2.802.643 0 1.234.217 1.707.58 1.297-.803 3.079-1.303 5.053-1.357.184-2.19 2.024-3.917 4.258-3.917Z"/></svg></div>
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></div>
-            <div class="m-tile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg></div>
-          </div>
-        </div>
+      <!-- CAPTURA REAL (2026-08-13). Aquí había una maqueta dibujada a mano en
+           CSS que enseñaba un hub que ya no existe: reloj gigante, buscador y
+           seis accesos. La app hace tiempo que es un bento de widgets, así que
+           una maqueta a mano solo puede envejecer mal — ahora va la captura de
+           verdad, y se actualiza volviendo a capturar. -->
+      <div class="mock">
+        <img src="./assets/captura-hub.jpg" width="1600" height="900" alt="Naviris abierto en su hub: buscador, accesos, clima, tendencias, calendario y más widgets" />
       </div>
       </div>
     </div>
@@ -625,12 +605,8 @@
   </footer>
 
   <script>
-    // Reloj del mockup
-    (function(){
-      const c=document.getElementById('mockclock');
-      const t=()=>{c.textContent=new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});};
-      t();setInterval(t,10000);
-    })();
+    // (El reloj del mockup se retiró con la maqueta dibujada a mano: ahora el
+    //  hero es una captura real y no hay nada que poner en hora.)
 
     // Descarga: los botones principales apuntan SIEMPRE a la última ESTABLE.
     // Las versiones de desarrollo (prereleases -dev) nunca se ofrecen aquí: se
