@@ -1926,18 +1926,14 @@ let spTimer = null;
    about:blank y se libera; la URL queda guardada y vuelve sola en cuanto pulsas
    play, abres el panel o eliges una cancion. No se duerme nunca sonando, que
    seria cortarte la musica. */
-/* DESACTIVADO (2026-08-13). A Dosa se le cerraba la sesión de Spotify y SOLO
-   la de Spotify: comprobado en disco que falta su cookie de sesión (sp_dc)
-   mientras las de X y YouTube siguen ahí y persistentes. Se descartó una por
-   una: no hay nada en Naviris que borre cookies salvo el botón manual de
-   borrar datos del sitio, el adblock no inyecta scriptlets en Spotify y no hay
-   ningún addon suyo instalado. Lo único específico de Spotify que hacíamos era
-   ESTO: mandar su página a about:blank para liberar memoria. Al destruir la
-   página viva, su reproductor puede cerrar sesión al descargarse.
-   Se apaga hasta confirmar. Cuesta memoria, pero una sesión que se cae vale
-   más que unos MB. Para reactivarlo, poner SP_DORMIR_MS a 15000. */
-const SP_DORMIR_MS = 0;
-const SP_GRACIA_MS = 60000;   // margen desde el último uso: cerrar el panel no es dejar de usarlo
+/* REACTIVADO (2026-08-13). Estuvo apagado mientras se buscaba por qué se
+   cerraba la sesión de Spotify: resultó no tener nada que ver — sp_dc es una
+   cookie DE SESIÓN y Chromium la tiraba al salir (arreglado en main.js,
+   conservaSesiones). Con el culpable encontrado, vuelve el ahorro, pero con
+   más margen: cinco minutos en pausa en vez de quince segundos. Liberar
+   cientos de MB merece la pena; hacerlo con prisa, no. */
+const SP_DORMIR_MS = 5 * 60 * 1000;
+const SP_GRACIA_MS = 5 * 60 * 1000;   // margen desde el último uso: cerrar el panel no es dejar de usarlo
 let spPausaDesde = 0, spDormido = false, spUrlDormida = '', spUltimoUso = 0, spListaSucia = false, spTicks = 0;
 function spDuerme() {
   if (spDormido || !spPlayerWv) return;
