@@ -1653,9 +1653,30 @@ autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', me
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { state: 'dev' };
   applyUpdateChannel(); // el ajuste puede haber cambiado sin reiniciar
+  // Una comprobación normal vuelve a mirar TODAS las releases: si antes se
+  // eligió una línea, el feed quedó clavado en aquel tag y aquí no vale.
+  autoUpdater.setFeedURL({ provider: 'github', owner: 'DosaAKA2A', repo: 'Naviris', releaseType: 'prerelease' });
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
+/* Comparador de versiones propio (2.7.5-dev.3 → [2,7,5,0,3]). El cuarto número
+   pone la estable por delante de sus propias dev: 2.7.5 gana a 2.7.5-dev.9. */
+function trozosVersion(v) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(?:-[A-Za-z]+\.?(\d+))?$/.exec(String(v || ''));
+  if (!m) return null;
+  const pre = m[4] !== undefined;
+  return [+m[1], +m[2], +m[3], pre ? 0 : 1, pre ? +m[4] : 0];
+}
+function esMasNueva(a, b) {
+  const x = trozosVersion(a), y = trozosVersion(b);
+  if (!x) return false;
+  if (!y) return true;
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+}
+// Lo último que el selector le enseñó al usuario, con su tag, para instalar
+// EXACTAMENTE eso y no lo que el actualizador decida por su cuenta.
+let lineasVistas = { stable: null, dev: null };
 // Las DOS líneas oficiales (Naviris estable y NavirisDev) tal y como están
 // publicadas ahora mismo, para que el usuario elija desde cualquier versión.
 ipcMain.handle('update:channels', async () => {
@@ -1666,7 +1687,7 @@ ipcMain.handle('update:channels', async () => {
       const names = (r.assets || []).map((a) => a.name);
       if (!names.some((n) => /Setup.*\.exe$/i.test(n))) return null;
       if (!names.includes(dev ? 'dev.yml' : 'latest.yml')) return null; // sin feed, el updater no podría instalarla
-      return { version: String(r.tag_name || '').replace(/^v/, '') };
+      return { version: String(r.tag_name || '').replace(/^v/, ''), tag: String(r.tag_name || '') };
     };
     /* LA ESTABLE, POR SU PROPIO ENDPOINT (2026-08-13). Antes se pedía la LISTA
        y se buscaba dentro, pero la API pagina de 30 en 30 y con tantas
@@ -1676,18 +1697,24 @@ ipcMain.handle('update:channels', async () => {
        /releases/latest devuelve justo la última NO prerelease. */
     const [rEst, rLista] = await Promise.all([
       fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases/latest', cab),
-      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=15', cab)
+      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=30', cab)
     ]);
     const estable = rEst.ok ? sirve(await rEst.json(), false) : null;
+    /* LA DEV, POR VERSIÓN MÁS ALTA, NUNCA POR ORDEN DE LISTA (2026-08-13).
+       La lista de releases de GitHub NO viene ordenada por fecha: con la 2.7.4
+       recién publicada, la API devolvía la dev.11 y la dev.10 por DEBAJO de la
+       dev.2, así que "la primera prerelease" era la dev.9 — el selector ofrecía
+       una dev vieja y las dos últimas no había forma de bajarlas. */
     let dev = null;
     if (rLista.ok) {
       for (const r of await rLista.json()) {
         if (!r.prerelease) continue;
-        dev = sirve(r, true);
-        if (dev) break;
+        const c = sirve(r, true);
+        if (c && (!dev || esMasNueva(c.version, dev.version))) dev = c;
       }
     }
     if (!estable && !dev) throw new Error('GitHub no devolvió ninguna versión instalable');
+    lineasVistas = { stable: estable, dev };
     return { ok: true, current: app.getVersion(), stable: estable, dev };
   } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; }
 });
@@ -1698,7 +1725,21 @@ ipcMain.handle('update:choose', async (_e, line) => {
   const dev = line === 'dev';
   autoUpdater.channel = dev ? 'dev' : 'latest';
   autoUpdater.allowPrerelease = dev;
-  autoUpdater.allowDowngrade = true;
+  /* SE INSTALA LO QUE SE ENSEÑÓ, NO LO QUE EL ACTUALIZADOR ENCUENTRE. Con el
+     proveedor de GitHub, electron-updater vuelve a buscar por su cuenta cuál
+     es la última release (por el feed atom) y esa búsqueda puede no coincidir
+     con la versión que el selector acaba de mostrar. Apuntando el feed a la
+     carpeta de descargas de ESE tag, lo que se baja es esa versión y ninguna
+     otra: si el botón dice 2.7.5-dev.1, se instala 2.7.5-dev.1. */
+  const elegida = lineasVistas[dev ? 'dev' : 'stable'];
+  if (elegida && elegida.tag) {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: 'https://github.com/DosaAKA2A/Naviris/releases/download/' + encodeURIComponent(elegida.tag) + '/',
+      channel: dev ? 'dev' : 'latest'
+    });
+  }
+  autoUpdater.allowDowngrade = true; // va DESPUÉS: el setter de channel lo toca
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
