@@ -577,49 +577,50 @@
     (async function(){
       const REPO='DosaAKA2A/Naviris';
       const fallback='https://github.com/'+REPO+'/releases/latest';
-      const esEstable=r=>!r.draft && !r.prerelease && !/-dev/i.test(r.tag_name||'');
+      const pon=(id,href)=>{const e=document.getElementById(id); if(e&&href) e.href=href;};
+      const txt=(id,v)=>{const e=document.getElementById(id); if(e&&v) e.textContent=v;};
+      const gh=u=>fetch(u,{headers:{'Accept':'application/vnd.github+json'}});
       try{
-        const rr=await fetch('https://api.github.com/repos/'+REPO+'/releases',{headers:{'Accept':'application/vnd.github+json'}});
-        if(!rr.ok) throw 0;
-        const rels=await rr.json();
-        for(const rel of rels){
-          if(!esEstable(rel)) continue;
+        /* LA ESTABLE, POR SU PROPIO ENDPOINT. Antes se pedía la LISTA de
+           releases y se buscaba a mano la primera estable — pero la API
+           devuelve 30 por página y, con tantas versiones de desarrollo por
+           medio, la estable había quedado en el puesto 47: no se encontraba
+           nunca y el botón acababa mandando a la página de GitHub en vez de
+           bajar el instalador. /releases/latest devuelve justo la última NO
+           prerelease, sin paginar y sin buscar. */
+        const r=await gh('https://api.github.com/repos/'+REPO+'/releases/latest');
+        if(r.ok){
+          const rel=await r.json();
           const setup=(rel.assets||[]).find(a=>/setup.*\.exe$/i.test(a.name));
-          if(!setup) continue;
           const portable=(rel.assets||[]).find(a=>/\.exe$/i.test(a.name) && !/setup/i.test(a.name));
-          document.getElementById('dl-main').href=setup.browser_download_url;
-          document.getElementById('dl-hero').href=setup.browser_download_url;
-          if(portable) document.getElementById('dl-portable').href=portable.browser_download_url;
-          const mb=Math.round(setup.size/1048576); if(mb) document.getElementById('size-main').textContent='~'+mb+' MB';
-          document.getElementById('ver-main').textContent=rel.tag_name||'';
-          document.getElementById('ver-hero').textContent=rel.tag_name||'Última versión';
-          break;
-        }
-        // El APK sale de la estable más reciente que lo tenga
-        for(const rel of rels){
-          if(!esEstable(rel)) continue;
           const apk=(rel.assets||[]).find(a=>/\.apk$/i.test(a.name));
-          if(apk){
-            document.getElementById('dl-android').href=apk.browser_download_url;
-            document.getElementById('dl-apk').href=apk.browser_download_url;
+          if(setup){
+            pon('dl-main',setup.browser_download_url);
+            pon('dl-hero',setup.browser_download_url);
+            const mb=Math.round(setup.size/1048576); if(mb) txt('size-main','~'+mb+' MB');
+          }
+          if(portable) pon('dl-portable',portable.browser_download_url);
+          if(apk){ pon('dl-android',apk.browser_download_url); pon('dl-apk',apk.browser_download_url); }
+          txt('ver-main',rel.tag_name||'');
+          txt('ver-hero',rel.tag_name||'Última versión');
+        }
+        /* La línea de desarrollo va aparte y con su aviso: nunca se ofrece como
+           descarga principal. Basta con mirar las últimas releases. */
+        const rr=await gh('https://api.github.com/repos/'+REPO+'/releases?per_page=10');
+        if(rr.ok){
+          for(const rel of await rr.json()){
+            if(!(rel.prerelease||/-dev/i.test(rel.tag_name||''))) continue;
+            const setup=(rel.assets||[]).find(a=>/setup.*\.exe$/i.test(a.name));
+            if(!setup) continue;
+            pon('dl-dev',setup.browser_download_url);
+            txt('ver-dev',rel.tag_name||'');
+            const linea=document.getElementById('dev-line'); if(linea) linea.hidden=false;
             break;
           }
         }
-        // Línea aparte para quien quiera la de desarrollo, con su aviso
-        for(const rel of rels){
-          if(!(rel.prerelease||/-dev/i.test(rel.tag_name||''))) continue;
-          const setup=(rel.assets||[]).find(a=>/setup.*\.exe$/i.test(a.name));
-          if(!setup) continue;
-          document.getElementById('dl-dev').href=setup.browser_download_url;
-          document.getElementById('ver-dev').textContent=rel.tag_name||'';
-          document.getElementById('dev-line').hidden=false;
-          break;
-        }
       }catch(e){
-        document.getElementById('dl-main').href=fallback;
-        document.getElementById('dl-hero').href=fallback;
-        document.getElementById('dl-portable').href=fallback;
-        document.getElementById('dl-android').href='https://github.com/'+REPO+'/releases';
+        pon('dl-main',fallback); pon('dl-hero',fallback); pon('dl-portable',fallback);
+        pon('dl-android','https://github.com/'+REPO+'/releases');
       }
     })();
   </script>
