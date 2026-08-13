@@ -452,7 +452,13 @@ button { font-family: inherit; }
 .sb-btn:active { transform: scale(.94); }
 /* Estado abierto = squircle relleno con el degradado de realce e icono en
    blanco, como el riel de la referencia. El squircle ES el indicador. */
-.sb-btn.open { background: var(--grad-realce); color: var(--grad-fg); }
+".sb-btn.open { background: var(--grad-realce); color: var(--grad-fg); }
+/* Spotify en el sidebar: encendido en el color del tema mientras SUENA algo,
+   y apagado cuando el reproductor se ha dormido. En pausa se queda normal. */
+#sb-spotify.sonando { color: var(--realce); }
+#sb-spotify.sonando::after { content: ''; position: absolute; right: 6px; top: 8px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--realce); }
+#sb-spotify.dormido { opacity: .38; }
 .sb-btn.accent { color: #b98266; }
 .sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }

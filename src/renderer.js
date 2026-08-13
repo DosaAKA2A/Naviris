@@ -1942,6 +1942,7 @@ function spDuerme() {
   spDormido = true;
   try { spPlayerWv.src = 'about:blank'; } catch { /* nada */ }
   document.querySelectorAll('.w-sp').forEach((el) => el.classList.add('sp-dormido'));
+  els.sbSpotify?.classList.add('dormido'); els.sbSpotify?.classList.remove('sonando');
 }
 /* Despertar: se restaura la pagina y, si se pidio reproducir, se pulsa play en
    cuanto carga (Spotify recupera solo la cancion donde la dejaste). */
@@ -1950,6 +1951,7 @@ function spDespierta(conPlay) {
   if (!spDormido) { if (conPlay) spCmd('play'); return; }
   spDormido = false; spPausaDesde = 0;
   document.querySelectorAll('.w-sp').forEach((el) => el.classList.remove('sp-dormido'));
+  els.sbSpotify?.classList.remove('dormido');
   const alCargar = () => {
     spPlayerWv.removeEventListener('dom-ready', alCargar);
     if (conPlay) setTimeout(() => spCmd('play'), 1800);
@@ -1987,6 +1989,15 @@ async function actualizaSpotify() {
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
   if (tab) els.sbSpotify.classList.remove('hidden');
   cuerpos.forEach((el) => pintaSpotify(el, st, !!tab));
+  /* El botón del sidebar cuenta lo que pasa (2026-08-13): VERDE mientras suena
+     algo, apagado cuando el reproductor está dormido, y normal en pausa. */
+  if (els.sbSpotify) {
+    els.sbSpotify.classList.toggle('sonando', !!(st && st.on && st.t) && !spDormido);
+    els.sbSpotify.classList.toggle('dormido', spDormido);
+    els.sbSpotify.title = spDormido ? 'Spotify — dormido, pulsa para volver'
+      : (st && st.on && st.t) ? 'Spotify — sonando: ' + st.t
+      : 'Spotify — tu música mientras navegas';
+  }
   // Relectura de la lista: al navegar por Spotify, y de todos modos cada 15 s
   // como red de seguridad (su reproductor no avisa de todo lo que cambia).
   spTicks++;
@@ -2311,11 +2322,31 @@ const XT_LEE = `(() => {
 })()`;
 // x.com/explore con TU sesion: tendencias "Para ti" (el algoritmo del propio
 // usuario). Sin sesion, X no pinta [data-testid=trend] y caemos a mundiales.
-const XT_LEE_X = `(() => {
+/* ESPERA ACTIVA (2026-08-13). Se leía 1,5 s después de cargar y X todavía no
+   había pintado las tendencias: salían menos de tres y el widget caía a las
+   mundiales. Comprobado con el CDP de Dosa que el webview oculto SÍ entra con
+   su sesión y ve doce — solo hacía falta esperarlas. */
+const XT_LEE_X = `(async () => {
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 14; i++) {
+    if (document.querySelectorAll('[data-testid="trend"]').length >= 3) break;
+    await esperar(700);
+  }
   const out = [];
+  /* En x.com/home las tendencias viven en el módulo lateral "Qué está
+     pasando"; en /explore son la lista principal. Se prueban las dos formas
+     porque el data-testid no siempre está en el mismo sitio. */
+  const modulo = document.querySelector('[aria-label*="endencias"], [aria-label*="rending"]');
+  if (modulo && !document.querySelector('[data-testid="trend"]')) {
+    modulo.querySelectorAll('div[dir="ltr"], span').forEach((e) => {
+      const t = (e.textContent || '').trim();
+      if (t.startsWith('#') && t.length > 1 && !out.includes(t)) out.push(t);
+    });
+    if (out.length >= 3) return out.slice(0, 9);
+    out.length = 0;
+  }
   document.querySelectorAll('[data-testid="trend"]').forEach((t) => {
-    const lineas = (t.innerText || '').split('
-').map((x) => x.trim()).filter(Boolean);
+    const lineas = (t.innerText || '').split('\\n').map((x) => x.trim()).filter(Boolean);
     const tag = lineas.find((l) => l.startsWith('#')) || lineas[1] || lineas[0];
     if (tag && tag.length > 1 && !out.includes(tag)) out.push(tag);
   });
@@ -2325,7 +2356,8 @@ function renderXTrends(body) {
   const pinta = (items, cargando) => {
     const fuente = xtCache.src === 'ti' ? 'Para ti' : 'Mundial';
     const sinSesion = !cargando && xtCache.src !== 'ti';
-    body.innerHTML = `<div class="w-head">${window.brandIcon('x') || window.icon('hash')} Tendencias<span class="xt-chip">${fuente} · X</span></div>` +
+    body.innerHTML = `<div class="w-head">${window.brandIcon('x') || window.icon('hash')} Tendencias<span class="xt-chip">${fuente} · X</span>` +
+      `<button class="wh-btn xt-rf" title="Volver a leer las tendencias">${window.icon('arrow-path')}</button></div>` +
       `<div class="xt-lista">` +
       (cargando ? '<div class="w-vacio">Leyendo tendencias…</div>'
         : (items.map((t, i) => `<button class="xt-i"><span class="xt-n">${i + 1}</span><bdi class="xt-t">${escapeHtml(t)}</bdi>${window.icon('arrow-up-right')}</button>`).join('') ||
@@ -2334,6 +2366,9 @@ function renderXTrends(body) {
       // callarlo hacía pensar que el widget estaba roto.
       (sinSesion ? `<button class="xt-login">Inicia sesión en X para ver las tuyas</button>` : '');
     body.querySelector('.xt-login')?.addEventListener('click', (e) => { e.stopPropagation(); navigateActive('https://x.com/login'); });
+    body.querySelector('.xt-rf')?.addEventListener('click', (e) => {
+      e.stopPropagation(); xtCache = { t: 0, items: [], src: 'mundial' }; renderXTrends(body);
+    });
     body.querySelectorAll('.xt-i').forEach((b, i) => b.addEventListener('click', (e) => {
       e.stopPropagation(); navigateActive('https://x.com/search?q=' + encodeURIComponent(items[i]));
     }));
@@ -2346,7 +2381,12 @@ function renderXTrends(body) {
       });
     });
   };
-  if (xtCache.items.length && Date.now() - xtCache.t < 20 * 60 * 1000) { pinta(xtCache.items); return; }
+  /* La caché duraba 20 min PARA TODO, también para el respaldo mundial: una
+     vez caía ahí seguía enseñando mundiales veinte minutos aunque ya tuvieras
+     X abierto. Ahora lo tuyo se cachea 20 min y el respaldo solo 2, para que
+     vuelva a intentarlo en cuanto haya sesión. */
+  const vida = xtCache.src === 'ti' ? 20 * 60 * 1000 : 2 * 60 * 1000;
+  if (xtCache.items.length && Date.now() - xtCache.t < vida) { pinta(xtCache.items); return; }
   pinta([], true);
   /* De donde salen tus tendencias, por orden (2026-08-13):
      1. TU PESTANA de X. Es la unica que tiene tu sesion de verdad.
@@ -2366,7 +2406,7 @@ function renderXTrends(body) {
   });
   deTuPestana().then((mias) => {
     if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; pinta(mias); return null; }
-    return scrapeOculto('https://x.com/explore', XT_LEE_X).then((tuyas) => {
+    return scrapeOculto('https://x.com/explore', XT_LEE_X, 24000).then((tuyas) => {
       if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; pinta(tuyas); return null; }
       return mundiales();
     });
