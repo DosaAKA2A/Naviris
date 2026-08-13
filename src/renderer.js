@@ -1574,6 +1574,9 @@ function renderHub() {
      forma de subir (overflow hidden). Recomponer = empezar arriba. */
   const scr = els.hub.querySelector('.hub-scroll');
   if (scr && scr.scrollTop) scr.scrollTop = 0;
+  // Los contenedores que scrollean dentro de los widgets acaban de nacer:
+  // se enganchan al scroll propio (nunca la barra del sistema).
+  if (window.nvsRepasa) requestAnimationFrame(window.nvsRepasa);
   // Si al medir de verdad la celda sale distinta (primer render sin layout),
   // se repinta UNA vez con la medida buena.
   if (!renderHub._ajustando) {
@@ -2081,11 +2084,8 @@ async function llenaListas(body) {
     wv.webview.executeJavaScript(SPL_TOCA(+b.dataset.i), true).catch(() => {});
     setTimeout(actualizaSpotify, 600);
   }));
-  // Sin barra de scroll: lo que no cabe se oculta (criterio de Correo y Descargas)
-  requestAnimationFrame(() => {
-    const tope = cont.clientHeight;
-    cont.querySelectorAll('.spl-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope + 2) f.style.display = 'none'; });
-  });
+  // Aquí SÍ hay scroll (con la barra propia de Naviris): un álbum entero no
+  // cabe en la tarjeta y ocultar lo que sobra dejaba media lista invisible.
 }
 
 /* ============ Widget Cuenta (2026-08-11) ============
@@ -4888,8 +4888,12 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
      sistema. Todo lo que scrollee en la interfaz entra en esta lista — los
      menus y popovers se sumaron al limitarlos al alto de la ventana, que es
      cuando empezaron a scrollear. */
-  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
+  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, .spl-lista, .ml-lista, .xt-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
   const barrer = () => document.querySelectorAll(SEL).forEach(montar);
+  /* El hub y sus widgets se pintan DESPUÉS de este repaso inicial, y luego cada
+     vez que se recompone: sin esta puerta, listas como la de Spotify se
+     quedaban con la barra del sistema. renderHub la llama al terminar. */
+  window.nvsRepasa = barrer;
   barrer();
   // Los paneles y páginas se crean al vuelo: se revisan al abrirse
   document.addEventListener('click', () => setTimeout(barrer, 120), true);

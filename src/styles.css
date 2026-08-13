@@ -1386,7 +1386,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-sp { position: relative; background: transparent; backdrop-filter: none; box-shadow: none; padding: 0; display: flex; flex-direction: column; min-height: 118px; height: 100%; overflow: visible; }
 .sp-player { display: flex; align-items: stretch; gap: 14px; height: 96px; flex-shrink: 0; }
 .sp-bib { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 2px 16px 12px; }
-.sp-bib .spl-lista { flex: 1; min-height: 0; overflow: hidden; margin-top: 8px; }
+/* La lista SCROLLEA (2026-08-13): antes se ocultaban las filas que no cabían
+   y no había forma de ver el resto del álbum. Lleva el scroll propio de
+   Naviris — regla del proyecto: ninguna barra del sistema. */
+.sp-bib .spl-lista { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin-top: 8px; }
 
 .w-sp::before { content: ''; position: absolute; inset: 0; z-index: 0; border-radius: 26px; background: var(--hub-card);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.8); backdrop-filter: blur(var(--glass-blur)) saturate(1.8);
@@ -1424,9 +1427,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .sp-abre:hover { background: var(--chip-hover); }
 /* FAB de play: pastilla blanca nítida (como los círculos de las referencias),
    asentada en el scoop de la esquina */
-.w-sp .sp-play { position: absolute; right: 4px; top: 72px; width: 46px; height: 46px; background: #fff; color: #111; box-shadow: 0 6px 18px rgba(0,0,0,.32); }
+/* Play en VERDE con el icono blanco (petición de Dosa): es el botón de
+   Spotify, y su verde lo identifica en cualquier tema. */
+.w-sp .sp-play { position: absolute; right: 4px; top: 72px; width: 46px; height: 46px; background: #1db954; color: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.32); }
 .w-sp .sp-play svg { width: 17px; height: 17px; }
-.w-sp .sp-play:hover { background: #fff; transform: scale(1.06); }
+.w-sp .sp-play:hover { background: #1ed760; transform: scale(1.06); }
 .w-sp .sp-play:disabled { opacity: .55; }
 
 /* ===== Widget CALENDARIO con recordatorios (2026-08-11) ===== */
@@ -1546,7 +1551,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* ===== Widget "Tu música" (el rojo del mock): filas-pastilla nítidas ===== */
 /* Sin barras de scroll (quedaban dos, vertical y horizontal, cruzando la
    tarjeta): las filas que no caben se ocultan, igual que en Correo. */
-.spl-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; overflow: hidden; }
+.spl-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; overflow-y: auto; overflow-x: hidden; }
 /* Fila de canción (rehecha 2026-08-13): era una PASTILLA blanca enorme y, con
    el artista debajo, se partía en dos líneas y ocupaba media tarjeta. Ahora es
    una fila compacta: título arriba, artista debajo en tono menor, y el play
