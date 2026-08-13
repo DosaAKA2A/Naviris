@@ -1643,15 +1643,43 @@ function friendlyUpdateError(err) {
   if (/sha512|checksum|integrity|signature/i.test(raw)) return 'La descarga de la actualización no coincide. Reinténtalo.';
   return 'No se pudo comprobar la actualización. Reinténtalo más tarde.';
 }
+/* ACTUALIZACIÓN AUTOMÁTICA DE LA ESTABLE (petición de Dosa, 2026-08-13).
+   En la línea estable no hay nada que elegir: solo existe una versión buena,
+   la última. Así que al arrancar se descarga sola y se instala al CERRAR el
+   navegador — sin instalador a la vista, sin buscar nada en el menú y sin
+   reiniciar la sesión de trabajo por sorpresa: la próxima vez que abras
+   Naviris, ya es la nueva.
+
+   NavirisDev queda FUERA a propósito: ahí se prueba, se salta entre versiones
+   y a veces se vuelve atrás, y eso lo decide el usuario en el selector.
+   Tampoco se automatiza si el usuario apuntó su instalación al canal dev. */
+let chequeoSilencioso = false;   // el arranque, no una elección del usuario
+let bajandoSolo = false;         // evita relanzar la descarga en cada aviso
+function actualizacionSolaPermitida() {
+  if (!app.isPackaged) return false;
+  if (/-dev/i.test(app.getVersion())) return false;
+  return settings.devUpdates !== true;
+}
 autoUpdater.on('checking-for-update', () => broadcast('update:status', { state: 'checking' }));
-autoUpdater.on('update-available', (info) => broadcast('update:status', { state: 'available', version: info.version }));
+autoUpdater.on('update-available', (info) => {
+  const sola = chequeoSilencioso && actualizacionSolaPermitida();
+  broadcast('update:status', { state: 'available', version: info.version, auto: sola });
+  if (sola && !bajandoSolo) {
+    bajandoSolo = true;
+    // Si falla (sin red, release a medio publicar) no se avisa de nada: se
+    // reintenta en el siguiente arranque. Un error de algo que el usuario no
+    // ha pedido no debe interrumpirle.
+    autoUpdater.downloadUpdate().catch(() => { bajandoSolo = false; });
+  }
+});
 autoUpdater.on('update-not-available', (info) => broadcast('update:status', { state: 'latest', version: info.version }));
-autoUpdater.on('download-progress', (p) => broadcast('update:status', { state: 'downloading', percent: Math.round(p.percent) }));
-autoUpdater.on('update-downloaded', (info) => broadcast('update:status', { state: 'downloaded', version: info.version }));
-autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: friendlyUpdateError(err) }));
+autoUpdater.on('download-progress', (p) => broadcast('update:status', { state: 'downloading', percent: Math.round(p.percent), auto: bajandoSolo }));
+autoUpdater.on('update-downloaded', (info) => broadcast('update:status', { state: 'downloaded', version: info.version, auto: bajandoSolo }));
+autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: friendlyUpdateError(err), auto: bajandoSolo }));
 
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { state: 'dev' };
+  chequeoSilencioso = false; // lo pide el usuario: nada se baja sin que lo mande
   applyUpdateChannel(); // el ajuste puede haber cambiado sin reiniciar
   // Una comprobación normal vuelve a mirar TODAS las releases: si antes se
   // eligió una línea, el feed quedó clavado en aquel tag y aquí no vale.
@@ -1722,6 +1750,7 @@ ipcMain.handle('update:channels', async () => {
 // permite bajar de versión (volver de NavirisDev a la estable es un downgrade).
 ipcMain.handle('update:choose', async (_e, line) => {
   if (!app.isPackaged) return { state: 'dev' };
+  chequeoSilencioso = false;
   const dev = line === 'dev';
   autoUpdater.channel = dev ? 'dev' : 'latest';
   autoUpdater.allowPrerelease = dev;
@@ -1763,8 +1792,9 @@ app.whenReady().then(async () => {
   // estándar `components` no existe; el guard evita romper ese caso.
   try { if (components && components.whenReady) await components.whenReady(); }
   catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
-  // Comprobación silenciosa al arrancar (solo en versión instalada)
-  if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
+  // Comprobación silenciosa al arrancar (solo en versión instalada). En la
+  // estable esto además descarga e instala sola la versión nueva; en dev solo avisa.
+  if (app.isPackaged) { chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); }
   braveAdblock.init();
   // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.
   // El id se valida contra la lista de instalados y se limita a [a-z0-9-], así

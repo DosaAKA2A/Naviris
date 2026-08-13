@@ -4156,7 +4156,9 @@ els.menuPop.addEventListener('click', (e) => {
   const a = e.target.closest('button')?.dataset.action; if (!a) return; els.menuPop.classList.add('hidden');
   if (a === 'newtab') createTab(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
-  if (a === 'update') { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); }
+  // Con la estable ya descargada, la entrada del menú instala directamente: el
+  // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
+  if (a === 'update') { if (updAutoLista) window.cobalt.updateInstall(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
   if (a === 'permissions') showPermManager();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
@@ -4553,6 +4555,7 @@ loadToolAddons();
 const updStatus = $('#upd-status'), updBtn = $('#upd-btn'), updBar = $('#upd-bar'), updLines = $('#upd-lines');
 let updChosen = null;     // línea elegida ('stable'|'dev') mientras descarga
 let updReadyLine = null;  // línea ya descargada, lista para instalar
+let updAutoLista = null;  // versión estable bajada sola, esperando al cierre
 let updBusy = false;
 const UPD_LABEL = { stable: 'Naviris', dev: 'NavirisDev' };
 function setUpd(text, cls) { updStatus.textContent = text; updStatus.className = cls || ''; }
@@ -4572,6 +4575,7 @@ async function showChannels() {
   }
   updLines.classList.remove('hidden');
   if (!updBusy && !updReadyLine) setUpd('Estás en la v' + r.current + '. Elige la versión que quieras usar.');
+  else if (updAutoLista) setUpd('Naviris v' + updAutoLista + ' lista: se instala sola al cerrar el navegador.', 'hot');
 }
 async function chooseLine(line) {
   if (updReadyLine === line) { window.cobalt.updateInstall(); return; }
@@ -4599,10 +4603,26 @@ function marcaActualizacion(version) {
     pop.insertBefore(entrada, pop.firstElementChild);
   }
 }
+/* La estable ya se ha descargado sola y se instalará al cerrar. Se avisa por
+   dos motivos: para que no sorprenda que al abrir mañana cambie la versión, y
+   para poder instalarla YA sin esperar — el mismo botón del menú lo hace. */
+function marcaListaParaInstalar(version) {
+  const boton = $('#nav-menu');
+  if (boton) { boton.classList.add('hay-update'); boton.title = 'Menú — Naviris ' + version + ' lista para instalar'; }
+  const pop = $('#menu-pop'), entrada = $('#menu-update');
+  if (pop && entrada) {
+    entrada.classList.add('destacado');
+    entrada.textContent = 'Reiniciar e instalar la ' + version;
+    if (pop.firstElementChild !== entrada) pop.insertBefore(entrada, pop.firstElementChild);
+  }
+}
 window.cobalt.onUpdateStatus((s) => {
   if (s.state === 'available') {
     // Solo se descarga si el usuario eligió línea; el aviso silencioso de arranque solo notifica
     if (!updChosen) {
+      // …salvo en la estable, que se baja sola en segundo plano: ahí no hay
+      // nada que pedirle al usuario, se le avisa cuando ya está lista.
+      if (s.auto) return;
       // Un toast se va solo y el usuario se queda sin enterarse. Ademas se
       // marca el boton del menu con un punto, que no caduca, y la entrada de
       // actualizar sube ARRIBA del todo mientras haya version nueva.
@@ -4617,7 +4637,13 @@ window.cobalt.onUpdateStatus((s) => {
   } else if (s.state === 'downloading') {
     if (updChosen) { setUpd('Descargando ' + UPD_LABEL[updChosen] + '… ' + s.percent + '%'); updBar.classList.remove('hidden'); updBar.querySelector('i').style.width = s.percent + '%'; }
   } else if (s.state === 'downloaded') {
-    if (!updChosen) return;
+    if (!updChosen) {
+      if (!s.auto) return;
+      updAutoLista = s.version; updReadyLine = 'stable';
+      marcaListaParaInstalar(s.version);
+      toast('Naviris v' + s.version + ' lista: se instala sola al cerrar el navegador');
+      return;
+    }
     updReadyLine = updChosen; updChosen = null; updBusy = false;
     updBar.classList.add('hidden');
     setUpd(UPD_LABEL[updReadyLine] + ' v' + s.version + ' lista para instalar.', 'hot');
