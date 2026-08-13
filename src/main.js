@@ -1600,20 +1600,35 @@ ipcMain.handle('update:check', async () => {
 // publicadas ahora mismo, para que el usuario elija desde cualquier versión.
 ipcMain.handle('update:channels', async () => {
   try {
-    const res = await fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=30', { headers: { 'User-Agent': 'Naviris' } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const list = await res.json();
-    const find = (dev) => {
-      for (const r of list) {
-        if (r.draft || !!r.prerelease !== dev) continue;
-        const names = (r.assets || []).map((a) => a.name);
-        if (!names.some((n) => /Setup.*\.exe$/i.test(n))) continue;
-        if (!names.includes(dev ? 'dev.yml' : 'latest.yml')) continue; // sin feed, el updater no podría instalarla
-        return { version: String(r.tag_name || '').replace(/^v/, '') };
-      }
-      return null;
+    const cab = { headers: { 'User-Agent': 'Naviris', Accept: 'application/vnd.github+json' } };
+    const sirve = (r, dev) => {
+      if (!r || r.draft) return null;
+      const names = (r.assets || []).map((a) => a.name);
+      if (!names.some((n) => /Setup.*\.exe$/i.test(n))) return null;
+      if (!names.includes(dev ? 'dev.yml' : 'latest.yml')) return null; // sin feed, el updater no podría instalarla
+      return { version: String(r.tag_name || '').replace(/^v/, '') };
     };
-    return { ok: true, current: app.getVersion(), stable: find(false), dev: find(true) };
+    /* LA ESTABLE, POR SU PROPIO ENDPOINT (2026-08-13). Antes se pedía la LISTA
+       y se buscaba dentro, pero la API pagina de 30 en 30 y con tantas
+       versiones de desarrollo por medio la estable había caído al puesto 47:
+       el selector decía "no publicada" teniéndola delante, y desde una
+       instalación estable no había forma de reinstalar su propia línea.
+       /releases/latest devuelve justo la última NO prerelease. */
+    const [rEst, rLista] = await Promise.all([
+      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases/latest', cab),
+      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=15', cab)
+    ]);
+    const estable = rEst.ok ? sirve(await rEst.json(), false) : null;
+    let dev = null;
+    if (rLista.ok) {
+      for (const r of await rLista.json()) {
+        if (!r.prerelease) continue;
+        dev = sirve(r, true);
+        if (dev) break;
+      }
+    }
+    if (!estable && !dev) throw new Error('GitHub no devolvió ninguna versión instalable');
+    return { ok: true, current: app.getVersion(), stable: estable, dev };
   } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; }
 });
 // El usuario eligió LÍNEA explícitamente: se apunta el feed a esa línea y se
@@ -1627,6 +1642,12 @@ ipcMain.handle('update:choose', async (_e, line) => {
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
+/* DESCARGA COMPLETA, NUNCA DIFERENCIAL. electron-updater intenta bajar solo
+   los trozos que cambian comparando blockmaps; entre líneas distintas (de la
+   estable a NavirisDev) esa comparación no tiene sentido y se queda colgada a
+   medias — el sintoma que reporto el amigo de Dosa: "descargando 12%" y de ahi
+   no pasa. Bajar los 86 MB enteros tarda un poco mas y termina siempre. */
+autoUpdater.disableDifferentialDownload = true;
 ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
 ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 
