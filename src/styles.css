@@ -1260,15 +1260,23 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    Solo se animan transform y opacity. */
 .nvs-host { scrollbar-width: none; -ms-overflow-style: none; }
 .nvs-host::-webkit-scrollbar { width: 0; height: 0; }
-.nvs-bar { position: absolute; top: 0; right: 2px; width: 12px; z-index: 60; pointer-events: none; opacity: 0; transition: opacity var(--dur-3) var(--ease); }
+/* La barra FLOTA DENTRO, separada del canto (2026-08-13). Pegada a 2px se
+   comia el borde redondeado del contenedor y, al rodar, el pulgar se ponia del
+   color de acento: parecia que el scroll se metia en la tarjeta. Ahora entra
+   mas, es mas fina y se queda en gris — un scroll no es un elemento de marca. */
+.nvs-bar { position: absolute; top: 0; right: 9px; width: 10px; z-index: 60; pointer-events: none; opacity: 0; transition: opacity var(--dur-3) var(--ease); }
 .nvs-bar.visible { opacity: 1; }
-.nvs-thumb { position: absolute; right: 4px; width: 4px; border-radius: 999px; background: var(--nvs-thumb, rgba(255,255,255,.22));
+.nvs-thumb { position: absolute; right: 3px; width: 4px; border-radius: 999px; background: var(--nvs-thumb, rgba(255,255,255,.24));
   transform-origin: 100% 50%; transition: transform var(--dur-3) var(--spring), background var(--dur-2) var(--ease); pointer-events: auto; cursor: grab; }
 /* Rodando: el pulgar se estira a lo ancho y se aclara; al parar, vuelve */
-.nvs-bar.rodando .nvs-thumb { transform: scaleX(2.1); background: var(--nvs-thumb-on, var(--realce)); }
-.nvs-thumb:hover { transform: scaleX(2.1); }
-.nvs-thumb:active { cursor: grabbing; transform: scaleX(2.4); }
-:root.light .nvs-thumb, :root.rosa .nvs-thumb { background: rgba(20,18,26,.24); }
+.nvs-bar.rodando .nvs-thumb { transform: scaleX(1.7); background: var(--nvs-thumb-on, rgba(255,255,255,.5)); }
+.nvs-thumb:hover { transform: scaleX(1.7); }
+.nvs-thumb:active { cursor: grabbing; transform: scaleX(2); }
+:root.light .nvs-thumb, :root.rosa .nvs-thumb { background: rgba(20,18,26,.26); }
+:root.light .nvs-bar.rodando .nvs-thumb, :root.rosa .nvs-bar.rodando .nvs-thumb { background: rgba(20,18,26,.5); }
+/* En menus y popovers el hueco es menor: la barra se arrima un poco mas */
+#menu-pop .nvs-bar, #shield-pop .nvs-bar, #res-pop .nvs-bar, #rat-pop .nvs-bar,
+#loot-pop .nvs-bar, #site-pop .nvs-bar, .ctx-menu .nvs-bar, .temas-pop .nvs-bar { right: 4px; }
 
 /* Legibilidad sobre el vidrio (2026-08-11): con superficies translúcidas, el
    texto secundario caía sobre zonas claras del fondo y se perdía. Sube de
