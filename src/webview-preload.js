@@ -38,7 +38,7 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
   } catch (e) { /* nada */ }
 }
 
-// --- Cine de IRIS: pase de la biblioteca ---
+// --- MOOVIN: pase de la biblioteca ---
 // La biblioteca de iris.it.com/cine es privada: su worker no suelta ni el catálogo
 // ni un solo archivo sin pase. Naviris lo recuerda a nivel de navegador y lo pone
 // ANTES de que corra la página (de ahí executeInMainWorld en document_start), así

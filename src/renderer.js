@@ -2616,7 +2616,7 @@ function actualizaDescargasW() {
 
 
 /* ============ Widget MOOVIN (2026-08-12) ============
-   Acceso a la biblioteca privada de IRIS (antes "Cine de IRIS"): Naviris ya
+   Acceso a la biblioteca privada de MOOVIN: Naviris ya
    pone el pase solo al entrar (cine:pase en main), asi que el widget es la
    puerta — cartel con play y entrada directa. */
 function renderMoovinW(body) {

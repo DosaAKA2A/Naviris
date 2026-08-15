@@ -1068,7 +1068,7 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
 ipcMain.on('yt-adblock-on', (e, url) => {
   e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
 });
-// Pase de la biblioteca del Cine de IRIS (iris.it.com/cine, privada). Naviris lo
+// Pase de la biblioteca de MOOVIN (iris.it.com/cine, privada). Naviris lo
 // recuerda a nivel de navegador para que ahí no aparezca la pantalla del pase.
 // A diferencia de los dos de arriba esto SÍ es un secreto, y el preload corre en
 // todos los sitios: solo se entrega y solo se acepta desde iris.it.com. Tampoco
