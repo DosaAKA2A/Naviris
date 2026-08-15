@@ -1088,6 +1088,18 @@ ipcMain.on('moovin:pase-set', (e, v) => {
   settings = { ...settings, moovinPase: v.trim() };
   saveSettings(settings);
 });
+/* Clave propia de la app, para que MOOVIN se abra solo desde Naviris sin que
+   nadie escriba nada. Vive en src/app-key.js, que NO se versiona (main es
+   público y Pages lo sirve entero); en el CI lo escribe el secret
+   NAVIRIS_MOOVIN_KEY. Si el archivo no está, esto devuelve cadena vacía y se
+   pide el pase como en cualquier otro navegador: no se rompe nada.
+   OJO con lo que esto es y lo que no: la clave viaja dentro de un instalador
+   público y un .asar se abre con un descompresor, así que frena a quien
+   tropiece con la URL, no a quien se lo proponga. Va aparte del pase para
+   poder rotarla sin dejar fuera a quien entra por navegador. */
+let CLAVE_APP = '';
+try { CLAVE_APP = String(require('./app-key') || '').trim(); } catch { /* sin clave: se pide el pase */ }
+ipcMain.on('moovin:clave-app', (e) => { e.returnValue = esMoovin(e) ? CLAVE_APP : ''; });
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());

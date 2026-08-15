@@ -49,10 +49,17 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
 if (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0) {
   try {
     const pase = ipcRenderer.sendSync('moovin:pase');
-    if (pase) {
+    // La clave de la app entra sola aunque esta persona no haya escrito nunca
+    // el pase: es lo que hace que MOOVIN se abra directo en cualquier Naviris.
+    // Si el build no lleva clave, viaja vacía y la página pide el pase.
+    const claveApp = ipcRenderer.sendSync('moovin:clave-app');
+    if (pase || claveApp) {
       contextBridge.executeInMainWorld({
-        func: function (p) { window.__navMoovinPase = p; },
-        args: [pase]
+        func: function (p, c) {
+          if (p) window.__navMoovinPase = p;
+          if (c) window.__navMoovinApp = c;
+        },
+        args: [pase, claveApp]
       });
     }
     window.addEventListener('load', () => {

@@ -34,6 +34,20 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # Clave con la que Naviris abre MOOVIN sin pedir nada. No esta en el repo
+      # (main es publico y Pages lo sirve entero), asi que la pone el secret.
+      # Si el secret no esta configurado, el archivo queda vacio y Naviris pide
+      # el pase como cualquier navegador: la compilacion NO falla por esto.
+      - name: Escribir la clave de MOOVIN
+        shell: bash
+        env:
+          NAVIRIS_MOOVIN_KEY: ${{ secrets.NAVIRIS_MOOVIN_KEY }}
+        run: |
+          printf "module.exports = '%s';\n" "$NAVIRIS_MOOVIN_KEY" > src/app-key.js
+          if [ -z "$NAVIRIS_MOOVIN_KEY" ]; then
+            echo "AVISO: sin NAVIRIS_MOOVIN_KEY; este build pedira el pase en MOOVIN"
+          fi
+
       # Las comillas son OBLIGATORIAS: sin ellas, el ": " de "VMP: no distribuir"
       # convierte el escalar en un mapa anidado y GitHub rechaza el fichero entero
       # ("workflow file issue"). Estuvo asi del 2026-07-25 al 2026-07-31: el
