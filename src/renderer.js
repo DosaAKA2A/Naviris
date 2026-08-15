@@ -2832,8 +2832,8 @@ function renderAuthW(body) {
       <div class="au-head">
         <span class="au-tit">Códigos</span>
         <span class="au-tools">
-          <button class="au-add" title="Añadir cuenta" data-ico="plus"></button>
-          <button class="au-lock" title="Bloquear" data-ico="lock-closed"></button>
+          <button class="au-add" title="Añadir cuenta">${window.icon('plus')}</button>
+          <button class="au-lock" title="Bloquear">${window.icon('lock-closed')}</button>
         </span>
       </div>
       <div class="au-lista">${r.items.map((it) => `
