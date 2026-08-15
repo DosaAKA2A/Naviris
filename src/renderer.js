@@ -2617,14 +2617,14 @@ function actualizaDescargasW() {
 
 /* ============ Widget MOOVIN (2026-08-12) ============
    Acceso a la biblioteca privada de MOOVIN: Naviris ya
-   pone el pase solo al entrar (cine:pase en main), asi que el widget es la
+   pone el pase solo al entrar (moovin:pase en main), asi que el widget es la
    puerta — cartel con play y entrada directa. */
 function renderMoovinW(body) {
   body.innerHTML = `
     <div class="mv-cartel">${window.icon('tv-minimal')}</div>
     <div class="mv-meta"><div class="mv-tit">Moovin</div><div class="mv-sub">Tu biblioteca privada</div></div>
     <button class="mv-play" title="Entrar">${window.icon('play')}</button>`;
-  const abre = (e) => { e?.stopPropagation(); navigateActive('https://iris.it.com/cine/'); };
+  const abre = (e) => { e?.stopPropagation(); navigateActive('https://iris.it.com/moovin/'); };
   body.querySelector('.mv-play').addEventListener('click', abre);
   body.addEventListener('click', abre);
 }

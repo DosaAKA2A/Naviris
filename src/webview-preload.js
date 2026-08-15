@@ -39,26 +39,26 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
 }
 
 // --- MOOVIN: pase de la biblioteca ---
-// La biblioteca de iris.it.com/cine es privada: su worker no suelta ni el catálogo
+// La biblioteca de iris.it.com/moovin es privada: su worker no suelta ni el catálogo
 // ni un solo archivo sin pase. Naviris lo recuerda a nivel de navegador y lo pone
 // ANTES de que corra la página (de ahí executeInMainWorld en document_start), así
 // que aquí la pantalla del pase no llega a verse. Si la persona lo escribe a mano
 // en la página, se guarda solo para las próximas veces, incluso si luego borra los
 // datos del sitio. El pase no llega a ningún otro dominio: main.js solo lo entrega
 // y solo lo acepta desde iris.it.com.
-if (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/cine') === 0) {
+if (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0) {
   try {
-    const pase = ipcRenderer.sendSync('cine:pase');
+    const pase = ipcRenderer.sendSync('moovin:pase');
     if (pase) {
       contextBridge.executeInMainWorld({
-        func: function (p) { window.__navCinePase = p; },
+        func: function (p) { window.__navMoovinPase = p; },
         args: [pase]
       });
     }
     window.addEventListener('load', () => {
       try {
-        const puesto = localStorage.getItem('cinePase') || '';
-        if (puesto && puesto !== pase) ipcRenderer.send('cine:pase-set', puesto);
+        const puesto = localStorage.getItem('moovinPase') || '';
+        if (puesto && puesto !== pase) ipcRenderer.send('moovin:pase-set', puesto);
       } catch (e) { /* nada */ }
     });
   } catch (e) { /* nada */ }

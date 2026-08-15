@@ -118,7 +118,7 @@ const DEFAULT_SETTINGS = {
   agentMode: false,
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
-  cinePase: '',             // pase de la biblioteca privada de iris.it.com/cine
+  moovinPase: '',             // pase de la biblioteca privada de iris.it.com/moovin
   atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
   mouseNav: true,           // botones laterales del ratón para atrás/adelante
   blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
@@ -205,7 +205,12 @@ const TWITCH_ADHIDE = `(function(){
 
 function loadSettings() {
   try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(settingsPath(), 'utf8')) };
+    const s = { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(settingsPath(), 'utf8')) };
+    // El pase de la biblioteca se guardaba con el nombre anterior del sitio.
+    // Se pasa al nuevo para no obligar a escribirlo otra vez.
+    if (s.cinePase && !s.moovinPase) s.moovinPase = s.cinePase;
+    delete s.cinePase;
+    return s;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -1068,19 +1073,19 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
 ipcMain.on('yt-adblock-on', (e, url) => {
   e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
 });
-// Pase de la biblioteca de MOOVIN (iris.it.com/cine, privada). Naviris lo
+// Pase de la biblioteca de MOOVIN (iris.it.com/moovin, privada). Naviris lo
 // recuerda a nivel de navegador para que ahí no aparezca la pantalla del pase.
 // A diferencia de los dos de arriba esto SÍ es un secreto, y el preload corre en
 // todos los sitios: solo se entrega y solo se acepta desde iris.it.com. Tampoco
 // entra en la sincronización de la cuenta: no sale de este equipo.
-const esCine = (e) => {
+const esMoovin = (e) => {
   try { return /(^|\.)iris\.it\.com$/.test(new URL(e.senderFrame.url).hostname); }
   catch { return false; }
 };
-ipcMain.on('cine:pase', (e) => { e.returnValue = esCine(e) ? (settings.cinePase || '') : ''; });
-ipcMain.on('cine:pase-set', (e, v) => {
-  if (!esCine(e) || typeof v !== 'string' || !v.trim() || v.length > 64) return;
-  settings = { ...settings, cinePase: v.trim() };
+ipcMain.on('moovin:pase', (e) => { e.returnValue = esMoovin(e) ? (settings.moovinPase || '') : ''; });
+ipcMain.on('moovin:pase-set', (e, v) => {
+  if (!esMoovin(e) || typeof v !== 'string' || !v.trim() || v.length > 64) return;
+  settings = { ...settings, moovinPase: v.trim() };
   saveSettings(settings);
 });
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });

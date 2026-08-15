@@ -1,6 +1,6 @@
-/* Naviris addon: Watch Party v2.6.2
+/* Naviris addon: Watch Party v2.7.0
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
-   MOOVIN (iris.it.com/cine).
+   MOOVIN (iris.it.com/moovin).
    NO transmite video: cada quien reproduce su propia copia con su propia
    cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
    chat, vía el relay de Cloudflare.
@@ -25,18 +25,23 @@
    español neutro. Requiere Naviris 2.7.3-dev.12+ (el CSP anterior bloqueaba
    la conexión con el servidor de salas y unirse no hacía nada).
 
-   v2.6.0: soporta MOOVIN (iris.it.com/cine), el reproductor propio de IRIS
+   v2.6.0: soporta MOOVIN (iris.it.com/moovin), el reproductor propio de IRIS
    Studio para ver una película cargada por enlace o archivo local.
    La página habla el mismo protocolo del relay, así que una sala creada allí
    y una creada desde este addon son intercambiables. La identidad del video
-   es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:cine.
+   es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:moovin.
 
    v2.6.2: el reproductor se llama MOOVIN y aquí seguía saliendo el nombre
    anterior. Además el sufijo que se recortaba de "Viendo: …" era el del
    nombre anterior, que la página ya no escribe: ahora pone "— MOOVIN", así
-   que el título salía sin recortar. Los identificadores NO cambian (ruta /cine,
-   clave de sitio `iris`, identidad de sala `iris:<url>`): son protocolo
-   compartido con la página y renombrarlos rompería las salas en curso.
+   que el título salía sin recortar.
+
+   v2.7.0: la página se mudó de /cine a /moovin y la anterior ya no existe.
+   Cambian con ella la detección del sitio y la identidad de la sala sin
+   película (ahora iris:moovin), así que ESTA VERSIÓN NO ES COMPATIBLE con
+   salas creadas desde la anterior: hay que actualizar en ambos lados. La
+   identidad con película sigue siendo el ?v= (la URL del video), que no
+   depende de la ruta, así que esas salas sí siguen entendiéndose.
 */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
@@ -220,10 +225,8 @@
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
-    // MOOVIN: solo la ruta /cine (el resto de iris.it.com no reproduce). La ruta
-    // sigue siendo /cine y no debe cambiar: los enlaces de invitación ya
-    // compartidos y el preload del pase la reconocen así.
-    if (/(^|\.)iris\.it\.com$/.test(h) && /^\/cine(\/|$)/.test(p)) return 'iris';
+    // MOOVIN: solo la ruta /moovin (el resto de iris.it.com no reproduce).
+    if (/(^|\.)iris\.it\.com$/.test(h) && /^\/moovin(\/|$)/.test(p)) return 'iris';
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
@@ -245,9 +248,9 @@
     // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él,
     // la página vacía cuenta como "el mismo sitio" para no forzar navegación
     // cuando el anfitrión reproduce un archivo local.
-    m = /iris\.it\.com\/cine[^#]*[?&]v=([^&#]+)/i.exec(url || '');
+    m = /iris\.it\.com\/moovin[^#]*[?&]v=([^&#]+)/i.exec(url || '');
     if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
-    if (/iris\.it\.com\/cine(\/|$|\?)/i.test(url || '')) return 'iris:cine';
+    if (/iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
     return null;
   }
   function fmtT(s) {
@@ -460,7 +463,7 @@
     if (modoActual === 'fuera') {
       if (ui.hint) ui.hint.textContent = site
         ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola a lo que vea el anfitrión.'
-        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o MOOVIN (iris.it.com/cine) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o MOOVIN (iris.it.com/moovin) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       if (ui.crear) ui.crear.disabled = !site;
       if (ui.unirse) ui.unirse.disabled = !site;
       return;
