@@ -393,6 +393,21 @@ const UA_CH = {
 };
 ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
 
+/* Estado REAL de un permiso para el sitio que pregunta: 'allow', 'block' o
+   'prompt' si aún no se ha decidido.
+   Hace falta porque setPermissionCheckHandler de Electron solo sabe decir sí o
+   no, y al responder "no" a algo que en realidad está SIN decidir, la página
+   leía Notification.permission === 'denied'. Eso no es solo una huella rara:
+   muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
+   diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
+   notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
+ipcMain.on('perm:estado', (e, permiso) => {
+  let origen = '';
+  try { origen = originOf(e.senderFrame.url); } catch { /* nada */ }
+  const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
+  e.returnValue = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
+});
+
 function setupSession(ses) {
   // UA de Chrome puro para navegar: el UA por defecto lleva los tokens
   // "Naviris/x" y "Electron/x", y los sitios que husmean el navegador no lo

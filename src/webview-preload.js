@@ -44,6 +44,65 @@ try {
   }
 } catch (e) { /* nada */ }
 
+// --- Piezas de Chromium que Electron no trae y que delatan al navegador ---
+// Comparado señal a señal con el Chrome instalado en la misma máquina, quedaban
+// cuatro diferencias. No son cosmética: un navegador que dice ser Chrome y no se
+// comporta como tal falla en webs que husmean el entorno, y una de ellas era un
+// fallo de verdad (lo de las notificaciones, abajo).
+//   1. window.chrome estaba VACÍO. En Chrome trae app, csi y loadTimes; es la
+//      comprobación más conocida para distinguir un navegador embebido.
+//   2. screen.colorDepth daba 32; Chrome en Windows siempre dice 24.
+//   3. navigator.languages iba al revés ("es,es-ES" en vez de "es-ES,es").
+//   4. Notification.permission decía "denied" cuando en realidad estaba SIN
+//      decidir: Naviris pregunta al usuario, pero la web leía "denegado" y ni
+//      lo intentaba, así que el diálogo no salía nunca. Ahora dice la verdad
+//      ('prompt' mientras no haya decisión guardada para ese sitio).
+try {
+  const permNotif = ipcRenderer.sendSync('perm:estado', 'notifications');
+  contextBridge.executeInMainWorld({
+    func: function (estadoNotif) {
+      try {
+        var t0 = Date.now();
+        if (!window.chrome || !window.chrome.loadTimes) {
+          var chrome = window.chrome || {};
+          if (!chrome.app) chrome.app = { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }, getDetails: function () { return null; }, getIsInstalled: function () { return false; } };
+          if (!chrome.csi) chrome.csi = function () { return { startE: t0, onloadT: t0, pageT: Date.now() - t0, tran: 15 }; };
+          if (!chrome.loadTimes) chrome.loadTimes = function () {
+            var t = performance.timing || {}, s = (t.navigationStart || t0) / 1000;
+            return { requestTime: s, startLoadTime: s, commitLoadTime: s, finishDocumentLoadTime: s, finishLoadTime: s, firstPaintTime: s, firstPaintAfterLoadTime: 0, navigationType: 'Other', wasFetchedViaSpdy: false, wasNpnNegotiated: true, npnNegotiatedProtocol: 'h2', wasAlternateProtocolAvailable: false, connectionInfo: 'h2' };
+          };
+          try { Object.defineProperty(window, 'chrome', { configurable: true, enumerable: true, writable: true, value: chrome }); } catch (e) { window.chrome = chrome; }
+        }
+        try {
+          Object.defineProperty(screen, 'colorDepth', { configurable: true, get: function () { return 24; } });
+          Object.defineProperty(screen, 'pixelDepth', { configurable: true, get: function () { return 24; } });
+        } catch (e) { /* nada */ }
+        try {
+          var idiomas = navigator.languages || [];
+          var largos = idiomas.filter(function (l) { return l.indexOf('-') !== -1; });
+          var cortos = idiomas.filter(function (l) { return l.indexOf('-') === -1; });
+          var orden = largos.concat(cortos);
+          if (orden.length) Object.defineProperty(navigator, 'languages', { configurable: true, get: function () { return Object.freeze(orden.slice()); } });
+        } catch (e) { /* nada */ }
+        if (estadoNotif && typeof Notification !== 'undefined') {
+          var real = estadoNotif === 'allow' ? 'granted' : estadoNotif === 'block' ? 'denied' : 'default';
+          try { Object.defineProperty(Notification, 'permission', { configurable: true, get: function () { return real; } }); } catch (e) { /* nada */ }
+          try {
+            var q = navigator.permissions.query.bind(navigator.permissions);
+            navigator.permissions.query = function (d) {
+              if (d && d.name === 'notifications') {
+                return Promise.resolve({ name: 'notifications', state: real === 'granted' ? 'granted' : real === 'denied' ? 'denied' : 'prompt', onchange: null, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } });
+              }
+              return q(d);
+            };
+          } catch (e) { /* nada */ }
+        }
+      } catch (e) { /* si algo falla, se queda como estaba */ }
+    },
+    args: [permNotif]
+  });
+} catch (e) { /* nada */ }
+
 // --- X/Twitter: muro de verificación de edad ("contenido no apto para menores") ---
 // X decide si taparlo con el interruptor rweb_age_assurance_flow_enabled, que viaja en
 // el window.__INITIAL_STATE__ del HTML; su lector es `customOverrides[clave] ??
