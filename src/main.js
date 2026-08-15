@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
@@ -1368,6 +1369,148 @@ async function revealCard(id, reason) {
 }
 ipcMain.handle('cards:reveal', soloUI((_e, id) => revealCard(id, 'Naviris: verifica tu identidad para ver la tarjeta')));
 ipcMain.handle('cards:fill', soloUI((_e, id) => revealCard(id, 'Naviris: verifica tu identidad para autorrellenar la tarjeta')));
+
+/* ---------- Códigos de verificación en dos pasos (TOTP) ----------
+   Mismo trato que las contraseñas y las tarjetas: el secreto se guarda cifrado
+   con DPAPI (safeStorage) y ver los códigos exige Windows Hello.
+
+   TOTP es el estándar abierto RFC 6238, el mismo que usan Google Authenticator
+   o Authy: del secreto compartido y el reloj (en tramos de 30 s) sale un HMAC
+   del que se recortan 6 dígitos. No hay nada propietario.
+
+   OJO CON EL SECRETO: no es "la contraseña de un sitio", es la semilla que
+   genera TODOS los códigos futuros. Quien la tenga entra siempre. Por eso no
+   se devuelve nunca al renderer salvo en `totp:reveal`, que pide Hello, y por
+   eso los códigos solo salen con la caja desbloqueada. */
+const totpPath = () => path.join(app.getPath('userData'), 'cobalt-totp.json');
+function loadTotp() { try { return JSON.parse(fs.readFileSync(totpPath(), 'utf8')); } catch { return []; } }
+function saveTotp(list) { try { fs.writeFileSync(totpPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('totp save', e); } }
+
+// Base32 de RFC 4648 sin padding, que es como viajan los secretos TOTP.
+function base32ADatos(s) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const limpio = String(s || '').toUpperCase().replace(/[\s-]/g, '').replace(/=+$/, '');
+  let bits = 0, valor = 0;
+  const out = [];
+  for (const ch of limpio) {
+    const i = A.indexOf(ch);
+    if (i === -1) throw new Error('secreto no válido');
+    valor = (valor << 5) | i; bits += 5;
+    if (bits >= 8) { out.push((valor >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  if (!out.length) throw new Error('secreto vacío');
+  return Buffer.from(out);
+}
+
+function codigoTotp(secreto, { digits = 6, period = 30, algorithm = 'sha1' } = {}, cuando) {
+  const clave = base32ADatos(secreto);
+  const contador = Math.floor((cuando == null ? Date.now() : cuando) / 1000 / period);
+  const buf = Buffer.alloc(8);
+  buf.writeUInt32BE(Math.floor(contador / 0x100000000), 0);
+  buf.writeUInt32BE(contador >>> 0, 4);
+  const h = crypto.createHmac(algorithm, clave).update(buf).digest();
+  const off = h[h.length - 1] & 0x0f;
+  const num = ((h[off] & 0x7f) << 24) | (h[off + 1] << 16) | (h[off + 2] << 8) | h[off + 3];
+  return String(num % Math.pow(10, digits)).padStart(digits, '0');
+}
+
+/* Acepta tanto una URI otpauth:// (la del QR) como el secreto pelado. */
+function parseaOtp(entrada) {
+  const txt = String(entrada || '').trim();
+  if (/^otpauth:\/\//i.test(txt)) {
+    const u = new URL(txt);
+    if (!/^totp$/i.test(u.hostname)) throw new Error('solo se admiten códigos por tiempo (TOTP)');
+    const etiqueta = decodeURIComponent(u.pathname.replace(/^\//, ''));
+    const corte = etiqueta.indexOf(':');
+    const q = u.searchParams;
+    return {
+      secret: (q.get('secret') || '').replace(/\s/g, ''),
+      issuer: q.get('issuer') || (corte > 0 ? etiqueta.slice(0, corte) : ''),
+      label: corte > 0 ? etiqueta.slice(corte + 1).trim() : etiqueta,
+      digits: Math.min(10, Math.max(6, parseInt(q.get('digits') || '6', 10) || 6)),
+      period: Math.min(120, Math.max(15, parseInt(q.get('period') || '30', 10) || 30)),
+      algorithm: (q.get('algorithm') || 'SHA1').toLowerCase().replace('-', '')
+    };
+  }
+  return { secret: txt.replace(/\s/g, ''), issuer: '', label: '', digits: 6, period: 30, algorithm: 'sha1' };
+}
+
+/* La caja se abre con Hello y se queda abierta un rato: pedir la huella cada
+   30 segundos, que es lo que dura un código, no lo usaría nadie. */
+const TOTP_ABIERTA_MS = 5 * 60 * 1000;
+let totpAbiertaHasta = 0;
+const totpAbierta = () => Date.now() < totpAbiertaHasta;
+
+ipcMain.handle('totp:available', soloUI(() => ({
+  encryption: safeStorage.isEncryptionAvailable(),
+  unlocked: totpAbierta(),
+  count: loadTotp().length
+})));
+ipcMain.handle('totp:unlock', soloUI(async () => {
+  if (!loadTotp().length) { totpAbiertaHasta = Date.now() + TOTP_ABIERTA_MS; return { ok: true }; }
+  const ok = await verifyWindowsHello('Naviris: verifica tu identidad para ver tus códigos');
+  if (!ok) return { ok: false, error: 'verificacion cancelada' };
+  totpAbiertaHasta = Date.now() + TOTP_ABIERTA_MS;
+  return { ok: true, hasta: totpAbiertaHasta };
+}));
+ipcMain.handle('totp:lock', soloUI(() => { totpAbiertaHasta = 0; return { ok: true }; }));
+ipcMain.handle('totp:list', soloUI(() => loadTotp().map((e) => ({
+  id: e.id, issuer: e.issuer, label: e.label, digits: e.digits, period: e.period
+}))));
+ipcMain.handle('totp:add', soloUI((_e, { entrada, issuer, label } = {}) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'El cifrado del sistema no está disponible' };
+  let d;
+  try { d = parseaOtp(entrada); } catch (err) { return { ok: false, error: err.message }; }
+  if (!d.secret) return { ok: false, error: 'Falta el secreto' };
+  // Se genera un código antes de guardar: si el secreto está mal, se ve ahora y
+  // no dentro de un mes cuando haga falta entrar en la cuenta.
+  try { codigoTotp(d.secret, d); } catch { return { ok: false, error: 'Ese secreto no es válido' }; }
+  const list = loadTotp();
+  const ent = {
+    id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    issuer: String(issuer || d.issuer || '').slice(0, 60).trim() || 'Cuenta',
+    label: String(label || d.label || '').slice(0, 80).trim(),
+    digits: d.digits, period: d.period, algorithm: d.algorithm,
+    enc: safeStorage.encryptString(d.secret).toString('base64'),
+    created: Date.now()
+  };
+  list.push(ent);
+  saveTotp(list);
+  totpAbiertaHasta = Date.now() + TOTP_ABIERTA_MS;  // recién añadida, se puede ver
+  return { ok: true, id: ent.id, issuer: ent.issuer, label: ent.label };
+}));
+ipcMain.handle('totp:delete', soloUI(async (_e, id) => {
+  const ok = await verifyWindowsHello('Naviris: verifica tu identidad para borrar un código');
+  if (!ok) return { ok: false, error: 'verificacion cancelada' };
+  saveTotp(loadTotp().filter((e) => e.id !== id));
+  return { ok: true };
+}));
+ipcMain.handle('totp:codes', soloUI(() => {
+  if (!totpAbierta()) return { ok: false, locked: true };
+  const ahora = Date.now();
+  const items = loadTotp().map((e) => {
+    let code = '------';
+    try { code = codigoTotp(safeStorage.decryptString(Buffer.from(e.enc, 'base64')), e, ahora); }
+    catch { code = 'error'; }
+    const per = e.period || 30;
+    return { id: e.id, issuer: e.issuer, label: e.label, code, restan: per - Math.floor(ahora / 1000) % per, period: per };
+  });
+  return { ok: true, items, hasta: totpAbiertaHasta };
+}));
+// El secreto en claro solo por aquí, y siempre con Hello: sirve para pasar la
+// cuenta a otro dispositivo o guardarla en la copia de seguridad.
+ipcMain.handle('totp:reveal', soloUI(async (_e, id) => {
+  const e = loadTotp().find((x) => x.id === id);
+  if (!e) return { ok: false, error: 'no existe' };
+  const ok = await verifyWindowsHello('Naviris: verifica tu identidad para ver el secreto');
+  if (!ok) return { ok: false, error: 'verificacion cancelada' };
+  try {
+    const sec = safeStorage.decryptString(Buffer.from(e.enc, 'base64'));
+    const etiqueta = encodeURIComponent((e.issuer ? e.issuer + ':' : '') + (e.label || ''));
+    const uri = `otpauth://totp/${etiqueta}?secret=${sec}&issuer=${encodeURIComponent(e.issuer || '')}&digits=${e.digits}&period=${e.period}&algorithm=${(e.algorithm || 'sha1').toUpperCase()}`;
+    return { ok: true, secret: sec, uri };
+  } catch { return { ok: false, error: 'no se pudo descifrar' }; }
+}));
 
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
 ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });

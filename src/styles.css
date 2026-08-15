@@ -1751,6 +1751,56 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wl-ver:hover { transform: translateY(-1px); }
 .w-wallet.t-2x1 .wl-puntos { margin-top: 4px; }
 
+/* ===== Widget de códigos 2FA ===== */
+.w-auth { padding: 12px 12px 10px; height: 100%; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.au-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
+.au-tit { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+.au-tools { display: inline-flex; gap: 2px; }
+.au-tools button { width: 24px; height: 24px; border: none; border-radius: 7px; background: none; color: var(--text-dim);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background var(--dur-1), color var(--dur-1); }
+.au-tools button:hover { background: var(--bg-3); color: var(--text); }
+.au-tools svg { width: 15px; height: 15px; }
+
+.au-lista { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.au-it { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; cursor: pointer;
+  transition: background var(--dur-1); }
+.au-it:hover { background: var(--bg-3); }
+.au-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.au-em { font-size: 12.5px; font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-lb { font-size: 10.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-cod { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Cifras tabulares: si no, los dígitos bailan al cambiar el código cada 30 s. */
+.au-num { font-family: var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums;
+  font-size: 16px; font-weight: 700; letter-spacing: .04em; color: var(--accent); }
+.au-ring { width: 18px; height: 18px; transform: rotate(-90deg); flex: none; }
+.au-r-bg { fill: none; stroke: var(--line-2); stroke-width: 2.5; }
+.au-r-fg { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+
+.au-vacio { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 6px; }
+.au-vacio svg { width: 26px; height: 26px; color: var(--text-dim); }
+.au-vacio span { font-size: 11.5px; color: var(--text-dim); line-height: 1.4; }
+.au-vacio button { border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg);
+  font-family: inherit; font-size: 11px; font-weight: 650; padding: 7px 14px; cursor: pointer;
+  transition: transform var(--dur-1) var(--spring); }
+.au-vacio button:hover { transform: translateY(-1px); }
+
+/* Alta de cuenta */
+.au-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.5); backdrop-filter: blur(3px); }
+.au-box { width: min(420px, calc(100vw - 40px)); background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--glass-lift); }
+.au-box-t { font-size: 15px; font-weight: 700; }
+.au-box-s { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.au-mono { font-family: var(--mono, ui-monospace, monospace); font-size: 11.5px; color: var(--text); }
+.au-in { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 10px 12px; font-family: inherit; font-size: 12.5px; outline: none; transition: border-color var(--dur-1); }
+.au-in:focus { border-color: var(--focus); }
+.au-box-b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.au-box-b button { border: none; border-radius: 10px; font-family: inherit; font-size: 12.5px; font-weight: 650;
+  padding: 9px 15px; cursor: pointer; background: var(--bg-3); color: var(--text); }
+.au-box-b .au-ok { background: var(--accent); color: var(--accent-fg); }
+.au-err { font-size: 11.5px; color: #e6a9b4; min-height: 14px; }
+
 /* ===== Asas de estirado (modo Editar, tallas libres) ===== */
 .w-redim { position: absolute; display: none; z-index: 6; }
 #hub.editing .w-redim { display: block; }

@@ -775,7 +775,8 @@ const WIDGET_TYPES = {
   moovin: { name: 'Moovin', icon: 'tv-minimal' },
   clip: { name: 'Portapapeles', icon: 'clipboard' },
   deco: { name: 'Adorno', icon: 'star' },
-  wallet: { name: 'Tarjetas', icon: 'credit-card' }
+  wallet: { name: 'Tarjetas', icon: 'credit-card' },
+  auth: { name: 'Códigos 2FA', icon: 'shield-check' }
 };
 /* ===== GRILLA UNIVERSAL DE CELDAS (2026-08-11, pedido de Dosa) =====
    Como la pantalla de un movil: celda base 160x160 (el RELOJ es la referencia,
@@ -812,7 +813,8 @@ const TAMANOS = {
   moovin: [[2, 2], [1, 1], [2, 1], [4, 2]],
   clip: [[2, 2], [1, 1], [2, 3], [3, 2]],
   deco: [[1, 1], [2, 1], [2, 2]],
-  wallet: [[2, 1], [1, 1], [2, 2]]
+  wallet: [[2, 1], [1, 1], [2, 2]],
+  auth: [[2, 2], [2, 1], [2, 3], [3, 2]]
 };
 // Tallas LIBRES: estas cajas se estiran por los bordes a cualquier rectangulo
 // de celdas (las imagenes se adaptan por cover; los accesos reorganizan tiles).
@@ -1494,6 +1496,7 @@ function renderHub() {
     else if (w.type === 'clip') { body.className = 'w-card w-clip'; renderClipW(body); }
     else if (w.type === 'deco') { body.className = 'w-card w-deco'; body.innerHTML = '<span class="dc-a"></span><span class="dc-b"></span><span class="dc-c"></span>'; }
     else if (w.type === 'wallet') { body.className = 'w-card w-wallet'; renderWalletW(body); }
+    else if (w.type === 'auth') { body.className = 'w-card w-auth'; renderAuthW(body); }
     body.classList.add('t-' + tw + 'x' + th); // talla para CSS estructural
     if (body.parentNode !== el) el.appendChild(body);
 
@@ -2784,6 +2787,164 @@ function renderWalletW(body) {
   };
   body.querySelector('.wl-ver').addEventListener('click', abre);
   body.addEventListener('click', abre);
+}
+
+/* ============ Widget de códigos 2FA (TOTP) ============
+   Los códigos NO se pintan de entrada: la caja se abre con Windows Hello y se
+   queda abierta unos minutos. Si no, cualquiera que pasara por delante del
+   portátil abierto tendría a la vista el segundo factor de todas las cuentas,
+   que es justo lo que este widget debería proteger.
+   El secreto no llega nunca aquí: main devuelve solo el código ya calculado. */
+let authTimer = null;
+function renderAuthW(body) {
+  clearInterval(authTimer);
+  const pinta = async () => {
+    const est = await window.cobalt.totpAvailable();
+    if (!est.encryption) {
+      body.innerHTML = `<div class="au-vacio">${window.icon('shield-check')}<span>El cifrado del sistema no está disponible</span></div>`;
+      return;
+    }
+    if (!est.count) {
+      body.innerHTML = `
+        <div class="au-vacio">${window.icon('shield-check')}
+          <span>Sin códigos guardados</span>
+          <button class="au-add">Añadir cuenta</button>
+        </div>`;
+      body.querySelector('.au-add').addEventListener('click', (e) => { e.stopPropagation(); pideAlta(pinta); });
+      return;
+    }
+    if (!est.unlocked) {
+      body.innerHTML = `
+        <div class="au-vacio">${window.icon('lock-closed')}
+          <span>${est.count} ${est.count === 1 ? 'cuenta guardada' : 'cuentas guardadas'}</span>
+          <button class="au-unlock">Desbloquear</button>
+        </div>`;
+      body.querySelector('.au-unlock').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const r = await window.cobalt.totpUnlock();
+        if (r.ok) pinta(); else toast('No se pudo verificar tu identidad');
+      });
+      return;
+    }
+    const r = await window.cobalt.totpCodes();
+    if (!r.ok) { pinta(); return; }
+    body.innerHTML = `
+      <div class="au-head">
+        <span class="au-tit">Códigos</span>
+        <span class="au-tools">
+          <button class="au-add" title="Añadir cuenta" data-ico="plus"></button>
+          <button class="au-lock" title="Bloquear" data-ico="lock-closed"></button>
+        </span>
+      </div>
+      <div class="au-lista">${r.items.map((it) => `
+        <div class="au-it" data-id="${it.id}">
+          <div class="au-info">
+            <span class="au-em">${escapeHtml(it.issuer)}</span>
+            ${it.label ? `<span class="au-lb">${escapeHtml(it.label)}</span>` : ''}
+          </div>
+          <div class="au-cod">
+            <span class="au-num">${it.code.replace(/(\d{3})(?=\d)/, '$1 ')}</span>
+            <svg class="au-ring" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" class="au-r-bg"></circle>
+              <circle cx="12" cy="12" r="9" class="au-r-fg"
+                style="stroke-dasharray:56.5; stroke-dashoffset:${(56.5 * (1 - it.restan / it.period)).toFixed(1)}"></circle>
+            </svg>
+          </div>
+        </div>`).join('')}</div>`;
+    body.querySelectorAll('.au-it').forEach((el) => {
+      // Un clic copia el código: es lo que se hace el 100 % de las veces.
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
+        window.cobalt.clipWrite(n);
+        toast('Código copiado');
+      });
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showCtxMenu(e.clientX, e.clientY, [
+          {
+            label: 'Copiar código', icon: 'clipboard', action: () => {
+              const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
+              window.cobalt.clipWrite(n); toast('Código copiado');
+            }
+          },
+          {
+            label: 'Copiar la cuenta para otro dispositivo', icon: 'key', action: async () => {
+              const v = await window.cobalt.totpReveal(el.dataset.id);
+              if (v.ok) { window.cobalt.clipWrite(v.uri); toast('Enlace de la cuenta copiado'); }
+              else toast('No se pudo verificar tu identidad');
+            }
+          },
+          { sep: true },
+          {
+            label: 'Eliminar', icon: 'trash', danger: true, action: async () => {
+              const v = await window.cobalt.totpDelete(el.dataset.id);
+              if (v.ok) { toast('Código eliminado'); pinta(); } else toast('No se pudo verificar tu identidad');
+            }
+          }
+        ]);
+      });
+    });
+    body.querySelector('.au-add').addEventListener('click', (e) => { e.stopPropagation(); pideAlta(pinta); });
+    body.querySelector('.au-lock').addEventListener('click', async (e) => {
+      e.stopPropagation(); await window.cobalt.totpLock(); pinta();
+    });
+  };
+  pinta();
+  // Un segundo: es lo que necesita la cuenta atrás para no ir a saltos.
+  authTimer = setInterval(async () => {
+    if (!document.body.contains(body)) { clearInterval(authTimer); return; }
+    const est = await window.cobalt.totpAvailable();
+    if (!est.unlocked || !est.count) { pinta(); return; }
+    const r = await window.cobalt.totpCodes();
+    if (!r.ok) { pinta(); return; }
+    r.items.forEach((it) => {
+      const el = body.querySelector(`.au-it[data-id="${it.id}"]`);
+      if (!el) return;
+      const num = el.querySelector('.au-num');
+      const txt = it.code.replace(/(\d{3})(?=\d)/, '$1 ');
+      if (num.textContent !== txt) num.textContent = txt;
+      const fg = el.querySelector('.au-r-fg');
+      if (fg) fg.style.strokeDashoffset = (56.5 * (1 - it.restan / it.period)).toFixed(1);
+    });
+  }, 1000);
+}
+
+/* Alta: se admite tanto el enlace otpauth:// del QR como el secreto pelado que
+   enseñan las webs debajo del código. */
+function pideAlta(alTerminar) {
+  const cap = document.createElement('div');
+  cap.className = 'au-modal';
+  cap.innerHTML = `
+    <div class="au-box">
+      <div class="au-box-t">Añadir cuenta</div>
+      <div class="au-box-s">Pega el enlace <span class="au-mono">otpauth://</span> del código QR, o el secreto que muestra la web al activar la verificación en dos pasos.</div>
+      <input class="au-in au-uri" type="text" spellcheck="false" placeholder="otpauth://totp/... o JBSWY3DPEHPK3PXP" />
+      <input class="au-in au-nom" type="text" spellcheck="false" placeholder="Nombre (ej. Discord)" />
+      <div class="au-box-b">
+        <button class="au-cancel">Cancelar</button>
+        <button class="au-ok">Guardar</button>
+      </div>
+      <div class="au-err"></div>
+    </div>`;
+  document.body.appendChild(cap);
+  const uri = cap.querySelector('.au-uri'), nom = cap.querySelector('.au-nom'), err = cap.querySelector('.au-err');
+  uri.focus();
+  const cierra = () => cap.remove();
+  cap.addEventListener('click', (e) => { if (e.target === cap) cierra(); });
+  cap.querySelector('.au-cancel').addEventListener('click', cierra);
+  const guarda = async () => {
+    err.textContent = '';
+    const v = uri.value.trim();
+    if (!v) { err.textContent = 'Pega el enlace o el secreto'; return; }
+    const r = await window.cobalt.totpAdd({ entrada: v, issuer: nom.value.trim() });
+    if (!r.ok) { err.textContent = r.error || 'No se pudo guardar'; return; }
+    cierra(); toast('Cuenta añadida'); alTerminar && alTerminar();
+  };
+  cap.querySelector('.au-ok').addEventListener('click', guarda);
+  uri.addEventListener('keydown', (e) => { if (e.key === 'Enter') nom.focus(); });
+  nom.addEventListener('keydown', (e) => { if (e.key === 'Enter') guarda(); });
+  cap.addEventListener('keydown', (e) => { if (e.key === 'Escape') cierra(); });
 }
 
 /* Aviso de recordatorios: chequeo cada 30 s; toast siempre y notificación si se puede */
@@ -5029,7 +5190,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
      sistema. Todo lo que scrollee en la interfaz entra en esta lista — los
      menus y popovers se sumaron al limitarlos al alto de la ventana, que es
      cuando empezaron a scrollear. */
-  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, .spl-lista, .ml-lista, .xt-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
+  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, .spl-lista, .ml-lista, .xt-lista, .au-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
   const barrer = () => document.querySelectorAll(SEL).forEach(montar);
   /* El hub y sus widgets se pintan DESPUÉS de este repaso inicial, y luego cada
      vez que se recompone: sin esta puerta, listas como la de Spotify se

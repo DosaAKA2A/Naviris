@@ -69,6 +69,17 @@ contextBridge.exposeInMainWorld('cobalt', {
   cardsReveal: (id) => ipcRenderer.invoke('cards:reveal', id),
   cardsFill: (id) => ipcRenderer.invoke('cards:fill', id),
 
+  // Códigos de verificación en dos pasos (TOTP). El secreto NO sale de main:
+  // por aquí solo viajan los códigos ya calculados, y solo con la caja abierta.
+  totpAvailable: () => ipcRenderer.invoke('totp:available'),
+  totpUnlock: () => ipcRenderer.invoke('totp:unlock'),
+  totpLock: () => ipcRenderer.invoke('totp:lock'),
+  totpList: () => ipcRenderer.invoke('totp:list'),
+  totpAdd: (datos) => ipcRenderer.invoke('totp:add', datos),
+  totpDelete: (id) => ipcRenderer.invoke('totp:delete', id),
+  totpCodes: () => ipcRenderer.invoke('totp:codes'),
+  totpReveal: (id) => ipcRenderer.invoke('totp:reveal', id),
+
   addonsCatalog: () => ipcRenderer.invoke('addons:catalog'),
   addonsList: () => ipcRenderer.invoke('addons:list'),
   addonsInstall: (meta) => ipcRenderer.invoke('addons:install', meta),
