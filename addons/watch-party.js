@@ -429,36 +429,36 @@
       party.ws = ws;
       ws.onopen = function () { reintento = 0; send({ t: 'join', room: code, name: name, host: asHost }); };
       ws.onmessage = function (ev) {
-      if (!party || party.ws !== ws) return;
-      var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
-      if (m.t === 'joined') {
-        var volvia = party.everOk;
-        party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
-        if (volvia) logSys('Conexión recuperada');
-        else {
-          logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
-          logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
+        if (!party || party.ws !== ws) return;
+        var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
+        if (m.t === 'joined') {
+          var volvia = party.everOk;
+          party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
+          if (volvia) logSys('Conexión recuperada');
+          else {
+            logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
+            logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
+          }
+          if (asHost) beatStart();
         }
-        if (asHost) beatStart();
-      }
-      else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logAct(m.who, 'se unió a la sala'); else if (m.left && m.who) logAct(m.who, 'salió de la sala'); }
-      else if (m.t === 'ev') applyRemote(m);
-      else if (m.t === 'beat') {
-        if (!party.host) {
-          var hadLock = !!party.lock; party.lock = !!m.lock;
-          if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión activó el control exclusivo' : 'El anfitrión desactivó el control exclusivo');
-          var hadNav = !!party.navLock; party.navLock = m.nlock !== false;
-          if (party.navLock !== hadNav) logSys(party.navLock ? 'Ahora solo el anfitrión puede cambiar el video' : 'Ahora cualquiera puede cambiar el video');
-          // Solo se te devuelve al video del anfitrión si la sala está cerrada;
-          // si está abierta, el video lo manda quien lo haya cambiado.
-          if (party.navLock) syncEpisode(m.url);
-          if (typeof m.time === 'number') applyBeat(m);
+        else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logAct(m.who, 'se unió a la sala'); else if (m.left && m.who) logAct(m.who, 'salió de la sala'); }
+        else if (m.t === 'ev') applyRemote(m);
+        else if (m.t === 'beat') {
+          if (!party.host) {
+            var hadLock = !!party.lock; party.lock = !!m.lock;
+            if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión activó el control exclusivo' : 'El anfitrión desactivó el control exclusivo');
+            var hadNav = !!party.navLock; party.navLock = m.nlock !== false;
+            if (party.navLock !== hadNav) logSys(party.navLock ? 'Ahora solo el anfitrión puede cambiar el video' : 'Ahora cualquiera puede cambiar el video');
+            // Solo se te devuelve al video del anfitrión si la sala está cerrada;
+            // si está abierta, el video lo manda quien lo haya cambiado.
+            if (party.navLock) syncEpisode(m.url);
+            if (typeof m.time === 'number') applyBeat(m);
+          }
         }
-      }
-      else if (m.t === 'chat') logChat(m.from || '?', String(m.msg || ''));
-      else if (m.t === 'error') party.status = 'Error: ' + m.msg;
-      render(); glow();
-    };
+        else if (m.t === 'chat') logChat(m.from || '?', String(m.msg || ''));
+        else if (m.t === 'error') party.status = 'Error: ' + m.msg;
+        render(); glow();
+      };
       // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
       // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
       var neverOk = function () { return !party.everOk; };
