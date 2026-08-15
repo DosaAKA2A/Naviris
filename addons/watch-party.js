@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.7.0
+/* Naviris addon: Watch Party v2.7.1
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (iris.it.com/moovin).
    NO transmite video: cada quien reproduce su propia copia con su propia
@@ -42,6 +42,20 @@
    salas creadas desde la anterior: hay que actualizar en ambos lados. La
    identidad con película sigue siendo el ?v= (la URL del video), que no
    depende de la ruta, así que esas salas sí siguen entendiéndose.
+
+   v2.7.1: al cambiar de episodio, a los invitados no se les cambiaba.
+   El aviso de cambio de video se mandaba bien, pero el receptor lo tiraba: el
+   guard descartaba el cambio salvo que fueras el anfitrión, y el anfitrión es
+   justo quien nunca lo recibe. Faltaba saber de quién venía, así que ahora el
+   relay marca `host` al reenviar (va del attachment del join, no del cliente)
+   y el guard mira ese dato. Hasta ahora solo colaba por el latido, con hasta
+   2 s de retraso y únicamente con el candado de video puesto.
+   Además: la URL del latido se lee fuera del executeJavaScript (al cambiar de
+   episodio la promesa se rompe y se perdía justo el latido con la URL nueva) y
+   el WebSocket se reconecta solo con espera creciente, que antes un corte
+   dejaba la sala pintada sin sincronizar nada.
+   Necesita el relay actualizado: sin `host` en el reenvío, el cambio sigue
+   llegando solo por el latido.
 */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
@@ -323,7 +337,11 @@
     // (el propio anfitrión siempre acepta el cambio de un invitado cuando
     // tiene el cambio de video abierto).
     if (m.kind === 'nav') {
-      if (party.navLock && !party.host) return;   // sala cerrada: manda el anfitrión
+      // Sala cerrada: solo se sigue al anfitrión. `m.host` lo pone el servidor
+      // al reenviar, así que es de fiar; antes no venía y el guard miraba
+      // `party.host`, con lo que un invitado descartaba TODOS los cambios,
+      // incluidos los del anfitrión, y nunca le seguía de episodio.
+      if (party.navLock && !m.host && !party.host) return;
       var want = epIdOf(m.url); if (!want) return;
       var cur = ''; try { cur = party.wv.getURL(); } catch (e) { /* nada */ }
       if (epIdOf(cur) === want) return;
@@ -355,17 +373,24 @@
     beatStop();
     var tick = function () {
       if (!party) return;
+      // La URL se lee FUERA del executeJavaScript: al cambiar de episodio el
+      // mundo JS de la página se destruye y la promesa se rompe, que es
+      // justo el latido que llevaba la URL nueva. Se manda igual, con el
+      // tiempo si se pudo consultar y sin él si no.
+      var url = ''; try { url = party.wv.getURL(); } catch (e) { /* nada */ }
+      var base = { t: 'beat', url: url, lock: !!party.lock, nlock: !!party.navLock, at: Date.now() };
+      var mandado = false;
+      var manda = function (st) {
+        if (mandado || !party) return;
+        mandado = true;
+        if (st && st.has) { base.time = st.time; base.paused = st.paused; }
+        base.at = Date.now();
+        send(base);
+      };
       try {
-        party.wv.executeJavaScript('window.__navPartyState?__navPartyState():null').then(function (st) {
-          if (!party) return;
-          var url = ''; try { url = party.wv.getURL(); } catch (e) { /* nada */ }
-          // El latido siempre lleva la URL (los invitados siguen el episodio) y
-          // el modo de control; tiempo/pausa solo si ya hay video.
-          var msg = { t: 'beat', url: url, lock: !!party.lock, nlock: !!party.navLock, at: Date.now() };
-          if (st && st.has) { msg.time = st.time; msg.paused = st.paused; }
-          send(msg);
-        }).catch(function () {});
-      } catch (e) { /* nada */ }
+        party.wv.executeJavaScript('window.__navPartyState?__navPartyState():null')
+          .then(manda).catch(function () { manda(null); });
+      } catch (e) { manda(null); }
     };
     tick();
     beatTimer = setInterval(tick, 2000);
@@ -386,22 +411,34 @@
     wv.addEventListener('dom-ready', onRenav);
     wv.addEventListener('destroyed', onGone);
     inject(wv);
-    var ws;
-    try { ws = new WebSocket(SERVER); } catch (e) {
-      // El CSP del renderer puede vetar la conexión (Naviris < 2.7.3-dev.12).
-      party.status = 'Sin conexión con el servidor. Actualiza Naviris.';
-      naviris.toast('Watch Party no puede conectar: actualiza Naviris');
-      render(); glow(); return;
-    }
-    party.ws = ws;
-    ws.onopen = function () { send({ t: 'join', room: code, name: name, host: asHost }); };
-    ws.onmessage = function (ev) {
+
+    /* El socket se abre aquí dentro para poder repetirlo: si se cae (el Durable
+       Object se redespliega, el portátil se suspende, un bache de red) antes se
+       quedaba la sala pintada con su código mientras ya no se sincronizaba
+       nada, que por fuera se ve igual que "no me cambia el episodio". */
+    var reintento = 0, reTimer = null;
+    function abreSocket() {
+      if (!party) return;
+      var ws;
+      try { ws = new WebSocket(SERVER); } catch (e) {
+        // El CSP del renderer puede vetar la conexión (Naviris < 2.7.3-dev.12).
+        party.status = 'Sin conexión con el servidor. Actualiza Naviris.';
+        naviris.toast('Watch Party no puede conectar: actualiza Naviris');
+        render(); glow(); return;
+      }
+      party.ws = ws;
+      ws.onopen = function () { reintento = 0; send({ t: 'join', room: code, name: name, host: asHost }); };
+      ws.onmessage = function (ev) {
       if (!party || party.ws !== ws) return;
       var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
       if (m.t === 'joined') {
+        var volvia = party.everOk;
         party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
-        logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
-        logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
+        if (volvia) logSys('Conexión recuperada');
+        else {
+          logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
+          logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
+        }
         if (asHost) beatStart();
       }
       else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logAct(m.who, 'se unió a la sala'); else if (m.left && m.who) logAct(m.who, 'salió de la sala'); }
@@ -422,16 +459,31 @@
       else if (m.t === 'error') party.status = 'Error: ' + m.msg;
       render(); glow();
     };
-    // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
-    // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
-    var neverOk = function () { return !party.everOk; };
-    ws.onclose = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Desconectado'; beatStop(); render(); } };
-    ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Sin conexión con el servidor'; render(); } };
-    render(); glow();
+      // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
+      // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
+      var neverOk = function () { return !party.everOk; };
+      ws.onclose = function () {
+        if (!party || party.ws !== ws) return;
+        party.ok = false; beatStop();
+        if (neverOk()) { party.status = 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); return; }
+        // Ya había conectado alguna vez: es un corte, se vuelve a entrar sola.
+        reintento++;
+        var espera = Math.min(30000, 1000 * Math.pow(2, reintento - 1));
+        party.status = 'Reconectando…';
+        if (reTimer) clearTimeout(reTimer);
+        reTimer = setTimeout(function () { if (party) abreSocket(); }, espera);
+        render();
+      };
+      ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Sin conexión con el servidor'; render(); } };
+      render(); glow();
+    }
+    party.paraReconexion = function () { if (reTimer) { clearTimeout(reTimer); reTimer = null; } };
+    abreSocket();
   }
   function leave(silent) {
     if (!party) return;
     beatStop();
+    try { party.paraReconexion && party.paraReconexion(); } catch (e) { /* nada */ }
     var wv = party.wv;
     try { wv.removeEventListener('console-message', onConsole); } catch (e) { /* nada */ }
     try { wv.removeEventListener('did-navigate', onRenav); wv.removeEventListener('did-navigate-in-page', onRenav); wv.removeEventListener('dom-ready', onRenav); wv.removeEventListener('destroyed', onGone); } catch (e) { /* nada */ }

@@ -70,7 +70,12 @@ export class PartyRoom {
     if (!meta.room) return; // el resto requiere estar en una sala
     if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat') {
       // Reenviar tal cual a los demás de la sala (nunca al emisor: evita eco).
+      // `host` lo pone el servidor desde el attachment del join, no el cliente:
+      // es el único dato de quién manda en el que el receptor puede confiar, y
+      // sin él no puede distinguir un cambio de video del anfitrión de uno de
+      // otro invitado (y acababa descartando los dos).
       m.from = meta.name;
+      m.host = !!meta.host;
       this.broadcast(meta.room, m, ws);
     }
   }
