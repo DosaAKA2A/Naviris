@@ -362,13 +362,65 @@ function recordDlHistory(p) {
 // que el vídeo no cargara o disparaba el anti-adblock. El salto real es en cliente.
 const YT_AD_PATHS = ['/pagead/', '/api/stats/ads', '/ptracking'];
 
+/* ===== Identidad del navegador, en un solo sitio =====
+   El UA string y los client hints tienen que contar la MISMA historia; si no,
+   Cloudflare (y cualquier antifraude) lo lee como cliente falseado. Se calcula
+   una vez y de aquí beben las cabeceras (main) y navigator.userAgentData (que
+   fija el preload en cada web). */
+const UA_BRUTO = app.userAgentFallback.replace(/\s(?:Naviris|Electron)\/\S+/g, '');
+const VERSION_COMPLETA = (UA_BRUTO.match(/Chrome\/([\d.]+)/) || [, '0.0.0.0'])[1];
+const VERSION_MAYOR = VERSION_COMPLETA.split('.')[0];
+// Chrome recorta la versión del UA a MAJOR.0.0.0 desde la "UA reduction"; dejar
+// la versión completa aquí es en sí mismo una señal de cliente no estándar.
+const UA_LIMPIO = UA_BRUTO.replace(/Chrome\/[\d.]+/, 'Chrome/' + VERSION_MAYOR + '.0.0.0');
+const MARCA_RELLENO = 'Not/A)Brand';   // el mismo que ya usa Chromium aquí
+const UA_CH = {
+  versionCompleta: VERSION_COMPLETA,
+  versionMayor: VERSION_MAYOR,
+  marcas: `"${MARCA_RELLENO}";v="99", "Chromium";v="${VERSION_MAYOR}", "Google Chrome";v="${VERSION_MAYOR}"`,
+  marcasCompletas: `"${MARCA_RELLENO}";v="99.0.0.0", "Chromium";v="${VERSION_COMPLETA}", "Google Chrome";v="${VERSION_COMPLETA}"`,
+  // Lo que consume el preload para rehacer navigator.userAgentData.
+  lista: [
+    { brand: MARCA_RELLENO, version: '99' },
+    { brand: 'Chromium', version: VERSION_MAYOR },
+    { brand: 'Google Chrome', version: VERSION_MAYOR }
+  ],
+  listaCompleta: [
+    { brand: MARCA_RELLENO, version: '99.0.0.0' },
+    { brand: 'Chromium', version: VERSION_COMPLETA },
+    { brand: 'Google Chrome', version: VERSION_COMPLETA }
+  ]
+};
+ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
+
 function setupSession(ses) {
   // UA de Chrome puro para navegar: el UA por defecto lleva los tokens
   // "Naviris/x" y "Electron/x", y los sitios que husmean el navegador no lo
   // reconocen: Spotify, por ejemplo, servía su reproductor degradado de móvil
   // (barra de pestañas abajo, sin sidebar). Quitando esos tokens queda el UA
   // estándar de Chrome y sirven la web de escritorio completa.
-  ses.setUserAgent(app.userAgentFallback.replace(/\s(?:Naviris|Electron)\/\S+/g, ''));
+  //
+  // Pero quitar esos tokens A MEDIAS era PEOR que no tocar nada: el UA decía
+  // "Chrome" mientras los client hints (Sec-CH-UA y navigator.userAgentData)
+  // seguían diciendo solo "Chromium", sin la marca "Google Chrome" que manda
+  // Chrome de verdad. Cloudflare compara ambos canales, veía la contradicción y
+  // clasificaba a Naviris como cliente automatizado: el Turnstile de cualquier
+  // web se quedaba dando vueltas en "Un momento…" para siempre y NO había forma
+  // de pasar una verificación. Comprobado contra un Chrome real en la misma
+  // máquina: manda tres marcas (Not·A·Brand, Google Chrome, Chromium) y la
+  // versión RECORTADA a MAJOR.0.0.0 en el UA. Aquí se iguala ese formato, en los
+  // dos canales, para que la identidad sea coherente. Ver `uaCH` más abajo.
+  ses.setUserAgent(UA_LIMPIO);
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    const h = { ...details.requestHeaders };
+    // Puede llegar con cualquier combinación de mayúsculas según el origen.
+    for (const k of Object.keys(h)) {
+      if (/^sec-ch-ua$/i.test(k)) h[k] = UA_CH.marcas;
+      else if (/^sec-ch-ua-full-version-list$/i.test(k)) h[k] = UA_CH.marcasCompletas;
+      else if (/^sec-ch-ua-full-version$/i.test(k)) h[k] = '"' + UA_CH.versionCompleta + '"';
+    }
+    callback({ requestHeaders: h });
+  });
   ses.webRequest.onBeforeRequest((details, callback) => {
     if (!settings.adblockEnabled || details.resourceType === 'mainFrame' || isWhitelisted(details.referrer)) {
       return callback({});

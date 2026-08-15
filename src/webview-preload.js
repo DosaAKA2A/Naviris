@@ -3,6 +3,47 @@
 // Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
 const { ipcRenderer, contextBridge } = require('electron');
 
+// --- Identidad coherente del navegador (client hints) ---
+// main ya reescribe las cabeceras Sec-CH-UA, pero eso no basta: los antifraude
+// leen TAMBIÉN navigator.userAgentData desde JavaScript, y ahí Chromium seguía
+// anunciándose sin la marca "Google Chrome" mientras el UA decía ser Chrome. Esa
+// contradicción es lo que dejaba el Turnstile de Cloudflare girando sin fin en
+// cualquier web, sin poder completar ninguna verificación.
+// Va en document_start y en TODOS los sitios a propósito: la incoherencia no era
+// de una web concreta. Se mantiene el objeto original para todo lo demás
+// (plataforma, móvil, arquitectura) y solo se corrigen las marcas.
+try {
+  const hints = ipcRenderer.sendSync('ua:hints');
+  if (hints && hints.lista) {
+    contextBridge.executeInMainWorld({
+      func: function (h) {
+        try {
+          var d = navigator.userAgentData;
+          if (!d) return;
+          var alta = d.getHighEntropyValues.bind(d);
+          var falso = {
+            brands: h.lista,
+            mobile: d.mobile,
+            platform: d.platform,
+            toJSON: function () { return { brands: h.lista, mobile: d.mobile, platform: d.platform }; },
+            getHighEntropyValues: function (claves) {
+              return alta(claves).then(function (v) {
+                if (v.brands) v.brands = h.lista;
+                if (v.fullVersionList) v.fullVersionList = h.listaCompleta;
+                return v;
+              });
+            }
+          };
+          Object.defineProperty(navigator, 'userAgentData', {
+            configurable: true, enumerable: true, get: function () { return falso; }
+          });
+        } catch (e) { /* si no se puede, se queda el original */ }
+      },
+      args: [hints]
+    });
+  }
+} catch (e) { /* nada */ }
+
 // --- X/Twitter: muro de verificación de edad ("contenido no apto para menores") ---
 // X decide si taparlo con el interruptor rweb_age_assurance_flow_enabled, que viaja en
 // el window.__INITIAL_STATE__ del HTML; su lector es `customOverrides[clave] ??
