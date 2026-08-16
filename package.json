@@ -15,7 +15,7 @@
     "icon": "electron build/render-icon.js",
     "fetch-bin": "node build/fetch-bin.js",
     "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always",
+    "release": "npm run dist && node build/publish-release.js",
     "publish": "node build/publish-release.js",
     "dist-publish": "npm run dist && node build/publish-release.js"
   },

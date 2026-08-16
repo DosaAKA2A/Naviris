@@ -9,7 +9,11 @@ name: Desktop Release (solo compilacion de prueba)
 # (ocurrio el 2026-07-25 con la v2.6.0-dev.3).
 #
 # Flujo de publicacion vigente:
-#   1. En local: `npm run release`  -> compila, firma VMP y sube la release.
+#   1. En local: `npm run release` -> `npm run dist` (compila y firma VMP) y
+#      luego build/publish-release.js, que sube los assets y genera el feed.
+#      NO usar `electron-builder --publish`: sus dos publicadores (nsis y
+#      portable) compiten por crear la misma release y el segundo muere con un
+#      422, dejandola sin instalador y sin .yml. Por eso existe el script.
 #   2. Al publicarse la release, "Mobile APK" adjunta el APK automaticamente.
 #
 # Este workflow queda solo como comprobacion manual de que el proyecto compila.
