@@ -472,7 +472,7 @@
     '#str-panel .lp-body{padding:12px 16px 18px}',
     '.str-lbl{margin:14px 2px 7px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim,#5c5e64)}',
     '.str-lbl:first-child{margin-top:2px}',
-    '.str-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#232327);background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);resize:vertical;min-height:64px;outline:none}',
+    '.str-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#232327);background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);resize:none;height:78px;outline:none}',
     '.str-in:focus{border-color:' + COLOR + '}',
     // Un enlace largo hace aparecer scroll en el cuadro, y ahi salia la barra
     // del sistema con sus flechitas. En Naviris ningun scroll usa la del
