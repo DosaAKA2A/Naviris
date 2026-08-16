@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.1.0 (kind: tool)
+/* Naviris addon: Strainer v1.1.1 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
@@ -37,7 +37,11 @@
 */
 (function () {
   var ID = 'strainer';
-  var COLOR = '#f5a524';                 // ambar: se ve de un vistazo que esta activo
+  // El realce del tema, NO un color propio: en el riel un ambar fijo cantaba
+  // entre iconos que siguen el tema (y en el tema rosa mas todavia). Es el mismo
+  // token con el que se encienden el hover del riel y el Spotify sonando. El
+  // ambar queda solo de respaldo por si el addon corre en un Naviris antiguo.
+  var COLOR = 'var(--realce, #f5a524)';
   var REGLAS_URL = 'https://naviris.site/addons/strainer.json';
 
   // Copia de respaldo de las reglas. La buena es la de naviris.site; esta solo
@@ -486,11 +490,13 @@
     '.str-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);transition:background .12s}',
     '.str-btn:hover{background:rgba(255,255,255,.15)}',
     '.str-btn:disabled{opacity:.5;cursor:default}',
-    '.str-btn.pri{background:' + COLOR + ';color:#1b1200}',
+    // El texto sobre el realce lo decide el tema: en lima va casi negro y en
+    // rosa blanco, asi que un marron fijo se volvia ilegible en uno de los dos.
+    '.str-btn.pri{background:' + COLOR + ';color:var(--accent-fg,#1b1200)}',
     '.str-btn.pri:hover{filter:brightness(1.08)}',
     '.str-est{font-size:12px;color:var(--muted,#8b8d94);margin-top:10px;min-height:16px}',
     '.str-est.mal{color:#ff6b6b}',
-    '.str-fin{border:1px solid ' + COLOR + ';border-radius:11px;padding:10px 12px;margin-top:10px;background:rgba(245,165,36,.07)}',
+    '.str-fin{border:1px solid ' + COLOR + ';border-radius:11px;padding:10px 12px;margin-top:10px;background:color-mix(in srgb, var(--realce, #f5a524) 8%, transparent)}',
     '.str-fin .h{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:' + COLOR + ';margin-bottom:6px}',
     '.str-fin .u{font-family:var(--mono,ui-monospace,monospace);font-size:12px;color:var(--text,#ececef);word-break:break-all;line-height:1.5}',
     '.str-salto{display:flex;gap:8px;font-size:11.5px;padding:5px 0;border-top:1px solid var(--line,#232327)}',
@@ -639,7 +645,9 @@
     btn = btn || document.getElementById('adt-' + ID);
     if (!btn) return;
     btn.style.color = activo ? COLOR : '';
-    btn.style.filter = activo ? 'drop-shadow(0 0 5px rgba(245,165,36,.75))' : '';
+    // El halo va en currentColor para que siga al realce del tema; con el ambar
+    // escrito a mano se quedaba naranja aunque el icono ya no lo fuera.
+    btn.style.filter = activo ? 'drop-shadow(0 0 5px currentColor)' : '';
     btn.title = 'Strainer: cuela un enlace y quédate con el final (' + contador + ' colados)' +
       (activo ? ' · las pasarelas se saltan solas al navegar' : ' · el salto automático está en pausa');
   }
