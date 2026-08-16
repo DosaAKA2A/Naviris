@@ -239,10 +239,10 @@
 
   /* ---------- el salto ---------- */
 
-  var memoria = new WeakMap();   // webview -> { saltos: [ts], desde: {url: ts} }
+  var memoria = new WeakMap();   // webview -> { saltos: [ts], desde: {url: ts}, ultima }
   function mem(wv) {
     var m = memoria.get(wv);
-    if (!m) { m = { saltos: [], desde: {} }; memoria.set(wv, m); }
+    if (!m) { m = { saltos: [], desde: {}, ultima: null }; memoria.set(wv, m); }
     return m;
   }
   function puedeSaltar(wv, url) {
@@ -291,6 +291,17 @@
     }, esperas[intento]);
   }
 
+  // Unica puerta de entrada: se mira una URL una sola vez por pestana. Los
+  // eventos de navegacion y el vigia pasan todos por aqui, asi que da igual
+  // cual llegue primero (o si no llega ninguno).
+  function revisa(wv, url) {
+    if (!url) return;
+    var m = mem(wv);
+    if (m.ultima === url) return;
+    m.ultima = url;
+    alNavegar(wv, url);
+  }
+
   function alNavegar(wv, url) {
     if (!activo || !url) return;
     var u = parse(url);
@@ -315,9 +326,9 @@
       // va en la URL, la pasarela no llega a recibir ni una visita. load-commit
       // y did-navigate quedan de red de seguridad, porque will-navigate no
       // cubre las navegaciones que arranca la propia interfaz (barra, marcador).
-      antes: function (e) { var u = e && e.url; if (u) setTimeout(function () { alNavegar(wv, u); }, 0); },
-      commit: function (e) { if (e && e.isMainFrame === false) return; var u = (e && e.url) || null; setTimeout(function () { alNavegar(wv, u || wv.getURL()); }, 0); },
-      nav: function (e) { alNavegar(wv, (e && e.url) || wv.getURL()); }
+      antes: function (e) { var u = e && e.url; if (u) setTimeout(function () { revisa(wv, u); }, 0); },
+      commit: function (e) { if (e && e.isMainFrame === false) return; var u = (e && e.url) || null; setTimeout(function () { revisa(wv, u || wv.getURL()); }, 0); },
+      nav: function (e) { revisa(wv, (e && e.url) || wv.getURL()); }
     };
     oyentes.set(wv, o);
     wv.addEventListener('will-navigate', o.antes);
@@ -325,7 +336,7 @@
     wv.addEventListener('did-navigate', o.nav);
     // Una pestana que ya estaba abierta en una pasarela cuando se instalo o se
     // encendio el addon tambien cuenta.
-    try { alNavegar(wv, wv.getURL()); } catch (e) { /* nada */ }
+    try { revisa(wv, wv.getURL()); } catch (e) { /* nada */ }
   }
   function desarmar() {
     for (var i = 0; i < wvs.length; i++) {
@@ -344,6 +355,14 @@
     try { lista = naviris.allWebviews ? naviris.allWebviews() : []; } catch (e) { lista = []; }
     if (!lista.length) { var a = naviris.activeWebview(); if (a) lista = [a]; }
     for (var i = 0; i < lista.length; i++) armar(lista[i]);
+    // Y se repasa la URL de todas, no solo la de las recien enganchadas: una
+    // pasarela CAIDA no dispara load-commit ni did-navigate (la pestana se
+    // queda en "Cargando…" para siempre) y sin este repaso no se saltaba nunca,
+    // que es justo el caso en que mas falta hace. revisa() no repite trabajo:
+    // solo actua cuando la URL de esa pestana cambia.
+    for (var j = 0; j < wvs.length; j++) {
+      try { revisa(wvs[j], wvs[j].getURL()); } catch (e) { /* pestana muriendo */ }
+    }
   }
 
   /* ---------- salto a mano (Alt+S) ---------- */
