@@ -4647,7 +4647,11 @@ const naviris = {
   registerTool({ id, label, icon, onClick, onUnload }) {
     if (document.getElementById('adt-' + id)) return;
     const b = document.createElement('button');
-    b.id = 'adt-' + id; b.className = 'sb-btn'; b.title = label; b.innerHTML = window.icon(icon || 'puzzle-piece');
+    // El icono lo elige el addon, que se actualiza por su cuenta: si pide uno
+    // que esta version del navegador no trae, el botón saldría VACÍO (un
+    // círculo sin nada dentro) y sin ningún aviso. Mejor la pieza de puzle.
+    const ico = window.iconExists?.(icon) ? icon : 'puzzle-piece';
+    b.id = 'adt-' + id; b.className = 'sb-btn'; b.title = label; b.innerHTML = window.icon(ico);
     b.addEventListener('click', () => onClick(b));
     adEls.tools.appendChild(b);
     if (typeof onUnload === 'function') toolUnloaders.set(id, onUnload);

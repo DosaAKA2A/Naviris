@@ -124,6 +124,16 @@
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
   };
 
+  /* ¿Existe ese icono? Los addons se actualizan por su cuenta desde el catálogo,
+     así que uno nuevo puede pedir un glifo que este navegador todavía no trae:
+     window.icon devolvería un <svg> vacío y el botón saldría en blanco, sin
+     ningún aviso. Quien pinta iconos de origen ajeno debe preguntar antes y
+     caer en 'puzzle-piece'. */
+  window.iconExists = function (name) {
+    return !!(L[name] || WX[name]
+      || ['mouse', 'twitch', 'eye-fill', 'star-solid'].indexOf(name) !== -1);
+  };
+
   // Logo de Naviris = isotipo correcto de Iris (assets/cobalt_logo.svg), gradiente animado
   const IRIS_VB = '0 0 876.27 874.83';
   const IRIS_D = 'M1.08,582.41L0,302.19C-.65,131.46,130.07-1.65,303,.02l306.38,2.95c152.34,1.47,267.72,141.24,266.88,290.55l-1.72,307.39c-.86,154.14-136.95,274.21-288.33,273.92l-299.69-.58C128.09,873.93,1.69,742.98,1.08,582.41ZM670.98,820.63c85.92-7.81,145.77-71.41,151.41-157.79,5.07-77.74-16.57-152.57-53.84-222.68-82.97-156.09-213.93-281-375.71-352.86-56.61-25.15-115.91-37.9-176.04-34.9C124.83,56.97,57.47,124.72,53.55,217.62c-11.51,273.02,343.75,627.9,617.43,603.01Z';
