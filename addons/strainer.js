@@ -409,11 +409,18 @@
       vistos[actual] = 1;
       if (n >= 5 || esFinal(actual)) return Promise.resolve(cadena);
       var r = reglaDe(actual);
+      // Sacarlo de la URL es gratis y no se inventa nada: el destino va escrito
+      // ahi. Esto se sigue haciendo salte donde salte.
       var d = destinoDeUrl(actual, r);
       if (d && !vistos[d]) {
         cadena.push({ url: d, via: 'la URL' });
         return paso(d, n + 1);
       }
+      // Abrir la pagina, en cambio, solo se hace con el enlace que pego la
+      // persona (ella dice que es una pasarela) o con una pasarela CONOCIDA. Si
+      // no, se acaba resolviendo paginas normales: probado, example.com llevaba
+      // a iana.org y de ahi a icann.org, tres saltos mas alla del enlace bueno.
+      if (n > 0 && !r) return Promise.resolve(cadena);
       avisa('Abriendo la pasarela por detrás…');
       return porDetras(actual).then(function (d2) {
         if (!d2 || vistos[d2] || d2 === actual) return cadena;
