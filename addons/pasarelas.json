@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "actualizado": "2026-08-16",
+  "nota": "Reglas del addon Salta pasarelas. Este archivo se sirve desde naviris.site y el addon lo relee cada vez que arranca: aqui se anaden o corrigen sitios SIN publicar una version nueva del addon ni del navegador. Modos: 'parametro' (el destino viaja en la URL, no hace falta ni cargar la pagina), 'dom' (el destino esta en un enlace de la pagina ya cargada) y 'boton' (hay que pulsar algo antes). 'ruta' es opcional y limita la regla a esa parte del camino. 'params' es opcional: si falta se prueban los nombres habituales.",
+  "reglas": [
+    {
+      "host": "sphinxanime.com",
+      "ruta": "^/short/",
+      "modo": "parametro",
+      "params": ["anonym"],
+      "nota": "VERIFICADO 2026-08-16: el destino va en base64 plano en ?anonym=, sin ofuscar. No hay temporizador ni anuncios."
+    },
+    {
+      "host": "box.sphinxanime.net",
+      "modo": "dom",
+      "selector": "a[href^=\"http\"]",
+      "nota": "VERIFICADO 2026-08-16: pagina estatica de ~4 KB, el enlace final esta en un <a href> directo. OJO: mega.nz y 1fichier.com aparecen ahi dentro de un array app_domains de un script y NO son espejos; por eso la regla mira enlaces, no el texto de los scripts."
+    },
+
+    { "host": "linkvertise.com", "modo": "dom" },
+    { "host": "link-to.net", "modo": "dom" },
+    { "host": "up-to-down.net", "modo": "dom" },
+    { "host": "direct-link.net", "modo": "dom" },
+    { "host": "link-center.net", "modo": "dom" },
+    { "host": "link-target.net", "modo": "dom" },
+
+    { "host": "loot-link.com", "modo": "dom" },
+    { "host": "lootdest.info", "modo": "dom" },
+    { "host": "lootdest.org", "modo": "dom" },
+    { "host": "links-loot.com", "modo": "dom" },
+    { "host": "mboost.me", "modo": "dom" },
+    { "host": "rekonise.com", "modo": "dom" },
+    { "host": "sub2unlock.com", "modo": "dom" },
+    { "host": "sub2unlock.net", "modo": "dom" },
+    { "host": "boost.ink", "modo": "dom" },
+    { "host": "work.ink", "modo": "dom" },
+
+    { "host": "ouo.io", "modo": "dom" },
+    { "host": "ouo.press", "modo": "dom" },
+    { "host": "adf.ly", "modo": "dom" },
+    { "host": "shorte.st", "modo": "dom" },
+    { "host": "sh.st", "modo": "dom" },
+    { "host": "destyy.com", "modo": "dom" },
+    { "host": "festyy.com", "modo": "dom" },
+    { "host": "gestyy.com", "modo": "dom" },
+    { "host": "corneey.com", "modo": "dom" },
+    { "host": "ceesty.com", "modo": "dom" },
+    { "host": "adfoc.us", "modo": "dom" },
+    { "host": "bc.vc", "modo": "dom" },
+
+    { "host": "exe.io", "modo": "dom" },
+    { "host": "exey.io", "modo": "dom" },
+    { "host": "fc.lc", "modo": "dom" },
+    { "host": "clk.sh", "modo": "dom" },
+    { "host": "gplinks.co", "modo": "dom" },
+    { "host": "gplinks.in", "modo": "dom" },
+    { "host": "droplink.co", "modo": "dom" },
+    { "host": "shrinkme.io", "modo": "dom" },
+    { "host": "shrinkearn.com", "modo": "dom" },
+    { "host": "adshrink.it", "modo": "dom" },
+    { "host": "ez4short.com", "modo": "dom" },
+    { "host": "linkpays.in", "modo": "dom" },
+    { "host": "mdiskshortner.link", "modo": "dom" },
+    { "host": "tii.ai", "modo": "dom" },
+    { "host": "oke.io", "modo": "dom" }
+  ]
+}

@@ -776,6 +776,10 @@ const ATAJOS_UI = [
   { k: 't', mod: (i) => i.control && i.shift, cmd: 'reopen-tab' },
   { k: 'w', mod: (i) => i.control && !i.shift, cmd: 'close-tab' },
   { k: 'p', mod: (i) => i.alt && !i.control, cmd: 'pip' },
+  // Reservado para los addons (ver naviris.onAtajo en el renderer). Sin esto un
+  // atajo de addon solo respondería con el foco en la interfaz, nunca leyendo
+  // una página, que es justo cuando hace falta.
+  { k: 's', mod: (i) => i.alt && !i.control && !i.shift, cmd: 'addon-s' },
   { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
   { k: 'h', mod: (i) => i.control, cmd: 'history' },
   { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },

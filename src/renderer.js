@@ -4621,6 +4621,16 @@ async function renderAddons() {
 // Los addons viven en naviris.site: se actualizan sin publicar una release.
 // Limpiadores que registran los addons de tipo herramienta (ver registerTool).
 const toolUnloaders = new Map();
+// Atajos reclamados por addons (Alt + letra). Llegan por dos caminos: el
+// keydown de esta interfaz y, cuando el foco está dentro de una página, el
+// before-input-event del main (comandos 'addon-<letra>').
+const atajosAddon = new Map();
+function lanzaAtajoAddon(tecla) {
+  const fn = atajosAddon.get(String(tecla || '').toLowerCase());
+  if (!fn) return false;
+  try { fn(); } catch { /* que un addon falle no rompe el teclado */ }
+  return true;
+}
 const naviris = {
   toast,
   activeWebview: () => { const t = activeTab(); return t && t.kind === 'web' && !t.asleep ? t.webview : null; },
@@ -4647,6 +4657,16 @@ const naviris = {
     if (fin) { toolUnloaders.delete(id); try { fin(); } catch { /* que un addon falle al soltar no impide retirarlo */ } }
     document.getElementById('adt-' + id)?.remove();
   },
+  // Atajo de teclado para un addon: solo Alt + una letra, y solo las que el
+  // core no usa ya (hoy queda libre la 's'). Funciona con el foco en la
+  // interfaz y también leyendo una página. offAtajo se llama en onUnload.
+  onAtajo(tecla, fn) {
+    tecla = String(tecla || '').toLowerCase();
+    if (tecla.length !== 1 || typeof fn !== 'function') return false;
+    atajosAddon.set(tecla, fn);
+    return true;
+  },
+  offAtajo(tecla) { atajosAddon.delete(String(tecla || '').toLowerCase()); },
   // Sensibilidad de X: única puerta de los addons hacia ese ajuste (lo usa el
   // addon "Sensibilidad X"; el resto de settings no se expone a addons).
   xSensitive: {
@@ -4917,6 +4937,9 @@ window.addEventListener('keydown', (e) => {
   // --- Paneles ---
   if (soloCtrl && k === 'j') { e.preventDefault(); toggleDownloads(); return; }
   if (soloCtrl && k === 'h') { e.preventDefault(); toggleHistory(); return; }
+
+  // --- Addons --- (al final: los atajos del core mandan sobre los de un addon)
+  if (e.altKey && !e.ctrlKey && !e.shiftKey && k.length === 1 && lanzaAtajoAddon(k)) { e.preventDefault(); }
 });
 // Los mismos atajos, pero llegados desde una página con el foco dentro (el main
 // los intercepta con before-input-event y los reenvía por IPC).
@@ -4963,6 +4986,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'reopen-tab') reabrirCerrada();
   else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
   else if (cmd === 'pip') miniReproductor();
+  else if (cmd.startsWith('addon-')) lanzaAtajoAddon(cmd.slice(6));
   else if (cmd === 'downloads') toggleDownloadsPage();
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();

@@ -55,6 +55,15 @@
       "entry": "https://naviris.site/addons/blockify.js"
     },
     {
+      "id": "salta-pasarelas",
+      "name": "Salta pasarelas",
+      "version": "1.0.0",
+      "kind": "tool",
+      "icon": "skip-forward",
+      "description": "Las pasarelas de los acortadores (cuenta atrás, \"continuar\" y anuncios entre el enlace de descarga y el archivo) llevan el destino consigo casi siempre: este addon lo saca y lleva la pestaña directa al enlace final. Si el destino viaja en la URL, Naviris corta la carga y salta antes de que la pasarela pinte un solo anuncio; si no, busca en la página el enlace al alojamiento (Drive, Mega, MediaFire, pixeldrain, gofile y compañía) y salta ahí, reintentando por si lo escriben tarde. Encadena varias pasarelas seguidas y se frena solo ante un bucle. Con Alt+S fuerzas el salto en la página que estés viendo aunque el sitio no tenga regla. El botón del sidebar lo activa o lo pausa (ámbar = activo) y lleva la cuenta de pasarelas saltadas. La lista de sitios se actualiza sola desde naviris.site, sin esperar versiones. Requiere Naviris 2.7.6-dev.3 o superior para Alt+S dentro de la página y para las reglas al día.",
+      "entry": "https://naviris.site/addons/salta-pasarelas.js"
+    },
+    {
       "id": "long-screenshot",
       "name": "Captura larga",
       "version": "1.1.0",
