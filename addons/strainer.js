@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.1.2 (kind: tool)
+/* Naviris addon: Strainer v1.1.3 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
@@ -627,15 +627,29 @@
     elIn.value = ''; elRes.innerHTML = ''; estado(''); elIn.focus();
   });
 
+  /* Pega el panel a su boton del riel. Con el `top` fijo de .side-panel-left
+     salia arriba del todo mientras el boton esta abajo. El calculo va AQUI y no
+     solo en naviris.anclaAlBoton porque esa API es del navegador y los addons se
+     actualizan por su cuenta: esperando al build, en el Naviris que ya tiene la
+     gente esto seguiria mal. Si la API esta, manda ella (asi el dia que cambie
+     el anclaje del riel, este panel cambia con el resto). */
+  function anclaPanel() {
+    var btn = document.getElementById('adt-' + ID);
+    if (!btn) return;
+    try { if (naviris.anclaAlBoton) { naviris.anclaAlBoton(panel, btn); return; } } catch (e) { /* seguimos abajo */ }
+    var r = btn.getBoundingClientRect();
+    panel.style.left = Math.round(r.right + 14) + 'px';
+    panel.style.bottom = 'auto';
+    panel.style.top = '0px';                     // visible y medible antes de colocarlo
+    var h = panel.offsetHeight;
+    panel.style.top = Math.max(8, Math.min(Math.round(r.top), window.innerHeight - h - 12)) + 'px';
+  }
+
   function abrePanel() {
     var oculto = panel.classList.contains('hidden');
     panel.classList.toggle('hidden');
     if (!oculto) return;
-    // Pegado a su boton del riel, que esta abajo del todo: con el `top` fijo de
-    // .side-panel-left el panel salia arriba, lejos de lo que lo abrio. Se ancla
-    // DESPUES de quitar 'hidden' porque hay que poder medirlo.
-    try { if (naviris.anclaAlBoton) naviris.anclaAlBoton(panel, document.getElementById('adt-' + ID)); }
-    catch (e) { /* Naviris antiguo: se queda donde lo deje el CSS */ }
+    anclaPanel();   // despues de quitar 'hidden': hay que poder medir el panel
     pintaSwitch();
     // Si lo que hay copiado es un enlace, se ofrece ya escrito: es lo que
     // acabas de copiar de la pagina de descarga nueve de cada diez veces.
