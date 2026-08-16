@@ -770,9 +770,9 @@ const WIDGET_TYPES = {
   imagen: { name: 'Imagen', icon: 'photo', span: 2 },
   mail: { name: 'Gmail', icon: 'inbox', span: 2, rspan: 2 },
   descargas: { name: 'Descargas', icon: 'download' },
-  privada: { name: 'Ventana privada', icon: 'hat-glasses' },
+  privada: { name: 'Ventana privada', icon: 'book-lock' },
   monitor: { name: 'Monitor', icon: 'res-scale' },
-  moovin: { name: 'Moovin', icon: 'tv-minimal' },
+  moovin: { name: 'Moovin', icon: 'tv' },
   clip: { name: 'Portapapeles', icon: 'clipboard' },
   deco: { name: 'Adorno', icon: 'star' },
   wallet: { name: 'Tarjetas', icon: 'credit-card' },
@@ -2624,7 +2624,7 @@ function actualizaDescargasW() {
    puerta — cartel con play y entrada directa. */
 function renderMoovinW(body) {
   body.innerHTML = `
-    <div class="mv-cartel">${window.icon('tv-minimal')}</div>
+    <div class="mv-cartel">${window.icon('tv')}</div>
     <div class="mv-meta"><div class="mv-tit">Moovin</div><div class="mv-sub">Tu biblioteca privada</div></div>
     <button class="mv-play" title="Entrar">${window.icon('play')}</button>`;
   const abre = (e) => { e?.stopPropagation(); navigateActive('https://iris.it.com/moovin/'); };
@@ -2761,7 +2761,7 @@ function renderNotasW(body) {
    Un solo boton, como icono de app: cuadrado 1x1 en violeta con el candado
    grande. Clic = ventana privada nueva. */
 function renderPrivadaW(body) {
-  body.innerHTML = `<div class="pv-ico">${window.icon('hat-glasses')}</div><span class="pv-t">Privada</span>`;
+  body.innerHTML = `<div class="pv-ico">${window.icon('book-lock')}</div><span class="pv-t">Privada</span>`;
   body.addEventListener('click', () => window.cobalt.newPrivateWindow());
 }
 
@@ -4657,6 +4657,43 @@ const naviris = {
     if (fin) { toolUnloaders.delete(id); try { fin(); } catch { /* que un addon falle al soltar no impide retirarlo */ } }
     document.getElementById('adt-' + id)?.remove();
   },
+  // Abre una pestaña con esa dirección. Por defecto pasa a primer plano.
+  abrePestana(url, activar = true) {
+    if (!/^https?:\/\//i.test(url || '')) return null;
+    const t = createTab(url, activar !== false);
+    return t ? t.id : null;
+  },
+  /* Lee una página SIN enseñársela al usuario: webview fuera de pantalla con la
+     misma sesión que las pestañas, se carga, se ejecuta `expr` dentro y se
+     destruye. Devuelve lo que devuelva expr, o null si no da nada a tiempo.
+     Lo usa Strainer para resolver una pasarela sin que sus anuncios lleguen a
+     verse. OJO: no se oculta con display:none — una webview así no llega a
+     cargar; hay que sacarla de la vista. */
+  leePagina(url, expr, ms) {
+    return new Promise((resolve) => {
+      if (!/^https?:\/\//i.test(url || '') || typeof expr !== 'string') { resolve(null); return; }
+      const wv = document.createElement('webview');
+      wv.setAttribute('partition', PARTITION);
+      wv.style.cssText = 'position:fixed;left:-20000px;top:0;width:1024px;height:768px;opacity:0;pointer-events:none';
+      let cerrado = false;
+      const acaba = (v) => {
+        if (cerrado) return;
+        cerrado = true; clearTimeout(reloj);
+        try { wv.remove(); } catch { /* ya no estaba */ }
+        resolve(v || null);
+      };
+      const reloj = setTimeout(() => acaba(null), Math.min(Math.max(Number(ms) || 12000, 2000), 40000));
+      // dom-ready se repite en cada navegación de la pasarela: cada una es otra
+      // oportunidad de encontrar el enlace, y la última palabra la tiene el reloj.
+      wv.addEventListener('dom-ready', async () => {
+        try { wv.setAudioMuted(true); } catch { /* nada */ }
+        try { const r = await wv.executeJavaScript(expr); if (r) acaba(r); } catch { /* la página no dejó */ }
+      });
+      wv.addEventListener('did-fail-load', (e) => { if (e.isMainFrame) acaba(null); });
+      document.body.appendChild(wv);
+      wv.src = url;
+    });
+  },
   // Atajo de teclado para un addon: solo Alt + una letra, y solo las que el
   // core no usa ya (hoy queda libre la 's'). Funciona con el foco en la
   // interfaz y también leyendo una página. offAtajo se llama en onUnload.
@@ -4704,7 +4741,9 @@ async function loadToolAddons() {
   // y Valve Rat Tool se descatalogaron (2026-07-29). Si alguien los tiene
   // instalados, se desinstalan solos para que no quede código muerto sin
   // actualizaciones.
-  for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper']) {
+  // 'salta-pasarelas' vivió unas horas el 2026-08-16: es el mismo addon que
+  // ahora se llama Strainer, con otro id. Se desinstala para que no queden dos.
+  for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper', 'salta-pasarelas']) {
     if (installed[retirado]) { try { await window.cobalt.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
   }
   // Migración 2.7.3: la sensibilidad de X salió de Ajustes y ahora es el addon
