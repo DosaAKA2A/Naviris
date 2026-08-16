@@ -15,7 +15,7 @@ const store = {
 
 const els = {};
 [
-  'splash', 'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
+  'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
@@ -4886,6 +4886,81 @@ window.cobalt.onUpdateStatus((s) => {
   }
 });
 
+/* ===== Novedades tras actualizar (2026-08-17) =====
+   Naviris se instala solo y en silencio, así que sin esto la actualización sería
+   invisible: te cambia el navegador debajo y nadie te cuenta qué. El panel sale
+   UNA vez, al primer arranque de la versión nueva (quién decide eso es el main:
+   compara la versión guardada con la que corre). */
+
+/* Las notas de una release de Naviris vienen en DOS formatos, y los dos tienen
+   que entrar aquí:
+   - PROSA, que es el formato real de este proyecto: párrafos separados por una
+     línea en blanco, escritos para que los lea gente (mirar v2.7.5 o v2.7.6-dev.2).
+   - VIÑETAS del changelog que GitHub genera solo cuando la release se crea sin
+     notas ("* mensaje del commit by @usuario in <enlace>").
+   Cazado a tiempo: una primera versión solo aceptaba viñetas y con las notas de
+   verdad devolvía la lista VACÍA, así que el panel siempre habría caído al texto
+   de respaldo sin contar ni un cambio. */
+function limpiaNotas(md) {
+  const fuera = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/gu; // sin emojis (regla del proyecto)
+  const pule = (t) => t
+    .replace(/\s+by\s+@[\w-]+(\s+in\s+\S+)?$/i, '')  // autoría y enlace del commit
+    .replace(/\bhttps?:\/\/\S+/g, '')                 // enlaces sueltos
+    .replace(/[*_`#]+/g, '')                          // negritas, cursivas, código, encabezados
+    .replace(fuera, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const items = [];
+  // Los párrafos se separan por líneas en blanco; dentro de uno, cada viñeta
+  // es un cambio y la prosa suelta cuenta como uno solo.
+  for (const bloque of String(md || '').split(/\n\s*\n/)) {
+    const lineas = bloque.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lineas.length) continue;
+    if (lineas.some((l) => /^[*-]\s+/.test(l))) {
+      for (const l of lineas) {
+        if (!/^[*-]\s+/.test(l) || /full changelog/i.test(l)) continue;
+        const t = pule(l.replace(/^[*-]\s+/, ''));
+        if (t) items.push(t);
+      }
+    } else {
+      const crudo = lineas.join(' ').trim();
+      // Un encabezado ("## Novedades", "**Novedades**", "What's Changed") titula
+      // la lista, no es un cambio; y el Full Changelog es ruido de plataforma.
+      if (/^#{1,6}\s/.test(crudo) || /^\*\*[^*]+\*\*$/.test(crudo)) continue;
+      const t = pule(crudo);
+      if (t && !/^what'?s changed$/i.test(t) && !/^full changelog/i.test(t)) items.push(t);
+    }
+  }
+  return items.slice(0, 8).map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+}
+
+async function muestraNovedades() {
+  let nov = null;
+  try { nov = await window.cobalt.updateNovedades(); } catch { return; }
+  if (!nov) return;
+  $('#nov-ver').textContent = 'Versión ' + nov.version + (nov.anterior ? ' · antes ' + nov.anterior : '');
+  const lista = $('#nov-lista');
+  lista.textContent = '';
+  const items = limpiaNotas(nov.notas);
+  if (items.length) {
+    for (const t of items) {
+      const d = document.createElement('div');
+      d.className = 'nov-it';
+      d.textContent = t; // textContent, nunca innerHTML: el texto viene de fuera
+      lista.appendChild(d);
+    }
+  } else {
+    // Sin notas (sin red, o release recién publicada): enterarte de que cambió
+    // sigue siendo lo importante.
+    const d = document.createElement('div');
+    d.className = 'nov-vacio';
+    d.textContent = 'Se instaló sola, sin instalador ni reinicios. Puedes ver el detalle de los cambios en el menú, en Acerca de Naviris.';
+    lista.appendChild(d);
+  }
+  $('#nov-modal').classList.remove('hidden');
+}
+$('#nov-ok').addEventListener('click', () => $('#nov-modal').classList.add('hidden'));
+
 /* Ventana */
 $('#win-min').addEventListener('click', () => window.cobalt.minimize());
 $('#win-max').addEventListener('click', () => window.cobalt.maximize());
@@ -5177,17 +5252,19 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   } else {
     createTab();
   }
-  // El splash se ELIMINA del DOM tras el fundido: con visibility:hidden sus
-  // animaciones infinitas seguían corriendo toda la sesión en el compositor.
-  setTimeout(() => {
-    els.splash.classList.add('gone');
-    // El hub entra escalonado POR DEBAJO mientras el splash se va: el relevo
-    // se solapa, que es lo que hace que parezca una sola secuencia.
-    els.hub.classList.add('estrenando');
-    if (els.hub.classList.contains('active')) focusUrlbar();
-    setTimeout(() => els.splash.remove(), 600);
-    setTimeout(() => els.hub.classList.remove('estrenando'), 1700);
-  }, 1950);
+  /* LA INTERFAZ YA ESTÁ MONTADA. El arranque es ahora una ventana aparte
+     (src/splash.html) y ESTA ventana sigue oculta hasta este aviso: así nadie
+     ve el esqueleto vacío montándose. El main la enseña y cierra el cuadrado.
+     Ver crearSplash()/cerrarSplash() en main.js. */
+  window.cobalt.uiLista();
+  // El hub entra escalonado mientras el cuadrado se va: el relevo se solapa,
+  // que es lo que hace que parezca una sola secuencia. La clase se quita al
+  // terminar, así no queda nada animándose.
+  els.hub.classList.add('estrenando');
+  if (els.hub.classList.contains('active')) focusUrlbar();
+  setTimeout(() => els.hub.classList.remove('estrenando'), 1700);
+  // Tras actualizarse sola: panel con lo que cambió (ver novedades más abajo)
+  muestraNovedades();
 })();
 
 

@@ -265,44 +265,11 @@ button { font-family: inherit; }
 .iris-wrap { position: relative; width: var(--sz, 20px); height: var(--sz, 20px); display: inline-block; flex-shrink: 0; }
 .iris-wrap svg { display: block; }
 
-/* Splash */
-/* ===== ARRANQUE (rehecho 2026-08-12) =====
-   Antes: logo latiendo en bucle, barra indeterminada yendo y viniendo, espera
-   fija y fundido. Ahora es una COREOGRAFÍA que pasa UNA vez y termina: aura
-   que florece, anillo que se traza, logo que entra con muelle desde el
-   desenfoque, nombre letra a letra y barra que se llena de verdad. Al salir,
-   el splash se va hacia el observador y desenfoca mientras el hub entra.
-   REGLA DEL PROYECTO: ninguna animación infinita (los bucles SMIL del logo
-   fueron una fuga de 7 MB/s) y solo transform/opacity/filter. */
-/* Paleta IRIS del logo: el arranque es momento de MARCA, no del tema. Naviris
-   se adapta a lo que quieras, y por eso su logo es multicolor — el splash lleva
-   esos mismos colores y NUNCA el acento del tema (con el tema verde salía todo
-   verde y parecía otra cosa). */
-#splash { --iris-1: #b9aae6; --iris-2: #9dc3e6; --iris-3: #a4d9c2; --iris-4: #e6d6a4; --iris-5: #e6a9b4;
-  position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse at 50% 42%, #121215 0%, #060607 72%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .55s ease, visibility .55s, transform .55s cubic-bezier(.4,0,.6,1); }
-#splash::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .05; pointer-events: none; }
-#splash.gone { opacity: 0; visibility: hidden; transform: scale(1.06); }
-/* PLACA CUADRADA, PEQUEÑA (2026-08-13, petición de Dosa: como la de Opera GX,
-   y fuera el brillo arcoíris). El aura conica se retira entera: el arranque es
-   ahora una placa de 132px con el logo dentro, el nombre debajo y una barra
-   fina. EL LOGO NO SE TOCA: la placa aparece y sube, él se queda como es. */
-.splash-mark { position: relative; display: flex; align-items: center; justify-content: center;
-  width: 132px; height: 132px; border-radius: 30px;
-  background: linear-gradient(160deg, #17171c 0%, #0e0e11 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 44px rgba(0,0,0,.55);
-  animation: sp-marca .7s cubic-bezier(.2,.9,.3,1) both; }
-@keyframes sp-marca { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: none; opacity: 1; } }
-/* Nombre: pequeño y bajo la placa, letra a letra */
-.splash-name { display: flex; font-family: "Inter Var", "Segoe UI Variable Display", "Segoe UI", sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 7px; text-indent: 7px; margin-top: 18px; color: #cfd0d5; }
-.splash-name span { display: inline-block; animation: sp-letra .5s cubic-bezier(.2,.9,.3,1.1) both; animation-delay: calc(.3s + var(--i) * .04s); }
-@keyframes sp-letra { 0% { transform: translateY(9px); opacity: 0; } 100% { transform: none; opacity: 1; } }
-@keyframes sp-sube { 0% { transform: translateY(8px); opacity: 0; } 100% { transform: none; opacity: 1; } }
-/* Barra DETERMINADA: se llena y se queda llena */
-.splash-bar { width: 132px; height: 2px; margin-top: 16px; border-radius: 2px; background: #1c1c20; overflow: hidden; animation: sp-sube .5s ease-out .95s both; }
-.splash-bar-fill { height: 100%; width: 100%; border-radius: 2px; transform-origin: left center;
-  background: linear-gradient(90deg, var(--iris-1), var(--iris-2), var(--iris-3), var(--iris-4), var(--iris-5));
-  animation: sp-carga 1.2s cubic-bezier(.5,.05,.2,1) .35s both; }
-@keyframes sp-carga { 0% { transform: scaleX(0); } 70% { transform: scaleX(.82); } 100% { transform: scaleX(1); } }
+/* ===== ARRANQUE =====
+   Ya NO vive en esta ventana (2026-08-17): era una placa pequena flotando dentro
+   de una ventana de 1280x800, asi que lo que se veia era la ventana enorme. El
+   arranque es ahora una VENTANA propia y cuadrada, con sus estilos en
+   src/splash.html; esta ventana no se muestra hasta estar montada. */
 /* El hub ENTRA detrás del splash: los widgets suben escalonados, una sola vez
    (la clase se quita al terminar, así no queda nada animándose). Solo
    transform y opacity: 20 tarjetas de cristal desenfocándose a la vez daría
@@ -1138,6 +1105,20 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .upd-line .ul-btn:hover { background: var(--chip-hover); }
 .upd-line .ul-btn:disabled { color: var(--text-dim); cursor: default; background: var(--chip-dim); }
 .upd-line .ul-btn.hidden { display: none; }
+
+/* ===== Novedades tras actualizar (2026-08-17) =====
+   Sin cajas ni bordes por cada cosa: el logo, el titular y una lista con
+   viñetas de realce. La misma vara de siempre — ordenar con espacio y
+   tipografía, no con recuadros. */
+.nov-head { display: flex; align-items: center; gap: 13px; }
+.nov-mark { line-height: 0; flex: 0 0 auto; }
+.nov-tit { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nov-ver { font-size: 12px; color: var(--text-dim); }
+.nov-lista { display: flex; flex-direction: column; gap: 9px; margin-top: 2px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+.nov-lista .nov-it { position: relative; padding-left: 15px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+/* La viñeta sigue al realce del tema, como el resto de estados encendidos */
+.nov-lista .nov-it::before { content: ""; position: absolute; left: 0; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: var(--realce); }
+.nov-lista .nov-vacio { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
 #sidebar-config { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 
 #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); z-index: 900; background: var(--bg-3); border: 1px solid var(--line-3); border-radius: 10px; padding: 11px 18px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .22s, transform .22s; box-shadow: 0 14px 40px var(--shadow-panel); max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1191,7 +1172,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* El logo "vive" al tocarlo: rotación de tono por CSS (las animaciones SMIL
    del gradiente fugaban memoria en Electron 33; ver icons.js) */
-.iris-wrap:hover .iris-logo, #splash .iris-logo { animation: iris-hue 5s linear infinite; }
+.iris-wrap:hover .iris-logo { animation: iris-hue 5s linear infinite; }
 @keyframes iris-hue { to { filter: hue-rotate(360deg); } }
 
 /* AutoClaim v2: la pestaña que farmea se marca en verde (sin grupo acoplado) */

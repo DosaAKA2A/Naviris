@@ -19,15 +19,10 @@
   <!-- La refracción del liquid glass la genera el motor de lentes de
        renderer.js (lgAplicar): filtros SVG por forma en un <defs> propio. -->
 
-  <!-- ===== Splash ===== -->
-  <!-- Coreografía de arranque (2026-08-12): aura que florece UNA vez, anillo
-       que se dibuja alrededor del logo, nombre letra a letra y barra que se
-       llena de verdad. Todo finito: al acabar no queda nada animándose. -->
-  <div id="splash">
-    <div class="splash-mark"><span class="iris-slot splash-iris" data-iris="64"></span></div>
-    <div class="splash-name" aria-label="NAVIRIS"><span style="--i:0">N</span><span style="--i:1">A</span><span style="--i:2">V</span><span style="--i:3">I</span><span style="--i:4">R</span><span style="--i:5">I</span><span style="--i:6">S</span></div>
-    <div class="splash-bar"><div class="splash-bar-fill"></div></div>
-  </div>
+  <!-- El arranque ya NO vive aquí (2026-08-17): era una placa pequeña flotando
+       dentro de una ventana de 1280×800, así que lo que se veía era la ventana
+       enorme. Ahora es una ventana propia y cuadrada (src/splash.html) y esta
+       no se muestra hasta estar montada. -->
 
   <!-- ===== Titlebar + pestañas ===== -->
   <header id="titlebar">
@@ -404,6 +399,24 @@
       </div>
       <div id="upd-bar" class="upd-bar hidden"><i></i></div></div>
     <div class="modal-actions"><button id="upd-btn" style="margin-right:auto">Buscar actualizaciones</button><button id="about-close" class="primary">Cerrar</button></div></div></div>
+
+  <!-- ===== Novedades tras actualizar (2026-08-17) =====
+       Naviris se actualiza solo y sin instalador, así que este panel es lo
+       ÚNICO que te dice que cambió algo. Sale una vez, al primer arranque de
+       la versión nueva. -->
+  <div id="nov-modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="nov-head">
+        <span class="nov-mark iris-slot" data-iris="34"></span>
+        <div class="nov-tit">
+          <h3>Naviris se ha actualizado</h3>
+          <span class="nov-ver" id="nov-ver"></span>
+        </div>
+      </div>
+      <div id="nov-lista" class="nov-lista"></div>
+      <div class="modal-actions"><button id="nov-ok" class="primary">Entendido</button></div>
+    </div>
+  </div>
 
   <div id="toast" role="status"></div>
 

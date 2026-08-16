@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('cobalt', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   restart: () => ipcRenderer.send('app:restart'),
+  // Arranque: avisa de que la interfaz ya está montada, para que el main
+  // enseñe la ventana y cierre el cuadrado de carga.
+  uiLista: () => ipcRenderer.send('ui:listo'),
+  // Novedades de la versión recién instalada (o null si no hay que enseñar nada)
+  updateNovedades: () => ipcRenderer.invoke('update:novedades'),
   version: () => ipcRenderer.invoke('app:version'),
   gpuStatus: () => ipcRenderer.invoke('gpu:status'),
 

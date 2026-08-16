@@ -695,8 +695,86 @@ function ytDownload({ url, mode, quality }) {
   return id;
 }
 
+/* ---------- Ventana de arranque ----------
+   PETICIÓN DE DOSA (2026-08-17): "la ventana de Naviris al cargar sigue siendo
+   muy grande, debe ser solo un cuadrado con el logo y una pequeña barra de carga
+   que se aprecia de inicio a fin".
+
+   La placa cuadrada ya existía, pero vivía DENTRO de la ventana principal, que
+   se abre a 1280×800: lo que se veía era una ventana enorme con una plaquita
+   flotando en medio. Ahora el arranque es una ventana propia de 300×300 y la
+   principal no se muestra hasta que su interfaz está montada.
+
+   La barra avanza con hitos REALES del arranque (no por animación), y el splash
+   se queda un mínimo en pantalla para que se recorra entera aunque el equipo
+   arranque en frío o en caliente. */
+let splashWin = null;
+let splashPct = 0;          // último tramo, por si el splash aún no ha cargado
+let splashDesde = 0;        // cuándo se mostró: sirve para el mínimo en pantalla
+const SPLASH_MINIMO = 1250; // ms que la barra necesita para leerse de inicio a fin
+
+function crearSplash() {
+  splashWin = new BrowserWindow({
+    width: 300, height: 300, resizable: false, movable: true,
+    frame: false, transparent: false, backgroundColor: '#08080a',
+    center: true, alwaysOnTop: true, skipTaskbar: false,
+    maximizable: false, minimizable: false, fullscreenable: false,
+    title: 'Naviris',
+    webPreferences: {
+      preload: path.join(__dirname, 'splash-preload.js'),
+      contextIsolation: true, nodeIntegration: false,
+      /* PARTICIÓN PROPIA Y EN MEMORIA. Esta ventana se crea ANTES de que
+         castlabs registre el CDM de Widevine, y la sesión por defecto es
+         justo donde se registra: con su propia partición no la toca ni de
+         lado, así que el DRM de la ventana principal queda intacto. */
+      partition: 'naviris-splash'
+    }
+  });
+  splashWin.loadFile(path.join(__dirname, 'splash.html'));
+  splashWin.once('ready-to-show', () => {
+    if (!splashWin || splashWin.isDestroyed()) return;
+    splashDesde = Date.now();
+    splashWin.show();
+  });
+  // El tramo que ya se hubiera cumplido antes de que la página existiera
+  splashWin.webContents.once('did-finish-load', () => splashProgreso(splashPct));
+  splashWin.on('closed', () => { splashWin = null; });
+}
+
+function splashProgreso(pct) {
+  splashPct = Math.max(splashPct, pct);
+  if (!splashWin || splashWin.isDestroyed()) return;
+  try { splashWin.webContents.send('splash:progreso', { pct: splashPct, version: app.getVersion() }); } catch {}
+}
+
+// Cierra el arranque y enseña la ventana ya montada. El relevo se hace en este
+// orden (primero mostrar, luego cerrar) para que no se vea el escritorio entre
+// una y otra.
+function cerrarSplash(win) {
+  const espera = Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde));
+  setTimeout(() => {
+    splashProgreso(100);
+    // Lo justo para que el último tramo de la barra se vea llegar al final
+    setTimeout(() => {
+      if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); }
+      if (splashWin && !splashWin.isDestroyed()) splashWin.close();
+    }, 260);
+  }, espera);
+}
+
+// La ventana principal que está esperando a que su interfaz termine de montarse
+let ventanaEsperandoUI = null;
+// El renderer avisa cuando la interfaz ya está en pantalla (pestañas, hub y
+// tema aplicados). Es el único hito que sabe de verdad que "ya se puede ver".
+ipcMain.on('ui:listo', () => {
+  const win = ventanaEsperandoUI;
+  if (!win) return;
+  ventanaEsperandoUI = null;
+  cerrarSplash(win);
+});
+
 // ---------- Ventanas ----------
-function createWindow(isPrivate = false) {
+function createWindow(isPrivate = false, conSplash = false) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 560,
     frame: false, show: false, backgroundColor: '#0a0a0c',
@@ -729,7 +807,19 @@ function createWindow(isPrivate = false) {
     webPreferences.disableDialogs = true;
   });
   win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
-  win.once('ready-to-show', () => win.show());
+  /* CON SPLASH la ventana NO se muestra al estar pintada, sino cuando su
+     interfaz avisa de que está montada ('ui:listo' desde el renderer). Si se
+     mostrara antes se vería el esqueleto vacío detrás del cuadrado, que es
+     justo lo que se quiere evitar.
+     RED DE SEGURIDAD: si el renderer nunca avisa (un error de JS al arrancar
+     dejaría la ventana invisible para siempre), a los 8 s se muestra igual. */
+  if (conSplash) {
+    ventanaEsperandoUI = win;
+    win.webContents.once('did-finish-load', () => splashProgreso(85));
+    setTimeout(() => { if (ventanaEsperandoUI === win) { ventanaEsperandoUI = null; cerrarSplash(win); } }, 8000);
+  } else {
+    win.once('ready-to-show', () => win.show());
+  }
   win.on('maximize', () => win.webContents.send('win:maximized', true));
   win.on('unmaximize', () => win.webContents.send('win:maximized', false));
   // Botones laterales del ratón (4 y 5). En Windows llegan como WM_APPCOMMAND ->
@@ -2010,7 +2100,56 @@ ipcMain.handle('update:choose', async (_e, line) => {
    no pasa. Bajar los 86 MB enteros tarda un poco mas y termina siempre. */
 autoUpdater.disableDifferentialDownload = true;
 ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
-ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
+/* INSTALACIÓN SIN INSTALADOR (petición de Dosa, 2026-08-17: "que se instale
+   automáticamente al abrir pero sin abrir un instalador; eso provoca que mis
+   usuarios pierdan interés en las actualizaciones").
+
+   Dos piezas, y las dos hacen falta:
+   - `oneClick: true` en package.json — el asistente con "Siguiente" y elección
+     de carpeta desaparece; el instalador es una barra sin botones. Como es por
+     usuario (perMachine: false) tampoco pide permisos de administrador.
+   - los dos true de aquí: `isSilent` (no enseñar ni esa barra) e
+     `isForceRunAfter` (volver a abrir Naviris al terminar). Sin el primero se
+     seguiría viendo una ventana, que es justo lo que molestaba.
+
+   PRECIO, sabido y aceptado: quien ya tenga Naviris instalado hará UNA última
+   transición con el asistente actual (el instalador viejo es el que corre esa
+   vez); a partir de ahí todas son silenciosas. Y las instalaciones nuevas ya no
+   pueden elegir carpeta: eso es exactamente lo que se cambia por no tener
+   ventana. */
+ipcMain.on('update:install', () => autoUpdater.quitAndInstall(true, true));
+
+/* ---------- Novedades tras actualizar ----------
+   La otra mitad de la experiencia tipo Opera GX: si te actualizas sin enterarte,
+   al abrir tienes que VER qué cambió. Se compara la versión guardada con la que
+   está corriendo; si no coinciden, la próxima interfaz que arranque enseña el
+   panel. La versión se apunta aquí mismo, así el panel sale UNA sola vez aunque
+   se abran varias ventanas. */
+let novedadesPendientes = null;
+function revisaVersionInstalada() {
+  const actual = app.getVersion();
+  const previa = settings.versionVista;
+  // Solo en la versión instalada, y nunca en el primer arranque de todos (ahí
+  // no hay "novedades": es una instalación nueva, no una actualización).
+  if (app.isPackaged && previa && previa !== actual) novedadesPendientes = { version: actual, anterior: previa };
+  if (previa !== actual) { settings.versionVista = actual; saveSettings(settings); }
+}
+/* Las notas salen de la release de GitHub, que ya se generan solas al publicar
+   (generate_release_notes en build/publish-release.js). Si no se pueden traer
+   (sin red, release recién publicada), el panel se enseña igual con la versión:
+   enterarte de que Naviris cambió es lo importante, el detalle es un extra. */
+ipcMain.handle('update:novedades', async () => {
+  const pend = novedadesPendientes;
+  if (!pend) return null;
+  novedadesPendientes = null; // una vez por arranque
+  let notas = '';
+  try {
+    const r = await fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases/tags/v' + encodeURIComponent(pend.version),
+      { headers: { 'User-Agent': 'Naviris', Accept: 'application/vnd.github+json' } });
+    if (r.ok) notas = String((await r.json()).body || '');
+  } catch {}
+  return { version: pend.version, anterior: pend.anterior, notas };
+});
 
 // El tema del navegador se propaga a las webs: con modo claro activo, las
 // páginas que respetan prefers-color-scheme (YouTube, Outlook…) también
@@ -2018,15 +2157,24 @@ ipcMain.on('update:install', () => autoUpdater.quitAndInstall());
 nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
 
 app.whenReady().then(async () => {
+  // Lo PRIMERO que ocurre: el cuadrado ya está en pantalla mientras el resto
+  // del arranque (que es lo que tarda) sigue su curso por detrás.
+  crearSplash();
+  splashProgreso(12);
   // Widevine (castlabs ECS): descargar/registrar el CDM antes de crear ventanas,
   // para poder reproducir vídeo DRM (Crunchyroll, Netflix, etc.). Con Electron
   // estándar `components` no existe; el guard evita romper ese caso.
+  // Es el tramo más lento del arranque (la primera vez incluso descarga el CDM).
   try { if (components && components.whenReady) await components.whenReady(); }
   catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
+  splashProgreso(48);
   // Comprobación silenciosa al arrancar (solo en versión instalada). En la
   // estable esto además descarga e instala sola la versión nueva; en dev solo avisa.
   if (app.isPackaged) { chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); }
+  // ¿Se actualizó desde la última vez? Entonces la interfaz enseñará qué cambió.
+  revisaVersionInstalada();
   braveAdblock.init();
+  splashProgreso(62);
   // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.
   // El id se valida contra la lista de instalados y se limita a [a-z0-9-], así
   // que no hay forma de salirse de la carpeta de addons ni de cargar otra cosa.
@@ -2042,7 +2190,8 @@ app.whenReady().then(async () => {
   });
   setupSession(session.fromPartition(PART_NORMAL));
   setupSession(session.fromPartition(PART_PRIVATE));
-  createWindow();
+  splashProgreso(74);
+  createWindow(false, true); // la primera ventana es la que releva al splash
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
