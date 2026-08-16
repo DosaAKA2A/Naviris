@@ -474,6 +474,14 @@
     '.str-lbl:first-child{margin-top:2px}',
     '.str-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#232327);background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);resize:vertical;min-height:64px;outline:none}',
     '.str-in:focus{border-color:' + COLOR + '}',
+    // Un enlace largo hace aparecer scroll en el cuadro, y ahi salia la barra
+    // del sistema con sus flechitas. En Naviris ningun scroll usa la del
+    // sistema: misma barra fina que el resto de la app.
+    '.str-in::-webkit-scrollbar{width:11px;height:11px}',
+    '.str-in::-webkit-scrollbar-track,.str-in::-webkit-scrollbar-corner{background:transparent}',
+    '.str-in::-webkit-scrollbar-thumb{background:rgba(128,128,132,.42);border:3px solid transparent;border-radius:999px;background-clip:content-box}',
+    '.str-in::-webkit-scrollbar-thumb:hover{background:rgba(128,128,132,.62);background-clip:content-box}',
+    '.str-in::-webkit-scrollbar-button{display:none;width:0;height:0}',
     '.str-row{display:flex;gap:8px;margin-top:10px}',
     '.str-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);transition:background .12s}',
     '.str-btn:hover{background:rgba(255,255,255,.15)}',
