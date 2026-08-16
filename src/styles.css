@@ -1213,7 +1213,13 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #sb-loot svg { width: 20px; height: 20px; }
 #sb-loot.on-twitch { color: #9146ff; }
 #sb-loot.collecting { color: var(--ok); }
-.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 13px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 44px rgba(0,0,0,.55); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; }
+/* `top` es solo el sitio de partida: quien abre el panel debe anclarlo a su
+   botón con naviris.anclaAlBoton(). Y no-drag es OBLIGATORIO: si el panel cae
+   sobre la barra de título, esa franja es región de arrastre de ventana y el
+   sistema se queda los clics ANTES de que lleguen a la página — la X del
+   encabezado dejaba de funcionar sin dar ni un error. Mismo motivo por el que
+   `#tabstrip > *` y `#agent-badge` ya lo llevan. */
+.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 13px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 44px rgba(0,0,0,.55); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; -webkit-app-region: no-drag; }
 @keyframes lp-in { from { transform: translateX(-26px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
 .lp-head { display: flex; align-items: center; padding: 12px 14px 8px; }
 .lp-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text); }

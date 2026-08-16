@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.1.1 (kind: tool)
+/* Naviris addon: Strainer v1.1.2 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
@@ -521,6 +521,10 @@
   var panel = document.createElement('aside');
   panel.id = 'str-panel';
   panel.className = 'side-panel-left hidden';
+  panel.dataset.addon = ID;
+  // Respaldo por si el .side-panel-left de este Naviris aun no lo trae: sobre la
+  // barra de titulo la region de arrastre se queda los clics y la X no responde.
+  panel.style.webkitAppRegion = 'no-drag';
   panel.innerHTML =
     '<div class="lp-head"><span class="lp-title"><span id="str-ico"></span> Strainer</span>' +
     '<button id="str-close" class="lp-x" title="Cerrar"></button></div>' +
@@ -627,6 +631,11 @@
     var oculto = panel.classList.contains('hidden');
     panel.classList.toggle('hidden');
     if (!oculto) return;
+    // Pegado a su boton del riel, que esta abajo del todo: con el `top` fijo de
+    // .side-panel-left el panel salia arriba, lejos de lo que lo abrio. Se ancla
+    // DESPUES de quitar 'hidden' porque hay que poder medirlo.
+    try { if (naviris.anclaAlBoton) naviris.anclaAlBoton(panel, document.getElementById('adt-' + ID)); }
+    catch (e) { /* Naviris antiguo: se queda donde lo deje el CSS */ }
     pintaSwitch();
     // Si lo que hay copiado es un enlace, se ofrece ya escrito: es lo que
     // acabas de copiar de la pagina de descarga nueve de cada diez veces.

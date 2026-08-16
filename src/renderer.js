@@ -4656,6 +4656,15 @@ const naviris = {
     adEls.tools.appendChild(b);
     if (typeof onUnload === 'function') toolUnloaders.set(id, onUnload);
   },
+  /* Coloca el panel de un addon PEGADO a su botón del riel. Un panel con un
+     `top` fijo aparece lejos de lo que lo abrió (y si cae sobre la barra de
+     título, deja de recibir clics). Es el mismo anclaje que usan el Rat Tool y
+     el panel de resolución, para que todo el riel se comporte igual. */
+  anclaAlBoton(panel, btn) {
+    btn = btn || document.getElementById('adt-' + (panel && panel.dataset ? panel.dataset.addon : ''));
+    if (!panel || !btn) return;
+    anclarPop(panel, btn);
+  },
   unregisterTool(id) {
     const fin = toolUnloaders.get(id);
     if (fin) { toolUnloaders.delete(id); try { fin(); } catch { /* que un addon falle al soltar no impide retirarlo */ } }
