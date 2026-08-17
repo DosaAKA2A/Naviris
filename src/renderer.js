@@ -776,7 +776,7 @@ const WIDGET_TYPES = {
   clip: { name: 'Portapapeles', icon: 'clipboard' },
   deco: { name: 'Adorno', icon: 'star' },
   wallet: { name: 'Tarjetas', icon: 'credit-card' },
-  auth: { name: 'Códigos 2FA', icon: 'shield-check' }
+  auth: { name: 'Autenticador', icon: 'fingerprint' }
 };
 /* ===== GRILLA UNIVERSAL DE CELDAS (2026-08-11, pedido de Dosa) =====
    Como la pantalla de un movil: celda base 160x160 (el RELOJ es la referencia,
@@ -2796,28 +2796,68 @@ function renderWalletW(body) {
    que es justo lo que este widget debería proteger.
    El secreto no llega nunca aquí: main devuelve solo el código ya calculado. */
 let authTimer = null;
+
+/* El logo REAL de la cuenta cuando lo tenemos (Simple Icons, monocromo como
+   manda el hub), y si no la inicial en un chip. Un autenticador con los logos
+   de Discord o GitHub se lee de un vistazo; una lista de texto, no. Los nombres
+   que no coinciden con la marca se traducen a mano (Google guarda sus códigos
+   como "Google", pero el logo que tenemos es el de Gmail). */
+const MARCA_2FA = {
+  google: 'gmail', gmail: 'gmail', discord: 'discord', github: 'github', twitch: 'twitch',
+  reddit: 'reddit', spotify: 'spotify', instagram: 'instagram', whatsapp: 'whatsapp',
+  youtube: 'youtube', pinterest: 'pinterest', crunchyroll: 'crunchyroll',
+  x: 'x', twitter: 'x', claude: 'claude', anthropic: 'claude'
+};
+function emblema2fa(issuer) {
+  const nom = String(issuer || '').trim();
+  const clave = nom.toLowerCase().replace(/\s+/g, '');
+  const marca = MARCA_2FA[clave] || ((window.brandNames && window.brandNames().includes(clave)) ? clave : null);
+  const svg = marca && window.brandIcon ? window.brandIcon(marca) : null;
+  if (svg) return `<span class="au-logo au-logo-marca">${svg}</span>`;
+  return `<span class="au-logo au-logo-ini">${escapeHtml((nom.charAt(0) || '?').toUpperCase())}</span>`;
+}
+// Cabecera común a TODOS los estados: el widget se llama igual esté vacío,
+// bloqueado o lleno. Antes solo la tenía el estado con códigos, y los otros dos
+// parecían otra cosa.
+function cabecera2fa(acciones) {
+  return `
+    <div class="au-head">
+      <span class="au-marca">${window.icon('fingerprint')}<span class="au-tit">Autenticador</span></span>
+      ${acciones ? `<span class="au-tools">${acciones}</span>` : ''}
+    </div>`;
+}
+
 function renderAuthW(body) {
   clearInterval(authTimer);
   const pinta = async () => {
     const est = await window.cobalt.totpAvailable();
     if (!est.encryption) {
-      body.innerHTML = `<div class="au-vacio">${window.icon('shield-check')}<span>El cifrado del sistema no está disponible</span></div>`;
+      body.innerHTML = cabecera2fa('') + `
+        <div class="au-hero">
+          <span class="au-emblema">${window.icon('shield-check')}</span>
+          <span class="au-hero-t">No disponible</span>
+          <span class="au-hero-s">Este equipo no ofrece el cifrado que hace falta para guardar los códigos.</span>
+        </div>`;
       return;
     }
     if (!est.count) {
-      body.innerHTML = `
-        <div class="au-vacio">${window.icon('shield-check')}
-          <span>Sin códigos guardados</span>
-          <button class="au-add">Añadir cuenta</button>
+      body.innerHTML = cabecera2fa('') + `
+        <div class="au-hero">
+          <span class="au-emblema au-emblema-on">${window.icon('fingerprint')}</span>
+          <span class="au-hero-t">Tus códigos, aquí</span>
+          <span class="au-hero-s">Los seis dígitos que te piden al entrar en Discord, GitHub o Google, sin buscar el móvil.</span>
+          <button class="au-add au-cta">${window.icon('plus')}<span>Añadir cuenta</span></button>
         </div>`;
       body.querySelector('.au-add').addEventListener('click', (e) => { e.stopPropagation(); pideAlta(pinta); });
       return;
     }
     if (!est.unlocked) {
-      body.innerHTML = `
-        <div class="au-vacio">${window.icon('lock-closed')}
-          <span>${est.count} ${est.count === 1 ? 'cuenta guardada' : 'cuentas guardadas'}</span>
-          <button class="au-unlock">Desbloquear</button>
+      body.innerHTML = cabecera2fa('') + `
+        <div class="au-hero">
+          <span class="au-emblema">${window.icon('lock-closed')}</span>
+          <span class="au-hero-t">${est.count} ${est.count === 1 ? 'cuenta guardada' : 'cuentas guardadas'}</span>
+          <span class="au-hero-s">Los códigos se abren con Windows Hello y se quedan a la vista unos minutos.</span>
+          <button class="au-unlock au-cta">${window.icon('fingerprint')}<span>Desbloquear</span></button>
         </div>`;
       body.querySelector('.au-unlock').addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -2828,16 +2868,12 @@ function renderAuthW(body) {
     }
     const r = await window.cobalt.totpCodes();
     if (!r.ok) { pinta(); return; }
-    body.innerHTML = `
-      <div class="au-head">
-        <span class="au-tit">Códigos</span>
-        <span class="au-tools">
+    body.innerHTML = cabecera2fa(`
           <button class="au-add" title="Añadir cuenta">${window.icon('plus')}</button>
-          <button class="au-lock" title="Bloquear">${window.icon('lock-closed')}</button>
-        </span>
-      </div>
+          <button class="au-lock" title="Bloquear">${window.icon('lock-closed')}</button>`) + `
       <div class="au-lista">${r.items.map((it) => `
-        <div class="au-it" data-id="${it.id}">
+        <div class="au-it" data-id="${it.id}" title="Clic para copiar">
+          ${emblema2fa(it.issuer)}
           <div class="au-info">
             <span class="au-em">${escapeHtml(it.issuer)}</span>
             ${it.label ? `<span class="au-lb">${escapeHtml(it.label)}</span>` : ''}
