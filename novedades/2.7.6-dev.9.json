@@ -1,0 +1,27 @@
+{
+  "version": "2.7.6-dev.9",
+  "linea": "dev",
+  "titulo": "Novedades, ahora en una página",
+  "entradilla": "El recuadro pequeño no daba para contar una versión entera. Cada versión que cambie algo se presenta a partir de ahora aquí, con imágenes.",
+  "bloques": [
+    {
+      "titulo": "Una página por versión, no un aviso",
+      "texto": "Como Naviris se actualiza solo y sin instalador, esta página es lo único que te cuenta qué ha cambiado. Se abre sola la primera vez que abres una versión nueva, y puedes volver a ella cuando quieras desde el menú, en Novedades de esta versión.\n\nEl texto y las imágenes no viajan dentro del navegador: se leen de naviris.site, igual que el catálogo de addons. Eso permite escribir o corregir la página de una versión sin tener que publicar otra."
+    },
+    {
+      "titulo": "Un arranque que no ocupa media pantalla",
+      "texto": "Naviris arranca con un cuadrado pequeño con el logo y una barra que se llena de principio a fin, y la ventana grande solo aparece cuando ya está montada del todo. La barra avanza con pasos reales del arranque, no por animación.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/arranque.png"
+    },
+    {
+      "titulo": "El autenticador, rehecho",
+      "texto": "Cada cuenta aparece con el logo de su servicio en monocromo y el anillo que muestra cuánto le queda al código. Los estados vacío y bloqueado dejan de ser un hueco con una frase y pasan a explicar para qué sirve el widget.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/autenticador.png"
+    },
+    {
+      "titulo": "Tu cuenta, con tu nombre",
+      "texto": "La Cuenta Naviris ya no te llama por la primera parte de tu correo: puedes poner tu nombre en el propio panel, y es el que se usa en el hub y en tu avatar. Viaja con tu cuenta, así que en otro equipo te llamas igual.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/cuenta.png"
+    }
+  ]
+}

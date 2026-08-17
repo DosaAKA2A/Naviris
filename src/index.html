@@ -193,6 +193,27 @@
             <div id="addons-list" class="adp-list"><div class="adp-loading">Cargando catálogo…</div></div>
           </div>
         </section>
+
+        <!-- ===== Novedades de la versión (2026-08-17) =====
+             Naviris se actualiza solo y sin instalador, así que esta página es
+             lo ÚNICO que cuenta qué cambió. El contenido (textos e imágenes) NO
+             viaja en el build: se lee de naviris.site/novedades/<version>.json,
+             igual que el catálogo de addons, así que se puede escribir y
+             corregir sin publicar una versión nueva. -->
+        <section id="nov-page" class="overlay-page hidden">
+          <div class="novp-inner">
+            <header class="novp-hero">
+              <span class="novp-marca"><span class="iris-slot" data-iris="40"></span></span>
+              <span class="novp-linea" id="novp-linea"></span>
+              <h1 id="novp-tit">Novedades</h1>
+              <p id="novp-sub" class="novp-sub"></p>
+            </header>
+            <div id="novp-bloques" class="novp-bloques"></div>
+            <div class="novp-pie">
+              <button id="novp-cerrar" class="novp-cta">Empezar a navegar</button>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -216,6 +237,7 @@
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <hr />
     <button id="menu-update" data-action="update">Buscar actualizaciones</button>
+    <button data-action="novedades">Novedades de esta versión</button>
     <button data-action="about">Acerca de Naviris</button>
   </div>
 

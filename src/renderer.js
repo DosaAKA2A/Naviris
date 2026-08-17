@@ -4401,6 +4401,14 @@ els.menuPop.addEventListener('click', (e) => {
   // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
   if (a === 'update') { if (updAutoLista) window.cobalt.updateInstall(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
   if (a === 'permissions') showPermManager();
+  // Volver a ver la página de la versión instalada cuando quieras: sale sola al
+  // actualizar, pero cerrarla no puede significar perderla.
+  if (a === 'novedades') (async () => {
+    const v = await window.cobalt.version();
+    const pag = await paginaNovedades(v);
+    if (pag) abreNovedadesPagina(pag);
+    else toast('Esta versión no trae página de novedades');
+  })();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
@@ -5014,10 +5022,77 @@ function limpiaNotas(md) {
   return items.slice(0, 8).map((t) => t.charAt(0).toUpperCase() + t.slice(1));
 }
 
+/* ===== PÁGINA de novedades (2026-08-17) =====
+   El panel pequeño no da para contar una versión entera. Cuando la versión trae
+   una página escrita, se abre ESA; el panel queda de respaldo para las versiones
+   que no la tengan.
+   El contenido no viaja en el build: se lee de naviris.site, igual que el
+   catálogo de addons, así que se escribe y se corrige sin publicar nada. */
+const NOV_BASE = 'https://naviris.site/novedades/';
+async function paginaNovedades(version) {
+  try {
+    const r = await fetch(NOV_BASE + encodeURIComponent(version) + '.json', { cache: 'no-cache' });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d && Array.isArray(d.bloques) && d.bloques.length) ? d : null;
+  } catch { return null; }
+}
+function abreNovedadesPagina(d) {
+  const pg = $('#nov-page');
+  $('#novp-linea').textContent = d.linea === 'dev' ? 'NavirisDev' : 'Naviris';
+  $('#novp-tit').textContent = d.titulo || ('Naviris ' + d.version);
+  $('#novp-sub').textContent = d.entradilla || '';
+  const cont = $('#novp-bloques');
+  cont.textContent = '';
+  for (const b of d.bloques) {
+    const sec = document.createElement('section');
+    sec.className = 'novp-bloque';
+    if (b.titulo) {
+      const h = document.createElement('h2');
+      h.className = 'novp-b-tit'; h.textContent = b.titulo;
+      sec.appendChild(h);
+    }
+    if (b.texto) {
+      const p = document.createElement('p');
+      p.className = 'novp-b-txt'; p.textContent = b.texto; // textContent: el contenido viene de la red
+      sec.appendChild(p);
+    }
+    if (b.imagen) {
+      const caja = document.createElement('div');
+      caja.className = 'novp-img';
+      const im = document.createElement('img');
+      im.loading = 'lazy';
+      im.alt = b.titulo || '';
+      im.src = String(b.imagen);
+      // Una imagen que no carga (sin red, ruta mal escrita) no puede dejar un
+      // hueco roto en medio del texto: se retira y el bloque sigue leyéndose.
+      im.addEventListener('error', () => caja.remove());
+      caja.appendChild(im);
+      sec.appendChild(caja);
+    }
+    cont.appendChild(sec);
+  }
+  tabs.forEach((t) => t.webview?.classList.remove('active'));
+  els.hub.classList.remove('active');
+  pg.classList.remove('hidden'); pg.classList.add('active');
+  pg.scrollTop = 0;
+}
+function cierraNovedadesPagina() {
+  const pg = $('#nov-page');
+  pg.classList.remove('active'); pg.classList.add('hidden');
+  const t = activeTab();
+  if (t && t.kind === 'web' && t.webview) t.webview.classList.add('active');
+  else els.hub.classList.add('active');
+}
+$('#novp-cerrar').addEventListener('click', cierraNovedadesPagina);
+
 async function muestraNovedades() {
   let nov = null;
   try { nov = await window.cobalt.updateNovedades(); } catch { return; }
   if (!nov) return;
+  // Con página escrita para esta versión, se abre la página entera
+  const pag = await paginaNovedades(nov.version);
+  if (pag) { abreNovedadesPagina(pag); return; }
   $('#nov-ver').textContent = 'Versión ' + nov.version + (nov.anterior ? ' · antes ' + nov.anterior : '');
   const lista = $('#nov-lista');
   lista.textContent = '';

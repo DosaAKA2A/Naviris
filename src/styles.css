@@ -1819,6 +1819,38 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-auth.t-2x1 .au-emblema svg { width: 17px; height: 17px; }
 .w-auth.t-2x1 .au-cta { margin-top: 4px; padding: 6px 13px; }
 
+/* ===== Página de novedades (2026-08-17) =====
+   El panel pequeño no daba para contar una versión entera (Dosa: "quiero toda
+   una página explicando todos los cambios"). Esto es una portada de verdad:
+   marca, titular, y cada cambio con su imagen y su explicación.
+   Sin cajas por todo: manda el espacio y la tipografía. */
+.novp-inner { max-width: 760px; margin: 0 auto; padding: 7vh 28px 40px; }
+.novp-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; margin-bottom: 46px; }
+.novp-marca { line-height: 0; }
+/* La línea (Naviris / NavirisDev) en pastilla de realce: de un vistazo sabes
+   si esto es la estable o una de desarrollo. */
+.novp-linea { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--realce) 20%, transparent); color: var(--realce); }
+#novp-tit { font-size: 34px; font-weight: 600; letter-spacing: -.5px; line-height: 1.15; }
+.novp-sub { font-size: 15px; color: var(--text-dim); line-height: 1.6; max-width: 54ch; }
+
+.novp-bloques { display: flex; flex-direction: column; gap: 44px; }
+.novp-bloque { display: flex; flex-direction: column; gap: 14px; }
+.novp-b-tit { font-size: 19px; font-weight: 600; letter-spacing: -.2px; }
+.novp-b-txt { font-size: 14px; color: var(--text-dim); line-height: 1.7; max-width: 62ch; }
+/* La imagen es una captura de la propia app: marco discreto y esquinas del
+   sistema, sin sombras dramáticas. */
+.novp-img { width: 100%; border-radius: var(--r-l); overflow: hidden; background: var(--bg-2);
+  border: 1px solid var(--line); }
+.novp-img img { display: block; width: 100%; height: auto; }
+
+.novp-pie { display: flex; justify-content: center; margin-top: 52px; }
+.novp-cta { border: none; border-radius: 999px; background: var(--accent); color: var(--accent-fg);
+  font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 26px; cursor: pointer;
+  transition: transform var(--dur-1) var(--spring), filter var(--dur-1) var(--ease); }
+.novp-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.novp-cargando, .novp-fallo { font-size: 13px; color: var(--text-dim); text-align: center; padding: 30px 0; }
+
 /* Alta de cuenta */
 .au-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
   background: rgba(0,0,0,.5); backdrop-filter: blur(3px); }

@@ -1,0 +1,35 @@
+{
+  "version": "2.7.6",
+  "linea": "estable",
+  "titulo": "Naviris 2.7.6",
+  "entradilla": "A partir de esta versión, Naviris se actualiza solo: sin buscar nada en el menú y sin instalador. Esto es lo que cambia.",
+  "bloques": [
+    {
+      "titulo": "Se actualiza sola, sin instalador",
+      "texto": "Cuando hay una versión nueva, Naviris la descarga en segundo plano mientras navegas y la deja lista. Se instala al cerrar el navegador, así que la próxima vez que lo abras ya estás en la nueva. No hay asistente con botones de Siguiente, no hay que elegir carpeta y no hace falta entrar en el menú a buscar nada.\n\nSolo esta vez verás el instalador de siempre, porque quien corre la actualización es la versión que ya tienes puesta. A partir de la siguiente, todas son silenciosas."
+    },
+    {
+      "titulo": "Un arranque que no ocupa media pantalla",
+      "texto": "Naviris ya no abre una ventana enorme mientras carga. Ahora arranca con un cuadrado pequeño con el logo y una barra que se llena de principio a fin, y la ventana grande solo aparece cuando ya está montada del todo: se acabó ver el esqueleto vacío colocándose.\n\nLa barra no es decorativa. Cada tramo corresponde a un paso real del arranque, así que lo que ves avanzar es lo que de verdad está pasando.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/arranque.png"
+    },
+    {
+      "titulo": "Tus códigos de verificación, en el hub",
+      "texto": "Naviris genera los códigos de seis dígitos que te piden al entrar en Discord, GitHub, Google o Steam, igual que una aplicación de autenticación del móvil. Se añaden pegando el enlace del código QR o el secreto que enseña la web.\n\nLos códigos no están a la vista de entrada: se abren con Windows Hello y se quedan disponibles unos minutos. El secreto se guarda cifrado con tu cuenta de Windows y no sale del navegador. Cada cuenta aparece con el logo de su servicio y un anillo que muestra cuánto le queda al código.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/autenticador.png"
+    },
+    {
+      "titulo": "Tu cuenta, con tu nombre",
+      "texto": "La Cuenta Naviris ya no te llama por la primera parte de tu correo. Puedes poner tu nombre de usuario en el propio panel, y es el que se usa en la pastilla del hub, en el widget de cuenta y en tu avatar cuando no tienes foto.\n\nViaja con tu cuenta, así que al entrar desde otro equipo te llamas igual. Si lo dejas vacío, se vuelve al nombre del correo.",
+      "imagen": "https://naviris.site/novedades/img/2.7.6/cuenta.png"
+    },
+    {
+      "titulo": "Strainer: quédate con el enlace de verdad",
+      "texto": "Un addon nuevo para las páginas intermedias que se cruzan entre tú y la descarga. Pegas el enlace en su panel y te devuelve el destino final, resolviendo la cadena por detrás para que sus anuncios no lleguen a cargarse.\n\nTambién puede saltarlas mientras navegas: si caes en una pasarela conocida, la pestaña pasa sola. Las reglas se actualizan por su cuenta, sin esperar a una versión nueva del navegador."
+    },
+    {
+      "titulo": "Y esta misma página",
+      "texto": "Como las actualizaciones ya no se piden a mano, cada versión nueva se presenta aquí, con lo que cambia explicado y con imágenes. Puedes volver a abrirla cuando quieras desde el menú, en Novedades de esta versión."
+    }
+  ]
+}
