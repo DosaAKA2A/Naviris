@@ -1520,7 +1520,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* La foto llena el círculo de la tarjeta de cuenta y tapa la inicial */
 .u-ava.con-foto { background-size: cover; background-position: center; color: transparent; }
 /* Foto de perfil en el modal de cuenta */
-.acc-perfil { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
+/* Arriba, no centrado: con el nombre como primera línea, centrar dejaba la foto
+   a la altura del correo y el nombre colgando solo. Así arrancan juntos. */
+.acc-perfil { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 6px; }
 .acc-perfil-txt { min-width: 0; }
 .acc-foto { width: 68px; height: 68px; border-radius: 999px; flex-shrink: 0; cursor: pointer;
   background: var(--grad-realce); background-size: cover; background-position: center;
@@ -1528,6 +1530,19 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   color: var(--grad-fg); font-size: 26px; font-weight: 650;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
 .acc-foto.con-foto { color: transparent; }
+/* Nombre de usuario: campo discreto, no un formulario. Se lee como el título
+   del panel pero con superficie de pastilla, para que se vea que SE PUEDE
+   escribir ahí (sin ella nadie descubriría que es editable).
+   OJO A LA ESPECIFICIDAD: `.modal-card input` (0,1,1) gana a `.acc-nombre`
+   (0,1,0) por muy abajo que esté en el archivo, y le devolvía la caja de
+   formulario con sus 36px. De ahí el selector con las dos. */
+.modal-card input.acc-nombre { width: 100%; height: 32px; margin-bottom: 5px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: 9px; background: var(--chip); color: var(--text);
+  font-family: inherit; font-size: 15px; font-weight: 600;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.modal-card input.acc-nombre::placeholder { color: var(--text-dim); font-weight: 500; }
+.modal-card input.acc-nombre:hover { background: var(--chip-hover); }
+.modal-card input.acc-nombre:focus { background: var(--bg); border-color: var(--realce); }
 .acc-foto-btns { display: flex; gap: 8px; margin-top: 8px; }
 .acc-foto-btns button { border: none; border-radius: 999px; background: var(--chip); color: var(--text);
   font-family: inherit; font-size: 11.5px; padding: 6px 12px; cursor: pointer; }

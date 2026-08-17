@@ -2116,7 +2116,7 @@ function renderUserCard(body) {
   const logged = !!(account && account.token);
   body.classList.toggle('u-on', logged);
   if (logged) {
-    const nombre = account.email.split('@')[0];
+    const nombre = nombreCuenta();
     const st = store.get('cobalt.syncStamp', 0);
     body.innerHTML = `
       <div class="u-ava${fotoLocal() ? ' con-foto' : ''}"${fotoLocal() ? ` style="background-image:url('${fotoLocal()}')"` : ''}>${escapeHtml(nombre.charAt(0).toUpperCase())}</div>
@@ -2992,6 +2992,7 @@ function buildSyncData() {
     dials: store.get('cobalt.dials', null),
     widgets: store.get('cobalt.widgets', null),
     notes: store.get('cobalt.notes', ''),
+    nombre: store.get('cobalt.account.nombre', ''),
     // Un fondo por tema (dev.49). `hubBg` se mantiene para las versiones que
     // aun sincronizan el fondo unico: viaja el del tema activo.
     hubBg: store.get(bgThemeKey(), null),
@@ -3004,6 +3005,9 @@ async function applySyncData(d) {
   if (Array.isArray(d.dials)) { store.set('cobalt.dials', d.dials); dials = d.dials; }
   if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
+  // Solo si el blob TRAE la clave: una versión anterior no la manda, y tomar su
+  // ausencia por "sin nombre" borraría el que acabas de poner en este equipo.
+  if (typeof d.nombre === 'string') store.set('cobalt.account.nombre', d.nombre.trim().slice(0, 24));
   if (d.hubBgs && typeof d.hubBgs === 'object') for (const t of TEMAS) if (d.hubBgs[t]) store.set(bgThemeKey(t), d.hubBgs[t]);
   if (d.hubBg && !(d.hubBgs && d.hubBgs[temaActual()])) applyBackground(d.hubBg);
   else if (d.hubBgs) applyBackground(store.get(bgThemeKey(), defaultBgTema()));
@@ -3023,12 +3027,41 @@ const accEls = {
   modal: $('#account-modal'), loginView: $('#acc-login-view'), userView: $('#acc-user-view'),
   email: $('#acc-email'), pass: $('#acc-pass'), error: $('#acc-error'), who: $('#acc-who'), last: $('#acc-last'),
   foto: $('#acc-foto'), fotoSet: $('#acc-foto-set'), fotoDel: $('#acc-foto-del'),
+  nombre: $('#acc-nombre'),
   pill: $('#hub-account'), pillLabel: $('#hub-account-label')
 };
+
+/* ===== NOMBRE DE USUARIO (2026-08-17, petición de Dosa) =====
+   Antes, en todas partes donde había que llamarte de algún modo se usaba la
+   parte del correo (hatred.aka2a). Ahora puedes poner el tuyo, y manda en los
+   tres sitios: la pastilla del hub, el widget de cuenta y la inicial del avatar
+   cuando no hay foto.
+   Vive en el BLOB de sincronización, no en una clave propia del servidor como
+   la foto: son 20 bytes, no compite por el espacio del blob y viaja entre
+   equipos sin tocar el worker. Vacío = se vuelve al nombre del correo. */
+function nombreCuenta() {
+  const n = String(store.get('cobalt.account.nombre', '') || '').trim();
+  if (n) return n;
+  return (account && account.email) ? account.email.split('@')[0] : '';
+}
+function guardaNombre() {
+  if (!accEls.nombre) return;
+  const antes = String(store.get('cobalt.account.nombre', '') || '');
+  const v = accEls.nombre.value.trim().slice(0, 24);
+  if (v === antes) return;
+  store.set('cobalt.account.nombre', v);
+  accEls.nombre.value = v;
+  accEls.nombre.placeholder = nombreCuenta();
+  renderAccountPill();  // pastilla y widget del hub
+  pintaFoto();          // la inicial del avatar sigue al nombre
+  accPush();            // y viaja a la cuenta con el resto de preferencias
+  toast(v ? 'Nombre actualizado' : 'Se usará el nombre de tu correo');
+}
+
 function renderAccountPill() {
   const logged = !!(account && account.token);
   accEls.pill.classList.toggle('logged', logged);
-  accEls.pillLabel.textContent = logged ? account.email.split('@')[0] : 'Iniciar sesión';
+  accEls.pillLabel.textContent = logged ? nombreCuenta() : 'Iniciar sesión';
   accEls.pill.title = logged ? `Cuenta Naviris — ${account.email}` : 'Cuenta Naviris: guarda tus preferencias en la nube';
   refrescaUserCards(); // el widget de cuenta del hub refleja el mismo estado
 }
@@ -3039,6 +3072,11 @@ function showAccountModal() {
   accEls.userView.classList.toggle('hidden', !logged);
   if (logged) {
     accEls.who.textContent = account.email;
+    if (accEls.nombre) {
+      accEls.nombre.value = String(store.get('cobalt.account.nombre', '') || '');
+      // El placeholder enseña con qué te va a llamar si lo dejas vacío
+      accEls.nombre.placeholder = account.email.split('@')[0];
+    }
     cargaFoto();
     const st = store.get('cobalt.syncStamp', 0);
     accEls.last.textContent = st ? 'Última sincronización: ' + new Date(st).toLocaleString('es') : 'Aún sin sincronizar en este equipo.';
@@ -3050,6 +3088,10 @@ accEls.pill.addEventListener('click', showAccountModal);
 accEls.foto?.addEventListener('click', eligeFoto);
 accEls.fotoSet?.addEventListener('click', eligeFoto);
 accEls.fotoDel?.addEventListener('click', quitaFoto);
+// Se guarda al salir del campo o con Enter: sin botón de guardar que recordar
+accEls.nombre?.addEventListener('change', guardaNombre);
+accEls.nombre?.addEventListener('blur', guardaNombre);
+accEls.nombre?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); accEls.nombre.blur(); } });
 $('#acc-cancel').addEventListener('click', () => accEls.modal.classList.add('hidden'));
 $('#acc-close2').addEventListener('click', () => accEls.modal.classList.add('hidden'));
 
@@ -3067,7 +3109,7 @@ function pintaFoto(img) {
   if (accEls.foto) {
     accEls.foto.style.backgroundImage = url ? `url("${url}")` : '';
     accEls.foto.classList.toggle('con-foto', !!url);
-    accEls.foto.textContent = url ? '' : ((account && account.email) ? account.email.charAt(0).toUpperCase() : '');
+    accEls.foto.textContent = url ? '' : (nombreCuenta().charAt(0).toUpperCase() || '');
     accEls.fotoDel?.classList.toggle('hidden', !url);
   }
   document.querySelectorAll('.w-user .u-ava').forEach((a) => {
@@ -3145,7 +3187,9 @@ $('#acc-register').addEventListener('click', () => accAuth('/register'));
 accEls.pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') accAuth('/login'); });
 $('#acc-logout').addEventListener('click', async () => {
   await accRequest('/logout', { method: 'POST' });
-  store.set('cobalt.account.foto', null);   // la foto es de la cuenta, no del equipo
+  // Foto y nombre son de la CUENTA, no del equipo: al salir se van con ella
+  store.set('cobalt.account.foto', null);
+  store.set('cobalt.account.nombre', '');
   account = null; store.set('cobalt.account', null); store.set('cobalt.syncStamp', 0);
   renderAccountPill(); showAccountModal();
 });

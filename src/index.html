@@ -378,6 +378,11 @@
         <div class="acc-perfil">
           <div id="acc-foto" class="acc-foto" title="Tu foto de perfil"></div>
           <div class="acc-perfil-txt">
+            <!-- El nombre se escribe aquí mismo: en reposo se lee como un título,
+                 y solo al tocarlo se ve que es un campo. Si lo dejas vacío, manda
+                 la parte del correo (el mismo nombre que se usaba antes). -->
+            <input id="acc-nombre" class="acc-nombre" type="text" maxlength="24" spellcheck="false"
+                   autocomplete="off" title="Tu nombre de usuario" aria-label="Tu nombre de usuario" />
             <p>Sesión iniciada como <b id="acc-who"></b>.</p>
             <p id="acc-last" class="acc-last"></p>
             <div class="acc-foto-btns">
