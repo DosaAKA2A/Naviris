@@ -1839,10 +1839,14 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .novp-b-tit { font-size: 19px; font-weight: 600; letter-spacing: -.2px; }
 .novp-b-txt { font-size: 14px; color: var(--text-dim); line-height: 1.7; max-width: 62ch; }
 /* La imagen es una captura de la propia app: marco discreto y esquinas del
-   sistema, sin sombras dramáticas. */
-.novp-img { width: 100%; border-radius: var(--r-l); overflow: hidden; background: var(--bg-2);
-  border: 1px solid var(--line); }
-.novp-img img { display: block; width: 100%; height: auto; }
+   sistema, sin sombras dramáticas.
+   NUNCA se estira. Una captura de un panel de 280px agrandada al ancho de la
+   página se ve borrosa y desproporcionada; a su tamaño real se ve nítida y
+   además se entiende que es un recorte de la interfaz. Las capturas anchas sí
+   llenan la columna, porque el max-width las limita. */
+.novp-img { width: fit-content; max-width: 100%; margin: 0 auto;
+  border-radius: var(--r-l); overflow: hidden; background: var(--bg-2); border: 1px solid var(--line); }
+.novp-img img { display: block; max-width: 100%; height: auto; }
 
 .novp-pie { display: flex; justify-content: center; margin-top: 52px; }
 .novp-cta { border: none; border-radius: 999px; background: var(--accent); color: var(--accent-fg);
