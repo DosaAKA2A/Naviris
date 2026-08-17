@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.1.3 (kind: tool)
+/* Naviris addon: Strainer v1.2.0 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
@@ -21,8 +21,15 @@
    2. De la pagina cargada: el enlace al alojamiento final (Drive, Mega,
       MediaFire, pixeldrain, gofile...), con reintentos, porque muchas
       pasarelas lo escriben tarde con JavaScript.
-   3. En modo profundo (Alt+S y panel), ademas: meta refresh, cualquier enlace
-      externo con camino propio y las URLs dentro de los scripts.
+   3. De los scripts de la pagina: el destino en base64 (hasta doble) o como URL
+      suelta, y el meta refresh.
+
+   REGLA DE ORO desde v1.2.0: salvo que la regla del sitio traiga su propio
+   selector, Strainer solo devuelve un enlace cuando el destino es un
+   ALOJAMIENTO RECONOCIDO. Si no lo reconoce, no devuelve nada. Antes tenia
+   recursos que adivinaban (el enlace externo mas largo, cualquier URL de un
+   script, "donde haya acabado la pagina") y en las pasarelas con publicidad
+   agresiva adivinaban el anuncio.
 
    Las reglas por dominio NO viven aqui: estan en naviris.site/addons/strainer.json
    y se releen en cada arranque, asi que anadir un sitio no obliga a publicar
@@ -184,8 +191,11 @@
     }
 
     var i, u2, as = document.querySelectorAll('a[href]');
+    var sc = document.querySelectorAll('script:not([src])');
 
-    // 1. Selector propio de la regla: manda sobre todo lo demas.
+    // 1. Selector propio de la regla: manda sobre todo lo demas. Es el unico
+    //    caso en el que vale un destino que no sea un alojamiento conocido,
+    //    porque ahi alguien ya miro esa pasarela y respondio por ella.
     if (sel) {
       try {
         var esp = document.querySelectorAll(sel);
@@ -196,17 +206,27 @@
     // 2. Enlace a un alojamiento de archivos conocido.
     for (i = 0; i < as.length; i++) { u2 = sirve(as[i].getAttribute('href'), true); if (u2) return u2; }
 
-    // 3. Redireccion por meta refresh.
-    var meta = document.querySelector('meta[http-equiv="refresh" i]');
-    if (meta) {
-      var m = /url\s*=\s*['"]?([^'";]+)/i.exec(meta.getAttribute('content') || '');
-      if (m) { u2 = sirve(m[1], false); if (u2) return u2; }
+    // 3. El destino en base64 dentro de un script. Hay pasarelas (SoraLink y
+    //    parecidas) que no dejan ni un <a>: guardan el enlace codificado y acto
+    //    seguido reenvian a su portada, que es la que lleva el contador y los
+    //    anuncios. Aqui se caza en la pasarela, antes de ese reenvio.
+    //    Solo se acepta si al decodificar sale un alojamiento CONOCIDO: un
+    //    base64 cualquiera de la publicidad no puede colarse por aqui.
+    for (i = 0; i < sc.length; i++) {
+      var trozos = (sc[i].textContent || '').match(/[A-Za-z0-9+/_-]{24,}={0,2}/g) || [];
+      for (var b = 0; b < trozos.length; b++) {
+        var d = trozos[b];
+        for (var vuelta = 0; vuelta < 2; vuelta++) {      // admite base64 doble
+          try { d = atob(d.replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { break; }
+          if (!/^[\x20-\x7e]+$/.test(d)) break;
+          if (/^https?:\/\//i.test(d)) { u2 = sirve(d, true); if (u2) return u2; break; }
+        }
+      }
     }
 
     // 4. URLs dentro de los scripts, pero solo a alojamientos conocidos y con
     //    camino propio: hay paginas con listas de dominios sueltos (app_domains
     //    y parecidas) que no son espejos de nada.
-    var sc = document.querySelectorAll('script:not([src])');
     for (i = 0; i < sc.length; i++) {
       var urls = (sc[i].textContent || '').match(/https?:\/\/[^\s"'<>\\)]+/g) || [];
       for (var j = 0; j < urls.length; j++) {
@@ -216,33 +236,21 @@
       }
     }
 
-    if (!profundo) return '';
-
-    // 5. Solo en modo profundo: cualquier enlace externo con camino propio. El
-    //    mas largo suele ser el bueno (los cortos son avisos legales, el sitio
-    //    del acortador, redes sociales que ya estan filtradas).
-    var mejor = '', largo = -1;
-    for (i = 0; i < as.length; i++) {
-      u2 = sirve(as[i].getAttribute('href'), false);
-      if (!u2) continue;
-      var p; try { p = new URL(u2).pathname; } catch (e) { continue; }
-      if (p.length < 2) continue;
-      if (p.length > largo) { largo = p.length; mejor = u2; }
-    }
-    if (mejor) return mejor;
-
-    // 6. URLs de los scripts a cualquier sitio.
-    for (i = 0; i < sc.length; i++) {
-      var us = (sc[i].textContent || '').match(/https?:\/\/[^\s"'<>\\)]+/g) || [];
-      for (var k = 0; k < us.length; k++) {
-        var u3; try { u3 = new URL(us[k]); } catch (e) { continue; }
-        if (u3.pathname.length < 2) continue;
-        u2 = sirve(us[k], false); if (u2) return u2;
-      }
+    // 5. Redireccion por meta refresh, tambien solo a un alojamiento conocido.
+    var meta = document.querySelector('meta[http-equiv="refresh" i]');
+    if (meta) {
+      var m = /url\s*=\s*['"]?([^'";]+)/i.exec(meta.getAttribute('content') || '');
+      if (m) { u2 = sirve(m[1], true); if (u2) return u2; }
     }
 
-    // 7. Y si la pasarela ya nos llevo sola a otro sitio, eso ES el resultado.
-    if (origen && location.href !== origen && /^https?:/.test(location.href)) return location.href;
+    // Y hasta aqui. ANTES habia tres recursos mas para el modo profundo: el
+    // enlace externo con el camino mas largo, cualquier URL suelta de un script
+    // y "donde haya acabado la pagina". Los tres ADIVINABAN, y en una pasarela
+    // con publicidad agresiva lo que adivinaban era el anuncio: Dosa acabo en
+    // paginas para adultos colando un enlace de descarga (2026-08-17). Un
+    // colador que ante la duda entrega publicidad es peor que uno que diga que
+    // no lo encontro, asi que si el destino no es un alojamiento reconocido no
+    // se devuelve nada. `profundo` ya no relaja este criterio.
     return '';
   }
 
