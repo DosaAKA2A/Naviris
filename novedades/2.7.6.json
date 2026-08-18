@@ -1,9 +1,11 @@
 {
+  "_nota": "VACIADA el 2026-08-18 con el OK de Dosa: la 2.7.6 tiene la pagina de novedades SIN SALIDA (el arreglo llego en 2.7.7-dev.3). Sin bloques, paginaNovedades devuelve null y al usuario le sale el panel pequeno de siempre, que si se cierra. Restaurar el contenido (esta debajo, en _bloques_originales) cuando la estable vigente ya tenga el arreglo.",
   "version": "2.7.6",
   "linea": "estable",
   "titulo": "Naviris 2.7.6",
   "entradilla": "A partir de esta versión, Naviris se actualiza solo: sin buscar nada en el menú y sin instalador. Esto es lo que cambia.",
-  "bloques": [
+  "bloques": [],
+  "_bloques_originales": [
     {
       "titulo": "Se actualiza sola, sin instalador",
       "texto": "Cuando hay una versión nueva, Naviris la descarga en segundo plano mientras navegas y la deja lista. Se instala al cerrar el navegador, así que la próxima vez que lo abras ya estás en la nueva. No hay asistente con botones de Siguiente, no hay que elegir carpeta y no hace falta entrar en el menú a buscar nada.\n\nSolo esta vez verás el instalador de siempre, porque quien corre la actualización es la versión que ya tienes puesta. A partir de la siguiente, todas son silenciosas."
