@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.1",
+  "linea": "dev",
+  "titulo": "El hub se ajusta a tu pantalla",
+  "entradilla": "La composición del hub ya no era la misma para todos los monitores: en una pantalla 16:9 se montaba la de las ultrapanorámicas y no cabía. Esta versión la elige según tu pantalla y rehace las que quedaron descuadradas.",
+  "bloques": [
+    {
+      "titulo": "Una composición por forma de pantalla",
+      "texto": "El hub se apoya en una rejilla de celdas, y cuántas columnas caben depende de la forma del monitor: 13 en una pantalla normal y 17 en una ultrapanorámica. Hasta ahora una instalación nueva se quedaba siempre con la de 17, aunque el monitor fuera 16:9, y ahí las celdas salían tan pequeñas que las tarjetas se cortaban: el reproductor, tu cuenta y el monitor de recursos perdían texto, la tarjeta de accesos empujaba a las de abajo y alguna caja acababa suelta en medio.\n\nAhora la composición la elige la forma de tu pantalla. Las dos son la misma: la de 16:9 es la ultrapanorámica sin las dos columnas vacías que la separan por dentro, así que las tarjetas quedan igual de colocadas y con el tamaño para el que están dibujadas."
+    },
+    {
+      "titulo": "Si el tuyo estaba descuadrado, se rehace solo",
+      "texto": "No tienes que tocar nada: al abrir esta versión se rehace la composición con el ancho que le toca a tu pantalla.\n\nSolo se rehace si nunca compusiste el hub a mano. Si moviste, agrandaste, quitaste o añadiste una sola tarjeta, tu composición manda y no se toca. La anterior se guarda de todas formas por si acaso, y lo que sea tuyo se conserva: las imágenes que hayas elegido siguen donde estaban.\n\nLa regla, a partir de aquí: mientras no compongas, el hub sigue a tu monitor; en cuanto compones, es tuyo."
+    },
+    {
+      "titulo": "Buscador y accesos, siempre primero",
+      "texto": "Son lo primero que se usa del hub, así que ahora se colocan antes que el resto. Si alguna vez no cabe todo, ellos no se quedan fuera.\n\nDe paso, la tarjeta de accesos ya calcula bien cuántos caben por fila: antes se creía uno más de la cuenta y pedía más alto del que necesitaba, empujando a las tarjetas de debajo sin motivo."
+    }
+  ]
+}
