@@ -5073,14 +5073,17 @@ function marcaActualizacion(version) {
     pop.insertBefore(entrada, pop.firstElementChild);
   }
 }
-/* La estable ya se ha descargado sola y se instalará al cerrar. Se avisa por
-   dos motivos: para que no sorprenda que al abrir mañana cambie la versión, y
-   para poder instalarla YA sin esperar — el mismo botón del menú lo hace. */
+/* La versión nueva ya se ha descargado sola y se instalará al cerrar. Se avisa
+   por dos motivos: para que no sorprenda que al abrir mañana cambie la versión,
+   y para poder instalarla YA sin esperar. La entrada del menú vive oculta y
+   SOLO existe en este estado (Dosa, 2026-08-18: nada de "buscar
+   actualizaciones" a mano; la actualización se anuncia sola). */
 function marcaListaParaInstalar(version) {
   const boton = $('#nav-menu');
   if (boton) { boton.classList.add('hay-update'); boton.title = 'Menú — Naviris ' + version + ' lista para instalar'; }
   const pop = $('#menu-pop'), entrada = $('#menu-update');
   if (pop && entrada) {
+    entrada.classList.remove('hidden');
     entrada.classList.add('destacado');
     entrada.textContent = 'Reiniciar e instalar la ' + version;
     if (pop.firstElementChild !== entrada) pop.insertBefore(entrada, pop.firstElementChild);
@@ -5109,7 +5112,8 @@ window.cobalt.onUpdateStatus((s) => {
   } else if (s.state === 'downloaded') {
     if (!updChosen) {
       if (!s.auto) return;
-      updAutoLista = s.version; updReadyLine = 'stable';
+      if (updAutoLista === s.version) return; // el reloj vuelve a mirar cada 2 h: avisar UNA vez
+      updAutoLista = s.version; updReadyLine = /-dev/i.test(s.version) ? 'dev' : 'stable';
       marcaListaParaInstalar(s.version);
       toast('Naviris v' + s.version + ' lista: se instala sola al cerrar el navegador');
       return;

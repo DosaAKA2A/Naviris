@@ -1964,22 +1964,24 @@ function friendlyUpdateError(err) {
   if (/sha512|checksum|integrity|signature/i.test(raw)) return 'La descarga de la actualización no coincide. Reinténtalo.';
   return 'No se pudo comprobar la actualización. Reinténtalo más tarde.';
 }
-/* ACTUALIZACIÓN AUTOMÁTICA DE LA ESTABLE (petición de Dosa, 2026-08-13).
-   En la línea estable no hay nada que elegir: solo existe una versión buena,
-   la última. Así que al arrancar se descarga sola y se instala al CERRAR el
-   navegador — sin instalador a la vista, sin buscar nada en el menú y sin
-   reiniciar la sesión de trabajo por sorpresa: la próxima vez que abras
-   Naviris, ya es la nueva.
+/* ACTUALIZACIÓN AUTOMÁTICA DE LAS DOS LÍNEAS (Dosa, 2026-08-13 y 2026-08-18).
+   Cada instalación sigue SU canal y se actualiza sola dentro de él: la estable
+   recibe estables y NavirisDev recibe devs (quién apunta a qué lo decide
+   applyUpdateChannel). Al detectar versión nueva se descarga en silencio y se
+   instala al CERRAR el navegador — sin instalador a la vista y sin cortar la
+   sesión de trabajo; si el navegador sigue abierto, se avisa con una
+   notificación cuando ya está lista.
 
-   NavirisDev queda FUERA a propósito: ahí se prueba, se salta entre versiones
-   y a veces se vuelve atrás, y eso lo decide el usuario en el selector.
-   Tampoco se automatiza si el usuario apuntó su instalación al canal dev. */
-let chequeoSilencioso = false;   // el arranque, no una elección del usuario
+   Antes NavirisDev quedaba fuera y solo se actualizaba desde el selector del
+   menú. Consecuencia real (2026-08-18): se publicó un arreglo en dev y ningún
+   usuario de dev lo recibió — se quedaron con el fallo instalado esperando un
+   gesto manual que nadie sabía que había que hacer. Regla de Dosa: quien usa
+   dev recibe dev en automático, quien usa estable recibe estable, y la única
+   interfaz de actualización es la notificación en tiempo real. */
+let chequeoSilencioso = false;   // el arranque o el reloj, no una elección del usuario
 let bajandoSolo = false;         // evita relanzar la descarga en cada aviso
 function actualizacionSolaPermitida() {
-  if (!app.isPackaged) return false;
-  if (/-dev/i.test(app.getVersion())) return false;
-  return settings.devUpdates !== true;
+  return app.isPackaged;
 }
 autoUpdater.on('checking-for-update', () => broadcast('update:status', { state: 'checking' }));
 autoUpdater.on('update-available', (info) => {
@@ -1994,6 +1996,9 @@ autoUpdater.on('update-available', (info) => {
   }
 });
 autoUpdater.on('update-not-available', (info) => broadcast('update:status', { state: 'latest', version: info.version }));
+// Con una lista para instalar ya no se comprueba más: instalará al cerrar.
+let updYaLista = false;
+autoUpdater.on('update-downloaded', () => { updYaLista = true; });
 autoUpdater.on('download-progress', (p) => broadcast('update:status', { state: 'downloading', percent: Math.round(p.percent), auto: bajandoSolo }));
 autoUpdater.on('update-downloaded', (info) => broadcast('update:status', { state: 'downloaded', version: info.version, auto: bajandoSolo }));
 autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: friendlyUpdateError(err), auto: bajandoSolo }));
@@ -2168,9 +2173,17 @@ app.whenReady().then(async () => {
   try { if (components && components.whenReady) await components.whenReady(); }
   catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
   splashProgreso(48);
-  // Comprobación silenciosa al arrancar (solo en versión instalada). En la
-  // estable esto además descarga e instala sola la versión nueva; en dev solo avisa.
-  if (app.isPackaged) { chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); }
+  // Comprobación silenciosa al arrancar (solo en versión instalada): cada
+  // línea baja la suya y se instala al cerrar. Y MIENTRAS el navegador siga
+  // abierto se vuelve a mirar cada 2 horas: antes solo se miraba al arrancar,
+  // y quien no cierra nunca el navegador no se enteraba de nada — publicamos
+  // un arreglo y los usuarios con la sesión abierta se quedaron con el fallo
+  // (2026-08-18). Al encontrarla, la notificación de "lista" sale en vivo.
+  if (app.isPackaged) {
+    const mira = () => { if (updYaLista) return; chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); };
+    mira();
+    setInterval(mira, 2 * 3600 * 1000);
+  }
   // ¿Se actualizó desde la última vez? Entonces la interfaz enseñará qué cambió.
   revisaVersionInstalada();
   braveAdblock.init();

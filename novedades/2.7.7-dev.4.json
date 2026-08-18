@@ -1,0 +1,24 @@
+{
+  "version": "2.7.7-dev.4",
+  "linea": "dev",
+  "titulo": "Las actualizaciones llegan solas",
+  "entradilla": "NavirisDev ya se actualiza igual que la estable: sola y en su propia línea. Y la página de novedades ya no te retiene: se cierra por donde quieras.",
+  "bloques": [
+    {
+      "titulo": "Cada línea se actualiza sola",
+      "texto": "Quien usa NavirisDev recibe las versiones dev en automático, y quien usa Naviris estable recibe las estables. Hasta ahora NavirisDev solo se actualizaba si ibas al menú a buscar la versión a mano, así que los arreglos publicados se quedaban esperando sin que nadie los recibiera.\n\nLa descarga es silenciosa y se instala al cerrar el navegador: la próxima vez que lo abras, ya es la nueva. Si lo tienes abierto, un aviso te dice que la versión está lista, con la opción de reiniciar ya. Y aunque no cierres nunca el navegador, cada dos horas se vuelve a comprobar."
+    },
+    {
+      "titulo": "Fuera \"Buscar actualizaciones\"",
+      "texto": "Como las actualizaciones llegan solas, la entrada del menú para buscarlas a mano desaparece. Solo aparece una entrada cuando hay una versión ya descargada, para reiniciar e instalarla al momento. El selector para cambiar entre Naviris y NavirisDev sigue en Acerca de Naviris."
+    },
+    {
+      "titulo": "La página de novedades ya se puede cerrar",
+      "texto": "Esta misma página tenía atrapado a más de uno: la única salida era el botón del final y ni cambiar de pestaña la quitaba. Ahora tiene un aspa arriba a la derecha, se cierra con Escape, y también al cambiar de pestaña o abrir Marcadores, Descargas o Addons."
+    },
+    {
+      "titulo": "El hub se ajusta a tu pantalla",
+      "texto": "De las versiones anteriores de esta serie: la composición del hub la elige la forma de tu monitor (13 columnas en 16:9, 17 en ultrapanorámica), ningún widget se dibuja más pequeño del tamaño para el que está hecho, y las composiciones que quedaron descuadradas por el fallo anterior se rehacen solas — salvo que hayas compuesto tú, en cuyo caso no se toca nada."
+    }
+  ]
+}

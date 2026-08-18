@@ -239,7 +239,11 @@
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <hr />
-    <button id="menu-update" data-action="update">Buscar actualizaciones</button>
+    <!-- Sin "Buscar actualizaciones" (Dosa, 2026-08-18): las dos líneas se
+         actualizan solas en su canal. Esta entrada vive OCULTA y solo aparece,
+         ya como "Reiniciar e instalar la X", cuando hay una versión bajada
+         esperando — es la parte persistente de la notificación. -->
+    <button id="menu-update" data-action="update" class="hidden">Buscar actualizaciones</button>
     <button data-action="novedades">Novedades de esta versión</button>
     <button data-action="about">Acerca de Naviris</button>
   </div>
