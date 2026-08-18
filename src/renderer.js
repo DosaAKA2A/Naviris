@@ -288,7 +288,9 @@ function attachWebview(tab, url) {
 function activateTab(id) {
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
   if (tab.asleep && tab.webview) { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; tab.sinCargar = false; }
-  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
+  // La de novedades tambien: si no, se quedaba encima al cambiar de pestaña y
+  // parecia una pestaña que no se podia cerrar (2026-08-18).
+  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => {
     if (!t.webview || t.kind !== 'web') return;
@@ -610,7 +612,7 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
 function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
@@ -3980,7 +3982,7 @@ function renderDownloadsPage() {
 async function showDownloadsPage() {
   closeRightPanels();
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage();
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage(); cierraNovedadesPagina(true);
   els.dlPage.classList.remove('hidden'); els.dlPage.classList.add('active'); els.sbDownloads.classList.add('open');
   dlpFiles = await window.cobalt.listDownloadFiles();
   renderDownloadsPage();
@@ -4764,7 +4766,7 @@ const adEls = {
 };
 function showAddonsPage() {
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage();
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
   adEls.page.classList.remove('hidden'); adEls.page.classList.add('active');
   renderAddons();
 }
@@ -5224,14 +5226,24 @@ function abreNovedadesPagina(d) {
   pg.classList.remove('hidden'); pg.classList.add('active');
   pg.scrollTop = 0;
 }
-function cierraNovedadesPagina() {
+/* La capa TAPA el contenido entero (inset:0, z-index 6), así que mientras esté
+   abierta el usuario no ve ni sus pestañas ni el hub. Por eso tiene que poder
+   salirse SIEMPRE y por donde le dé la gana, no solo por el botón del final:
+   se abre sola, la lee quien quiere, y quien no, la cierra (2026-08-18).
+   `soloOculta` es para cuando quien llama ya va a activar lo que toca (cambiar
+   de pestaña, abrir Marcadores…): ahí no hay que reactivar nada por detrás. */
+function cierraNovedadesPagina(soloOculta) {
   const pg = $('#nov-page');
+  if (!pg.classList.contains('active')) return false;
   pg.classList.remove('active'); pg.classList.add('hidden');
+  if (soloOculta === true) return true;
   const t = activeTab();
   if (t && t.kind === 'web' && t.webview) t.webview.classList.add('active');
   else els.hub.classList.add('active');
+  return true;
 }
-$('#novp-cerrar').addEventListener('click', cierraNovedadesPagina);
+$('#novp-cerrar').addEventListener('click', () => cierraNovedadesPagina());
+$('#novp-x').addEventListener('click', () => cierraNovedadesPagina());
 
 async function muestraNovedades() {
   let nov = null;
@@ -5341,11 +5353,12 @@ window.addEventListener('keydown', (e) => {
   if (e.altKey && e.key === 'Home') { e.preventDefault(); els.sbHome.click(); return; }
   if (e.key === 'Escape') {
     // Escape sale de lo que este abierto ANTES de parar la carga: primero los
-    // menus del hub, luego la pagina de Addons (se vuelve al hub). Cerrar lo
-    // que estorba no depende de donde este el foco — al abrir una pestaña el
-    // foco va a la barra de direcciones y, con el filtro de "escribiendo",
-    // Escape no cerraba nada.
+    // menus del hub, luego las paginas de Novedades y Addons (se vuelve al
+    // hub). Cerrar lo que estorba no depende de donde este el foco — al abrir
+    // una pestaña el foco va a la barra de direcciones y, con el filtro de
+    // "escribiendo", Escape no cerraba nada.
     if (cierraMenusHub()) return;
+    if (cierraNovedadesPagina()) return;
     if (adEls.page.classList.contains('active')) { hideAddonsPage(); els.hub.classList.add('active'); return; }
     if (!escribiendo) { pararCarga(); return; }
   }
