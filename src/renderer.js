@@ -893,14 +893,23 @@ function tallaValida(w) {
        reordena en orden de lectura en las columnas que quepan.
    El reflujo NO se guarda nunca: al agrandar la ventana vuelve tu maqueta
    intacta. Solo se guarda lo que muevas tú en modo edición. */
-/* Las celdas NO bajan de estos tamaños: los widgets están dibujados para una
-   celda de ~150px y por debajo de ~118 se les rompe el contenido (el Monitor
-   se corta, el reproductor se aplasta, las filas de Correo se parten). Antes
-   se encogía hasta 66px con tal de que la maqueta cupiera, y eso era lo que
-   se veía roto. Ahora se prefiere reordenar y hacer scroll antes que encoger. */
+/* Las celdas NO bajan de este tamaño: los widgets están dibujados para una
+   celda de ~150px y encogiéndolos se les rompe el contenido (el Monitor se
+   corta, el reproductor se aplasta, las filas de Correo se parten). Antes se
+   encogía hasta 66px con tal de que la maqueta cupiera, y eso era lo que se
+   veía roto. Se prefiere reordenar y hacer scroll antes que encoger.
+
+   UN SOLO SUELO, 132 (2026-08-18). Había dos números y no cuadraban: por alto
+   no se bajaba de 132 —"si aprieta, scroll"— pero por ancho se dejaba llegar
+   hasta 118. La captura de un 2560x1440 con la maqueta de 17 columnas salió
+   justo en ese hueco, a 120px, y se veía roto: "Abrir Spotify" encima de la
+   barra de progreso y la tarjeta de la cuenta con el texto aplastado. O sea
+   que el 118 era demasiado optimista y el 132 que ya estaba escrito para el
+   alto era el bueno. Ahora manda en los dos ejes: por debajo de 132, reflujo,
+   donde los widgets se pintan a su tamaño y el buscador y los accesos van los
+   primeros y a todo lo ancho. Mejor eso que un bento ilegible. */
 const CELDA_DISENO = 150;  // tamaño para el que están hechos los widgets
-const CELDA_MIN = 118;     // mínimo con el que aún se leen; por debajo, reflujo
-const CELDA_COMODA = 132;  // si el alto aprieta, no encogemos más: preferimos scroll
+const CELDA_MIN = 132;     // suelo único: por debajo no se pinta la maqueta
 let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
   // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
@@ -915,9 +924,9 @@ function medidasMalla() {
   const cwAncho = Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C);
   const cwAlto = Math.floor((altoUtil - (F - 1) * CELDA_GAP) / F);
   if (cwAncho >= CELDA_MIN) {
-    // La maqueta se conserva. Si el alto no da, celda cómoda y scroll: mucho
+    // La maqueta se conserva. Si el alto no da, celda al suelo y scroll: mucho
     // mejor que reordenar los widgets por una ventana un poco baja.
-    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_COMODA));
+    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_MIN));
     return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
   }
   // Ventana estrecha o vertical: reflujo en columnas, con la celda de DISEÑO
