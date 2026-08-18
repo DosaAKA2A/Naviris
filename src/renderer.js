@@ -899,17 +899,16 @@ function tallaValida(w) {
    encogía hasta 66px con tal de que la maqueta cupiera, y eso era lo que se
    veía roto. Se prefiere reordenar y hacer scroll antes que encoger.
 
-   UN SOLO SUELO, 132 (2026-08-18). Había dos números y no cuadraban: por alto
-   no se bajaba de 132 —"si aprieta, scroll"— pero por ancho se dejaba llegar
-   hasta 118. La captura de un 2560x1440 con la maqueta de 17 columnas salió
-   justo en ese hueco, a 120px, y se veía roto: "Abrir Spotify" encima de la
-   barra de progreso y la tarjeta de la cuenta con el texto aplastado. O sea
-   que el 118 era demasiado optimista y el 132 que ya estaba escrito para el
-   alto era el bueno. Ahora manda en los dos ejes: por debajo de 132, reflujo,
-   donde los widgets se pintan a su tamaño y el buscador y los accesos van los
-   primeros y a todo lo ancho. Mejor eso que un bento ilegible. */
-const CELDA_DISENO = 150;  // tamaño para el que están hechos los widgets
-const CELDA_MIN = 132;     // suelo único: por debajo no se pinta la maqueta
+   UN SOLO NÚMERO, 150 (2026-08-18). Había tres —150 de diseño, 132 "cómoda" y
+   118 "mínima"— y los dos de abajo eran ilusiones. Probado en la app: a 120px
+   el reproductor monta el botón "Abrir Spotify" encima del control de volumen
+   y la tarjeta de la cuenta pierde el texto; a 132px el reproductor SIGUE
+   roto igual. O sea que no hay un tamaño intermedio en el que esto se vea
+   bien: o los widgets se dibujan al tamaño para el que están hechos, o se
+   rompen. Así que la maqueta no se pinta nunca por debajo de 150, y si no
+   cabe se prueba la composición estrecha y, si tampoco, reflujo — donde los
+   widgets también van a 150 y el buscador y los accesos mandan. */
+const CELDA_DISENO = 150;  // tamaño de los widgets Y suelo: no se baja de aquí
 let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
   // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
@@ -923,10 +922,10 @@ function medidasMalla() {
   const C = COLS_MAESTRA, F = FILAS_MAESTRA;
   const cwAncho = Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C);
   const cwAlto = Math.floor((altoUtil - (F - 1) * CELDA_GAP) / F);
-  if (cwAncho >= CELDA_MIN) {
-    // La maqueta se conserva. Si el alto no da, celda al suelo y scroll: mucho
+  if (cwAncho >= CELDA_DISENO) {
+    // La maqueta se conserva. Si el alto no da, celda de diseño y scroll: mucho
     // mejor que reordenar los widgets por una ventana un poco baja.
-    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_MIN));
+    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_DISENO));
     return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
   }
   // Ventana estrecha o vertical: reflujo en columnas, con la celda de DISEÑO
@@ -1426,10 +1425,24 @@ widgets.forEach((w) => {
    120px cuando los widgets están dibujados para 150, y el hub sale apretado y
    cortado. Se elige por la forma de la pantalla, que es el dato real. */
 const ULTRA_DESDE = 2; // 21:9 = 2.33; un 16:9 es 1.78 y un 16:10, 1.6
-function pantallaUltra() {
+// Ancho que le queda al hub con la ventana maximizada: la pantalla menos la
+// barra lateral (44 + 12 de margenes) y los margenes del contenido (4 + 10).
+const CROMO_ANCHO = 70;
+function cabenColumnas(C) {
+  const p = window.screen || {};
+  const anchoUtil = (((p.width || window.innerWidth) - CROMO_ANCHO) * 0.94);
+  return Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C) >= CELDA_DISENO;
+}
+/* Qué composición le toca a esta pantalla. Manda la FORMA, como quería Dosa:
+   21:9 lleva 17 columnas y 16:9 lleva 13. Pero un 21:9 corto (2560x1080) no da
+   para dibujar 17 columnas a tamaño de diseño —salen a 120px y el reproductor
+   se rompe—, así que ahí se usa la de 13: es la misma composición sin las
+   calles, y se ve entera y a su tamaño en vez de apretada. Si tampoco cabe la
+   de 13, ya se encarga medidasMalla de irse a reflujo. */
+function composicionDeLaPantalla() {
   const p = window.screen || {};
   const r = (p.width && p.height) ? p.width / p.height : window.innerWidth / window.innerHeight;
-  return r >= ULTRA_DESDE;
+  return (r >= ULTRA_DESDE && cabenColumnas(17)) ? 'uw' : 'std';
 }
 (function migraAMaquetaUnica() {
   const guardada = store.get('cobalt.maqueta', null);
@@ -1437,7 +1450,7 @@ function pantallaUltra() {
   if (widgets.some((w) => w.geo && w.geo.m)) return;
   const cuenta = (k) => widgets.filter((w) => w.geo && w.geo[k]).length;
   const fuente = deFabrica
-    ? (pantallaUltra() ? 'uw' : 'std')
+    ? composicionDeLaPantalla()
     : (cuenta('uw') >= cuenta('std') && cuenta('uw') ? 'uw' : (cuenta('std') ? 'std' : null));
   if (fuente) { COLS_MAESTRA = fuente === 'uw' ? 17 : 13; FILAS_MAESTRA = 7; }
   widgets.forEach((w) => {
@@ -1501,7 +1514,7 @@ function huellaDeFabrica(lista) {
   return null;
 }
 (function reparaMaquetaDeFabrica() {
-  const toca = pantallaUltra() ? 'uw' : 'std';
+  const toca = composicionDeLaPantalla();
   const cols = toca === 'uw' ? 17 : 13;
   if (COLS_MAESTRA === cols) return;            // ya está en el ancho que toca
   if (huellaDeFabrica(widgets) === null) return; // compuesta a mano: intocable
