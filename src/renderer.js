@@ -784,11 +784,12 @@ const WIDGET_TYPES = {
    a cualquier hueco libre. Cada tipo declara sus TALLAS (algunas cambian la
    estructura). Sustituye a los mapas por tramo (span/col8/lienzo). */
 /* UNA SOLA COMPOSICION (2026-08-11, logica de Dosa: "un UWQHD es un QHD mas
-   largo"). La celda se deriva del ALTO (5 filas fijas en horizontal): a misma
-   altura, mismas celdas. El ancho solo anade COLUMNAS: 16:9 usa 10, ultrawide
-   13 (las 3 extra son largo, no otra maqueta). Cada widget tiene UNA geometria
-   {col,row,w,h}; si en una pantalla estrecha no cabe, se recoloca TEMPORALMENTE
-   sin tocar la composicion. Ventana rara (vertical): modo flujo con scroll. */
+   largo"). La celda se deriva del ALTO (7 filas): a misma altura, mismas
+   celdas. El ancho solo anade COLUMNAS: 16:9 usa 13 y 21:9 usa 17, y a 1440p
+   las dos dan la celda de diseño (las 4 extra son largo, no otra maqueta).
+   Cada widget tiene UNA geometria {col,row,w,h}; si en una pantalla estrecha
+   no cabe, se recoloca TEMPORALMENTE sin tocar la composicion. Ventana rara
+   (vertical): modo flujo con scroll. */
 let CELDA_W = 160, CELDA_H = 160;
 const CELDA_GAP = 18;
 const FILAS_LOGICAS = 5;
@@ -822,23 +823,35 @@ const LIBRES = new Set(['imagen', 'shortcuts', 'search']);
 /* Los ACCESOS crecen con los marcadores: se calcula cuantas filas de tiles
    caben en su ancho y la tarjeta gana alto; los widgets de ABAJO se desplazan
    hacia abajo sin descuadrar (peticion de Dosa 2026-08-12). */
+/* Medidas REALES del CSS (2026-08-18): .w-card lleva padding 24 —o sea 48 de
+   los dos lados, no 26— y .sc-grid tiene gap 22px 16px, distinto por filas y
+   por columnas. Con el 26 de antes la cuenta creía que cabía un acceso más por
+   fila del que cabe: en la captura de 120px de celda calculaba 6 y el CSS
+   ponía 5. La tarjeta se dimensionaba para una rejilla que no era la pintada. */
 function altoAccesos(w) {
-  const TILE = 92, GAP_T = 16, ETIQ = 26, PAD = 26;
+  const TILE = 92, GAP_X = 16, GAP_Y = 22, ETIQ = 26, PAD = 48;
   const anchoPx = w.w * CELDA_W + (w.w - 1) * CELDA_GAP - PAD;
-  const porFila = Math.max(1, Math.floor((anchoPx + GAP_T) / (TILE + GAP_T)));
+  const porFila = Math.max(1, Math.floor((anchoPx + GAP_X) / (TILE + GAP_X)));
   const filas = Math.ceil((dials.length + 1) / porFila);
-  const altoPx = filas * (TILE + ETIQ) + (filas - 1) * GAP_T + PAD;
+  const altoPx = filas * (TILE + ETIQ) + (filas - 1) * GAP_Y + PAD;
   return Math.max(1, Math.ceil((altoPx + CELDA_GAP) / (CELDA_H + CELDA_GAP)));
 }
+/* El alto de los accesos y el empuje que provoca NO SE GUARDAN (2026-08-18):
+   salen del tamaño de celda, o sea de la ventana. Antes esto escribía en
+   geo.m y llamaba a saveWidgets, así que una ventana estrecha CONGELABA la
+   deformación en disco y tu composición ya no volvía ni abriendo en grande.
+   Ahora se devuelve un mapa de ajustes que solo vive en esta pintada: la
+   maqueta guardada queda intacta y todo se recalcula desde ella. */
 function ajustaAccesos() {
+  const ajustes = new Map();
   const w = widgets.find((x) => x.type === 'shortcuts' && x.geo && x.geo.m);
-  if (!w) return;
+  if (!w) return ajustes;
   const g = w.geo.m;
   const nuevo = altoAccesos(g);
   const delta = nuevo - g.h;
-  if (!delta) return;
+  if (!delta) return ajustes;
   const finAntes = g.row + g.h - 1;
-  g.h = nuevo; w.h = nuevo; w.row = g.row;
+  ajustes.set(w.id, { row: g.row, h: nuevo });
   // Empuje SOLO en las columnas que ocupan los accesos: los laterales no se
   // tocan (antes subia/bajaba toda la fila y descuadraba el bento).
   const cruza = (gx) => gx.col <= g.col + g.w - 1 && gx.col + gx.w - 1 >= g.col;
@@ -848,10 +861,10 @@ function ajustaAccesos() {
     if (!cruza(gx) || gx.row <= finAntes) return;
     const nueva = delta > 0
       ? Math.min(ultimasFilas - gx.h + 1, gx.row + delta)
-      : Math.max(g.row + g.h, gx.row + delta); // al encoger, vuelven a su sitio
-    gx.row = nueva; x.row = nueva;
+      : Math.max(g.row + nuevo, gx.row + delta); // al encoger, vuelven a su sitio
+    if (nueva !== gx.row) ajustes.set(x.id, { row: nueva, h: gx.h });
   });
-  saveWidgets();
+  return ajustes;
 }
 function tallaValida(w) {
   if (LIBRES.has(w.type)) {
@@ -937,9 +950,15 @@ function primerHueco(occ, w, h, cols) {
   return null; // no cabe: el widget se oculta hasta que haya sitio
 }
 
-/* Disposicion de FABRICA: la composicion de Dosa (2026-08-11) en el sistema
-   de COMPOSICION UNICA (celda por alto, 10 col en 16:9, 13 en ultrawide).
-   Las imagenes van vacias: el usuario pone las suyas. */
+/* Disposicion de FABRICA: la composicion de Dosa (2026-08-11) en las dos
+   anchuras. `uw` es la suya de 21:9 (17 columnas) y manda; `std` es LA MISMA
+   sin las dos calles vacías —las columnas 5-6 y 12-13—, que es justo lo que
+   sobra al pasar a 16:9 (17 - 4 = 13 columnas). Así los tres bloques (lateral
+   izquierdo, centro y lateral derecho) y las filas son idénticos en las dos
+   pantallas: el 21:9 solo añade aire, no otra maqueta. Se eligen por la forma
+   del monitor, no por cuál tiene más widgets (2026-08-18).
+   Las imagenes salen del tema (`slot` -> temas/<tema>/<slot>.jpg); las que
+   añada el usuario van sin slot y piden archivo. */
 const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wse",
@@ -988,16 +1007,16 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wi1",
     "type": "imagen",
-    "col": 7,
-    "row": 2,
-    "w": 3,
-    "h": 1,
+    "col": 12,
+    "row": 5,
+    "w": 2,
+    "h": 2,
     "geo": {
       "std": {
-        "col": 7,
-        "row": 2,
-        "w": 3,
-        "h": 1
+        "col": 12,
+        "row": 5,
+        "w": 2,
+        "h": 2
       },
       "uw": {
         "col": 16,
@@ -1055,16 +1074,16 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wdescargas1786480816361",
     "type": "descargas",
-    "col": 12,
-    "row": 6,
+    "col": 1,
+    "row": 5,
     "w": 2,
-    "h": 1,
+    "h": 2,
     "geo": {
       "std": {
-        "col": 12,
-        "row": 6,
+        "col": 1,
+        "row": 5,
         "w": 2,
-        "h": 1
+        "h": 2
       },
       "uw": {
         "col": 1,
@@ -1077,14 +1096,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "w1011786484898580",
     "type": "calendar",
-    "col": 12,
-    "row": 4,
+    "col": 10,
+    "row": 2,
     "w": 2,
     "h": 2,
     "geo": {
       "std": {
-        "col": 12,
-        "row": 4,
+        "col": 10,
+        "row": 2,
         "w": 2,
         "h": 2
       },
@@ -1099,13 +1118,13 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "w1071786484934841",
     "type": "privada",
-    "col": 7,
+    "col": 8,
     "row": 4,
     "w": 1,
     "h": 1,
     "geo": {
       "std": {
-        "col": 7,
+        "col": 8,
         "row": 4,
         "w": 1,
         "h": 1
@@ -1143,14 +1162,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "w1091786484963058",
     "type": "spotify",
-    "col": 1,
-    "row": 2,
+    "col": 12,
+    "row": 3,
     "w": 2,
     "h": 2,
     "geo": {
       "std": {
-        "col": 1,
-        "row": 2,
+        "col": 12,
+        "row": 3,
         "w": 2,
         "h": 2
       },
@@ -1165,16 +1184,16 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "w1021786485486556",
     "type": "imagen",
-    "col": 1,
-    "row": 6,
-    "w": 2,
-    "h": 2,
+    "col": 7,
+    "row": 2,
+    "w": 3,
+    "h": 1,
     "geo": {
       "std": {
-        "col": 1,
-        "row": 6,
-        "w": 2,
-        "h": 2
+        "col": 7,
+        "row": 2,
+        "w": 3,
+        "h": 1
       },
       "uw": {
         "col": 9,
@@ -1188,14 +1207,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wweather1786486269253",
     "type": "weather",
-    "col": 12,
-    "row": 3,
+    "col": 3,
+    "row": 2,
     "w": 2,
     "h": 1,
     "geo": {
       "std": {
-        "col": 12,
-        "row": 3,
+        "col": 3,
+        "row": 2,
         "w": 2,
         "h": 1
       },
@@ -1210,11 +1229,17 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "w1011786486744553",
     "type": "mail",
-    "col": 14,
+    "col": 10,
     "row": 4,
     "w": 2,
     "h": 3,
     "geo": {
+      "std": {
+        "col": 10,
+        "row": 4,
+        "w": 2,
+        "h": 3
+      },
       "uw": {
         "col": 14,
         "row": 4,
@@ -1227,13 +1252,13 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
     "id": "wxt1786486762568",
     "type": "xtrends",
     "col": 1,
-    "row": 4,
+    "row": 2,
     "w": 2,
     "h": 2,
     "geo": {
       "std": {
         "col": 1,
-        "row": 4,
+        "row": 2,
         "w": 2,
         "h": 2
       },
@@ -1248,14 +1273,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wmonitor1786495950984",
     "type": "monitor",
-    "col": 12,
-    "row": 7,
+    "col": 1,
+    "row": 4,
     "w": 2,
     "h": 1,
     "geo": {
       "std": {
-        "col": 12,
-        "row": 7,
+        "col": 1,
+        "row": 4,
         "w": 2,
         "h": 1
       },
@@ -1275,6 +1300,12 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
     "w": 2,
     "h": 2,
     "geo": {
+      "std": {
+        "col": 3,
+        "row": 3,
+        "w": 2,
+        "h": 2
+      },
       "uw": {
         "col": 3,
         "row": 3,
@@ -1286,14 +1317,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wnotes1786495950984",
     "type": "notes",
-    "col": 8,
-    "row": 4,
+    "col": 3,
+    "row": 5,
     "w": 2,
     "h": 2,
     "geo": {
       "std": {
-        "col": 8,
-        "row": 4,
+        "col": 3,
+        "row": 5,
         "w": 2,
         "h": 2
       },
@@ -1308,14 +1339,14 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wmoov1786496464075",
     "type": "moovin",
-    "col": 5,
-    "row": 5,
+    "col": 9,
+    "row": 4,
     "w": 1,
     "h": 1,
     "geo": {
       "std": {
-        "col": 5,
-        "row": 5,
+        "col": 9,
+        "row": 4,
         "w": 1,
         "h": 1
       },
@@ -1330,11 +1361,17 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wdeco1786498510113",
     "type": "deco",
-    "col": 9,
+    "col": 7,
     "row": 4,
     "w": 1,
     "h": 1,
     "geo": {
+      "std": {
+        "col": 7,
+        "row": 4,
+        "w": 1,
+        "h": 1
+      },
       "uw": {
         "col": 9,
         "row": 4,
@@ -1342,23 +1379,6 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
         "h": 1
       }
     }
-  },
-  {
-    "id": "w1011786501277856",
-    "type": "imagen",
-    "col": 6,
-    "row": 5,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 6,
-        "row": 5,
-        "w": 2,
-        "h": 1
-      }
-    },
-    "slot": 3
   }
 ]));
 /* MIGRACION A LA GRILLA (2026-08-12) — lo que descuadro la maqueta de Dosa:
@@ -1370,11 +1390,13 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
    nada guardado. Ahora una maqueta sin `geo` se reconoce como vieja, se guarda
    tal cual en cobalt.widgets.pre-grilla (por si hiciera falta volver) y se
    adopta la composicion de fabrica. */
+let deFabrica = false; // sin nada compuesto por el usuario: manda el monitor
 function migraMaquetaVieja(lista) {
-  if (!Array.isArray(lista) || !lista.length) return DEFAULT_WIDGETS();
+  if (!Array.isArray(lista) || !lista.length) { deFabrica = true; return DEFAULT_WIDGETS(); }
   if (lista.some((w) => w && w.geo && (w.geo.m || w.geo.std || w.geo.uw))) return lista;
   store.set('cobalt.widgets.pre-grilla', lista);
   const nueva = DEFAULT_WIDGETS();
+  deFabrica = true;
   store.set('cobalt.widgets', nueva);
   return nueva;
 }
@@ -1388,12 +1410,26 @@ widgets.forEach((w) => {
    porque es donde Dosa colocó todo) y pasa a ser LA maqueta. Las viejas
    geo.std/geo.uw se dejan intactas en disco como respaldo: si algún día hay
    que volver atrás, siguen ahí. */
+/* INSTALACION NUEVA: la composicion la elige el MONITOR (2026-08-18). Ese
+   desempate por número de widgets es para MIGRAR (el usuario compuso en una de
+   las dos y esa manda), pero en una instalación limpia no hay nada que migrar y
+   ganaba siempre la ultrapanorámica: 17 columnas en un 16:9 dejan la celda en
+   120px cuando los widgets están dibujados para 150, y el hub sale apretado y
+   cortado. Se elige por la forma de la pantalla, que es el dato real. */
+const ULTRA_DESDE = 2; // 21:9 = 2.33; un 16:9 es 1.78 y un 16:10, 1.6
+function pantallaUltra() {
+  const p = window.screen || {};
+  const r = (p.width && p.height) ? p.width / p.height : window.innerWidth / window.innerHeight;
+  return r >= ULTRA_DESDE;
+}
 (function migraAMaquetaUnica() {
   const guardada = store.get('cobalt.maqueta', null);
   if (guardada && guardada.cols) { COLS_MAESTRA = guardada.cols; FILAS_MAESTRA = guardada.filas || 7; }
   if (widgets.some((w) => w.geo && w.geo.m)) return;
   const cuenta = (k) => widgets.filter((w) => w.geo && w.geo[k]).length;
-  const fuente = cuenta('uw') >= cuenta('std') && cuenta('uw') ? 'uw' : (cuenta('std') ? 'std' : null);
+  const fuente = deFabrica
+    ? (pantallaUltra() ? 'uw' : 'std')
+    : (cuenta('uw') >= cuenta('std') && cuenta('uw') ? 'uw' : (cuenta('std') ? 'std' : null));
   if (fuente) { COLS_MAESTRA = fuente === 'uw' ? 17 : 13; FILAS_MAESTRA = 7; }
   widgets.forEach((w) => {
     const g = (w.geo && (w.geo[fuente] || w.geo.uw || w.geo.std)) || { col: w.col, row: w.row, w: w.w, h: w.h };
@@ -1402,6 +1438,83 @@ widgets.forEach((w) => {
       w: Math.max(1, g.w || w.w || 2), h: Math.max(1, g.h || w.h || 1)
     };
   });
+  store.set('cobalt.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
+  store.set('cobalt.widgets', widgets);
+})();
+/* REPARAR LAS QUE YA NACIERON TORCIDAS (2026-08-18) —————————————————————
+   Las instalaciones hechas antes de este arreglo tienen 17 columnas guardadas
+   aunque el monitor sea 16:9, y ahí la celda se queda en 120px: widgets
+   cortados, la tarjeta de accesos empujando a los de abajo y alguno tirado en
+   medio. Actualizar no les arreglaba nada, porque la maqueta ya está en disco
+   y la migración respeta lo guardado. Esto la rehace, pero SOLO si nadie ha
+   compuesto: si la maqueta guardada coincide con una de fábrica, cambiarla por
+   la de fábrica del ancho correcto no le quita nada a nadie. En cuanto tú
+   mueves una sola caja deja de coincidir y no se toca nunca más.
+
+   La huella exige que TODO cuadre con la de fábrica, y solo perdona lo que el
+   empuje de los accesos podía cambiar por su cuenta: la tarjeta pudo crecer de
+   alto, y los widgets que están debajo de ella y en sus columnas pudieron
+   BAJAR. Cualquier otra diferencia —una caja movida, redimensionada, quitada o
+   añadida— significa que ahí ha compuesto alguien, y entonces no se toca.
+
+   Regla que queda: mientras no compongas, el hub sigue a tu monitor; en cuanto
+   compones, es tuyo y manda tu composición. */
+const IMG_RETIRADA = 'w1011786501277856'; // la imagen que solo existía en 16:9
+function huellaDeFabrica(lista) {
+  const fab = DEFAULT_WIDGETS();
+  for (const k of ['uw', 'std']) {
+    const acc = (fab.find((f) => f.type === 'shortcuts') || { geo: {} }).geo[k];
+    const cruzaAcc = (g) => !!acc && g.col <= acc.col + acc.w - 1 && g.col + g.w - 1 >= acc.col;
+    const porId = new Map(fab.map((f) => [f.id, f]));
+    const bajados = [];
+    const cuadra = lista.every((w) => {
+      const g = w.geo && w.geo.m;
+      if (!g) return false;
+      const fw = porId.get(w.id);
+      if (!fw) return w.id === IMG_RETIRADA; // la única sobrante admitida
+      const f = fw.geo[k];
+      if (f.col !== g.col || f.w !== g.w) return false;
+      if (fw.type === 'shortcuts') return f.row === g.row; // solo pudo crecer de alto
+      if (f.h !== g.h) return false;
+      if (!(cruzaAcc(f) && f.row > acc.row)) return f.row === g.row;
+      // Debajo de los accesos y en sus columnas: el empuje solo baja, nunca sube.
+      if (g.row < f.row) return false;
+      bajados.push({ delta: g.row - f.row, tope: g.row + g.h - 1 >= FILAS_MAESTRA });
+      return true;
+    });
+    // El empuje es UN desplazamiento para todos: los que no lo comparten es que
+    // los movió alguien. Único perdón, los que topan con la última fila, que el
+    // empuje deja a medio camino.
+    const d = Math.max(0, ...bajados.map((x) => x.delta));
+    const empujeCoherente = bajados.every((x) => x.delta === d || x.tope);
+    if (cuadra && empujeCoherente && fab.every((f) => lista.some((w) => w.id === f.id))) return k;
+  }
+  return null;
+}
+(function reparaMaquetaDeFabrica() {
+  const toca = pantallaUltra() ? 'uw' : 'std';
+  const cols = toca === 'uw' ? 17 : 13;
+  if (COLS_MAESTRA === cols) return;            // ya está en el ancho que toca
+  if (huellaDeFabrica(widgets) === null) return; // compuesta a mano: intocable
+  store.set('cobalt.widgets.pre-reparacion', widgets);
+  const fab = DEFAULT_WIDGETS();
+  const porId = new Map(widgets.map((w) => [w.id, w]));
+  widgets = fab.map((f) => {
+    const viejo = porId.get(f.id);
+    if (!viejo) return f;
+    // Se conserva TODO lo que sea contenido del usuario (la imagen que haya
+    // elegido, por ejemplo); solo se rehace la geometría.
+    viejo.geo = viejo.geo || {};
+    viejo.geo.m = Object.assign({}, f.geo[toca]);
+    viejo.col = viejo.geo.m.col; viejo.row = viejo.geo.m.row;
+    viejo.w = viejo.geo.m.w; viejo.h = viejo.geo.m.h;
+    return viejo;
+  });
+  // La imagen retirada solo se queda si el usuario le puso una suya; con la
+  // del tema es pura decoración descolocada y se va.
+  const suelta = porId.get(IMG_RETIRADA);
+  if (suelta && suelta.img && !suelta.slot) widgets.push(suelta);
+  COLS_MAESTRA = cols; FILAS_MAESTRA = 7;
   store.set('cobalt.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
   store.set('cobalt.widgets', widgets);
 })();
@@ -1427,9 +1540,9 @@ function renderHub() {
   els.widgetGrid.style.gridTemplateRows = reflujo ? 'none' : `repeat(${m.filas}, ${CELDA_H}px)`;
   els.widgetGrid.style.gridAutoRows = `${CELDA_H}px`;
   els.widgetGrid.style.gap = `${CELDA_GAP}px`;
-  // OJO: ajustaAccesos GUARDA (crece la tarjeta y empuja a los de abajo). En
-  // reflujo no debe tocarse nada de la maqueta real.
-  if (!reflujo) ajustaAccesos();
+  // Alto de los accesos y empuje de los de abajo: SOLO para esta pintada. En
+  // reflujo no aplica, que ahí manda el orden de lectura.
+  const ajus = reflujo ? new Map() : ajustaAccesos();
   const occ = new Set();
   /* En REFLUJO manda el orden de lectura de tu maqueta (arriba a abajo,
      izquierda a derecha), PERO el buscador y los accesos van SIEMPRE los
@@ -1437,8 +1550,14 @@ function renderHub() {
      que quedar arriba y en el centro, caiga la ventana como caiga. */
   const MANDAN = { search: 0, shortcuts: 1 };
   const rango = (x) => (x.type in MANDAN ? MANDAN[x.type] : 2);
-  const enOrden = !reflujo ? widgets : [...widgets].sort((a, b) => {
+  /* Buscador y accesos se COLOCAN los primeros SIEMPRE, no solo en reflujo
+     (2026-08-18): son lo primero que se usa del hub, así que si alguna vez hay
+     pelea por una celda la ganan ellos y nunca se quedan sin pintar. Con la
+     maqueta sana esto no mueve nada —no hay solapes— y el resto conserva su
+     orden porque el sort es estable. */
+  const enOrden = [...widgets].sort((a, b) => {
     const ga = (a.geo && a.geo.m) || a, gb = (b.geo && b.geo.m) || b;
+    if (!reflujo) return rango(a) - rango(b);
     return (rango(a) - rango(b)) || (ga.row - gb.row) || (ga.col - gb.col);
   });
   for (const w of enOrden) {
@@ -1446,6 +1565,8 @@ function renderHub() {
     // que ningun widget puede "no pertenecer" y desaparecer.
     const g = w.geo && w.geo.m;
     if (g) { w.col = g.col; w.row = g.row; w.w = g.w; w.h = g.h; }
+    const aj = ajus.get(w.id);   // ajuste de los accesos: vive solo en esta pintada
+    if (aj) { w.row = aj.row; w.h = aj.h; }
     let [tw, th] = tallaValida(w); if (tw > cols) tw = cols; w.w = tw; w.h = th;
     // Buscador y accesos, a todo el ancho en reflujo (no se guarda: es solo
     // como se muestran mientras la ventana no da para la maqueta real).
@@ -1464,7 +1585,11 @@ function renderHub() {
       // Lo que se recoloca por el TAMAÑO DE LA VENTANA no se guarda jamás:
       // era exactamente lo que le destrozaba la maqueta a Dosa al abrir en
       // ventana pequeña. Solo persiste lo que se mueve en modo edición.
-      if (!reflujo) { w.col = cc; w.row = rr; fijaGeo(w); }
+      // El fijaGeo que había aquí escribía en geo.m y hacía justo lo que el
+      // comentario decía que no pasaba: el primer arrastre posterior guardaba
+      // la maqueta ya descolocada (2026-08-18). Solo se toca la posición de
+      // esta pintada, que es la que necesitan arrastre y redimensión.
+      if (!reflujo) { w.col = cc; w.row = rr; }
     }
     ocupa(occ, { col: cc, row: rr, w: tw, h: th });
     const el = document.createElement('div'); el.className = 'widget'; el.dataset.id = w.id;
