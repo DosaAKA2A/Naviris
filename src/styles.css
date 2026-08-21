@@ -272,7 +272,7 @@
   --danger: #ffffff; --ok: #bdbdbd;
   --realce: #ffffff;
   --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
-  --grad-medida: linear-gradient(90deg, #ffffff 0%, #b0b0b0 55%, #5c5c5c 100%);
+  --grad-medida: #ffffff;   /* la barra del monitor, BLANCA y sin degradado */
   --grad-fg: #131313;
   --sb-chip: rgba(255,255,255,.05);
   --tab-fg: #a0a0a0; --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
@@ -338,6 +338,9 @@
    No hay juego propio en src/temas/ — serian 3 JPG de mas para decir lo mismo. */
 :root.mono .w-img.img-tema img { filter: grayscale(1); }
 /* Logo de Naviris en blanco y negro (el splash queda fuera: es marca) */
+/* El play de Spotify va con relleno ENTERO: --grad-realce se apaga hacia el
+   gris a mitad del circulo y sobre una foto de fondo el boton se perdia. */
+:root.mono .w-sp .sp-play, :root.mono .w-sp .sp-play:hover { background: var(--accent); color: var(--accent-fg); }
 :root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #ffffff; }
 :root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ededed; }
 :root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #b4b4b4; }

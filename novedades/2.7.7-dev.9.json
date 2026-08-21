@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.9",
+  "linea": "dev",
+  "titulo": "Dos rellenos que se apagaban a media pieza",
+  "entradilla": "La barra del monitor y el botón de reproducir de Spotify usaban un degradado que se iba al gris. Ahora los dos van de un solo color.",
+  "bloques": [
+    {
+      "titulo": "La barra del monitor, blanca entera",
+      "texto": "El relleno de RAM y CPU iba de blanco a gris oscuro, así que la barra parecía apagarse a media medida en vez de medir algo. Ahora es blanca de punta a punta y el porcentaje se lee de un vistazo."
+    },
+    {
+      "titulo": "El botón de reproducir, de un color",
+      "texto": "El círculo de reproducir de Spotify llevaba el mismo degradado y sobre una foto de fondo se perdía. Ahora es un relleno entero. Si no tienes sesión de Spotify seguirá viéndose apagado: eso es el estado desactivado, no el color."
+    }
+  ]
+}
