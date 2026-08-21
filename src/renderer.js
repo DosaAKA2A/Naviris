@@ -52,12 +52,18 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 function applyTheme(light) {
   const t = temaActual();
   if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
-  else aplicaTema(t === 'claro' || t === 'rosa' ? 'oscuro' : t);
+  else aplicaTema(esTemaClaro(t) ? 'oscuro' : t);
 }
-/* Temas: 'oscuro' (el de siempre), 'claro' y 'rosa'. Cada uno es un juego de
-   tokens en <html>; lightMode se mantiene porque los ajustes y la cuenta ya
-   lo sincronizaban, y rosa se guarda aparte. */
-const TEMAS = ['oscuro', 'claro', 'rosa'];
+/* Temas: 'oscuro' (el de siempre), 'claro', 'rosa' y 'mono' (blanco y negro).
+   Cada uno es un juego de tokens en <html>; lightMode se mantiene porque los
+   ajustes y la cuenta ya lo sincronizaban, y rosa se guarda aparte. */
+const TEMAS = ['oscuro', 'claro', 'rosa', 'mono'];
+/* Que temas son CLAROS. Antes esto se escribia como 'tema !== oscuro' en
+   cuatro sitios, y con 'mono' —que es oscuro— eso mandaba lightMode=true:
+   nativeTheme, las scrollbars y los webviews habrian renderizado en claro
+   debajo de una interfaz negra. */
+const TEMAS_CLAROS = ['claro', 'rosa'];
+const esTemaClaro = (t) => TEMAS_CLAROS.includes(t);
 function temaActual() {
   const t = store.get('cobalt.tema', null);
   if (TEMAS.includes(t)) return t;
@@ -68,8 +74,9 @@ function aplicaTema(tema) {
   const raiz = document.documentElement;
   raiz.classList.toggle('light', tema === 'claro');
   raiz.classList.toggle('rosa', tema === 'rosa');
+  raiz.classList.toggle('mono', tema === 'mono');
   store.set('cobalt.tema', tema);
-  store.set('cobalt.lightMode', tema !== 'oscuro');
+  store.set('cobalt.lightMode', esTemaClaro(tema));
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema());
   /* Y se REPINTA el hub: las fotos de los contenedores son las del tema activo
@@ -84,6 +91,7 @@ function aplicaTema(tema) {
   const t = temaActual();
   document.documentElement.classList.toggle('light', t === 'claro');
   document.documentElement.classList.toggle('rosa', t === 'rosa');
+  document.documentElement.classList.toggle('mono', t === 'mono');
 })();
 let tabs = [], activeId = null, nextId = 1;
 // Pestañas cerradas hace poco, para reabrirlas con Ctrl+Shift+T (como Chrome,
@@ -830,12 +838,20 @@ const LIBRES = new Set(['imagen', 'shortcuts', 'search']);
    por columnas. Con el 26 de antes la cuenta creía que cabía un acceso más por
    fila del que cabe: en la captura de 120px de celda calculaba 6 y el CSS
    ponía 5. La tarjeta se dimensionaba para una rejilla que no era la pintada. */
+/* ALTO MINIMO, no alto impuesto (2026-08-21). Antes esta cuenta llevaba
+   PAD = 48 en los dos ejes y ETIQ = 26, asi que una sola fila de iconos daba
+   166px y NUNCA cabia en una celda de 150: los accesos siempre pedian dos
+   filas de celda, y por mucho que Dosa los estirara a lo ancho y los
+   encogiera a lo alto, la pintada los devolvia a 2. Ahora el padding vertical
+   de .w-shortcuts es 16 (PAD_Y = 32) y la etiqueta mide lo que mide
+   (line-height fija de 14 + 9 de hueco = 24), asi que una fila entra en una
+   celda y la tarjeta de accesos puede ser una franja de una sola fila. */
 function altoAccesos(w) {
-  const TILE = 92, GAP_X = 16, GAP_Y = 22, ETIQ = 26, PAD = 48;
-  const anchoPx = w.w * CELDA_W + (w.w - 1) * CELDA_GAP - PAD;
+  const TILE = 92, GAP_X = 16, GAP_Y = 22, ETIQ = 24, PAD_X = 48, PAD_Y = 32;
+  const anchoPx = w.w * CELDA_W + (w.w - 1) * CELDA_GAP - PAD_X;
   const porFila = Math.max(1, Math.floor((anchoPx + GAP_X) / (TILE + GAP_X)));
   const filas = Math.ceil((dials.length + 1) / porFila);
-  const altoPx = filas * (TILE + ETIQ) + (filas - 1) * GAP_Y + PAD;
+  const altoPx = filas * (TILE + ETIQ) + (filas - 1) * GAP_Y + PAD_Y;
   return Math.max(1, Math.ceil((altoPx + CELDA_GAP) / (CELDA_H + CELDA_GAP)));
 }
 /* El alto de los accesos y el empuje que provoca NO SE GUARDAN (2026-08-18):
@@ -849,7 +865,12 @@ function ajustaAccesos() {
   const w = widgets.find((x) => x.type === 'shortcuts' && x.geo && x.geo.m);
   if (!w) return ajustes;
   const g = w.geo.m;
-  const nuevo = altoAccesos(g);
+  /* El alto que TU le diste manda; la cuenta solo puede AGRANDARLO cuando los
+     accesos ya no caben (que es para lo que se hizo: crecer con los
+     marcadores). Antes se imponia el resultado de la cuenta a secas y eso
+     pisaba cualquier redimension: la tarjeta volvia sola a su alto "correcto"
+     en cuanto se repintaba el hub. */
+  const nuevo = Math.max(g.h, altoAccesos(g));
   const delta = nuevo - g.h;
   if (!delta) return ajustes;
   const finAntes = g.row + g.h - 1;
@@ -2581,8 +2602,12 @@ function renderXTrends(body) {
    al elegirla se retira el slot para que su foto mande. Antes era al reves, y
    los contenedores que apuntaban a un archivo suelto del disco se quedaban
    clavados en el juego de un tema (y solo existian en ese equipo). */
+/* El tema MONO no trae laminas propias: usa las del oscuro y el CSS las pasa
+   a gris (:root.mono .w-img.img-tema img). Tres JPG mas en el repo para decir
+   exactamente lo mismo no compensan, y asi no se pueden desincronizar. */
+function carpetaLaminas() { const t = temaActual(); return t === 'mono' ? 'oscuro' : t; }
 function imagenDeTema(w) {
-  if (w.slot) return `temas/${temaActual()}/${w.slot}.jpg`;
+  if (w.slot) return `temas/${carpetaLaminas()}/${w.slot}.jpg`;
   return w.img || '';
 }
 function renderImagen(body, w) {
@@ -2602,6 +2627,8 @@ function renderImagen(body, w) {
   const pinta = () => {
     const src = imagenDeTema(w);
     body.classList.toggle('con-img', !!src);
+    // Lamina DEL TEMA (no del usuario): es la unica que el tema mono pasa a gris.
+    body.classList.toggle('img-tema', !!w.slot);
     if (src) {
       body.innerHTML = `<img src="${escapeHtml(src)}" alt="" onerror="this.style.display='none'" /><button class="wi-cambia" title="Cambiar imagen">${window.icon('photo')}</button>`;
       body.querySelector('.wi-cambia').addEventListener('click', (e) => { e.stopPropagation(); elige(); });
@@ -3445,11 +3472,11 @@ function cierraMenusHub(excepto) {
     pinta();
     pop.classList.add('hidden'); boton.classList.remove('on');
     // lightMode sigue viviendo en los ajustes: lo leen el interruptor de la
-    // sidebar, el tema del sistema y la sincronización de la cuenta. El rosa
-    // también es claro, así que solo el oscuro lo apaga.
-    settings = await window.cobalt.setSettings({ lightMode: b.dataset.tema !== 'oscuro' });
-    if (els.optLight) els.optLight.checked = b.dataset.tema !== 'oscuro';
-    toast('Tema ' + (b.dataset.tema === 'oscuro' ? 'Naviris' : b.dataset.tema));
+    // sidebar, el tema del sistema y la sincronización de la cuenta. Lo
+    // encienden los temas CLAROS (claro y rosa); oscuro y mono lo apagan.
+    settings = await window.cobalt.setSettings({ lightMode: esTemaClaro(b.dataset.tema) });
+    if (els.optLight) els.optLight.checked = esTemaClaro(b.dataset.tema);
+    toast('Tema ' + b.textContent.trim());
   }));
   document.addEventListener('click', (e) => {
     if (pop.classList.contains('hidden')) return;
@@ -3553,6 +3580,22 @@ const BACKGROUNDS_ROSA = [
   'radial-gradient(120% 80% at 50% -10%, #e7ebf5 0%, #dcdfeb 62%)',    // Gris perla
   'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)'     // Aurora rosa
 ];
+/* Y en BLANCO Y NEGRO para el tema mono (2026-08-21): los mismos diez slots
+   sin una gota de color, cambiando la geometria y la profundidad para que el
+   selector siga ofreciendo diez miniaturas distintas. Misma identidad
+   canonica (el valor oscuro). */
+const BACKGROUNDS_MONO = [
+  'radial-gradient(130% 100% at 80% 0%, #141414 0%, #0a0a0a 45%, #000000 100%)', // Negro (predeterminado)
+  'linear-gradient(135deg, #2e2e2e 0%, #141414 100%)',                 // Grafito
+  'radial-gradient(120% 80% at 50% -10%, #2a2a2a 0%, #060606 62%)',    // Cenit
+  'radial-gradient(120% 80% at 20% 0%, #232323 0%, #050505 62%)',      // Esquina
+  'radial-gradient(120% 80% at 80% 100%, #242424 0%, #070707 62%)',    // Contraluz
+  'radial-gradient(120% 80% at 50% -10%, #1a1a1a 0%, #000000 62%)',    // Tinta
+  'linear-gradient(180deg, #1e1e1e 0%, #000000 100%)',                 // Caida
+  'linear-gradient(90deg, #000000 0%, #1c1c1c 50%, #000000 100%)',     // Pasillo
+  'radial-gradient(120% 80% at 50% 110%, #262626 0%, #070707 60%)',    // Suelo
+  'linear-gradient(135deg, #333333 0%, #111111 45%, #000000 100%)'     // Humo
+];
 /* Fondo por defecto: SIEMPRE el degradado plano del tema (2026-08-12, Dosa).
    Las fotos de src/temas/<tema>/ NO son fondos y nunca lo fueron: son el
    material de los WIDGETS DE IMAGEN, que cargan la del tema activo por su
@@ -3581,6 +3624,7 @@ function bgForTheme(v) {
   if (i < 0) return v;
   const raiz = document.documentElement.classList;
   if (raiz.contains('rosa')) return BACKGROUNDS_ROSA[i];
+  if (raiz.contains('mono')) return BACKGROUNDS_MONO[i];
   return raiz.contains('light') ? BACKGROUNDS_LIGHT[i] : BACKGROUNDS[i];
 }
 function applyBackground(v) {
@@ -3596,6 +3640,7 @@ function applyBackground(v) {
     || v === 'radial-gradient(130% 100% at 80% 0%, #23260f 0%, #141508 42%, #0a0a06 100%)') v = BACKGROUNDS[0];
   let i = BACKGROUNDS_LIGHT.indexOf(v);
   if (i < 0) i = BACKGROUNDS_ROSA.indexOf(v);
+  if (i < 0) i = BACKGROUNDS_MONO.indexOf(v);
   if (i >= 0) v = BACKGROUNDS[i]; // se guarda siempre el valor oscuro como identidad
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set(bgThemeKey(), v);

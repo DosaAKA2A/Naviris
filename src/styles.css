@@ -243,9 +243,100 @@
 :root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f59a35; }
 /* Logo de Naviris en OSCURO: lima ácido -> verde (2026-08-11), a juego con el
    acento del tema. El splash queda fuera: es momento de marca. */
-:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #eaff77; }
-:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #a8dc2a; }
-:root:not(.light):not(.rosa) .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #2f8f4f; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #eaff77; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #a8dc2a; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #2f8f4f; }
+/* ===== Tema Blanco y negro (2026-08-21) =====
+   El oscuro de siempre SIN NADA DE COLOR (peticion de Dosa). Hereda de :root
+   —que es el oscuro— y neutraliza todo lo cromatico: el lima del acento, el
+   lavanda secundario, el rojo de peligro, el verde de correcto, el ambar del
+   modo agente y los morados sueltos de los grupos de pestanas y del Rat Tool.
+   El REALCE pasa a ser blanco puro, asi que los botones primarios y los chips
+   activos van en blanco con el contenido en negro. Y el vidrio del hub se
+   pinta con tinte NEGRO: el del oscuro tira levemente a azul
+   (rgba(16,16,18)) y en un tema sin color eso se ve. */
+:root.mono {
+  --bg: #000000; --bg-2: #0a0a0a; --bg-3: #141414; --line: #1e1e1e;
+  --line-2: #2b2b2b; --line-3: #3a3a3a; --focus: #5a5a5a;
+  --hover: #1a1a1a; --active: #232323; --btn: #1e1e1e; --btn-hover: #2a2a2a; --track: #2a2a2a;
+  --accent: #ffffff; --accent-2: #8a8a8a; --accent-fg: #000000; --accent-hover: #d8d8d8;
+  --text: #f2f2f2; --text-strong: #ffffff; --text-dim: #9a9a9a; --muted: #9a9a9a; --dim: #666666;
+  --violet: #cfcfcf; --lima: #ffffff;
+  /* Peligro y correcto tampoco llevan color: el peligro es blanco puro (el
+     maximo contraste que hay en este tema) y el correcto un gris claro. Donde
+     el peligro se usa de FONDO, el contenido pasa a negro (reglas de abajo). */
+  --danger: #ffffff; --ok: #bdbdbd;
+  --realce: #ffffff;
+  --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
+  --grad-medida: linear-gradient(90deg, #ffffff 0%, #b0b0b0 55%, #5c5c5c 100%);
+  --grad-fg: #000000;
+  --sb-chip: rgba(255,255,255,.04);
+  --tab-fg: #a0a0a0; --tab-hover-bg: #1b1b1b; --tab-hover-fg: #f0f0f0;
+  --tab-asleep-fg: #767676; --fav-dot: #5e5e5e;
+  --winctl-fg: #c8c8c8; --winctl-hover: #202020; --winctl-active: #2a2a2a;
+  --sb-border: #0f0f0f; --sb-fg: #9a9a9a; --sb-hover: #1e1e1e; --sb-open: #1e1e1e; --sb-sep: #161616; --sb-div: #242424;
+  --sb-capsule: #101010;
+  --nav-fg: #bcbcbc; --nav-hover: #1b1b1b; --bm-fg: #c8c8c8;
+  --track-knob: #7a7a7a; --track-on: #ffffff; --track-knob-on: #000000;
+  --bar-from: #8a8a8a; --bar-to: #ffffff; --backdrop: rgba(0,0,0,.70);
+  --shadow-pop: rgba(0,0,0,.70); --shadow-panel: rgba(0,0,0,.65); --focus-ring: rgba(255,255,255,.10);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #141414 0%, #000000 60%);
+  --checker-a: #0d0d0d; --checker-b: #060606;
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(0,0,0,.26); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(0,0,0,.30); --hub-input-line: #232323;
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(0,0,0,.30); --hub-fab-line: #2a2a2a;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(0,0,0,.30); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #f2f2f2;
+  --hub-hairline: rgba(255,255,255,.16); --hub-label: #a8a8a8;
+  --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(0,0,0,.26); --tile-line: rgba(255,255,255,.07);
+  --vidrio-tinte: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), linear-gradient(rgba(0,0,0,.36), rgba(0,0,0,.36));
+  --cal-hoy-bg: #ffffff; --cal-hoy-fg: #000000;
+  --tile-letter: #ffffff; --tile-mono: #ffffff; --dial-add-line: #2f2f2f;
+  --clock-shadow: rgba(0,0,0,.6); --wx-ic: #d0d0d0; --addons-plate: rgba(0,0,0,.94);
+  --fav-filter: grayscale(1) brightness(1.6);
+}
+/* Lo cromatico que NO sale de un token y hay que apagar a mano */
+:root.mono .tab.drag-over { box-shadow: inset 2px 0 0 #cfcfcf; }
+:root.mono .tab.group-tab { border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.05); color: #d6d6d6; }
+:root.mono .tab.group-tab .gt-ic, :root.mono .tab.group-tab .gt-caret { color: #bdbdbd; }
+:root.mono .tab.group-tab .t-title { color: #e8e8e8; }
+:root.mono .tab.group-tab.open { background: rgba(255,255,255,.10); }
+:root.mono .tab.mini { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
+:root.mono .tab.mini.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
+:root.mono .tab.farming .t-fav { filter: grayscale(1) drop-shadow(0 0 4px rgba(255,255,255,.55)); }
+:root.mono .loot-ic, :root.mono #nav-loot, :root.mono .lp-title span[data-ico] svg, :root.mono .sb-btn.twitch-mode { color: #d6d6d6; }
+:root.mono .sb-btn.twitch-mode::after { background: #d6d6d6; }
+:root.mono #sb-loot.on-twitch { color: #ffffff; }
+:root.mono .loot-go { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: #000000; }
+:root.mono .hp-alpha input[type="range"] { accent-color: #ffffff; }
+:root.mono .wp-custom.sel { border-color: #ffffff; }
+:root.mono .ctx-item.danger, :root.mono .ctx-item.danger .ctx-ic { color: #ffffff; }
+:root.mono .ctx-item.danger:hover { background: rgba(255,255,255,.12); }
+:root.mono .sb-btn.accent { color: #d6d6d6; }
+:root.mono .sb-btn.accent:hover { color: #ffffff; background: var(--hover); }
+:root.mono #win-close:active { background: #d0d0d0; color: #000; }
+/* Modo agente: sin ambar ni verde. Activo = contorno, conectado = relleno. */
+:root.mono #agent-badge { color: #e0e0e0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.32); }
+:root.mono #agent-badge .ab-dot, :root.mono .tab .t-agent { background: #e0e0e0; }
+:root.mono #agent-badge.connected { color: #ffffff; background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.55); }
+:root.mono #agent-badge.connected .ab-dot { background: #ffffff; }
+:root.mono #content webview.agent-controlled.active { box-shadow: inset 0 0 0 3px #ffffff; }
+:root.mono .adp-badge.on { border-color: #3a3a3a; }
+:root.mono .adp-btn.danger:hover { border-color: #6a6a6a; color: #ffffff; }
+:root.mono .ls-btn.stop, :root.mono .au-err { color: #e0e0e0; }
+:root.mono .mp-item.done, :root.mono .mp-item.done .mi-dl { border-color: rgba(255,255,255,.35); }
+:root.mono .mp-item.done::after { background: rgba(0,0,0,.8); border-color: rgba(255,255,255,.30); }
+:root.mono .perm-row .pr-state.allow, :root.mono .perm-row .pr-state.block { background: rgba(255,255,255,.12); }
+:root.mono .sp-item button:hover, :root.mono .danger-btn:hover, :root.mono .pw-acts button.del:hover { background: rgba(255,255,255,.12); }
+:root.mono .danger-btn { border-color: rgba(255,255,255,.35); }
+/* Donde el PELIGRO es el fondo, su contenido va en negro (si no, blanco sobre blanco) */
+:root.mono #win-close:hover, :root.mono .d-x, :root.mono .w-tools button.rm:hover { color: #000000; }
+/* Las laminas de los widgets son las del tema oscuro (verdes): a gris.
+   No hay juego propio en src/temas/ — serian 3 JPG de mas para decir lo mismo. */
+:root.mono .w-img.img-tema img { filter: grayscale(1); }
+/* Logo de Naviris en blanco y negro (el splash queda fuera: es marca) */
+:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #ffffff; }
+:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #c4c4c4; }
+:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #7a7a7a; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
@@ -901,7 +992,14 @@ button { font-family: inherit; }
 .w-head svg { width: 13px; height: 13px; }
 
 /* Widget: accesos (tiles) */
-.w-shortcuts .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, 92px); justify-content: center; gap: 22px 16px; }
+/* Menos aire ARRIBA y ABAJO que el resto de tarjetas (2026-08-21): con los 24
+   de .w-card, una sola fila de iconos (92 de tile + 9 de hueco + 14 de nombre
+   = 115) pedia 163px de tarjeta y no entraba en una celda de 150. O sea que
+   los accesos NO PODIAN ocupar una sola fila de la maqueta por mucho que los
+   estiraras a lo ancho. Con 16 arriba y abajo caben en 118 y sobran 3px. Los
+   lados siguen en 24. */
+.w-shortcuts { padding: 16px 24px; display: flex; align-items: center; justify-content: center; }
+.w-shortcuts .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, 92px); justify-content: center; gap: 22px 16px; width: 100%; }
 .dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative; }
 /* Tiles de VIDRIO (2026-08-11): translúcidos con blur, como el resto del hub
    — dejan intuir el fondo sin que el icono pierda contraste. */
@@ -916,7 +1014,9 @@ button { font-family: inherit; }
    monocromos, en el tono del tema. */
 .dial:hover .d-tile { transform: translate3d(0,-6px,0); box-shadow: var(--glass-rim), 0 16px 30px -16px rgba(0,0,0,.45); }
 .dial:active .d-tile { transform: translate3d(0,-2px,0) scale(.98); transition-duration: .08s; }
-.d-name { font-size: 11.5px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+/* line-height FIJA: el alto del nombre entra en la cuenta de altoAccesos() y
+   con `normal` lo pone la tipografia (y cambia de un equipo a otro). */
+.d-name { font-size: 11.5px; line-height: 14px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 .dial:hover .d-name { color: var(--text); }
 /* Eliminar tile: solo en modo edición */
 .d-x { position: absolute; top: -6px; left: -6px; z-index: 4; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); background: var(--danger); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -988,6 +1088,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
 .sw-claro { background: linear-gradient(140deg, #ffffff, #dcdee4); }
 .sw-rosa { background: linear-gradient(140deg, #f48fc0, #fdeff5); }
+.sw-mono { background: linear-gradient(140deg, #ffffff 0%, #ffffff 48%, #000000 52%, #000000 100%); }
 /* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */

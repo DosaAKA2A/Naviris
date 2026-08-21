@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.5",
+  "linea": "dev",
+  "titulo": "Tema Blanco y negro, y los accesos ya caben en una fila",
+  "entradilla": "Un tema nuevo sin una gota de color, y la tarjeta de accesos deja de imponer su propio alto: si la quieres de una sola fila, se queda de una sola fila.",
+  "bloques": [
+    {
+      "titulo": "Tema Blanco y negro",
+      "texto": "Nuevo tema en el selector de Temas del hub, junto a Naviris, Claro y Rosa. Es el oscuro de siempre pero sin nada de color: el lima del acento pasa a blanco, el peligro y el correcto dejan de ser rojo y verde, los morados de los grupos de pestañas y del Rat Tool se apagan, y hasta el logo de Naviris va en blanco y gris. Los botones principales quedan en blanco con el texto en negro.\n\nTrae sus diez fondos propios, todos en gris y negro, y las láminas de los contenedores de imagen son las del tema oscuro pasadas a gris. El fondo que elijas se guarda aparte, como en el resto de temas."
+    },
+    {
+      "titulo": "Los accesos ya pueden ser una sola fila",
+      "texto": "La tarjeta de accesos calculaba su alto sola y siempre pedía dos filas de la maqueta, incluso cuando los iconos entraban en una. Daba igual cuánto la estiraras o la encogieras: al repintar el hub volvía a dos. Ahora el alto que le des tú manda, y la cuenta solo puede agrandarla cuando los accesos de verdad ya no caben.\n\nPara que una fila de iconos entre en una celda, la tarjeta lleva un poco menos de aire arriba y abajo que el resto, y sus iconos quedan centrados en vez de pegados al borde de arriba."
+    }
+  ]
+}
