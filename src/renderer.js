@@ -745,6 +745,39 @@ function styleDial(tile, letter, d) {
   getTile(d.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.className = 'd-fav'; im.src = t.icon; tile.style.setProperty('--icon-sz', '34px'); im.onload = () => letter.remove(); im.onerror = () => im.remove(); tile.appendChild(im); } });
 }
 let dialDrag = null;
+/* ===== DOCK de los accesos (2026-08-21) =====
+   Al entrar en un acceso, el crece y sus VECINOS se apartan y crecen menos,
+   como el dock de macOS. Dos decisiones que importan:
+
+   · Los vecinos se calculan por la FILA PINTADA (offsetTop), no por el orden
+     del DOM. La rejilla es auto-fit y envuelve, asi que el siguiente del DOM
+     puede ser el primero de la fila de abajo: con selectores de hermanos
+     (+ / :has) se empujaba un tile que no esta al lado.
+   · Solo escucha ENTRAR y SALIR, nunca mousemove. El dock de verdad magnifica
+     segun la distancia al cursor y eso obliga a trabajar en cada fotograma;
+     aqui son tres escalones fijos y cero coste mientras no te muevas de tile.
+
+   Solo toca transform (por variables CSS), como manda la regla del proyecto. */
+const DOCK = [[1.18, 0], [1.07, 6], [1.03, 3]];   // [escala, apartado px] por distancia
+function armaDock(grid) {
+  const limpia = () => grid.querySelectorAll('.dial').forEach((x) => { x.style.removeProperty('--dk-e'); x.style.removeProperty('--dk-x'); });
+  grid.addEventListener('mouseleave', limpia);
+  grid.addEventListener('mouseover', (e) => {
+    const d = e.target.closest('.dial');
+    // En modo edicion mandan el meneo y el arrastre: el dock se aparta.
+    if (!d || !grid.contains(d) || els.hub.classList.contains('editing')) { limpia(); return; }
+    const fila = [...grid.querySelectorAll('.dial')].filter((x) => x.offsetTop === d.offsetTop)
+      .sort((a, b) => a.offsetLeft - b.offsetLeft);
+    limpia();
+    const i = fila.indexOf(d);
+    fila.forEach((x, j) => {
+      const k = j - i, paso = DOCK[Math.abs(k)];
+      if (!paso) return;
+      x.style.setProperty('--dk-e', paso[0]);
+      x.style.setProperty('--dk-x', (k > 0 ? paso[1] : -paso[1]) + 'px');
+    });
+  });
+}
 function makeDialEl(d) {
   const el = document.createElement('div'); el.className = 'dial'; el.title = d.url;
   // En modo Editar, los tiles se reordenan arrastrando DENTRO del contenedor
@@ -1661,7 +1694,7 @@ function renderHub() {
       body.innerHTML = `<div class="ck-chip" title="Hoy"><span id="w-dnum"></span></div><div class="time" id="w-time"></div><div class="greet" id="w-greet"></div><div class="ck-fecha" id="w-fecha"></div>`;
     }
     else if (w.type === 'search') { body.className = 'w-searchwrap'; body.appendChild(buildSearch()); }
-    else if (w.type === 'shortcuts') { body.className = 'w-card w-shortcuts'; const g = document.createElement('div'); g.className = 'sc-grid'; dials.forEach((d) => g.appendChild(makeDialEl(d))); const add = document.createElement('div'); add.className = 'dial add'; add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir</div>`; add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); }); g.appendChild(add); body.appendChild(g); }
+    else if (w.type === 'shortcuts') { body.className = 'w-card w-shortcuts'; const g = document.createElement('div'); g.className = 'sc-grid'; dials.forEach((d) => g.appendChild(makeDialEl(d))); const add = document.createElement('div'); add.className = 'dial add'; add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir</div>`; add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); }); g.appendChild(add); body.appendChild(g); armaDock(g); }
     else if (w.type === 'date') { body.className = 'w-card w-date'; renderDate(body); }
     else if (w.type === 'weather') { body.className = 'w-card w-wx'; body.innerHTML = '<div class="w-loading">Cargando clima…</div>'; loadWeather(body, 'weather'); }
     else if (w.type === 'region') { body.className = 'w-card w-weather'; body.innerHTML = '<div class="w-loading">Cargando región…</div>'; loadWeather(body, 'region'); }
@@ -3709,8 +3742,13 @@ function generaFondoBlur() {
   if (!m) { els.hub.style.setProperty('--hub-bg-blur', bgForTheme(v)); return; } // un degradado ya es suave
   const img = new Image();
   img.onload = () => {
-    const W = Math.max(640, Math.round(window.innerWidth / 2));
-    const H = Math.max(360, Math.round(window.innerHeight / 2));
+    // Aspecto del HUB, no de la ventana (2026-08-21): el fondo nitido ya se
+    // centra sobre el hub, y esta copia se estira a --vidrio-tam, que tambien
+    // es el hub. Con el aspecto de la ventana salia deformada respecto al
+    // fondo real y el vidrio no cuadraba con lo que hay detras.
+    const rh = els.hub.getBoundingClientRect();
+    const W = Math.max(640, Math.round((rh.width || window.innerWidth) / 2));
+    const H = Math.max(360, Math.round((rh.height || window.innerHeight) / 2));
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const x = c.getContext('2d');
     x.filter = 'blur(22px) saturate(1.6)';
@@ -3724,8 +3762,12 @@ function generaFondoBlur() {
 }
 
 function pintaGrano() {
-  const w = Math.ceil(window.innerWidth);
-  const h = Math.ceil(window.innerHeight);
+  // Al tamano del HUB (2026-08-21): el grano va a 100% 100% del ::before, que
+  // desde este cambio se resuelve contra el hub y no contra la ventana. Con las
+  // medidas de la ventana el ruido salia estirado.
+  const rh = els.hub.getBoundingClientRect();
+  const w = Math.ceil(rh.width || window.innerWidth);
+  const h = Math.ceil(rh.height || window.innerHeight);
   if (!w || !h) return;
   const svg = `%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='${w}' height='${h}' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E`;
   els.hub.style.setProperty('--grano-vivo', `url("data:image/svg+xml,${svg}")`);
@@ -3814,13 +3856,18 @@ function lgAplicar() {
   // El motor ya no aplica filtros (backdrop-filter troceaba en esta GPU):
   // ahora ANCLA la capa desenfocada de cada cristal a coordenadas de viewport
   // (--vidrio-pos = -x -y del elemento). Determinista en cualquier compositor.
-  els.hub.style.setProperty('--vidrio-tam', `${window.innerWidth}px ${window.innerHeight}px`);
+  /* Coordenadas del HUB (2026-08-21), antes del viewport: el fondo nitido ya
+     no se ancla a la ventana, asi que la copia desenfocada tiene que medirse y
+     posicionarse contra la misma caja o el vidrio ensena un trozo que no es el
+     que tiene detras. */
+  const rHub = els.hub.getBoundingClientRect();
+  els.hub.style.setProperty('--vidrio-tam', `${Math.round(rHub.width)}px ${Math.round(rHub.height)}px`);
   LG.ro.disconnect();
   const piezas = els.hub.querySelectorAll('.d-tile, #hub-search, .hub-pill, .hub-fab, #hub-addons, .w-clock, .w-sp, .w-user, .w-card:not(.w-shortcuts):not(.w-wx):not(.w-mail)');
   piezas.forEach((el) => {
     el.style.webkitBackdropFilter = ''; el.style.backdropFilter = ''; // restos del motor viejo
     const r = el.getBoundingClientRect();
-    el.style.setProperty('--vidrio-pos', `${-Math.round(r.left)}px ${-Math.round(r.top)}px`);
+    el.style.setProperty('--vidrio-pos', `${-Math.round(r.left - rHub.left)}px ${-Math.round(r.top - rHub.top)}px`);
     LG.ro.observe(el);
   });
 }

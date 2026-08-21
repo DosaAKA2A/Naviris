@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.8",
+  "linea": "dev",
+  "titulo": "Los accesos se comportan como un dock, y tu fondo por fin se centra",
+  "entradilla": "Pasar el ratón por un acceso ya no es solo un salto de seis píxeles: crece y aparta a sus vecinos. Y si pones una foto de fondo, el centro de la foto cae donde debe.",
+  "bloques": [
+    {
+      "titulo": "Dock en los accesos",
+      "texto": "Al pasar por un acceso, él crece y los dos de cada lado se agrandan menos y se apartan, como el dock de macOS. El icono crece hacia arriba, así que la fila de nombres se queda recta.\n\nLos vecinos se calculan por la fila que ves, no por el orden interno: la rejilla envuelve cuando tienes muchos accesos, y sin eso el último de una fila empujaba al primero de la siguiente. Y no hay nada corriendo mientras mueves el ratón: solo se calcula al entrar y al salir de cada acceso."
+    },
+    {
+      "titulo": "Tu fondo se centra en el hub, no en la ventana",
+      "texto": "El fondo se anclaba a la ventana entera, así que el centro de tu imagen quedaba detrás de la barra lateral y de las barras de arriba: en pantalla ancha caía 25 píxeles a la izquierda y 48 por encima del centro real del hub. Además se escalaba para cubrir toda la ventana, o sea que recortaba de más y había trozos de la foto que no se veían nunca.\n\nAhora la referencia es el hub. Medido con una diana: antes se desviaba, ahora cae clavada en el centro."
+    }
+  ]
+}

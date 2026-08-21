@@ -905,9 +905,17 @@ button { font-family: inherit; }
   background: var(--grano-vivo, none) 0 0 / 100% 100% no-repeat,
               var(--hub-bg, linear-gradient(160deg, #24242b 0%, #191920 100%));
   background-position: 0 0, center; background-size: 100% 100%, cover;
-  /* MISMO sistema de coordenadas que la copia desenfocada de los cristales
-     (viewport): sin esto, el vidrio mostraba el fondo desplazado/reescalado. */
-  background-attachment: fixed, fixed; }
+  /* ANCLADO AL HUB, no al viewport (2026-08-21). Con `fixed`, center/cover se
+     resolvia contra la VENTANA entera, y el hub solo ensena su trozo: queda
+     desplazado por la barra lateral (48px por la izquierda) y por titlebar +
+     navbar (unos 106px por arriba), asi que el centro de la foto caia arriba
+     y a la izquierda del centro del hub. Ademas `cover` escalaba para cubrir
+     la ventana, o sea que recortaba de mas: trozos de la foto quedaban
+     detras del cromo sin verse nunca. Con `scroll` la caja de referencia es
+     el propio ::before, que es `inset: 0` del hub. La copia desenfocada de
+     los cristales se recoloca en el mismo sistema desde el renderer
+     (--vidrio-tam y --vidrio-pos), que es lo unico que tiene que cuadrar. */
+  background-attachment: scroll, scroll; }
 /* GRADIENTE TEXTURIZADO (petición 2026-08-11): grano de ruido estático SOBRE
    el degradado y BAJO el contenido — la textura de "cristal robusto" de la
    referencia sin salirse de la paleta del tema. */
@@ -1006,10 +1014,21 @@ button { font-family: inherit; }
    lados siguen en 24. */
 .w-shortcuts { padding: 16px 24px; display: flex; align-items: center; justify-content: center; }
 .w-shortcuts .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, 92px); justify-content: center; gap: 22px 16px; width: 100%; }
-.dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative; }
+/* DOCK (2026-08-21): la escala y el apartado los pone armaDock() en dos
+   variables; en reposo valen 1 y 0, asi que esto no hace nada hasta que
+   entras. Solo transform, como manda la regla del proyecto. */
+.dial { display: flex; flex-direction: column; align-items: center; gap: 9px; cursor: pointer; position: relative;
+  transform: translate3d(var(--dk-x, 0px), 0, 0);
+  transition: transform var(--dur-3) var(--spring); }
+.dial:hover { z-index: 2; }
+/* La tarjeta de accesos es transparente (no lleva vidrio), asi que dejarla
+   desbordar no rompe ningun canto: es lo que permite que el tile crecido se
+   salga como en un dock de verdad. */
+.w-shortcuts { overflow: visible; }
 /* Tiles de VIDRIO (2026-08-11): translúcidos con blur, como el resto del hub
    — dejan intuir el fondo sin que el icono pierda contraste. */
-.d-tile { width: 92px; height: 92px; border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transform: translateZ(0); backface-visibility: hidden; transition: transform .18s cubic-bezier(.2,.7,.3,1.3), box-shadow .18s; }
+.d-tile { width: 92px; height: 92px; border-radius: 30px; transform-origin: 50% 100%; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transform: translateZ(0); backface-visibility: hidden; transition: transform var(--dur-3) var(--spring), box-shadow .18s;
+  transform: translate3d(0, var(--dk-y, 0px), 0) scale(var(--dk-e, 1)); }
 .d-tile img { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); object-fit: contain; position: relative; z-index: 1; }
 /* Favicon del acceso: monocromo y con el brillo del tema (claro en tiles oscuros, oscuro en tiles claros) */
 .d-tile img.d-fav { filter: var(--fav-filter); }
@@ -1018,8 +1037,8 @@ button { font-family: inherit; }
 .d-tile .d-mono svg { width: 40px; height: 40px; }
 /* La opción "Logos a color" se ELIMINÓ (2026-08-11): los accesos van siempre
    monocromos, en el tono del tema. */
-.dial:hover .d-tile { transform: translate3d(0,-6px,0); box-shadow: var(--glass-rim), 0 16px 30px -16px rgba(0,0,0,.45); }
-.dial:active .d-tile { transform: translate3d(0,-2px,0) scale(.98); transition-duration: .08s; }
+.dial:hover .d-tile { --dk-y: -6px; box-shadow: var(--glass-rim), 0 18px 34px -16px rgba(0,0,0,.5); }
+.dial:active .d-tile { --dk-y: -2px; --dk-e: .96; transition-duration: .08s; }
 /* line-height FIJA: el alto del nombre entra en la cuenta de altoAccesos() y
    con `normal` lo pone la tipografia (y cambia de un equipo a otro). */
 .d-name { font-size: 11.5px; line-height: 14px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
@@ -1032,7 +1051,7 @@ button { font-family: inherit; }
 @keyframes jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
 .dial.add .d-tile { background: transparent; border: 1.5px dashed var(--dial-add-line); color: var(--dim); }
 .dial.add .d-tile svg { width: 22px; height: 22px; }
-.dial.add:hover .d-tile { border-color: #4a4b52; color: var(--text); box-shadow: none; transform: none; }
+.dial.add:hover .d-tile { border-color: #4a4b52; color: var(--text); box-shadow: none; --dk-y: 0px; }
 
 /* Modo edición de widgets */
 .widget .w-tools { position: absolute; top: -10px; right: -8px; z-index: 5; display: none; gap: 4px; }
