@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.7",
+  "linea": "dev",
+  "titulo": "La barra de búsqueda sobre foto, y los widgets pequeños",
+  "entradilla": "Si pones una foto de fondo, la barra de búsqueda dejaba de leerse. Y los widgets de una sola celda arrastraban el diseño de los grandes: un mordisco en la esquina sin nada dentro y textos diminutos.",
+  "bloques": [
+    {
+      "titulo": "La barra de búsqueda ya se lee sobre cualquier fondo",
+      "texto": "Con una foto detrás, el cristal de la barra la dejaba pasar entera: adoptaba el color y la textura de la imagen y el texto peleaba contra el dibujo. Medido sobre el fondo que lo destapó, el texto de ejemplo se quedaba en 2,8 de contraste, cuando hace falta 4,5.\n\nAhora el cristal se espesa cuando hay foto, y solo entonces, así que la barra vuelve a tener fondo propio. Y el gris del texto de ejemplo sube un escalón, que venía flojo también sobre el degradado liso. Medido después: entre 5,3 y 7,4 en los tres casos."
+    },
+    {
+      "titulo": "Los widgets de una celda dejan de romperse",
+      "texto": "El clima y la cuenta llevan un mordisco redondo en la esquina para el botón de abrir. Es un círculo de 60px, dibujado para las tallas grandes: en una celda de 150 se comía la tarjeta, y en la cuenta el botón ya estaba oculto, así que quedaba el agujero sin nada dentro.\n\nA una celda ya no hay mordisco ni botón, y la tarjeta vuelve a ser un cuadrado limpio. Descargas, además, se quedaba literalmente en blanco cuando no había ninguna descarga en curso."
+    },
+    {
+      "titulo": "Y se leen",
+      "texto": "A una celda cada tarjeta es una pieza con un solo elemento grande, no una tarjeta encogida. El avatar de la cuenta pasa de 22 a 32 píxeles, el icono del portapapeles de 13 a 36, y las etiquetas que quedaban ilegibles desaparecen en vez de quedarse ahí a 10 píxeles."
+    }
+  ]
+}

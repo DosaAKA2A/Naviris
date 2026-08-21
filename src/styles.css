@@ -973,7 +973,9 @@ button { font-family: inherit; }
 #hub-search:focus-within { border-color: color-mix(in srgb, var(--realce) 22%, transparent); box-shadow: 0 0 0 4px var(--wash); }
 #hub-search .g-ico { color: var(--text-dim); }
 #hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
-#hub-search input::placeholder { color: var(--dim); }
+/* --text-dim, no --dim: el gris apagado daba 2.8:1 medido sobre el propio
+   vidrio de la barra, y sobre una foto encima competia con la textura. */
+#hub-search input::placeholder { color: var(--text-dim); }
 
 /* Widget: fecha */
 .w-date .d-day { font-size: 40px; font-weight: 300; line-height: 1; }
@@ -1470,6 +1472,16 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #hub.bg-claro .hub-fab.on { background: rgba(255,255,255,.72); }
 /* Etiquetas FLOTANTES sobre cualquier foto: blanco con halo oscuro fuerte —
    legible sobre vetas claras y zonas oscuras a la vez, sin medir nada. */
+/* ===== La barra de busqueda SOBRE FOTO (2026-08-21) =====
+   Con un degradado plano detras, un tinte de alfa .30 basta para que la barra
+   se lea como superficie. Con una foto NO: la imagen la atraviesa entera, el
+   vidrio adopta el color y la textura de lo que haya debajo y el texto pelea
+   contra el dibujo. Medido con el fondo de Dosa: el placeholder bajaba a
+   2.8:1. Asi que con foto —y solo con foto— el tinte se espesa hasta que la
+   barra vuelve a tener fondo propio. El orden importa: bg-claro va DESPUES
+   porque las dos reglas tienen la misma especificidad. */
+#hub.refract #hub-search { background: linear-gradient(150deg, rgba(255,255,255,.10), rgba(255,255,255,.03)), rgba(8,8,8,.62); }
+#hub.bg-claro #hub-search { background: linear-gradient(150deg, rgba(255,255,255,.34), rgba(255,255,255,.16)), rgba(255,255,255,.68); }
 #hub.refract .d-name, #hub.refract .dial:hover .d-name {
   color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.5);
 }
@@ -2118,6 +2130,46 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-dlw.t-1x1 .dlw-meta { display: none; }
 .w-wallet.t-1x1 { padding: 10px; }
 .w-wallet.t-1x1 .wl-pie, .w-wallet.t-1x1 .wl-puntos { display: none; }
+/* ===== Arreglos de la talla 1x1 (2026-08-21) =====
+   El MORDISCO de la esquina (el scoop del boton ↗) es un circulo de 30px de
+   radio a 24px del borde: 60px de mordisco en una celda de 150. Esta dibujado
+   para las tallas 2x1 y 2x2. En la cuenta ademas el boton ya estaba oculto a
+   1x1, asi que quedaba el agujero SIN NADA DENTRO — es lo que vio Dosa. A esta
+   talla no cabe una accion en la esquina: se quita el mordisco y se quita el
+   boton, y la tarjeta vuelve a ser un cuadrado limpio. */
+.w-wx.t-1x1::before, .w-user.t-1x1::before { -webkit-mask: none; mask: none; }
+.w-wx.t-1x1 .wx2-go { display: none; }
+/* Y el clima a 1x1 no tenia ninguna regla: entraba con la maqueta de 2x1 (temp
+   + icono + descripcion + chips + ciudad) metida a la fuerza en 150px. */
+.w-wx.t-1x1 { padding: 0; display: flex; align-items: center; justify-content: center; }
+.w-wx.t-1x1 .wx2-ic, .w-wx.t-1x1 .wx2-desc, .w-wx.t-1x1 .wx2-chips, .w-wx.t-1x1 .wx2-city { display: none; }
+.w-wx.t-1x1 .wx2-temp { font-size: 38px; }
+/* DESCARGAS a 1x1 se quedaba EN BLANCO: el unico hijo que sobrevivia era
+   .dlw-activa, que lleva .hidden mientras no hay descarga en curso. Sin nada
+   bajando, la tarjeta no pintaba nada. Ahora ensena el icono de su cabecera. */
+.w-dlw.t-1x1 .w-head { display: flex; justify-content: center; margin: 0; }
+.w-dlw.t-1x1 .w-head svg { width: 36px; height: 36px; color: var(--text-dim); }
+.w-dlw.t-1x1.con-activa .w-head { display: none; }
+/* ===== TAMANOS a 1x1 (2026-08-21) =====
+   Medido en la app: privada y moovin ensenan su icono a 38px y se leen bien;
+   el resto arrastraba los tamanos de la tarjeta grande — el avatar de la
+   cuenta a 22px, el icono del portapapeles a 13px, las etiquetas del monitor
+   a 10px. A esta talla la tarjeta es UNA PIEZA con un solo elemento grande,
+   no una tarjeta encogida: el glifo principal sube a ~36px y las
+   micro-etiquetas se van en vez de quedarse ilegibles. */
+.w-user.t-1x1 .u-ava { width: 64px; height: 64px; font-size: 26px; }
+.w-user.t-1x1 .u-ava svg { width: 32px; height: 32px; }
+.w-cal.t-1x1 .cal-d.hoy { width: 68px; height: 68px; font-size: 29px; }
+/* La etiqueta de la cabecera es un nodo de texto suelto, sin span que ocultar:
+   font-size 0 en el contenedor y el icono recupera el suyo por su regla. */
+.w-dlw.t-1x1 .w-head, .w-clip.t-1x1 .w-head { font-size: 0; gap: 0; }
+.w-clip.t-1x1 { align-items: center; justify-content: center; }
+.w-clip.t-1x1 .w-head { display: flex; justify-content: center; margin: 0; color: var(--text-dim); }
+.w-clip.t-1x1 .w-head svg { width: 36px; height: 36px; }
+.w-clip.t-1x1 .w-vacio { display: none; }
+.w-mon.t-1x1 .mon-k { font-size: 11px; }
+.w-mon.t-1x1 .mon-v { font-size: 13px; }
+.w-wallet.t-1x1 .wl-marca { font-size: 12px; }
 .w-moov.t-1x1 .mv-meta { display: none; }
 .w-moov.t-1x1 .mv-play { right: 50%; top: 50%; transform: translate(50%, -50%); }
 .w-moov.t-1x1 .mv-play:hover { transform: translate(50%, -50%) scale(1.08); }
