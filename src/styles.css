@@ -246,9 +246,11 @@
 :root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #eaff77; }
 :root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #a8dc2a; }
 :root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #2f8f4f; }
-/* ===== Tema Blanco y negro (2026-08-21) =====
-   El oscuro de siempre SIN NADA DE COLOR (peticion de Dosa). Hereda de :root
-   —que es el oscuro— y neutraliza todo lo cromatico: el lima del acento, el
+/* ===== Tema NAVIRIS — el predeterminado (2026-08-21) =====
+   Manda el NEGRO y el logo va en degradado blanco. La clase sigue siendo
+   .mono porque la clave guardada no se renombra (ver TEMAS en renderer.js).
+   Hereda de :root, que son los tokens del tema ACID, y neutraliza todo lo
+   cromatico: el lima del acento, el
    lavanda secundario, el rojo de peligro, el verde de correcto, el ambar del
    modo agente y los morados sueltos de los grupos de pestanas y del Rat Tool.
    El REALCE pasa a ser blanco puro, asi que los botones primarios y los chips
@@ -256,42 +258,44 @@
    pinta con tinte NEGRO: el del oscuro tira levemente a azul
    (rgba(16,16,18)) y en un tema sin color eso se ve. */
 :root.mono {
-  --bg: #000000; --bg-2: #0a0a0a; --bg-3: #141414; --line: #1e1e1e;
-  --line-2: #2b2b2b; --line-3: #3a3a3a; --focus: #5a5a5a;
-  --hover: #1a1a1a; --active: #232323; --btn: #1e1e1e; --btn-hover: #2a2a2a; --track: #2a2a2a;
-  --accent: #ffffff; --accent-2: #8a8a8a; --accent-fg: #000000; --accent-hover: #d8d8d8;
-  --text: #f2f2f2; --text-strong: #ffffff; --text-dim: #9a9a9a; --muted: #9a9a9a; --dim: #666666;
+  /* CARBON, no negro puro (correccion de Dosa 2026-08-21). Toda la escala es
+     gris NEUTRO —R=G=B en cada valor— para que no se cuele ni un matiz. */
+  --bg: #131313; --bg-2: #1a1a1a; --bg-3: #232323; --line: #2a2a2a;
+  --line-2: #363636; --line-3: #444444; --focus: #606060;
+  --hover: #232323; --active: #2c2c2c; --btn: #262626; --btn-hover: #303030; --track: #303030;
+  --accent: #ffffff; --accent-2: #8a8a8a; --accent-fg: #131313; --accent-hover: #d8d8d8;
+  --text: #f2f2f2; --text-strong: #ffffff; --text-dim: #9a9a9a; --muted: #9a9a9a; --dim: #6b6b6b;
   --violet: #cfcfcf; --lima: #ffffff;
   /* Peligro y correcto tampoco llevan color: el peligro es blanco puro (el
      maximo contraste que hay en este tema) y el correcto un gris claro. Donde
-     el peligro se usa de FONDO, el contenido pasa a negro (reglas de abajo). */
+     el peligro se usa de FONDO, el contenido pasa a carbon (reglas de abajo). */
   --danger: #ffffff; --ok: #bdbdbd;
   --realce: #ffffff;
   --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
   --grad-medida: linear-gradient(90deg, #ffffff 0%, #b0b0b0 55%, #5c5c5c 100%);
-  --grad-fg: #000000;
-  --sb-chip: rgba(255,255,255,.04);
-  --tab-fg: #a0a0a0; --tab-hover-bg: #1b1b1b; --tab-hover-fg: #f0f0f0;
-  --tab-asleep-fg: #767676; --fav-dot: #5e5e5e;
-  --winctl-fg: #c8c8c8; --winctl-hover: #202020; --winctl-active: #2a2a2a;
-  --sb-border: #0f0f0f; --sb-fg: #9a9a9a; --sb-hover: #1e1e1e; --sb-open: #1e1e1e; --sb-sep: #161616; --sb-div: #242424;
-  --sb-capsule: #101010;
-  --nav-fg: #bcbcbc; --nav-hover: #1b1b1b; --bm-fg: #c8c8c8;
-  --track-knob: #7a7a7a; --track-on: #ffffff; --track-knob-on: #000000;
-  --bar-from: #8a8a8a; --bar-to: #ffffff; --backdrop: rgba(0,0,0,.70);
-  --shadow-pop: rgba(0,0,0,.70); --shadow-panel: rgba(0,0,0,.65); --focus-ring: rgba(255,255,255,.10);
-  --page-bg: radial-gradient(120% 80% at 50% -10%, #141414 0%, #000000 60%);
-  --checker-a: #0d0d0d; --checker-b: #060606;
-  --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(0,0,0,.26); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(0,0,0,.30); --hub-input-line: #232323;
-  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(0,0,0,.30); --hub-fab-line: #2a2a2a;
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(0,0,0,.30); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #f2f2f2;
+  --grad-fg: #131313;
+  --sb-chip: rgba(255,255,255,.05);
+  --tab-fg: #a0a0a0; --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
+  --tab-asleep-fg: #7d7d7d; --fav-dot: #666666;
+  --winctl-fg: #c8c8c8; --winctl-hover: #2a2a2a; --winctl-active: #343434;
+  --sb-border: #1d1d1d; --sb-fg: #9a9a9a; --sb-hover: #262626; --sb-open: #262626; --sb-sep: #202020; --sb-div: #2f2f2f;
+  --sb-capsule: #1b1b1b;
+  --nav-fg: #bcbcbc; --nav-hover: #242424; --bm-fg: #c8c8c8;
+  --track-knob: #7a7a7a; --track-on: #ffffff; --track-knob-on: #131313;
+  --bar-from: #8a8a8a; --bar-to: #ffffff; --backdrop: rgba(8,8,8,.66);
+  --shadow-pop: rgba(0,0,0,.62); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(255,255,255,.10);
+  --page-bg: radial-gradient(120% 80% at 50% -10%, #262626 0%, #131313 60%);
+  --checker-a: #1a1a1a; --checker-b: #151515;
+  --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(10,10,10,.26); --hub-card-line: rgba(255,255,255,.06);
+  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(10,10,10,.30); --hub-input-line: #2c2c2c;
+  --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(10,10,10,.30); --hub-fab-line: #333333;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(10,10,10,.30); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #f2f2f2;
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #a8a8a8;
-  --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(0,0,0,.26); --tile-line: rgba(255,255,255,.07);
-  --vidrio-tinte: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), linear-gradient(rgba(0,0,0,.36), rgba(0,0,0,.36));
-  --cal-hoy-bg: #ffffff; --cal-hoy-fg: #000000;
-  --tile-letter: #ffffff; --tile-mono: #ffffff; --dial-add-line: #2f2f2f;
-  --clock-shadow: rgba(0,0,0,.6); --wx-ic: #d0d0d0; --addons-plate: rgba(0,0,0,.94);
+  --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(10,10,10,.26); --tile-line: rgba(255,255,255,.07);
+  --vidrio-tinte: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), linear-gradient(rgba(10,10,10,.36), rgba(10,10,10,.36));
+  --cal-hoy-bg: #ffffff; --cal-hoy-fg: #131313;
+  --tile-letter: #ffffff; --tile-mono: #ffffff; --dial-add-line: #3a3a3a;
+  --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(20,20,20,.94);
   --fav-filter: grayscale(1) brightness(1.6);
 }
 /* Lo cromatico que NO sale de un token y hay que apagar a mano */
@@ -306,14 +310,14 @@
 :root.mono .loot-ic, :root.mono #nav-loot, :root.mono .lp-title span[data-ico] svg, :root.mono .sb-btn.twitch-mode { color: #d6d6d6; }
 :root.mono .sb-btn.twitch-mode::after { background: #d6d6d6; }
 :root.mono #sb-loot.on-twitch { color: #ffffff; }
-:root.mono .loot-go { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: #000000; }
+:root.mono .loot-go { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: #131313; }
 :root.mono .hp-alpha input[type="range"] { accent-color: #ffffff; }
 :root.mono .wp-custom.sel { border-color: #ffffff; }
 :root.mono .ctx-item.danger, :root.mono .ctx-item.danger .ctx-ic { color: #ffffff; }
 :root.mono .ctx-item.danger:hover { background: rgba(255,255,255,.12); }
 :root.mono .sb-btn.accent { color: #d6d6d6; }
 :root.mono .sb-btn.accent:hover { color: #ffffff; background: var(--hover); }
-:root.mono #win-close:active { background: #d0d0d0; color: #000; }
+:root.mono #win-close:active { background: #d0d0d0; color: #131313; }
 /* Modo agente: sin ambar ni verde. Activo = contorno, conectado = relleno. */
 :root.mono #agent-badge { color: #e0e0e0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.32); }
 :root.mono #agent-badge .ab-dot, :root.mono .tab .t-agent { background: #e0e0e0; }
@@ -329,14 +333,14 @@
 :root.mono .sp-item button:hover, :root.mono .danger-btn:hover, :root.mono .pw-acts button.del:hover { background: rgba(255,255,255,.12); }
 :root.mono .danger-btn { border-color: rgba(255,255,255,.35); }
 /* Donde el PELIGRO es el fondo, su contenido va en negro (si no, blanco sobre blanco) */
-:root.mono #win-close:hover, :root.mono .d-x, :root.mono .w-tools button.rm:hover { color: #000000; }
+:root.mono #win-close:hover, :root.mono .d-x, :root.mono .w-tools button.rm:hover { color: #131313; }
 /* Las laminas de los widgets son las del tema oscuro (verdes): a gris.
    No hay juego propio en src/temas/ — serian 3 JPG de mas para decir lo mismo. */
 :root.mono .w-img.img-tema img { filter: grayscale(1); }
 /* Logo de Naviris en blanco y negro (el splash queda fuera: es marca) */
 :root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #ffffff; }
-:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #c4c4c4; }
-:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #7a7a7a; }
+:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ededed; }
+:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #b4b4b4; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
@@ -1079,16 +1083,23 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .hub-fab.on { background: var(--grad-realce); color: var(--grad-fg); border-color: transparent; box-shadow: var(--glow); }
 /* Selector de tema: se abre hacia arriba desde su botón del hub */
 .temas-wrap { position: relative; display: inline-flex; }
-.temas-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 5px; min-width: 168px; border: 1px solid var(--hub-fab-line); background: var(--bg-3); border-radius: 12px; box-shadow: 0 12px 30px var(--shadow-pop); }
+.temas-pop { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 6; display: flex; flex-direction: column; gap: 3px; padding: 7px; min-width: 196px; border: 1px solid var(--hub-fab-line); background: var(--bg-3); border-radius: 16px; box-shadow: 0 18px 42px var(--shadow-pop); }
 .temas-pop.hidden { display: none; }
-.tema-op { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text); font-size: 12.5px; cursor: pointer; text-align: left; }
-.tema-op:hover { background: var(--wash); }
-.tema-op.on { color: var(--accent); font-weight: 600; }
-.tema-sw { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--hub-hairline); }
-.sw-oscuro { background: linear-gradient(140deg, #26262d, #0a0a0c); }
-.sw-claro { background: linear-gradient(140deg, #ffffff, #dcdee4); }
-.sw-rosa { background: linear-gradient(140deg, #f48fc0, #fdeff5); }
-.sw-mono { background: linear-gradient(140deg, #ffffff 0%, #ffffff 48%, #000000 52%, #000000 100%); }
+/* Cabecera del selector: el menu era una lista pelada y no decia ni de que iba */
+.temas-pop::before { content: "Tema"; font-size: 10px; font-weight: 650; letter-spacing: 1.1px; text-transform: uppercase; color: var(--hub-label); padding: 4px 10px 6px; }
+.tema-op { position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 32px 9px 9px; border: none; border-radius: 11px; background: transparent; color: var(--text); font-size: 13px; cursor: pointer; text-align: left; transition: background var(--dur-1) var(--ease); }
+.tema-op:hover { background: var(--hover); }
+.tema-op.on { color: var(--text-strong); font-weight: 600; background: var(--wash); }
+/* Palomita del tema activo: dos bordes girados, sin icono ni tipografia extra */
+.tema-op.on::after { content: ""; position: absolute; right: 13px; top: 50%; width: 5px; height: 9px; border: 2px solid currentColor; border-top: 0; border-left: 0; border-radius: 1px; transform: translateY(-62%) rotate(45deg); }
+/* MUESTRA = la superficie del tema con una cuna de su acento encima, la misma
+   regla para los cuatro. Antes cada una se invento su degradado y la de Acid
+   acababa ensenando un verde que no es el suyo (su acento es el lima #b8e351). */
+.tema-sw { width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0; border: none; box-shadow: inset 0 0 0 1px var(--hub-hairline), 0 2px 6px -2px rgba(0,0,0,.55); }
+.sw-mono   { background: linear-gradient(125deg, #ffffff 0%, #dcdcdc 44%, #232323 44%, #131313 100%); }
+.sw-oscuro { background: linear-gradient(125deg, #eaff77 0%, #b8e351 44%, #1a1a1a 44%, #0b0b0b 100%); }
+.sw-claro  { background: linear-gradient(125deg, #f59a35 0%, #d93a2b 44%, #ffffff 44%, #e6e8ec 100%); }
+.sw-rosa   { background: linear-gradient(125deg, #f2a0cd 0%, #d84f96 44%, #ffffff 44%, #f7e4ef 100%); }
 /* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */

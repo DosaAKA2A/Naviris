@@ -1,0 +1,24 @@
+{
+  "version": "2.7.7-dev.6",
+  "linea": "dev",
+  "titulo": "Naviris pasa a ser blanco y negro",
+  "entradilla": "El tema que da nombre al navegador se reinventa: blanco y negro sobre carbón, y es el que traes de fábrica. El de lima no se va, ahora se llama Acid.",
+  "bloques": [
+    {
+      "titulo": "El tema Naviris, en blanco y negro",
+      "texto": "Sin una gota de color: el acento pasa a blanco puro, así que los botones principales son blancos con el texto oscuro, y el logo va en degradado blanco. El peligro deja de ser rojo, el correcto deja de ser verde, y se apagan los morados de los grupos de pestañas y del Rat Tool.\n\nEl fondo es carbón, no negro puro. Trae sus diez fondos propios, todos en gris neutro. Es el tema predeterminado: si ya tenías uno elegido, sigues con el tuyo — este te espera en el selector."
+    },
+    {
+      "titulo": "El de lima ahora se llama Acid",
+      "texto": "El tema que hasta ahora se llamaba Naviris no desaparece ni cambia: solo cambia de nombre. Sigue siendo el mismo carbón con acento lima ácido, y lo tienes justo debajo del nuevo en el selector."
+    },
+    {
+      "titulo": "Selector de temas nuevo",
+      "texto": "Era una lista pelada de cuatro líneas. Ahora lleva cabecera, la opción activa se marca con una palomita, y cada muestra enseña de verdad de qué va su tema: la superficie del tema con una cuña de su color de acento encima. La de Acid enseñaba un verde que no era el suyo."
+    },
+    {
+      "titulo": "Los accesos ya pueden ser una sola fila",
+      "texto": "De la versión anterior de esta serie: la tarjeta de accesos calculaba su alto sola y siempre pedía dos filas de la maqueta, aunque los iconos entraran en una. Ahora el alto que le des tú manda, y la cuenta solo la agranda cuando los accesos de verdad ya no caben."
+    }
+  ]
+}

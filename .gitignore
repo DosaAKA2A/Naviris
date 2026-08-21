@@ -10,3 +10,6 @@ sync/worker/.wrangler/
 # Clave con la que Naviris entra solo en MOOVIN: NUNCA al repo (main es publico
 # y Pages lo sirve entero). Plantilla en src/app-key.example.js
 src/app-key.js
+
+# Maquetas de diseno: se miran, no se publican
+diseno/

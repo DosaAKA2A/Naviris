@@ -52,12 +52,25 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
 function applyTheme(light) {
   const t = temaActual();
   if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
-  else aplicaTema(esTemaClaro(t) ? 'oscuro' : t);
+  else aplicaTema(esTemaClaro(t) ? TEMA_POR_DEFECTO : t);
 }
-/* Temas: 'oscuro' (el de siempre), 'claro', 'rosa' y 'mono' (blanco y negro).
-   Cada uno es un juego de tokens en <html>; lightMode se mantiene porque los
-   ajustes y la cuenta ya lo sincronizaban, y rosa se guarda aparte. */
-const TEMAS = ['oscuro', 'claro', 'rosa', 'mono'];
+/* Temas: cada uno es un juego de tokens en <html>. lightMode se mantiene
+   porque los ajustes y la cuenta ya lo sincronizaban, y rosa se guarda aparte.
+
+   OJO CON LOS NOMBRES (2026-08-21): la clave guardada y el nombre que se ve
+   YA NO COINCIDEN. El tema que se llamaba "Naviris" (lima sobre carbon) pasa
+   a llamarse ACID, y el blanco y negro pasa a ser "Naviris" y el
+   PREDETERMINADO. Las claves NO se renombran a proposito: 'cobalt.tema' y
+   'cobalt.hubBg.<tema>' ya estan escritas en el disco de todo el mundo, y la
+   sincronizacion de la cuenta manda 'hubBgs' con estos nombres — renombrarlas
+   obligaria a migrar cuatro claves y romperia el intercambio con la linea
+   estable, que sigue mandando los de antes. Asi que la traduccion vive AQUI,
+   en un solo sitio, y de aqui la leen el menu y el aviso. */
+const TEMAS = ['mono', 'oscuro', 'claro', 'rosa'];   // en el orden del menu
+const NOMBRES = { mono: 'Naviris', oscuro: 'Acid', claro: 'Claro', rosa: 'Rosa' };
+// El tema de fabrica. Quien ya tiene uno elegido conserva el suyo: 'cobalt.tema'
+// se escribe en cada arranque, asi que esto solo lo estrenan los perfiles nuevos.
+const TEMA_POR_DEFECTO = 'mono';
 /* Que temas son CLAROS. Antes esto se escribia como 'tema !== oscuro' en
    cuatro sitios, y con 'mono' —que es oscuro— eso mandaba lightMode=true:
    nativeTheme, las scrollbars y los webviews habrian renderizado en claro
@@ -67,10 +80,10 @@ const esTemaClaro = (t) => TEMAS_CLAROS.includes(t);
 function temaActual() {
   const t = store.get('cobalt.tema', null);
   if (TEMAS.includes(t)) return t;
-  return store.get('cobalt.lightMode', false) ? 'claro' : 'oscuro';
+  return store.get('cobalt.lightMode', false) ? 'claro' : TEMA_POR_DEFECTO;
 }
 function aplicaTema(tema) {
-  if (!TEMAS.includes(tema)) tema = 'oscuro';
+  if (!TEMAS.includes(tema)) tema = TEMA_POR_DEFECTO;
   const raiz = document.documentElement;
   raiz.classList.toggle('light', tema === 'claro');
   raiz.classList.toggle('rosa', tema === 'rosa');
@@ -3476,7 +3489,7 @@ function cierraMenusHub(excepto) {
     // encienden los temas CLAROS (claro y rosa); oscuro y mono lo apagan.
     settings = await window.cobalt.setSettings({ lightMode: esTemaClaro(b.dataset.tema) });
     if (els.optLight) els.optLight.checked = esTemaClaro(b.dataset.tema);
-    toast('Tema ' + b.textContent.trim());
+    toast('Tema ' + (NOMBRES[b.dataset.tema] || b.dataset.tema));
   }));
   document.addEventListener('click', (e) => {
     if (pop.classList.contains('hidden')) return;
@@ -3580,21 +3593,22 @@ const BACKGROUNDS_ROSA = [
   'radial-gradient(120% 80% at 50% -10%, #e7ebf5 0%, #dcdfeb 62%)',    // Gris perla
   'linear-gradient(135deg, #fce4f2 0%, #ecdcf4 45%, #fdeff6 100%)'     // Aurora rosa
 ];
-/* Y en BLANCO Y NEGRO para el tema mono (2026-08-21): los mismos diez slots
-   sin una gota de color, cambiando la geometria y la profundidad para que el
+/* Los mismos diez slots para el tema Naviris (.mono), en gris NEUTRO y sobre
+   CARBON, no sobre negro puro: Dosa lo pidio expreso el 2026-08-21 ("no quiero
+   que sea tan oscuro"). Cambia la geometria y la profundidad para que el
    selector siga ofreciendo diez miniaturas distintas. Misma identidad
-   canonica (el valor oscuro). */
+   canonica (el valor del tema Acid). */
 const BACKGROUNDS_MONO = [
-  'radial-gradient(130% 100% at 80% 0%, #141414 0%, #0a0a0a 45%, #000000 100%)', // Negro (predeterminado)
-  'linear-gradient(135deg, #2e2e2e 0%, #141414 100%)',                 // Grafito
-  'radial-gradient(120% 80% at 50% -10%, #2a2a2a 0%, #060606 62%)',    // Cenit
-  'radial-gradient(120% 80% at 20% 0%, #232323 0%, #050505 62%)',      // Esquina
-  'radial-gradient(120% 80% at 80% 100%, #242424 0%, #070707 62%)',    // Contraluz
-  'radial-gradient(120% 80% at 50% -10%, #1a1a1a 0%, #000000 62%)',    // Tinta
-  'linear-gradient(180deg, #1e1e1e 0%, #000000 100%)',                 // Caida
-  'linear-gradient(90deg, #000000 0%, #1c1c1c 50%, #000000 100%)',     // Pasillo
-  'radial-gradient(120% 80% at 50% 110%, #262626 0%, #070707 60%)',    // Suelo
-  'linear-gradient(135deg, #333333 0%, #111111 45%, #000000 100%)'     // Humo
+  'radial-gradient(130% 100% at 80% 0%, #2b2b2b 0%, #1e1e1e 45%, #141414 100%)', // Carbon (predeterminado)
+  'linear-gradient(135deg, #3a3a3a 0%, #1f1f1f 100%)',                 // Grafito
+  'radial-gradient(120% 80% at 50% -10%, #353535 0%, #171717 62%)',    // Cenit
+  'radial-gradient(120% 80% at 20% 0%, #2e2e2e 0%, #161616 62%)',      // Esquina
+  'radial-gradient(120% 80% at 80% 100%, #303030 0%, #171717 62%)',    // Contraluz
+  'radial-gradient(120% 80% at 50% -10%, #262626 0%, #131313 62%)',    // Tinta
+  'linear-gradient(180deg, #2a2a2a 0%, #141414 100%)',                 // Caida
+  'linear-gradient(90deg, #151515 0%, #2c2c2c 50%, #151515 100%)',     // Pasillo
+  'radial-gradient(120% 80% at 50% 110%, #333333 0%, #171717 60%)',    // Suelo
+  'linear-gradient(135deg, #444444 0%, #232323 45%, #151515 100%)'     // Humo
 ];
 /* Fondo por defecto: SIEMPRE el degradado plano del tema (2026-08-12, Dosa).
    Las fotos de src/temas/<tema>/ NO son fondos y nunca lo fueron: son el
