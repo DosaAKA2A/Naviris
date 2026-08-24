@@ -1183,6 +1183,34 @@ ipcMain.handle('settings:get', () => settings);
 // ---------- Información del sitio (popover del candado) ----------
 // Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
 const PARTICIONES_VALIDAS = new Set(['persist:cobalt', 'cobalt-private']);
+/* ===== Contenedores =====
+   Un contenedor es una sesión con su propio bote de cookies: sirve para tener
+   dos cuentas del mismo sitio abiertas a la vez sin que se pisen. La lista vive
+   en los ajustes para que sobreviva al reinicio, y cada partición se prepara
+   igual que la normal antes de usarse. */
+const preparadas = new Set();
+function contenedoresGuardados() { return (settings.contenedores || []).map((c) => c.particion); }
+function preparaContenedor(particion) {
+  if (!particion.startsWith('persist:cont-')) return null;
+  PARTICIONES_VALIDAS.add(particion);
+  const ses = session.fromPartition(particion);
+  if (!preparadas.has(particion)) {
+    preparadas.add(particion);
+    setupSession(ses);
+    setupPermissions(ses);
+  }
+  return ses;
+}
+ipcMain.handle('cont:prepara', soloUI((_e, particion) => {
+  if (typeof particion !== 'string' || !/^persist:cont-[a-z0-9]{1,24}$/.test(particion)) return { ok: false };
+  preparaContenedor(particion);
+  return { ok: true };
+}));
+ipcMain.handle('cont:borra', soloUI(async (_e, particion) => {
+  if (!PARTICIONES_VALIDAS.has(particion) || !particion.startsWith('persist:cont-')) return { ok: false };
+  try { await session.fromPartition(particion).clearStorageData(); } catch { /* nada */ }
+  return { ok: true };
+}));
 ipcMain.handle('site:data', soloUI(async (_e, { url, partition }) => {
   try {
     if (!PARTICIONES_VALIDAS.has(partition)) return { ok: false };
@@ -2309,6 +2337,11 @@ app.whenReady().then(async () => {
   });
   setupSession(session.fromPartition(PART_NORMAL));
   setupSession(session.fromPartition(PART_PRIVATE));
+  // Contenedores: cada uno es una sesión aparte, así que necesita EXACTAMENTE la
+  // misma preparación que la normal (identidad, cabeceras, adblock, permisos).
+  // Si no, un contenedor navegaría con otra identidad y otras reglas, que es el
+  // tipo de incoherencia que ya costó las verificaciones de Cloudflare.
+  for (const p of contenedoresGuardados()) preparaContenedor(p);
   splashProgreso(74);
   createWindow(false, true); // la primera ventana es la que releva al splash
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

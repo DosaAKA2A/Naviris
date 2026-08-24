@@ -2350,3 +2350,7 @@ html.vtabs #vtabs-slot .tab.pinned { width: 100% !important; }
 #div-barra button { border: none; background: var(--bg-3); color: var(--text-dim); width: 22px; height: 40px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--elev-pop); }
 #div-barra button:hover { color: var(--text); background: var(--btn-hover); }
 #div-barra button svg { width: 12px; height: 12px; }
+
+/* Marca de contenedor en la pestaña: una barrita del color del contenedor. */
+.tab .t-cont { width: 3px; align-self: stretch; margin: 6px 2px 6px 0; border-radius: 999px; flex: none; }
+html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }

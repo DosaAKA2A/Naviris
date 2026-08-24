@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.17",
+  "linea": "dev",
+  "titulo": "Contenedores: dos cuentas del mismo sitio a la vez",
+  "entradilla": "Una pestaña puede vivir en su propia sesión, con sus propias cookies. Así entras con dos cuentas distintas en el mismo servicio sin que se pisen.",
+  "bloques": [
+    {
+      "titulo": "Cómo se usa",
+      "texto": "Clic derecho en una pestaña y Abrir en un contenedor nuevo. Se abre la misma dirección en una sesión limpia y aparte. A partir de ahí ese contenedor queda en la lista y puedes mandar más pestañas a él desde el mismo menú."
+    },
+    {
+      "titulo": "Se ve de un vistazo",
+      "texto": "Las pestañas de un contenedor llevan una barrita de color a la izquierda, distinta para cada uno, para que no confundas la cuenta del trabajo con la personal."
+    },
+    {
+      "titulo": "Con las mismas reglas que el resto",
+      "texto": "Cada contenedor se prepara igual que la sesión normal: misma identidad de navegador, mismas cabeceras, mismo bloqueador y mismos permisos por sitio. Una sesión que navegara con otra identidad sería justo el tipo de incoherencia que dispara verificaciones."
+    }
+  ]
+}

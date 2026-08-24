@@ -40,6 +40,28 @@ const els = {};
 // volver ya se había recargado). Edge duerme a las 2 h y Chrome ronda ahí;
 // 30 min es el punto en que ya no molesta y aún libera memoria de verdad.
 let divId = null;   // pestaña acompañante de la pantalla dividida (ver más abajo)
+
+/* ===== Contenedores =====
+   Un contenedor es una sesión aparte con su propio bote de cookies: sirve para
+   tener dos cuentas del mismo sitio abiertas a la vez sin que se pisen. La
+   pestaña recuerda en cuál vive, y main prepara esa partición con la MISMA
+   identidad y las mismas reglas que la normal antes de que se use. */
+const CONT_COLORES = ['#e0603a', '#3a9ae0', '#5cb85c', '#c07ae0', '#e0b03a', '#3ac0b0'];
+let contenedores = [];   // [{ id, nombre, particion, color }]
+
+function nuevoContenedor(nombre) {
+  const id = Math.random().toString(36).slice(2, 8);
+  const c = { id, nombre: nombre || 'Contenedor ' + (contenedores.length + 1), particion: 'persist:cont-' + id, color: CONT_COLORES[contenedores.length % CONT_COLORES.length] };
+  contenedores.push(c);
+  window.cobalt.setSettings({ contenedores }).then((s2) => { settings = s2; });
+  return c;
+}
+
+async function abreEnContenedor(url, cont) {
+  await window.cobalt.contPrepara(cont.particion);
+  const tab = createTab(url || null, true, cont);
+  return tab;
+}
 const SLEEP_AFTER_MS = 30 * 60 * 1000;
 let settings = { hardwareAcceleration: true, powerSaver: true };
 
@@ -227,7 +249,7 @@ function recordHistory(url, title) {
    pestaña que ni has mirado (pedido de Dosa, 2026-08-12). Reutiliza tal cual
    la mecánica de dormidas del ahorro de energía: despertar = poner el src.
    El título y el icono salen del historial si ya conocemos el sitio. */
-function createTab(url = null, activate = true) {
+function createTab(url = null, activate = true, contenedor = null) {
   if (url && !activate && /^https?:/i.test(url)) {
     const conocido = history.find((h) => h.url === url);
     const tab = crearDormida({ u: url, t: (conocido && conocido.title) || '' });
@@ -235,7 +257,7 @@ function createTab(url = null, activate = true) {
     getTile(url).then((t) => { if (t?.icon) { tab.favicon = t.icon; renderTabs(); } }).catch(() => {});
     renderTabs(); saveSession(); return tab;
   }
-  const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now() };
+  const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now(), contenedor: contenedor || null };
   tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
 }
 // Guarda las URLs abiertas para restaurarlas al reabrir (si el ajuste está activo).
@@ -271,7 +293,10 @@ function crearDormida(dato) {
 let mediaTimer = null;
 function attachWebview(tab, url) {
   const wv = document.createElement('webview');
-  wv.setAttribute('allowpopups', ''); wv.setAttribute('partition', PARTITION); wv.src = url;
+  wv.setAttribute('allowpopups', '');
+  // Una pestaña de contenedor navega en SU sesión, no en la normal.
+  wv.setAttribute('partition', tab.contenedor ? tab.contenedor.particion : PARTITION);
+  wv.src = url;
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   // Clic dentro de la página = cerrar los popovers de herramientas (esos
   // clics no burbujean hasta el document; el foco del webview sí avisa)
@@ -399,6 +424,8 @@ function menuDePestana(e, tab) {
     { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
     { sep: true },
     ...(web && tab.id !== activeId ? [{ label: 'Abrir en pantalla dividida', icon: 'square-2-stack', action: () => dividirCon(tab) }] : []),
+    ...(web && !IS_PRIVATE ? [{ label: 'Abrir en un contenedor nuevo', icon: 'layers', action: () => abreEnContenedor(tab.url, nuevoContenedor()) }] : []),
+    ...(web && !IS_PRIVATE ? contenedores.filter((c) => !tab.contenedor || c.id !== tab.contenedor.id).map((c) => ({ label: 'Abrir en ' + c.nombre, icon: 'layers', action: () => abreEnContenedor(tab.url, c) })) : []),
     ...(divId !== null && tab.id === divId ? [{ label: 'Salir de la pantalla dividida', icon: 'x-mark', action: () => salirDivision() }] : []),
     ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => { try { tab.webview?.reload(); } catch {} } }] : []),
     { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabs.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) },
@@ -426,6 +453,13 @@ function makeTabEl(tab, mini) {
   el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
     : tab.asleep ? `${tab.sinCargar ? 'Sin cargar — se abre al entrar' : 'Pestaña dormida'} — ${tab.title}\n${tab.sleptUrl || tab.url}`
     : (tab.url || 'Hub de Naviris');
+  if (tab.contenedor) {
+    const marca = document.createElement('span');
+    marca.className = 't-cont';
+    marca.style.background = tab.contenedor.color;
+    marca.title = 'Contenedor: ' + tab.contenedor.nombre;
+    el.appendChild(marca);
+  }
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
   const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
   close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tab.id); });
@@ -6006,6 +6040,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
+  contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];
   // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
   // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
   // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).

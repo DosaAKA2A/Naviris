@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   totpAvailable: () => ipcRenderer.invoke('totp:available'),
   totpUnlock: () => ipcRenderer.invoke('totp:unlock'),
   totpLock: () => ipcRenderer.invoke('totp:lock'),
+  contPrepara: (part) => ipcRenderer.invoke('cont:prepara', part),
+  contBorra: (part) => ipcRenderer.invoke('cont:borra', part),
   totpList: () => ipcRenderer.invoke('totp:list'),
   totpAdd: (datos) => ipcRenderer.invoke('totp:add', datos),
   totpDelete: (id) => ipcRenderer.invoke('totp:delete', id),
