@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -1258,6 +1258,43 @@ ipcMain.handle('sys:stats', soloUI(async () => {
       ramTotal: mem.total, ramLibre: mem.free,
       ramUso: Math.round((1 - mem.free / mem.total) * 100),
       appMb: Math.round(rssKb / 1024), appCpu: cpu,
+      procesos: mets.length
+    };
+  } catch { return null; }
+}));
+/* Rendimiento POR PESTAÑA. app.getAppMetrics() da CPU y memoria por PROCESO;
+   aquí se cruza con el proceso de cada webview para poder decir qué pestaña
+   gasta qué. OJO: Chromium mete varias pestañas del MISMO sitio en un solo
+   proceso, así que un pid puede servir a varias — se marca `comparten` para no
+   sumar la misma memoria dos veces y quedar como un contador que miente. */
+ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
+  try {
+    const mets = app.getAppMetrics();
+    const porPid = new Map(mets.map((p) => [p.pid, p]));
+    const cuantasPorPid = new Map();
+    const filas = (lista || []).map((t) => {
+      let pid = null;
+      try { pid = webContents.fromId(t.wcId)?.getOSProcessId() ?? null; } catch { /* dormida o ya cerrada */ }
+      if (pid) cuantasPorPid.set(pid, (cuantasPorPid.get(pid) || 0) + 1);
+      const m = pid ? porPid.get(pid) : null;
+      return {
+        id: t.id,
+        pid,
+        mb: m ? Math.round((m.memory && m.memory.workingSetSize || 0) / 1024) : null,
+        cpu: m ? Math.round((m.cpu && m.cpu.percentCPUUsage || 0) * 10) / 10 : null
+      };
+    });
+    for (const f of filas) f.comparten = f.pid ? (cuantasPorPid.get(f.pid) || 1) : 1;
+    // Todo lo que no es una pestaña: la propia interfaz, la GPU, la red, utilidades.
+    const dePestanas = new Set(filas.map((f) => f.pid).filter(Boolean));
+    const resto = mets.filter((p) => !dePestanas.has(p.pid));
+    const suma = (arr, f) => Math.round(arr.reduce((s, p) => s + f(p), 0));
+    return {
+      filas,
+      restoMb: suma(resto, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      restoCpu: Math.round(resto.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
+      totalMb: suma(mets, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      totalCpu: Math.round(mets.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
       procesos: mets.length
     };
   } catch { return null; }

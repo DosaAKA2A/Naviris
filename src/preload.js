@@ -104,6 +104,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   gmailFeed: () => ipcRenderer.invoke('gmail:feed'),
   lensImagen: (datos) => ipcRenderer.invoke('lens:imagen', datos),
   sysStats: () => ipcRenderer.invoke('sys:stats'),
+  perfTabs: (lista) => ipcRenderer.invoke('perf:tabs', lista),
   clipRead: () => ipcRenderer.invoke('clip:read'),
   clipWrite: (t) => ipcRenderer.invoke('clip:write', t),
 

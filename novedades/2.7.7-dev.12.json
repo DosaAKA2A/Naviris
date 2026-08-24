@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.12",
+  "linea": "dev",
+  "titulo": "Ya se ve qué gasta cada pestaña",
+  "entradilla": "Panel nuevo en la barra lateral: memoria y CPU pestaña por pestaña, y un botón para dormir la que se esté desmadrando.",
+  "bloques": [
+    {
+      "titulo": "Rendimiento, en la barra lateral",
+      "texto": "El icono del velocímetro abre una lista con lo que ocupa cada pestaña, ordenada de mayor a menor y con una barra para comparar de un vistazo. Arriba, tres cifras: lo que ocupa Naviris entero, lo que ocupan las pestañas y lo que ocupa la interfaz con el motor. Se refresca solo cada dos segundos."
+    },
+    {
+      "titulo": "Dormir una pestaña a mano",
+      "texto": "El botón de la luna suelta el proceso entero de esa pestaña: pasa a marcar cero y se despierta sola al volver a ella. Naviris ya lo hacía a los 30 minutos sin usarla; ahora puedes adelantarlo cuando una web se pone pesada."
+    },
+    {
+      "titulo": "Los números no inflan",
+      "texto": "Chromium mete varias pestañas del mismo sitio en un solo proceso. Cuando pasa, la fila lo dice y esa memoria se cuenta UNA vez en el total, no una por pestaña. Una pestaña dormida no tiene proceso y aparece con un guion, que es justo lo que se quiere ver."
+    }
+  ]
+}

@@ -57,6 +57,7 @@
       <div id="addon-tools"></div>
       <div class="sb-div"></div>
       <!-- Funciones del navegador -->
+      <button class="sb-btn" id="sb-perf" title="Rendimiento — qué gasta cada pestaña" data-ico="gauge"></button>
       <button class="sb-btn" id="sb-history" title="Historial" data-ico="clock"></button>
       <button class="sb-btn" id="sb-bookmarks" title="Marcadores" data-ico="bookmark"></button>
       <button class="sb-btn" id="sb-passwords" title="Contraseñas" data-ico="key"></button>
@@ -350,6 +351,14 @@
   </aside>
 
   <!-- ===== Panel de historial ===== -->
+  <!-- ===== Panel de rendimiento ===== -->
+  <aside id="perf-panel" class="hidden side-panel">
+    <div class="mp-head"><span>Rendimiento</span><span class="mp-tools"><button id="perf-close" data-ico="x-mark" title="Cerrar"></button></span></div>
+    <div id="perf-resumen" class="perf-resumen"></div>
+    <div id="perf-list"></div>
+    <div class="mp-foot perf-foot"><span id="perf-nota"></span></div>
+  </aside>
+
   <aside id="history-panel" class="hidden side-panel">
     <div class="mp-head"><span id="history-title">Historial</span><span class="mp-tools"><button id="history-close" data-ico="x-mark" title="Cerrar"></button></span></div>
     <div class="hist-search"><input id="history-filter" type="text" placeholder="Buscar en el historial…" spellcheck="false" /></div>

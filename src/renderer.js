@@ -31,7 +31,8 @@ const els = {};
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
-  'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close'
+  'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
+  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
@@ -3994,7 +3995,98 @@ function toggleDownloads(force) { const open = force !== undefined ? force : els
 els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
 $('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
-function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); }
+function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); cierraPerf(); }
+
+/* ============ Panel de rendimiento ============
+   Qué gasta CADA pestaña, no un total que no dice nada. Sale de
+   app.getAppMetrics() cruzado con el proceso de cada webview.
+   Dos avisos que hay que respetar para que los números no mientan:
+   - Chromium mete varias pestañas del MISMO sitio en un solo proceso. Cuando
+     pasa, la memoria es la del proceso entero: se marca y NO se suma dos veces.
+   - Una pestaña dormida no tiene proceso, así que no gasta nada. Eso no es un
+     hueco en la tabla, es justo lo que se quiere ver. */
+let perfTimer = null;
+const perfMB = (n) => (n >= 1024 ? (n / 1024).toFixed(1) + ' GB' : n + ' MB');
+
+function cierraPerf() {
+  if (perfTimer) { clearInterval(perfTimer); perfTimer = null; }
+  els.perfPanel?.classList.add('hidden');
+  els.sbPerf?.classList.remove('open');
+}
+
+function togglePerf(force) {
+  const abrir = force !== undefined ? force : els.perfPanel.classList.contains('hidden');
+  if (!abrir) { cierraPerf(); return; }
+  closeRightPanels();
+  els.perfPanel.classList.remove('hidden');
+  els.sbPerf.classList.add('open');
+  pintaPerf();
+  // 2 s: suficiente para ver subir una pestaña que se desmadra y lo bastante
+  // lento como para no ser, él mismo, un gasto de CPU.
+  perfTimer = setInterval(pintaPerf, 2000);
+}
+
+async function pintaPerf() {
+  if (!els.perfPanel || els.perfPanel.classList.contains('hidden')) return;
+  const web = tabs.filter((t) => t.kind === 'web');
+  const lista = web.map((t) => {
+    let wcId = null;
+    try { wcId = t.asleep ? null : t.webview?.getWebContentsId?.() ?? null; } catch { /* aún no montada */ }
+    return { id: t.id, wcId };
+  });
+  const d = await window.cobalt.perfTabs(lista).catch(() => null);
+  if (!d) return;
+
+  const porId = new Map(d.filas.map((f) => [f.id, f]));
+  const conDato = d.filas.filter((f) => f.mb !== null);
+  const pico = Math.max(1, ...conDato.map((f) => f.mb));
+  const dePestanas = new Set();
+  let mbPestanas = 0;
+  for (const f of conDato) { if (!dePestanas.has(f.pid)) { dePestanas.add(f.pid); mbPestanas += f.mb; } }
+
+  const caja = (k, v, sub) => `<div class="perf-caja"><span class="perf-k">${k}</span><span class="perf-v">${v}</span><span class="perf-s">${sub}</span></div>`;
+  els.perfResumen.innerHTML =
+    caja('Naviris', perfMB(d.totalMb), d.totalCpu + ' % de CPU')
+    + caja('Pestañas', perfMB(mbPestanas), web.length + (web.length === 1 ? ' abierta' : ' abiertas'))
+    + caja('Interfaz', perfMB(d.restoMb), d.procesos + ' procesos');
+
+  const orden = web.slice().sort((a, b) => ((porId.get(b.id)?.mb) || -1) - ((porId.get(a.id)?.mb) || -1));
+  els.perfList.innerHTML = '';
+  for (const t of orden) {
+    const f = porId.get(t.id) || {};
+    const fila = document.createElement('div');
+    fila.className = 'perf-fila' + (t.id === activeId ? ' activa' : '') + (t.asleep ? ' perf-dormida' : '');
+    const host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch { return t.url || ''; } })();
+    const cpuAlta = (f.cpu || 0) >= 15;
+    const sub = t.asleep ? 'Dormida — no gasta nada'
+      : f.comparten > 1 ? `${host} — comparte proceso con ${f.comparten - 1} más`
+        : host;
+    fila.innerHTML = `
+      <img class="perf-fav" src="${t.favicon || ''}" alt="" onerror="this.style.visibility='hidden'" />
+      <div class="perf-info">
+        <div class="perf-tit">${escapeHtml(t.title || host || 'Pestaña')}</div>
+        <div class="perf-sub">${escapeHtml(sub)}</div>
+        ${f.mb !== null && f.mb !== undefined ? `<div class="perf-barra"><i style="width:${Math.round((f.mb / pico) * 100)}%"></i></div>` : ''}
+      </div>
+      <div class="perf-num">
+        <div class="perf-mb">${f.mb !== null && f.mb !== undefined ? perfMB(f.mb) : '—'}</div>
+        <div class="perf-cpu${cpuAlta ? ' alta' : ''}">${f.cpu !== null && f.cpu !== undefined ? f.cpu + ' %' : ''}</div>
+      </div>
+      <button class="perf-acc" title="${t.asleep ? 'Despertar' : 'Dormir esta pestaña'}">${window.icon(t.asleep ? 'arrow-path' : 'moon-zzz')}</button>`;
+    fila.addEventListener('click', (e) => { if (!e.target.closest('.perf-acc')) activateTab(t.id); });
+    fila.querySelector('.perf-acc').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (t.asleep) { activateTab(t.id); return; }
+      if (t.id === activeId) { toast('No se duerme la pestaña que estás viendo'); return; }
+      try { t.sleptUrl = t.webview.getURL() || t.url; t.webview.src = 'about:blank'; t.asleep = true; renderTabs(); pintaPerf(); } catch { /* nada */ }
+    });
+    els.perfList.appendChild(fila);
+  }
+  els.perfNota.textContent = 'Dormir una pestaña libera su proceso entero. Naviris ya lo hace solo a los 30 minutos sin usarla.';
+}
+
+els.sbPerf?.addEventListener('click', () => togglePerf());
+els.perfClose?.addEventListener('click', () => togglePerf(false));
 
 /* ============ Página de descargas: archivos reales por tipo y fecha ============ */
 const DLP_TYPES = [
