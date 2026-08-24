@@ -27,6 +27,15 @@ const pkg = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8'))
 const VER = pkg.version;
 const ES_DEV = /-dev/i.test(VER);
 const CANAL = ES_DEV ? 'dev.yml' : 'latest.yml';
+/* Una versión ESTABLE alimenta los DOS canales.
+   Motivo: una instalación dev sigue dev.yml, así que si una estable solo
+   escribiera latest.yml, quien esté en dev se quedaría clavado en la última
+   prerelease y no vería nunca la versión buena — tendría que reinstalar a mano.
+   Publicando el mismo build en los dos feeds, cualquiera que esté en cualquier
+   versión salta directo a la última, sin pasar por ninguna intermedia.
+   Al revés NO: una dev no toca latest.yml, o las instalaciones estables se
+   tragarían una prerelease sin pedirlo. */
+const CANALES = ES_DEV ? ['dev.yml'] : ['latest.yml', 'dev.yml'];
 const TAG = 'v' + VER;
 const [OWNER, REPO] = ['DosaAKA2A', 'Naviris'];
 const DRY = process.argv.includes('--dry');
@@ -61,15 +70,18 @@ async function api(url, opts = {}) {
   const size = fs.statSync(setupPath).size;
   const nombreSetup = SETUP.replace(/ /g, '-');
   const yml = `version: ${VER}\nfiles:\n  - url: ${nombreSetup}\n    sha512: ${hash}\n    size: ${size}\npath: ${nombreSetup}\nsha512: ${hash}\nreleaseDate: '${new Date().toISOString()}'\n`;
-  const ymlPath = path.join(DIST, CANAL);
-  fs.writeFileSync(ymlPath, yml);
-  console.log(` feed generado: ${CANAL} (sha512 del Setup real)`);
+  const ymlPaths = CANALES.map((c) => {
+    const p = path.join(DIST, c);
+    fs.writeFileSync(p, yml);
+    return { file: p, name: c };
+  });
+  console.log(` feeds generados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
 
   const subir = [
     { file: setupPath, name: nombreSetup },
     { file: path.join(DIST, PORTABLE), name: PORTABLE.replace(/ /g, '-') },
     { file: path.join(DIST, BLOCKMAP), name: BLOCKMAP.replace(/ /g, '-') },
-    { file: ymlPath, name: CANAL }
+    ...ymlPaths
   ].filter((a) => fs.existsSync(a.file));
 
   if (DRY) {
@@ -108,9 +120,14 @@ async function api(url, opts = {}) {
   }
 
   // Comprobación final: el feed debe descargarse y apuntar al instalador subido
-  const feedUrl = `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/${CANAL}`;
-  const check = await (await fetch(feedUrl)).text();
-  const okFeed = check.includes(`version: ${VER}`) && check.includes(hash.slice(0, 24));
-  console.log(`\n${okFeed ? 'OK' : 'AVISO'}: ${CANAL} servido y ${okFeed ? 'coherente' : 'NO coincide (revisar)'}`);
+  let todosOk = true;
+  for (const c of CANALES) {
+    const feedUrl = `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/${c}`;
+    const check = await (await fetch(feedUrl)).text();
+    const ok = check.includes(`version: ${VER}`) && check.includes(hash.slice(0, 24));
+    if (!ok) todosOk = false;
+    console.log(`\n${ok ? 'OK' : 'AVISO'}: ${c} servido y ${ok ? 'coherente' : 'NO coincide (revisar)'}`);
+  }
+  if (!todosOk) process.exitCode = 1;
   console.log(`https://github.com/${OWNER}/${REPO}/releases/tag/${TAG}`);
 })().catch((e) => { console.error('FALLO:', e.message); process.exit(1); });

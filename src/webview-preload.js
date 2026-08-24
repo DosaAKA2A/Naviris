@@ -381,7 +381,8 @@ function buscaOtp() {
       .filter((el) => /otp|one.?time|2fa|mfa|totp|authenticator|verification|codigo|código|verificacion/i
         .test((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '')));
   }
-  return c.filter(visible)[0] || null;
+  const falsoPositivo = /promo|cupon|cup\u00f3n|descuento|discount|voucher|gift|referral|invit|postal|zip|iban|swift|pin|captcha/i;
+  return c.filter(visible).filter((el) => !falsoPositivo.test((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '')))[0] || null;
 }
 function avisaOtp() {
   if (otpAvisado) return;

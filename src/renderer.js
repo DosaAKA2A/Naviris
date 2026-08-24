@@ -352,6 +352,8 @@ function saveSession() {
     .map((t) => {
       const s = { u: t.sleptUrl || t.url, t: t.title || '', f: t.favicon || '' };
       if (t.pinned) s.p = 1;
+      if (t.espacio) s.e = t.espacio;
+      if (t.contenedor) s.c = t.contenedor;
       return s;
     });
   store.set('cobalt.session', urls);
@@ -364,7 +366,9 @@ function crearDormida(dato) {
   const tab = {
     id: nextId++, kind: 'web', url, title: (dato && dato.t) || hostOf(url) || url,
     webview: null, favicon: (dato && dato.f) || null,
-    asleep: true, sleptUrl: url, lastActive: 0
+    asleep: true, sleptUrl: url, lastActive: 0,
+    espacio: (dato && dato.e) || null,
+    contenedor: (dato && dato.c) || null
   };
   tabs.push(tab);
   attachWebview(tab, 'about:blank');
@@ -469,7 +473,14 @@ function closeTab(id) {
   recordarCerrada(tabs[idx]);   // para reabrirla con Ctrl+Shift+T
   tabs[idx].webview?.remove(); tabs.splice(idx, 1);
   if (!tabs.length) { createTab(); return; }
-  if (activeId === id) activateTab(tabs[Math.max(0, idx - 1)].id); else renderTabs();
+  if (activeId === id) {
+    // La sustituta sale del MISMO espacio; si no queda ninguna, se abre una
+    // nueva ahí en vez de sacarte a otro espacio sin avisar.
+    const vis = tabsVisibles();
+    if (!vis.length) { createTab(); return; }
+    const antes = vis.filter((t) => tabs.findIndex((x) => x.id === t.id) < idx).pop();
+    activateTab((antes || vis[0]).id);
+  } else renderTabs();
   saveSession();
 }
 /* ===== Fijar pestañas: comprimidas (solo favicon) al lado izquierdo ===== */
@@ -633,7 +644,7 @@ function renderTabs(forzar) {
    siempre la pestaña activa. */
 function aplicaDivision() {
   const compa = tabs.find((t) => t.id === divId);
-  if (!compa || compa.kind !== 'web' || compa.id === activeId) divId = null;
+  if (!compa || compa.kind !== 'web' || compa.id === activeId || !enEspacio(compa)) divId = null;
   els.content.classList.toggle('dividido', !!divId);
   els.divBarra.classList.toggle('hidden', !divId);
   for (const t of tabs) {
@@ -2866,7 +2877,9 @@ function renderImagen(body, w) {
     // Lamina DEL TEMA (no del usuario): es la unica que el tema mono pasa a gris.
     body.classList.toggle('img-tema', !!w.slot);
     if (src) {
-      body.innerHTML = `<img src="${escapeHtml(src)}" alt="" onerror="this.style.display='none'" /><button class="wi-cambia" title="Cambiar imagen">${window.icon('photo')}</button>`;
+      body.innerHTML = `<img src="${escapeHtml(src)}" alt="" /><button class="wi-cambia" title="Cambiar imagen">${window.icon('photo')}</button>`;
+      const imgW = body.querySelector('img');
+      imgW.addEventListener('error', () => { imgW.style.display = 'none'; });
       body.querySelector('.wi-cambia').addEventListener('click', (e) => { e.stopPropagation(); elige(); });
       body.onclick = null;
     } else {
@@ -4247,7 +4260,7 @@ async function pintaPerf() {
       : f.comparten > 1 ? `${host} — comparte proceso con ${f.comparten - 1} más`
         : host;
     fila.innerHTML = `
-      <img class="perf-fav" src="${t.favicon || ''}" alt="" onerror="this.style.visibility='hidden'" />
+      <img class="perf-fav" src="${t.favicon || ''}" alt="" />
       <div class="perf-info">
         <div class="perf-tit">${escapeHtml(t.title || host || 'Pestaña')}</div>
         <div class="perf-sub">${escapeHtml(sub)}</div>
@@ -4265,6 +4278,8 @@ async function pintaPerf() {
       if (t.id === activeId) { toast('No se duerme la pestaña que estás viendo'); return; }
       try { t.sleptUrl = t.webview.getURL() || t.url; t.webview.src = 'about:blank'; t.asleep = true; renderTabs(); pintaPerf(); } catch { /* nada */ }
     });
+    const favImg = fila.querySelector('.perf-fav');
+    favImg.addEventListener('error', () => { favImg.style.visibility = 'hidden'; });
     els.perfList.appendChild(fila);
   }
   els.perfNota.textContent = 'Dormir una pestaña libera su proceso entero. Naviris ya lo hace solo a los 30 minutos sin usarla.';
@@ -5860,7 +5875,7 @@ async function pintaOtras() {
     const host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch { return t.url || ''; } })();
     const fila = document.createElement('div');
     fila.className = 'fo-fila';
-    fila.innerHTML = `<img src="${t.favicon || ''}" alt="" onerror="this.style.visibility='hidden'" />
+    fila.innerHTML = `<img src="${t.favicon || ''}" alt="" />
       <div class="fo-info"><div class="fo-t">${escapeHtml(t.title || host || 'Pestaña')}</div><div class="fo-h">${escapeHtml(host)}</div></div>
       <span class="fo-n">${n}</span>`;
     fila.addEventListener('click', () => {
@@ -5872,6 +5887,8 @@ async function pintaOtras() {
       buscaTexto = texto;
       abrirBuscar();
     });
+    const ico = fila.querySelector('img');
+    ico.addEventListener('error', () => { ico.style.visibility = 'hidden'; });
     els.findOtras.appendChild(fila);
   }
   els.findOtras.classList.remove('hidden');
@@ -5923,7 +5940,8 @@ window.addEventListener('keydown', (e) => {
   // Ctrl+1..8 va a esa pestaña; Ctrl+9 a la última (igual que Chrome)
   if (soloCtrl && /^[1-9]$/.test(k)) {
     e.preventDefault();
-    const n = k === '9' ? tabs[tabs.length - 1] : tabs[parseInt(k, 10) - 1];
+    const vis = tabsVisibles();
+    const n = k === '9' ? vis[vis.length - 1] : vis[parseInt(k, 10) - 1];
     if (n) activateTab(n.id);
     return;
   }
@@ -6024,8 +6042,8 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'zoom-out') zoom(-1);
   else if (cmd === 'zoom-reset') zoom(0);
   else if (cmd === 'devtools') alternarDevtools();
-  else if (cmd === 'next-tab') { const n = tabs[(i + 1) % tabs.length]; if (n) activateTab(n.id); }
-  else if (cmd === 'prev-tab') { const n = tabs[(i + tabs.length - 1) % tabs.length]; if (n) activateTab(n.id); }
+  else if (cmd === 'next-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + 1) % v.length]; if (n) activateTab(n.id); }
+  else if (cmd === 'prev-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + v.length - 1) % v.length]; if (n) activateTab(n.id); }
   else if (cmd.startsWith('tab-')) {
     const d = cmd.slice(4);
     const n = d === '9' ? tabs[tabs.length - 1] : tabs[parseInt(d, 10) - 1];
