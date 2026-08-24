@@ -2141,12 +2141,49 @@ ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { state: 'dev' };
   chequeoSilencioso = false; // lo pide el usuario: nada se baja sin que lo mande
   applyUpdateChannel(); // el ajuste puede haber cambiado sin reiniciar
+  await apuntaALaMasNueva();
   // Una comprobación normal vuelve a mirar TODAS las releases: si antes se
   // eligió una línea, el feed quedó clavado en aquel tag y aquí no vale.
   autoUpdater.setFeedURL({ provider: 'github', owner: 'DosaAKA2A', repo: 'Naviris', releaseType: 'prerelease' });
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
 });
+/* NADIE SE QUEDA ATRÁS (2026-08-24).
+   El canal dev de electron-updater solo mira releases cuyo tag lleva sufijo de
+   canal, así que una instalación -dev NO ve NUNCA una estable, por nueva que
+   sea: se quedaba clavada en la última prerelease y hacía falta reinstalar a
+   mano. Medido: con la 2.7.7 ya publicada, una 2.7.7-dev.18 respondía "ya estás
+   en la última".
+   Por eso, antes de comprobar, se mira qué ofrece cada línea y se apunta a la
+   MÁS NUEVA de las dos. Si la persona eligió línea a mano (settings.devUpdates)
+   se respeta y aquí no se toca nada. Sin red, se queda como estaba. */
+async function apuntaALaMasNueva() {
+  if (typeof settings.devUpdates === 'boolean') return;   // eleccion explicita: manda ella
+  try {
+    const cab = { headers: { 'User-Agent': 'Naviris', Accept: 'application/vnd.github+json' } };
+    const [rEst, rLista] = await Promise.all([
+      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases/latest', cab),
+      fetch('https://api.github.com/repos/DosaAKA2A/Naviris/releases?per_page=30', cab)
+    ]);
+    const limpia = (t) => String(t || '').replace(/^v/, '');
+    const est = rEst.ok ? limpia((await rEst.json()).tag_name) : null;
+    let dev = null;
+    if (rLista.ok) {
+      for (const r of await rLista.json()) {
+        if (!r.prerelease || r.draft) continue;
+        const v = limpia(r.tag_name);
+        if (v && (!dev || esMasNueva(v, dev))) dev = v;
+      }
+    }
+    if (!est && !dev) return;
+    const usarDev = !!dev && (!est || esMasNueva(dev, est));
+    autoUpdater.channel = usarDev ? 'dev' : 'latest';
+    autoUpdater.allowPrerelease = usarDev;
+    // Saltar de línea puede parecerle un downgrade aunque la versión sea más nueva.
+    autoUpdater.allowDowngrade = true;
+  } catch { /* sin red: se queda con el canal de siempre */ }
+}
+
 /* Comparador de versiones propio (2.7.5-dev.3 → [2,7,5,0,3]). El cuarto número
    pone la estable por delante de sus propias dev: 2.7.5 gana a 2.7.5-dev.9. */
 function trozosVersion(v) {
@@ -2314,7 +2351,10 @@ app.whenReady().then(async () => {
   // un arreglo y los usuarios con la sesión abierta se quedaron con el fallo
   // (2026-08-18). Al encontrarla, la notificación de "lista" sale en vivo.
   if (app.isPackaged) {
-    const mira = () => { if (updYaLista) return; chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); };
+    // Tambien en el chequeo automatico: si no, la correccion de canal solo
+    // valdria para quien pulse el boton a mano, y la gracia es justo que no
+    // haga falta hacer nada.
+    const mira = async () => { if (updYaLista) return; chequeoSilencioso = true; await apuntaALaMasNueva(); autoUpdater.checkForUpdates().catch(() => {}); };
     mira();
     setInterval(mira, 2 * 3600 * 1000);
   }

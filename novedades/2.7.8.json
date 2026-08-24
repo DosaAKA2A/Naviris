@@ -1,0 +1,32 @@
+{
+  "version": "2.7.8",
+  "linea": "estable",
+  "titulo": "Buscar en la página, pantalla dividida, espacios y más",
+  "entradilla": "La versión más grande en mucho tiempo: seis funciones nuevas y tres fallos de los que se notan al usar el navegador todos los días.",
+  "bloques": [
+    {
+      "titulo": "Buscar dentro de la página, y en todas las pestañas",
+      "texto": "Ctrl+F abre el buscador que faltaba desde siempre, con contador y resaltado. Además te dice en qué OTRAS pestañas abiertas aparece lo que buscas y cuántas veces, y saltas a ellas con la búsqueda ya hecha."
+    },
+    {
+      "titulo": "Rendimiento: qué gasta cada pestaña",
+      "texto": "Nuevo panel con la memoria y la CPU de cada pestaña, ordenadas de la que más gasta a la que menos, y un botón para dormir la que se desmadre. Una pestaña dormida suelta su proceso entero y se despierta sola al volver a ella."
+    },
+    {
+      "titulo": "Pestañas en vertical, pantalla dividida y espacios",
+      "texto": "Las pestañas pueden ir en una columna a la izquierda, donde el título se lee. Dos páginas caben a la vez, una al lado de la otra. Y los espacios separan grupos de pestañas: cambias de espacio y la barra cambia entera sin cerrar ni recargar nada."
+    },
+    {
+      "titulo": "Contenedores y códigos de dos pasos",
+      "texto": "Una pestaña puede tener sus propias cookies, para estar en la misma web con dos cuentas a la vez. Y cuando una web te pide el código de verificación, el autenticador de Naviris te lo ofrece: un clic y queda puesto."
+    },
+    {
+      "titulo": "Tres fallos arreglados",
+      "texto": "La cámara, el micrófono y la ubicación se declaraban denegados cuando estaban sin decidir, así que muchas webs ni te preguntaban y no había forma de concederlos. Naviris mandaba once cabeceras al navegar donde Chrome manda catorce, y el idioma salía sin región. Y las pestañas de contenedor perdían su aislamiento al reiniciar."
+    },
+    {
+      "titulo": "Y que nadie se quede atrás",
+      "texto": "Naviris tenía dos líneas, estable y desarrollo, y quien estaba en desarrollo no veía nunca una versión estable por nueva que fuera: había que reinstalar a mano. Ahora, antes de comprobar, mira qué ofrece cada línea y se queda con la más nueva de las dos. Si tú has elegido línea a mano, se respeta tu elección."
+    }
+  ]
+}

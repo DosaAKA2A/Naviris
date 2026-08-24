@@ -1,8 +1,8 @@
 {
-  "version": "2.7.7",
-  "linea": "estable",
+  "version": "2.7.8-dev.0",
+  "linea": "dev",
   "titulo": "Buscar en la página, pantalla dividida, espacios y más",
-  "entradilla": "La versión más grande en mucho tiempo: seis funciones nuevas y tres fallos de los que se notan al usar el navegador todos los días.",
+  "entradilla": "Misma versión que la estable 2.7.8. Esta existe solo para que las instalaciones de desarrollo puedan dar el salto: en cuanto la tengas, Naviris pasará solo a la estable.",
   "bloques": [
     {
       "titulo": "Buscar dentro de la página, y en todas las pestañas",
@@ -23,6 +23,10 @@
     {
       "titulo": "Tres fallos arreglados",
       "texto": "La cámara, el micrófono y la ubicación se declaraban denegados cuando estaban sin decidir, así que muchas webs ni te preguntaban y no había forma de concederlos. Naviris mandaba once cabeceras al navegar donde Chrome manda catorce, y el idioma salía sin región. Y las pestañas de contenedor perdían su aislamiento al reiniciar."
+    },
+    {
+      "titulo": "Y que nadie se quede atrás",
+      "texto": "Naviris tenía dos líneas, estable y desarrollo, y quien estaba en desarrollo no veía nunca una versión estable por nueva que fuera: había que reinstalar a mano. Ahora, antes de comprobar, mira qué ofrece cada línea y se queda con la más nueva de las dos. Si tú has elegido línea a mano, se respeta tu elección."
     }
   ]
 }
