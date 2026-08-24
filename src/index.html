@@ -40,6 +40,9 @@
   </header>
 
   <div id="app-row">
+    <!-- Columna de pestañas verticales: el propio #tabstrip se muda aquí -->
+    <div id="vtabs-col" class="hidden"><div id="vtabs-slot"></div><button id="vtabs-new" title="Nueva pestaña (Ctrl+T)"></button></div>
+
     <!-- ===== Sidebar ===== -->
     <aside id="sidebar">
       <button class="sb-btn" id="sb-home" title="Hub de inicio" data-ico="home"></button>
@@ -248,6 +251,7 @@
     <label class="menu-toggle"><span>Continuar donde lo dejaste<br /><small>Reabre las pestañas al iniciar</small></span><input type="checkbox" id="opt-restore" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme las pestañas tras 30 min sin usarlas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Atajos de teclado<br /><small>Ctrl+T, Ctrl+W, Ctrl+R… · F11 y F12 siguen activos</small></span><input type="checkbox" id="opt-atajos" /></label>
+    <label class="menu-toggle"><span>Pestañas en vertical<br /><small>En una columna a la izquierda, con mucho más sitio para el título</small></span><input type="checkbox" id="opt-vtabs" /></label>
     <label class="menu-toggle"><span>Botones laterales del ratón<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>

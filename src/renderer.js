@@ -32,7 +32,8 @@ const els = {};
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
-  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras'
+  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
+  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
@@ -497,8 +498,26 @@ function renderTabs(forzar) {
 /* Cuánto le toca a cada pestaña con el ancho que hay: por debajo de cierto
    tamaño se les quita primero la X y luego el título, hasta quedarse en el
    favicon. Lo decide JS porque el CSS no puede medir a sus hermanas. */
+/* ===== Pestañas en vertical =====
+   El #tabstrip es UNO solo y se muda de sitio: al titlebar o a la columna de la
+   izquierda. Así renderTabs, el arrastre, los menús de pestaña y las mini de
+   AutoLoot siguen funcionando sin tocarlos, y no hay dos listas que puedan
+   contar cosas distintas. */
+function aplicaVerticales(on) {
+  const strip = els.tabstrip;
+  if (!strip || !els.vtabsCol) return;
+  document.documentElement.classList.toggle('vtabs', !!on);
+  els.vtabsCol.classList.toggle('hidden', !on);
+  if (on) els.vtabsSlot.appendChild(strip);
+  else els.newtabBtn.parentNode.insertBefore(strip, els.newtabBtn);
+  ajustaPestanas();
+}
+
 function ajustaPestanas() {
   const strip = els.tabstrip;
+  // En vertical cada pestaña ocupa el ancho entero: no hay nada que repartir, y
+  // los modos compacto/mínimo esconderían el título teniendo sitio de sobra.
+  if (document.documentElement.classList.contains('vtabs')) { strip.classList.remove('compacto', 'minimo'); return; }
   const sueltas = strip.querySelectorAll('.tab:not(.pinned)').length;
   if (!sueltas) { strip.classList.remove('compacto', 'minimo'); return; }
   let fijas = 0;
@@ -3282,6 +3301,7 @@ async function applySyncData(d) {
     els.optPasskeys.checked = settings.blockPasskeys !== false; els.optRestore.checked = settings.restoreSession !== false;
     els.optPowersaver.checked = settings.powerSaver;
     els.optAtajos.checked = settings.atajos !== false;
+    els.optVtabs.checked = !!settings.tabsVerticales;
     els.optMousenav.checked = settings.mouseNav !== false;
     const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   }
@@ -4767,6 +4787,12 @@ els.optPasskeys.addEventListener('change', async () => { settings = await window
 els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
 els.optAtajos.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ atajos: els.optAtajos.checked }); toast(els.optAtajos.checked ? 'Atajos de teclado activados' : 'Atajos de teclado desactivados'); });
+els.optVtabs.addEventListener('change', async () => {
+  settings = await window.cobalt.setSettings({ tabsVerticales: els.optVtabs.checked });
+  aplicaVerticales(els.optVtabs.checked);
+  toast(els.optVtabs.checked ? 'Pestañas en vertical' : 'Pestañas arriba');
+});
+els.vtabsNew.addEventListener('click', () => createTab());
 els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del ratón activados' : 'Botones del ratón desactivados'); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
@@ -5905,6 +5931,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
+  els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
   // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
   // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
   // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).

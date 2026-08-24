@@ -2314,3 +2314,25 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .fo-fila .fo-t { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fo-fila .fo-h { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fo-fila .fo-n { font-size: 11.5px; font-weight: 600; color: var(--realce); font-variant-numeric: tabular-nums; flex: none; }
+
+/* ===== Pestañas en vertical =====
+   No se duplica la lista: el propio #tabstrip se muda a esta columna y aquí
+   pasa a apilarse. Así renderTabs, el arrastre y los menús siguen valiendo
+   igual y no hay dos verdades sobre qué pestañas hay. */
+#vtabs-col { display: flex; flex-direction: column; width: 232px; flex: none; background: var(--bg-2); border-right: 1px solid var(--sb-border); padding: 6px; gap: 4px; }
+#vtabs-col.hidden { display: none; }
+#vtabs-slot { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+#vtabs-new { display: flex; align-items: center; gap: 8px; border: none; border-radius: var(--r-s); background: transparent; color: var(--text-dim); cursor: pointer; padding: 8px 10px; font: inherit; font-size: 12.5px; }
+#vtabs-new::before { content: "+"; font-size: 15px; line-height: 1; }
+#vtabs-new:hover { background: var(--hover); color: var(--text); }
+#vtabs-new::after { content: "Nueva pestaña"; }
+
+html.vtabs #titlebar #tabstrip,
+html.vtabs #titlebar #newtab-btn { display: none; }
+html.vtabs #vtabs-slot #tabstrip { display: flex; flex-direction: column; align-items: stretch; gap: 2px; height: auto; overflow-x: hidden; overflow-y: auto; width: 100%; -webkit-app-region: no-drag; }
+html.vtabs #vtabs-slot .tab { width: 100% !important; max-width: none !important; min-width: 0 !important; height: 34px; border-radius: var(--r-s); flex: none; }
+html.vtabs #vtabs-slot .tab.mini { height: 28px; padding-left: 22px; }
+/* En vertical hay ancho de sobra: el título va entero y la X siempre visible. */
+html.vtabs #vtabs-slot .tab .t-title { display: block !important; }
+html.vtabs #vtabs-slot .tab .t-close { display: flex !important; }
+html.vtabs #vtabs-slot .tab.pinned { width: 100% !important; }

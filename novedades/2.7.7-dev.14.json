@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.14",
+  "linea": "dev",
+  "titulo": "Pestañas en vertical",
+  "entradilla": "Nuevo ajuste en el menú: las pestañas pasan a una columna a la izquierda, donde caben muchas más y el título se lee.",
+  "bloques": [
+    {
+      "titulo": "Una columna en vez de una fila",
+      "texto": "Con veinte pestañas arriba no se lee ninguna. En vertical cada una ocupa una línea entera, con su icono, su título y su aspa. Se activa en el menú, en Pestañas en vertical, y se recuerda para la próxima vez."
+    },
+    {
+      "titulo": "Es la misma lista, no una copia",
+      "texto": "La barra de pestañas no se duplica: se muda. Por eso arrastrar para reordenar, el menú de cada pestaña, las fijadas y las mini de AutoClaim siguen funcionando igual en los dos modos, y nunca puede haber dos listas que no coincidan."
+    }
+  ]
+}
