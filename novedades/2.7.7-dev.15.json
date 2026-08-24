@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.15",
+  "linea": "dev",
+  "titulo": "Pantalla dividida",
+  "entradilla": "Dos pestañas a la vez, una al lado de la otra. Clic derecho en la pestaña que quieras al lado y listo.",
+  "bloques": [
+    {
+      "titulo": "Cómo se abre",
+      "texto": "Clic derecho en una pestaña que no sea la que estás viendo y Abrir en pantalla dividida. Esa se coloca a la derecha y la que tenías queda a la izquierda. Para deshacerlo, el botón redondo del centro, o clic derecho en la de la derecha y Salir de la pantalla dividida."
+    },
+    {
+      "titulo": "Siguen siendo dos pestañas normales",
+      "texto": "No se abre nada nuevo ni se duplica nada: las dos pestañas que ya tenías se reparten el ancho. Cada una conserva su historial, su sonido y su sitio en la barra, y si cierras la de la derecha se sale de la división sola."
+    }
+  ]
+}

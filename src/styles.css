@@ -2336,3 +2336,17 @@ html.vtabs #vtabs-slot .tab.mini { height: 28px; padding-left: 22px; }
 html.vtabs #vtabs-slot .tab .t-title { display: block !important; }
 html.vtabs #vtabs-slot .tab .t-close { display: flex !important; }
 html.vtabs #vtabs-slot .tab.pinned { width: 100% !important; }
+
+/* ===== Pantalla dividida =====
+   Dos pestañas a la vez. No se crean webviews nuevos: los dos que participan
+   dejan de ocupar el ancho entero y se reparten el hueco, así que la pestaña
+   de la derecha sigue siendo una pestaña normal con su historial y su sonido. */
+#content.dividido webview.active { width: calc(50% - 3px); }
+#content.dividido webview.izq { left: 0; right: auto; }
+#content.dividido webview.der { left: auto; right: 0; }
+#content.dividido webview.der.active { box-shadow: inset 0 0 0 2px var(--realce); }
+#div-barra { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; transform: translateX(-50%); z-index: 12; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+#div-barra.hidden { display: none; }
+#div-barra button { border: none; background: var(--bg-3); color: var(--text-dim); width: 22px; height: 40px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--elev-pop); }
+#div-barra button:hover { color: var(--text); background: var(--btn-hover); }
+#div-barra button svg { width: 12px; height: 12px; }

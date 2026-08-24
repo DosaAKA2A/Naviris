@@ -33,12 +33,13 @@ const els = {};
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
   'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
-  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs'
+  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
 // volver ya se había recargado). Edge duerme a las 2 h y Chrome ronda ahí;
 // 30 min es el punto en que ya no molesta y aún libera memoria de verdad.
+let divId = null;   // pestaña acompañante de la pantalla dividida (ver más abajo)
 const SLEEP_AFTER_MS = 30 * 60 * 1000;
 let settings = { hardwareAcceleration: true, powerSaver: true };
 
@@ -319,7 +320,9 @@ function activateTab(id) {
   // parecia una pestaña que no se podia cerrar (2026-08-18).
   hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
   cerrarBuscar();   // la búsqueda es de la página que se deja atrás
+  if (divId !== null && divId === id) divId = null;   // no se divide consigo misma
   els.hub.classList.toggle('active', tab.kind === 'hub');
+  setTimeout(aplicaDivision, 0);
   tabs.forEach((t) => {
     if (!t.webview || t.kind !== 'web') return;
     const active = t.id === id;
@@ -354,6 +357,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) els.urlbar.focus();
 });
 function closeTab(id) {
+  if (divId !== null && id === divId) { divId = null; els.content.classList.remove('dividido'); els.divBarra.classList.add('hidden'); }
   const idx = tabs.findIndex((t) => t.id === id); if (idx === -1) return;
   recordarCerrada(tabs[idx]);   // para reabrirla con Ctrl+Shift+T
   tabs[idx].webview?.remove(); tabs.splice(idx, 1);
@@ -394,6 +398,8 @@ function menuDePestana(e, tab) {
   const items = [
     { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
     { sep: true },
+    ...(web && tab.id !== activeId ? [{ label: 'Abrir en pantalla dividida', icon: 'square-2-stack', action: () => dividirCon(tab) }] : []),
+    ...(divId !== null && tab.id === divId ? [{ label: 'Salir de la pantalla dividida', icon: 'x-mark', action: () => salirDivision() }] : []),
     ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => { try { tab.webview?.reload(); } catch {} } }] : []),
     { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabs.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) },
     ...(web ? [{ label: 'Copiar dirección de página', icon: 'clipboard', action: () => copiarDireccion(tab) }] : []),
@@ -498,6 +504,44 @@ function renderTabs(forzar) {
 /* Cuánto le toca a cada pestaña con el ancho que hay: por debajo de cierto
    tamaño se les quita primero la X y luego el título, hasta quedarse en el
    favicon. Lo decide JS porque el CSS no puede medir a sus hermanas. */
+/* ===== Pantalla dividida =====
+   Dos pestañas visibles a la vez. No se crea nada nuevo: los webviews que ya
+   existen dejan de ocupar el ancho entero y se reparten el hueco, así que la de
+   la derecha sigue siendo una pestaña de verdad (su historial, su sonido, su
+   sitio en la barra). El acompañante se marca con `divId`; la izquierda es
+   siempre la pestaña activa. */
+function aplicaDivision() {
+  const compa = tabs.find((t) => t.id === divId);
+  if (!compa || compa.kind !== 'web' || compa.id === activeId) divId = null;
+  els.content.classList.toggle('dividido', !!divId);
+  els.divBarra.classList.toggle('hidden', !divId);
+  for (const t of tabs) {
+    if (!t.webview) continue;
+    t.webview.classList.remove('izq', 'der');
+    if (!divId) continue;
+    if (t.id === activeId) t.webview.classList.add('izq');
+    else if (t.id === divId) { t.webview.classList.add('der'); t.webview.classList.add('active'); }
+  }
+}
+
+function dividirCon(tab) {
+  if (!tab || tab.kind !== 'web') { toast('Solo se puede dividir con una pestaña web'); return; }
+  if (tab.id === activeId) { toast('Elige una pestaña distinta de la que estás viendo'); return; }
+  if (tab.asleep) { try { tab.webview.src = tab.sleptUrl || tab.url; tab.asleep = false; tab.sleptUrl = null; } catch { /* nada */ } }
+  divId = tab.id;
+  aplicaDivision();
+  renderTabs();
+  toast('Pantalla dividida — el botón del centro la deshace');
+}
+
+function salirDivision() {
+  if (divId === null) return;
+  divId = null;
+  aplicaDivision();
+  activateTab(activeId);   // devuelve el ancho entero a la que queda
+  renderTabs();
+}
+
 /* ===== Pestañas en vertical =====
    El #tabstrip es UNO solo y se muda de sitio: al titlebar o a la columna de la
    izquierda. Así renderTabs, el arrastre, los menús de pestaña y las mini de
@@ -4793,6 +4837,8 @@ els.optVtabs.addEventListener('change', async () => {
   toast(els.optVtabs.checked ? 'Pestañas en vertical' : 'Pestañas arriba');
 });
 els.vtabsNew.addEventListener('click', () => createTab());
+els.divSalir.innerHTML = window.icon('x-mark');
+els.divSalir.addEventListener('click', salirDivision);
 els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del ratón activados' : 'Botones del ratón desactivados'); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
