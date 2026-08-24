@@ -32,7 +32,7 @@ const els = {};
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
-  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota'
+  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
@@ -5587,6 +5587,8 @@ function abrirBuscar() {
 function cerrarBuscar() {
   if (!els.findBar || els.findBar.classList.contains('hidden')) return false;
   els.findBar.classList.add('hidden');
+  cierraOtras();
+  clearTimeout(otrasTimer);
   paraBusqueda();
   buscaWv = null;
   pintaRecuento(0, 0);
@@ -5603,8 +5605,65 @@ function reiniciaBusqueda() {
   if (buscaTexto) buscar(true, false);
 }
 
+/* Buscar en TODAS las pestañas abiertas.
+   Se cuenta sobre el texto visible de cada una, no con findInPage: findInPage
+   resalta y mueve el scroll, y no queremos remover pestañas que la persona no
+   está mirando. Las dormidas se saltan a propósito: no tienen contenido
+   cargado, y despertarlas para buscar sería justo lo contrario de lo que hace
+   el panel de rendimiento. */
+let otrasTimer = null;
+
+function cierraOtras() { els.findOtras?.classList.add('hidden'); }
+
+async function cuentaEnOtras(texto) {
+  const q = texto.toLowerCase();
+  const otras = tabs.filter((t) => t.kind === 'web' && t.id !== activeId && !t.asleep && t.webview);
+  const expr = `(() => { const t = (document.body ? document.body.innerText : '').toLowerCase();
+    const q = ${JSON.stringify(q)}; if (!q) return 0;
+    let n = 0, i = 0; while ((i = t.indexOf(q, i)) !== -1) { n++; i += q.length; } return n; })()`;
+  const res = await Promise.all(otras.map((t) => t.webview.executeJavaScript(expr, true)
+    .then((n) => ({ t, n: Number(n) || 0 })).catch(() => ({ t, n: 0 }))));
+  return res.filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
+}
+
+async function pintaOtras() {
+  if (!els.findOtras) return;
+  const texto = buscaTexto;
+  if (!texto || texto.length < 2 || els.findBar.classList.contains('hidden')) { cierraOtras(); return; }
+  const hits = await cuentaEnOtras(texto);
+  if (buscaTexto !== texto) return;                    // se siguió escribiendo
+  if (!hits.length) { cierraOtras(); return; }
+  els.findOtras.innerHTML = `<div class="fo-tit">También en ${hits.length} ${hits.length === 1 ? 'pestaña' : 'pestañas'}</div>`;
+  for (const { t, n } of hits) {
+    const host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch { return t.url || ''; } })();
+    const fila = document.createElement('div');
+    fila.className = 'fo-fila';
+    fila.innerHTML = `<img src="${t.favicon || ''}" alt="" onerror="this.style.visibility='hidden'" />
+      <div class="fo-info"><div class="fo-t">${escapeHtml(t.title || host || 'Pestaña')}</div><div class="fo-h">${escapeHtml(host)}</div></div>
+      <span class="fo-n">${n}</span>`;
+    fila.addEventListener('click', () => {
+      cierraOtras();
+      activateTab(t.id);
+      // activateTab cierra la barra (la búsqueda era de la otra página): se
+      // reabre con el mismo texto ya buscando en la que acaba de abrirse.
+      els.findInput.value = texto;
+      buscaTexto = texto;
+      abrirBuscar();
+    });
+    els.findOtras.appendChild(fila);
+  }
+  els.findOtras.classList.remove('hidden');
+}
+
 if (els.findInput) {
-  els.findInput.addEventListener('input', () => { buscaTexto = els.findInput.value; buscar(true, false); });
+  els.findInput.addEventListener('input', () => {
+    buscaTexto = els.findInput.value;
+    buscar(true, false);
+    clearTimeout(otrasTimer);
+    // Medio segundo de calma: contar en todas las pestañas a cada tecla sería
+    // pedirle trabajo a webs que nadie está mirando.
+    otrasTimer = setTimeout(pintaOtras, 500);
+  });
   els.findInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); buscar(!e.shiftKey, true); }
     else if (e.key === 'Escape') { e.preventDefault(); cerrarBuscar(); }

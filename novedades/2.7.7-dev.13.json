@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.13",
+  "linea": "dev",
+  "titulo": "Buscar ya no se queda en la pestaña que estás viendo",
+  "entradilla": "Al escribir en Ctrl+F, Naviris te dice en qué otras pestañas abiertas aparece eso y cuántas veces.",
+  "bloques": [
+    {
+      "titulo": "También en otras pestañas",
+      "texto": "Debajo de la barra de buscar sale una lista con las demás pestañas donde aparece el texto, ordenada por número de coincidencias. Pulsa una y saltas a ella con la búsqueda ya hecha. Casi ningún navegador hace esto y con veinte pestañas abiertas cambia el día."
+    },
+    {
+      "titulo": "Sin molestar a las webs que no estás mirando",
+      "texto": "El recuento se hace sobre el texto de cada pestaña, no resaltando ni moviendo su scroll, y espera medio segundo a que dejes de teclear. Las pestañas dormidas se saltan a propósito: despertarlas para buscar sería lo contrario de lo que hace el panel de rendimiento."
+    }
+  ]
+}
