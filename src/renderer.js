@@ -30,7 +30,8 @@ const els = {};
   'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder', 'dlp-active',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
-  'pw-bar', 'pw-text', 'pw-no', 'pw-yes'
+  'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
+  'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
@@ -297,6 +298,9 @@ function attachWebview(tab, url) {
   wv.addEventListener('page-title-updated', (e) => { if (tab.asleep) return; tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
   wv.addEventListener('did-navigate', onNav);
   wv.addEventListener('did-navigate-in-page', onNav);
+  // Buscar en la página: el recuento llega por evento, no en la llamada.
+  wv.addEventListener('found-in-page', onEncontrado);
+  wv.addEventListener('did-navigate', () => { if (tab.id === activeId) reiniciaBusqueda(); });
   wv.addEventListener('did-start-loading', () => { if (tab.id === activeId) els.navReload.innerHTML = window.icon('x-mark'); });
   wv.addEventListener('did-stop-loading', () => { if (tab.id === activeId) { els.navReload.innerHTML = window.icon('arrow-path'); syncNavUI(); } });
   wv.addEventListener('media-started-playing', () => { tab.audible = true; if (tab.muted) { try { wv.setAudioMuted(true); } catch {} } renderTabs(); });
@@ -312,6 +316,7 @@ function activateTab(id) {
   // La de novedades tambien: si no, se quedaba encima al cambiar de pestaña y
   // parecia una pestaña que no se podia cerrar (2026-08-18).
   hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
+  cerrarBuscar();   // la búsqueda es de la página que se deja atrás
   els.hub.classList.toggle('active', tab.kind === 'hub');
   tabs.forEach((t) => {
     if (!t.webview || t.kind !== 'web') return;
@@ -5423,6 +5428,101 @@ function reabrirCerrada() {
   const t = cerradas.pop(); if (!t) { toast('No hay pestañas cerradas recientes'); return; }
   createTab(t.url);
 }
+/* ============ Buscar en la página (Ctrl+F) ============
+   Naviris no lo tenía: `findInPage` no aparecía en el proyecto y Ctrl+F no
+   estaba entre los atajos, así que la función más básica de cualquier navegador
+   faltaba. Electron trae el motor hecho en webContents.findInPage; lo que se
+   monta aquí es la barra, el recuento y el recorrido de resultados.
+
+   Dos cosas que hay que respetar del API:
+   - findInPage RE-busca desde cero si no se le pasa `findNext: true`. Al teclear
+     se busca de nuevo (el texto cambió); al pulsar Intro se avanza con findNext,
+     que es lo que mueve al siguiente resultado en vez de repetir el primero.
+   - El recuento no vuelve en la llamada, llega después en el evento
+     `found-in-page`, y solo trae `matches` cuando `finalUpdate` es true. */
+let buscaTexto = '';
+let buscaWv = null;
+
+function pintaRecuento(actual, total) {
+  if (!els.findCount) return;
+  const vacio = total === 0 && buscaTexto !== '';
+  els.findCount.textContent = buscaTexto === '' ? '' : vacio ? 'Sin resultados' : actual + '/' + total;
+  els.findCount.classList.toggle('vacio', vacio);
+  const nada = vacio || buscaTexto === '';
+  if (els.findPrev) els.findPrev.disabled = nada;
+  if (els.findNext) els.findNext.disabled = nada;
+}
+
+function onEncontrado(e) {
+  const r = e.result || e;
+  if (r.finalUpdate) pintaRecuento(r.activeMatchOrdinal || 0, r.matches || 0);
+}
+
+// El webview mantiene su propia sesión de búsqueda: hay que soltarla al cambiar
+// de pestaña, al navegar y al cerrar la barra, o los resaltados se quedan pegados.
+function paraBusqueda(wv) {
+  try { (wv || buscaWv)?.stopFindInPage('clearSelection'); } catch { /* nada */ }
+}
+
+function buscar(adelante = true, siguiente = false) {
+  const wv = activeWv();
+  if (!wv) return;
+  if (buscaWv && buscaWv !== wv) paraBusqueda(buscaWv);
+  buscaWv = wv;
+  if (!buscaTexto) { paraBusqueda(wv); pintaRecuento(0, 0); return; }
+  try {
+    /* MEDIDO: pasar `findNext: false` de forma explícita hace que la búsqueda
+       se ejecute pero NO emita 'found-in-page', así que el recuento no llegaba
+       nunca. Sin opciones sí emite. O sea: consulta nueva, llamada pelada; para
+       avanzar dentro de la misma consulta, con findNext.
+       Tampoco vale llamar a stopFindInPage justo antes: el corte se lleva por
+       delante el evento de la búsqueda recién lanzada. La sesión se cierra solo
+       al cerrar la barra, al cambiar de pestaña y al navegar. */
+    if (siguiente) wv.findInPage(buscaTexto, { forward: adelante, findNext: true });
+    else wv.findInPage(buscaTexto);
+  } catch { /* la pestaña aún no tiene contenido */ }
+}
+
+function abrirBuscar() {
+  const wv = activeWv();
+  if (!wv) { toast('Abre una página para buscar dentro'); return; }
+  els.findBar?.classList.remove('hidden');
+  els.findInput?.focus();
+  els.findInput?.select();
+  if (buscaTexto) buscar(true, false);
+}
+
+function cerrarBuscar() {
+  if (!els.findBar || els.findBar.classList.contains('hidden')) return false;
+  els.findBar.classList.add('hidden');
+  paraBusqueda();
+  buscaWv = null;
+  pintaRecuento(0, 0);
+  try { activeWv()?.focus(); } catch { /* nada */ }
+  return true;
+}
+
+// Al navegar o cambiar de pestaña la búsqueda anterior ya no vale.
+function reiniciaBusqueda() {
+  if (!els.findBar || els.findBar.classList.contains('hidden')) { paraBusqueda(); buscaWv = null; return; }
+  paraBusqueda();
+  buscaWv = null;
+  pintaRecuento(0, 0);
+  if (buscaTexto) buscar(true, false);
+}
+
+if (els.findInput) {
+  els.findInput.addEventListener('input', () => { buscaTexto = els.findInput.value; buscar(true, false); });
+  els.findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); buscar(!e.shiftKey, true); }
+    else if (e.key === 'Escape') { e.preventDefault(); cerrarBuscar(); }
+  });
+  els.findNext?.addEventListener('click', () => { buscar(true, true); els.findInput.focus(); });
+  els.findPrev?.addEventListener('click', () => { buscar(false, true); els.findInput.focus(); });
+  els.findClose?.addEventListener('click', cerrarBuscar);
+  pintaRecuento(0, 0);
+}
+
 // F12: consola de desarrollador de la página activa (abre/cierra, como Chrome)
 function alternarDevtools() {
   const wv = activeWv(); if (!wv) { toast('Abre una página para inspeccionarla'); return; }
@@ -5467,6 +5567,7 @@ window.addEventListener('keydown', (e) => {
     // hub). Cerrar lo que estorba no depende de donde este el foco — al abrir
     // una pestaña el foco va a la barra de direcciones y, con el filtro de
     // "escribiendo", Escape no cerraba nada.
+    if (cerrarBuscar()) return;
     if (cierraMenusHub()) return;
     if (cierraNovedadesPagina()) return;
     if (adEls.page.classList.contains('active')) { hideAddonsPage(); els.hub.classList.add('active'); return; }
@@ -5484,6 +5585,8 @@ window.addEventListener('keydown', (e) => {
   if (soloCtrl && (k === '-' || e.key === 'Subtract')) { e.preventDefault(); zoom(-1); return; }
   if (soloCtrl && k === '0') { e.preventDefault(); zoom(0); return; }
   if (soloCtrl && k === 'p') { e.preventDefault(); try { activeWv()?.print(); } catch { /* nada */ } return; }
+  // --- Buscar en la página ---
+  if ((soloCtrl && k === 'f') || e.key === 'F3') { e.preventDefault(); abrirBuscar(); return; }
   if (soloCtrl && k === 'd') { e.preventDefault(); els.navStar.click(); return; }
 
   // --- Paneles ---

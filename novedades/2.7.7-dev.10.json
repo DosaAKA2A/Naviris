@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.10",
+  "linea": "dev",
+  "titulo": "Buscar en la página, y permisos que ya se pueden conceder",
+  "entradilla": "Llega el Ctrl+F que faltaba desde siempre, y se arregla un fallo que dejaba la cámara, el micrófono y la ubicación sin forma de activarse en muchas webs.",
+  "bloques": [
+    {
+      "titulo": "Ctrl+F, buscar dentro de la página",
+      "texto": "Naviris no tenía buscador de página. Ahora Ctrl+F (o F3) abre una barra arriba a la derecha: escribe y te marca todos los resultados, con el contador al lado. Intro pasa al siguiente, Mayús+Intro al anterior y Escape la cierra. Al cambiar de pestaña o navegar se limpia sola."
+    },
+    {
+      "titulo": "La cámara, el micrófono y la ubicación ya se pueden dar",
+      "texto": "Naviris le decía a las webs que esos permisos estaban DENEGADOS cuando en realidad estaban sin decidir. Muchas webs, al ver un no, ni se molestan en pedirlo: el aviso de Naviris no llegaba a salir y no había manera de concederlos aunque quisieras. Ahora dice la verdad y el aviso sale. Afecta también al portapapeles y al MIDI; lo de las notificaciones ya se había arreglado antes."
+    },
+    {
+      "titulo": "Naviris se presenta bien ante las webs",
+      "texto": "Al navegar faltaban tres cabeceras que manda cualquier Chrome, y el idioma salía como \"es\" pelado en vez de \"es-ES\". Un navegador que dice ser Chrome y no manda lo que Chrome manda levanta sospechas en los filtros antibot y sale con más verificaciones de las que le tocan. Medido contra Chrome y Opera GX en la misma máquina: de 19 diferencias quedan 10, y de esas la mitad son el tamaño de la ventana y el número de versión."
+    }
+  ]
+}

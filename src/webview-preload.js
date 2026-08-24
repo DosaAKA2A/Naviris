@@ -57,49 +57,117 @@ try {
 //      decidir: Naviris pregunta al usuario, pero la web leía "denegado" y ni
 //      lo intentaba, así que el diálogo no salía nunca. Ahora dice la verdad
 //      ('prompt' mientras no haya decisión guardada para ese sitio).
+// Repaso del 2026-08-24, midiendo otra vez contra Chrome 151 y Opera GX 134 en
+// la misma máquina (169 señales; quedaban 12 diferencias reales). Lo que se
+// corrige aquí, además de lo de arriba:
+//   5. permissions.query() decía "denied" para cámara, micrófono, ubicación,
+//      portapapeles y MIDI cuando en realidad estaban SIN decidir. Es el mismo
+//      fallo del punto 4, que solo se había arreglado para las notificaciones,
+//      y tiene el mismo precio: la web ve "denegado" y ni pide el permiso, así
+//      que el diálogo de Naviris no sale y no hay forma de concederlo.
+//   6. window.chrome tenía las claves en otro orden que Chrome (app, csi,
+//      loadTimes en vez de loadTimes, csi, app) y a chrome.app le faltaban
+//      installState y runningState en minúscula, que son funciones.
+//   7. storage.estimate() devolvía el hueco libre del disco entero (197 GB
+//      aquí); Chrome y Opera GX topan en 10 GB. Además de ser una diferencia,
+//      es una fuga de información del equipo.
+const PERMISOS_WEB = {
+  'notifications': 'notifications',
+  'geolocation': 'geolocation',
+  'camera': 'media',
+  'microphone': 'media',
+  'midi': 'midi',
+  'clipboard-read': 'clipboard-read',
+  'clipboard-write': 'clipboard-sanitized-write',
+  'background-sync': 'background-sync',
+  'idle-detection': 'idle-detection',
+  'screen-wake-lock': 'wake-lock'
+};
 try {
-  const permNotif = ipcRenderer.sendSync('perm:estado', 'notifications');
+  const idiomas = ipcRenderer.sendSync('ua:idiomas') || [];
+  const permisos = {};
+  for (const nombreWeb of Object.keys(PERMISOS_WEB)) {
+    const estado = ipcRenderer.sendSync('perm:estado', PERMISOS_WEB[nombreWeb]);
+    permisos[nombreWeb] = estado === 'allow' ? 'granted' : estado === 'block' ? 'denied' : 'prompt';
+  }
   contextBridge.executeInMainWorld({
-    func: function (estadoNotif) {
+    func: function (permisos, idiomas) {
       try {
         var t0 = Date.now();
+        var estadoNotif = permisos.notifications;
         if (!window.chrome || !window.chrome.loadTimes) {
+          // El ORDEN de las claves de window.chrome se ve desde JavaScript, y
+          // en Chrome es loadTimes, csi, app. Se asignan en ese mismo orden.
           var chrome = window.chrome || {};
-          if (!chrome.app) chrome.app = { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }, getDetails: function () { return null; }, getIsInstalled: function () { return false; } };
-          if (!chrome.csi) chrome.csi = function () { return { startE: t0, onloadT: t0, pageT: Date.now() - t0, tran: 15 }; };
           if (!chrome.loadTimes) chrome.loadTimes = function () {
             var t = performance.timing || {}, s = (t.navigationStart || t0) / 1000;
             return { requestTime: s, startLoadTime: s, commitLoadTime: s, finishDocumentLoadTime: s, finishLoadTime: s, firstPaintTime: s, firstPaintAfterLoadTime: 0, navigationType: 'Other', wasFetchedViaSpdy: false, wasNpnNegotiated: true, npnNegotiatedProtocol: 'h2', wasAlternateProtocolAvailable: false, connectionInfo: 'h2' };
           };
+          if (!chrome.csi) chrome.csi = function () { return { startE: t0, onloadT: t0, pageT: Date.now() - t0, tran: 15 }; };
+          if (!chrome.app) chrome.app = {
+            isInstalled: false,
+            getDetails: function () { return null; },
+            getIsInstalled: function () { return false; },
+            installState: function (cb) { if (typeof cb === 'function') cb('not_installed'); },
+            runningState: function () { return 'cannot_run'; },
+            InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+            RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+          };
           try { Object.defineProperty(window, 'chrome', { configurable: true, enumerable: true, writable: true, value: chrome }); } catch (e) { window.chrome = chrome; }
         }
+        try {
+          // Chrome topa la cuota que informa; Electron soltaba el disco real.
+          var TOPE = 10 * 1024 * 1024 * 1024;
+          if (navigator.storage && navigator.storage.estimate) {
+            var estimar = navigator.storage.estimate.bind(navigator.storage);
+            navigator.storage.estimate = function () {
+              return estimar().then(function (r) {
+                var o = {};
+                for (var k in r) o[k] = r[k];
+                if (typeof o.quota === 'number') o.quota = Math.min(o.quota, TOPE);
+                return o;
+              });
+            };
+          }
+        } catch (e) { /* nada */ }
         try {
           Object.defineProperty(screen, 'colorDepth', { configurable: true, get: function () { return 24; } });
           Object.defineProperty(screen, 'pixelDepth', { configurable: true, get: function () { return 24; } });
         } catch (e) { /* nada */ }
         try {
-          var idiomas = navigator.languages || [];
-          var largos = idiomas.filter(function (l) { return l.indexOf('-') !== -1; });
-          var cortos = idiomas.filter(function (l) { return l.indexOf('-') === -1; });
-          var orden = largos.concat(cortos);
-          if (orden.length) Object.defineProperty(navigator, 'languages', { configurable: true, get: function () { return Object.freeze(orden.slice()); } });
+          // Los idiomas los manda main, que es quien construye la cabecera
+          // Accept-Language: así navigator.language, navigator.languages y la
+          // cabecera cuentan los tres la misma historia. Antes language decía
+          // "es" mientras languages decía "es-ES,es".
+          var orden = (idiomas && idiomas.length) ? idiomas.slice() : (navigator.languages || []).slice();
+          if (orden.length) {
+            Object.defineProperty(navigator, 'languages', { configurable: true, get: function () { return Object.freeze(orden.slice()); } });
+            Object.defineProperty(navigator, 'language', { configurable: true, get: function () { return orden[0]; } });
+          }
         } catch (e) { /* nada */ }
         if (estadoNotif && typeof Notification !== 'undefined') {
-          var real = estadoNotif === 'allow' ? 'granted' : estadoNotif === 'block' ? 'denied' : 'default';
+          var real = estadoNotif === 'granted' ? 'granted' : estadoNotif === 'denied' ? 'denied' : 'default';
           try { Object.defineProperty(Notification, 'permission', { configurable: true, get: function () { return real; } }); } catch (e) { /* nada */ }
-          try {
-            var q = navigator.permissions.query.bind(navigator.permissions);
-            navigator.permissions.query = function (d) {
-              if (d && d.name === 'notifications') {
-                return Promise.resolve({ name: 'notifications', state: real === 'granted' ? 'granted' : real === 'denied' ? 'denied' : 'prompt', onchange: null, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } });
-              }
-              return q(d);
-            };
-          } catch (e) { /* nada */ }
         }
+        try {
+          // Un PermissionStatus de verdad hereda de EventTarget: hay webs que
+          // le enganchan onchange y explotarían con un objeto plano.
+          var q = navigator.permissions.query.bind(navigator.permissions);
+          navigator.permissions.query = function (d) {
+            var nombre = d && d.name;
+            if (nombre && Object.prototype.hasOwnProperty.call(permisos, nombre)) {
+              var et = new EventTarget();
+              et.name = nombre;
+              et.state = permisos[nombre];
+              et.onchange = null;
+              return Promise.resolve(et);
+            }
+            return q(d);
+          };
+        } catch (e) { /* nada */ }
       } catch (e) { /* si algo falla, se queda como estaba */ }
     },
-    args: [permNotif]
+    args: [permisos, idiomas]
   });
 } catch (e) { /* nada */ }
 

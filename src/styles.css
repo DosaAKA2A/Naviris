@@ -2254,3 +2254,24 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-deco:hover .dc-b { transform: rotate(-30deg) scale(1.06); opacity: .8; }
 .w-deco:hover .dc-c { transform: rotate(18deg) scale(1.1); opacity: .55; }
 .w-deco:active .dc-a { transform: rotate(45deg) scale(.7); }
+
+/* ===== Buscar en la página (Ctrl+F) =====
+   Flota sobre el contenido, arriba a la derecha, como en Chrome. No empuja la
+   página: si empujara, el webview se redimensiona y los resaltados de
+   findInPage se recalculan a cada tecla. */
+#find-bar { position: absolute; top: 10px; right: 16px; z-index: 40; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--r-full); box-shadow: var(--elev-pop); animation: find-in var(--dur-2) var(--spring) both; }
+#find-bar.hidden { display: none; }
+@keyframes find-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+#find-bar .find-ic { display: flex; color: var(--text-dim); }
+#find-bar .find-ic svg { width: 14px; height: 14px; }
+#find-input { width: 230px; border: none; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 13px; padding: 3px 0; }
+#find-input::placeholder { color: var(--dim); }
+#find-count { min-width: 56px; text-align: right; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#find-count.vacio { color: var(--danger); }
+#find-bar button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: var(--r-full); background: transparent; color: var(--nav-fg); cursor: pointer; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+#find-bar button:hover:not(:disabled) { background: var(--btn-hover); color: var(--text); }
+#find-bar button:disabled { opacity: .35; cursor: default; }
+#find-bar button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+#find-bar button svg { width: 14px; height: 14px; }
+#find-close { margin-left: 2px; }
+@media (prefers-reduced-motion: reduce) { #find-bar { animation: none; } }

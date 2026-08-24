@@ -105,6 +105,16 @@
       <main id="content">
         <div id="res-label" class="hidden"></div>
 
+        <!-- Buscar en la página (Ctrl+F) -->
+        <div id="find-bar" class="hidden">
+          <span class="find-ic" data-ico="magnifying-glass"></span>
+          <input id="find-input" type="text" spellcheck="false" autocomplete="off" placeholder="Buscar en la página" />
+          <span id="find-count"></span>
+          <button id="find-prev" title="Anterior (Mayús+Intro)" data-ico="chevron-left"></button>
+          <button id="find-next" title="Siguiente (Intro)" data-ico="chevron-right"></button>
+          <button id="find-close" title="Cerrar (Esc)" data-ico="x-mark"></button>
+        </div>
+
         <!-- Hub con widgets -->
         <section id="hub">
           <div class="hub-scroll">

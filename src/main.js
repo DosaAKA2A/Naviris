@@ -390,9 +390,44 @@ const UA_CH = {
     { brand: MARCA_RELLENO, version: '99.0.0.0' },
     { brand: 'Chromium', version: VERSION_COMPLETA },
     { brand: 'Google Chrome', version: VERSION_COMPLETA }
-  ]
+  ],
+  // El valor de la cabecera lleva la plataforma entrecomillada.
+  plataforma: process.platform === 'win32' ? '"Windows"'
+    : process.platform === 'darwin' ? '"macOS"' : '"Linux"'
 };
 ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
+
+/* Accept-Language con la MISMA forma que la de Chrome: el idioma completo y
+   detrás el idioma a secas con q=0.9 ("es-ES,es;q=0.9").
+   Si no se le pasa nada, Electron manda el locale pelado ("es"), y eso además
+   arrastraba a navigator.language mientras navigator.languages sí decía
+   "es-ES,es": dos APIs del mismo navegador contando cosas distintas.
+   Medido contra Chrome 151 en la misma máquina el 2026-08-24. */
+let IDIOMAS = null;
+function idiomasAceptados() {
+  if (IDIOMAS) return IDIOMAS;
+  // app.getLocale() devuelve el idioma PELADO ("es") en este Windows, y Chrome
+  // manda siempre la variante regional. La lista buena es la del sistema:
+  // getPreferredSystemLanguages() devuelve ["es-ES"].
+  let lista = [];
+  try { lista = (app.getPreferredSystemLanguages() || []).slice(); } catch { /* nada */ }
+  if (!lista.length) lista = [app.getLocale() || 'en-US'];
+  const salida = [];
+  for (const idioma of lista) {
+    if (!salida.includes(idioma)) salida.push(idioma);
+    const base = idioma.split('-')[0];
+    if (base && !salida.includes(base)) salida.push(base);
+  }
+  // El primero va sin q y los demás bajan de una décima en una décima, como Chrome.
+  IDIOMAS = salida.map((l, i) => (i === 0 ? l : `${l};q=${Math.max(0.1, 1 - i * 0.1).toFixed(1)}`)).join(',');
+  return IDIOMAS;
+}
+// La lista pelada, para que el preload deje navigator.language y .languages
+// diciendo lo mismo que la cabecera.
+function idiomasLista() {
+  return idiomasAceptados().split(',').map((t) => t.split(';')[0]);
+}
+ipcMain.on('ua:idiomas', (e) => { e.returnValue = idiomasLista(); });
 
 /* Estado REAL de un permiso para el sitio que pregunta: 'allow', 'block' o
    'prompt' si aún no se ha decidido.
@@ -426,15 +461,44 @@ function setupSession(ses) {
   // máquina: manda tres marcas (Not·A·Brand, Google Chrome, Chromium) y la
   // versión RECORTADA a MAJOR.0.0.0 en el UA. Aquí se iguala ese formato, en los
   // dos canales, para que la identidad sea coherente. Ver `uaCH` más abajo.
-  ses.setUserAgent(UA_LIMPIO);
+  ses.setUserAgent(UA_LIMPIO, idiomasAceptados());
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    const h = { ...details.requestHeaders };
-    // Puede llegar con cualquier combinación de mayúsculas según el origen.
-    for (const k of Object.keys(h)) {
-      if (/^sec-ch-ua$/i.test(k)) h[k] = UA_CH.marcas;
-      else if (/^sec-ch-ua-full-version-list$/i.test(k)) h[k] = UA_CH.marcasCompletas;
+    /* OJO, aquí estuvo el fallo que dejó a Naviris sin pasar NINGÚN Turnstile
+       hasta el 2026-08-24: este manejador RECORRÍA las cabeceras existentes y
+       solo reescribía la que encontrara. Pero Electron no genera ni una sola
+       client hint por su cuenta, así que no encontraba nada y la rama no
+       entraba jamás. Resultado medido contra un Chrome real: Naviris mandaba
+       11 cabeceras al navegar y Chrome 14; faltaban las tres de client hints.
+       Un User-Agent que dice "Chrome/148" sin ninguna Sec-CH-UA no es un
+       Chrome, y eso se ve desde el servidor sin ejecutar una línea de JS: por
+       eso no lo cazó nada de lo que se midió en agosto, que era todo JS, TLS y
+       DOM. Ahora se AÑADEN siempre, existan o no. */
+    const orig = details.requestHeaders;
+    const h = {};
+    // Chrome las coloca justo antes de Upgrade-Insecure-Requests (o del UA en
+    // las peticiones que no son de navegación). El orden de las cabeceras
+    // también se mira, así que se reconstruye el objeto respetando ese hueco.
+    let puestas = false;
+    const ponHints = () => {
+      if (puestas) return;
+      puestas = true;
+      h['sec-ch-ua'] = UA_CH.marcas;
+      h['sec-ch-ua-mobile'] = '?0';
+      h['sec-ch-ua-platform'] = UA_CH.plataforma;
+    };
+    for (const k of Object.keys(orig)) {
+      // Puede llegar con cualquier combinación de mayúsculas según el origen.
+      if (/^sec-ch-ua(-mobile|-platform)?$/i.test(k)) continue;   // se rehacen abajo
+      if (/^(upgrade-insecure-requests|user-agent)$/i.test(k)) ponHints();
+      if (/^sec-ch-ua-full-version-list$/i.test(k)) h[k] = UA_CH.marcasCompletas;
       else if (/^sec-ch-ua-full-version$/i.test(k)) h[k] = '"' + UA_CH.versionCompleta + '"';
+      // El segundo argumento de setUserAgent NO llega a las peticiones del
+      // webview (medido: seguía saliendo "es" pelado), así que la cabecera se
+      // fija aquí, que es donde se puede garantizar.
+      else if (/^accept-language$/i.test(k)) h[k] = idiomasAceptados();
+      else h[k] = orig[k];
     }
+    ponHints();   // por si la petición no llevaba ni UIR ni User-Agent
     callback({ requestHeaders: h });
   });
   ses.webRequest.onBeforeRequest((details, callback) => {
