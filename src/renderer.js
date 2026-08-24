@@ -4960,6 +4960,34 @@ async function onWebviewMessage(wv, e) {
     const cred = creds[0];
     const who = cred.username ? `<b>${escapeHtml(cred.username)}</b>` : 'la cuenta guardada';
     showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred));
+  } else if (e.channel === 'cobalt-otpform') {
+    /* Casilla de código de un solo uso: si hay una cuenta del autenticador que
+       case con este sitio, se ofrece el codigo. Se empareja por el emisor
+       (GitHub ↔ github.com) y por la etiqueta; si no casa ninguna NO se
+       ofrece nada, porque meter el codigo de otra cuenta seria peor que no
+       ofrecer. */
+    const host = hostOf(data.url); if (!host) return;
+    const disponible = await window.cobalt.totpAvailable().catch(() => false);
+    if (!disponible) return;
+    const lista = await window.cobalt.totpList().catch(() => []);
+    if (!lista.length) return;
+    const raiz = host.replace(/^www./, '').split('.')[0].toLowerCase();
+    const casa = (e2) => {
+      const em = (e2.issuer || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const lb = (e2.label || '').toLowerCase();
+      return !!em && (raiz.includes(em) || em.includes(raiz) || lb.includes(host));
+    };
+    const cuenta = lista.find(casa);
+    if (!cuenta) return;
+    const nombre = escapeHtml(cuenta.issuer || host);
+    const pon = async () => {
+      const r = await window.cobalt.totpCodes();
+      if (!r.ok) { toast('Desbloquea el autenticador para usar el código'); return; }
+      const it = r.items.find((x) => x.id === cuenta.id);
+      if (!it || !/^[0-9]{4,8}$/.test(it.code)) { toast('No se pudo generar el código'); return; }
+      try { wv.send('naviris-otp-fill', it.code); toast('Código puesto — caduca en ' + it.restan + ' s'); } catch { toast('No se pudo rellenar'); }
+    };
+    showPwBar('Rellenar el código de <b>' + nombre + '</b> desde tu autenticador.', 'Rellenar código', pon);
   } else if (e.channel === 'cobalt-cardform') {
     // Formulario de pago detectado: ofrecer la tarjeta guardada (CVC no; lo teclea el usuario)
     if (IS_PRIVATE) return;

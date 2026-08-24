@@ -365,6 +365,42 @@ if (document.readyState !== 'loading') announce();
 document.addEventListener('DOMContentLoaded', announce);
 // Reintentos para SPAs que montan el formulario después
 [600, 1500, 3000].forEach((ms) => setTimeout(announce, ms));
+
+/* --- Aviso de casilla de codigo de un solo uso (2FA) ---
+   El navegador ya guarda los TOTP; lo que faltaba era ofrecerlos donde se
+   escriben. Se busca primero autocomplete="one-time-code", que es la senal
+   estandar y la que usan las webs seria, y si no hay se cae a los nombres
+   habituales. Se exige que la casilla este VISIBLE para no ofrecer nada en
+   formularios ocultos. */
+let otpAvisado = false;
+function buscaOtp() {
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  let c = Array.from(document.querySelectorAll('input[autocomplete="one-time-code"]'));
+  if (!c.length) {
+    c = Array.from(document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"], input:not([type])'))
+      .filter((el) => /otp|one.?time|2fa|mfa|totp|authenticator|verification|codigo|código|verificacion/i
+        .test((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '')));
+  }
+  return c.filter(visible)[0] || null;
+}
+function avisaOtp() {
+  if (otpAvisado) return;
+  if (buscaOtp()) { otpAvisado = true; ipcRenderer.sendToHost('cobalt-otpform', { url: location.href }); }
+}
+if (document.readyState !== 'loading') avisaOtp();
+document.addEventListener('DOMContentLoaded', avisaOtp);
+[800, 2000, 4000].forEach((ms) => setTimeout(avisaOtp, ms));
+
+// Relleno del codigo: lo pide el host cuando la persona acepta.
+ipcRenderer.on('naviris-otp-fill', (_e, codigo) => {
+  const el = buscaOtp();
+  if (!el) return;
+  const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  set.call(el, String(codigo));
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.focus();
+});
 try {
   const obs = new MutationObserver(() => announce());
   obs.observe(document.documentElement, { childList: true, subtree: true });

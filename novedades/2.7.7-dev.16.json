@@ -1,0 +1,16 @@
+{
+  "version": "2.7.7-dev.16",
+  "linea": "dev",
+  "titulo": "El autenticador ya rellena el código",
+  "entradilla": "Cuando una web te pide el código de dos pasos, Naviris te lo ofrece si tiene esa cuenta guardada. Se acabó ir a buscarlo y copiarlo.",
+  "bloques": [
+    {
+      "titulo": "Aparece donde hace falta",
+      "texto": "Al llegar a la casilla del código sale la misma barra que ya usan las contraseñas: Rellenar el código de esa cuenta. Un clic y queda puesto, con el aviso de los segundos que le quedan antes de caducar."
+    },
+    {
+      "titulo": "Solo si es la cuenta correcta",
+      "texto": "El código se ofrece únicamente si el emisor guardado casa con el sitio en el que estás. Si no casa ninguno, Naviris no dice nada: meterte el código de otra cuenta sería peor que no ofrecerte nada."
+    }
+  ]
+}
