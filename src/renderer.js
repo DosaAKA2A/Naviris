@@ -52,6 +52,15 @@ let espacios = [];        // [{ id, nombre }]
 let espacioActivo = null;
 
 const enEspacio = (t) => (t.espacio || null) === (espacioActivo || null);
+const espacioPorId = (id) => espacios.find((e) => e.id === id) || null;
+const espacioDeTab = (t) => (t && t.espacio ? espacioPorId(t.espacio) : null);
+// Un espacio bloqueado navega en SU sesión: ni cookies ni historial compartidos.
+const particionDeTab = (t) => {
+  if (t.contenedor) return t.contenedor.particion;
+  const e = espacioDeTab(t);
+  return (e && e.bloqueado && e.particion) ? e.particion : PARTITION;
+};
+let espDesbloqueados = new Set();
 const tabsVisibles = () => tabs.filter(enEspacio);
 
 function guardaEspacios() {
@@ -65,8 +74,51 @@ function creaEspacio(nombre) {
   return e;
 }
 
-function cambiaEspacio(id) {
+/* Al salir de un espacio, sus pestañas se DUERMEN: sueltan su proceso entero y
+   dejan de gastar. Es la misma siesta que ya hace Naviris a los 30 minutos, solo
+   que aquí sabemos seguro que no las estás mirando. Las de AutoClaim se quedan
+   despiertas a propósito: existen justo para seguir contando en segundo plano. */
+function duermeEspacio(id) {
+  for (const t of tabs) {
+    if ((t.espacio || null) !== (id || null)) continue;
+    if (t.kind !== 'web' || t.asleep || t.autoLoot || !t.webview) continue;
+    try {
+      t.sleptUrl = t.webview.getURL() || t.url;
+      t.webview.src = 'about:blank';
+      t.asleep = true;
+    } catch { /* aún no había cargado */ }
+  }
+}
+
+async function cambiaEspacio(id) {
+  if (id === (espacioActivo || null)) return;
+  const destino = id ? espacioPorId(id) : null;
+  if (destino && destino.bloqueado && !espDesbloqueados.has(destino.id)) {
+    pideClave(destino, 'Entrar en ' + destino.nombre, async (clave) => {
+      const r = await window.cobalt.espDesbloquea(destino.id, clave);
+      if (!r.ok) { toast(r.error || 'Código incorrecto'); return; }
+      espDesbloqueados.add(destino.id);
+      cambiaEspacio(id);
+    });
+    return;
+  }
+  // Al salir de un espacio protegido, lo suyo se guarda y se recupera lo normal.
+  const salgoDe = espacioProtegidoActivo();
+  if (salgoDe) {
+    await window.cobalt.espGuarda(salgoDe.id, { historial: history, marcadores: bookmarks }).catch(() => {});
+    history = store.get('cobalt.history', []);
+    bookmarks = store.get('cobalt.bookmarks2', []);
+  }
+  duermeEspacio(espacioActivo);
   espacioActivo = id;
+  if (destino && destino.bloqueado) {
+    const r = await window.cobalt.espDatos(destino.id).catch(() => null);
+    if (r && r.ok) {
+      history = Array.isArray(r.datos.historial) ? r.datos.historial : [];
+      bookmarks = Array.isArray(r.datos.marcadores) ? r.datos.marcadores : [];
+    }
+  }
+  renderBookmarksBar();
   guardaEspacios();
   // Si la pestaña activa ya no se ve, se pasa a la última usada del espacio.
   const activa = tabs.find((t) => t.id === activeId);
@@ -79,40 +131,145 @@ function cambiaEspacio(id) {
   pintaEspacios();
 }
 
-function borraEspacio(id) {
-  // Las pestañas del espacio borrado no se pierden: vuelven al general.
-  for (const t of tabs) if (t.espacio === id) t.espacio = null;
+async function borraEspacio(id, clave) {
+  const esp = espacioPorId(id);
+  const r = await window.cobalt.espBorra(id, clave || '');
+  if (!r.ok) { toast(r.error || 'No se pudo borrar el espacio'); return; }
+  if (esp && esp.bloqueado) {
+    // Bloqueado: se va TODO. Sus pestañas no vuelven al general, porque eran
+    // justo las que no debían mezclarse; se cierran con él.
+    for (const t of tabs.filter((t2) => t2.espacio === id)) closeTab(t.id);
+  } else {
+    for (const t of tabs) if (t.espacio === id) t.espacio = null;
+  }
   espacios = espacios.filter((e) => e.id !== id);
   if (espacioActivo === id) espacioActivo = null;
+  espDesbloqueados.delete(id);
   guardaEspacios();
   renderTabs(true);
   pintaEspacios();
+  toast(esp && esp.bloqueado ? 'Espacio borrado con todo lo que guardaba' : 'Espacio borrado');
+}
+
+/* Cuadro de contraseña. Reutiliza el modal que ya existe, en modo password. */
+function pideClave(esp, titulo, cb, ayuda) {
+  els.promptTitle.innerHTML = escapeHtml(titulo)
+    + '<br><span style="font-weight:400;color:var(--text-dim);font-size:13px">'
+    + escapeHtml(ayuda || 'Contraseña de este espacio.') + '</span>';
+  els.promptInput.style.display = '';
+  els.promptInput.type = 'password';
+  els.promptInput.value = '';
+  els.promptInput.placeholder = 'Contraseña';
+  els.promptOk.textContent = 'Aceptar';
+  els.promptModal.classList.remove('hidden');
+  setTimeout(() => els.promptInput.focus(), 30);
+  promptCb = (valor) => { els.promptInput.type = 'text'; cb(valor || ''); };
+}
+
+function renombraEspacio(id) {
+  const esp = espacioPorId(id); if (!esp) return;
+  els.promptTitle.innerHTML = 'Nombre del espacio';
+  els.promptInput.style.display = '';
+  els.promptInput.type = 'text';
+  els.promptInput.value = esp.nombre;
+  els.promptInput.placeholder = 'Trabajo, Personal…';
+  els.promptOk.textContent = 'Guardar';
+  els.promptModal.classList.remove('hidden');
+  setTimeout(() => { els.promptInput.focus(); els.promptInput.select(); }, 30);
+  promptCb = (valor) => {
+    const n = String(valor || '').trim().slice(0, 32);
+    if (!n) return;
+    esp.nombre = n;
+    guardaEspacios();
+    pintaEspacios();
+    renderTabs(true);
+  };
+}
+
+function bloqueaEspacio(id) {
+  const esp = espacioPorId(id); if (!esp || esp.bloqueado) return;
+  pideClave(esp, 'Bloquear ' + esp.nombre, async (clave) => {
+    const r = await window.cobalt.espBloquea(id, clave);
+    if (!r.ok) { toast(r.error || 'No se pudo bloquear'); return; }
+    // La copia buena es la de main (trae la sal). Si se guardara la de aqui,
+    // la sal se perderia y el espacio no se podria abrir nunca mas.
+    Object.assign(esp, r.espacio || {});
+    espDesbloqueados.add(id);
+    guardaEspacios();
+    /* Si lo estas protegiendo desde dentro, lo que tenias delante era el
+       historial y los marcadores GENERALES: hay que soltarlos ya, o el primer
+       guardado los metaria dentro del espacio protegido. */
+    if ((espacioActivo || null) === id) {
+      const rd = await window.cobalt.espDatos(id).catch(() => null);
+      history = (rd && rd.ok && Array.isArray(rd.datos.historial)) ? rd.datos.historial : [];
+      bookmarks = (rd && rd.ok && Array.isArray(rd.datos.marcadores)) ? rd.datos.marcadores : [];
+      renderBookmarksBar();
+      if (typeof renderHistory === 'function' && !els.historyPanel.classList.contains('hidden')) renderHistory();
+    }
+    // Las pestañas que ya estaban dentro navegaban en la sesión normal; se
+    // recargan en la del espacio para que lo de dentro se quede dentro.
+    for (const t of tabs.filter((t2) => t2.espacio === id && t2.webview)) {
+      const u = t.asleep ? (t.sleptUrl || t.url) : (t.webview.getURL() || t.url);
+      t.webview.setAttribute('partition', esp.particion);
+      t.sleptUrl = u; t.webview.src = 'about:blank'; t.asleep = true;
+    }
+    pintaEspacios();
+    renderTabs(true);
+    toast('Espacio protegido. Te pedirá el código una vez por sesión.');
+  }, 'Se te pedirá al entrar, una vez por sesión, y también para borrarlo. Su historial y sus marcadores se guardan cifrados con este código: si lo pierdes, se pierden. Mínimo 4 caracteres.');
 }
 
 function pintaEspacios() {
   if (!els.espPop || els.espPop.classList.contains('hidden')) return;
   const cuenta = (id) => tabs.filter((t) => (id === null ? !t.espacio : t.espacio === id)).length;
-  const fila = (id, nombre, borrable) => `<div class="ep-fila${espacioActivo === id ? ' activo' : ''}" data-id="${id === null ? '' : id}">
-      <span class="ep-n">${escapeHtml(nombre)}</span><span class="ep-c">${cuenta(id)}</span>
-      ${borrable ? '<button class="ep-x" title="Borrar espacio">' + window.icon('trash') + '</button>' : ''}
-    </div>`;
-  els.espPop.innerHTML = '<div class="ep-tit">Espacios</div>'
-    + fila(null, 'General', false)
-    + espacios.map((e) => fila(e.id, e.nombre, true)).join('')
-    + '<button class="ep-nuevo">+ Espacio nuevo</button>';
-  els.espPop.querySelectorAll('.ep-fila').forEach((f) => {
-    f.addEventListener('click', (ev) => {
-      if (ev.target.closest('.ep-x')) return;
-      cambiaEspacio(f.dataset.id || null);
-    });
-    const x = f.querySelector('.ep-x');
-    if (x) x.addEventListener('click', (ev) => { ev.stopPropagation(); borraEspacio(f.dataset.id); });
-  });
-  els.espPop.querySelector('.ep-nuevo').addEventListener('click', () => {
+  els.espPop.innerHTML = '<div class="ep-tit">Espacios</div>';
+
+  const fila = (esp) => {
+    const id = esp ? esp.id : null;
+    const el = document.createElement('div');
+    el.className = 'ep-fila' + ((espacioActivo || null) === id ? ' activo' : '');
+    const bloq = esp && esp.bloqueado;
+    const abierto = bloq && espDesbloqueados.has(id);
+    el.innerHTML = `${bloq ? '<span class="ep-candado" title="' + (abierto ? 'Bloqueado, abierto en esta sesión' : 'Bloqueado: pide contraseña') + '">' + window.icon(abierto ? 'lock-open' : 'lock-closed') + '</span>' : ''}
+      <span class="ep-n">${escapeHtml(esp ? esp.nombre : 'General')}</span>
+      <span class="ep-c">${cuenta(id)}</span>`;
+    if (esp) {
+      const acc = document.createElement('span');
+      acc.className = 'ep-acc';
+      acc.innerHTML = `<button class="ep-b" data-a="nombre" title="Cambiar el nombre">${window.icon('pencil-square')}</button>
+        ${bloq ? '' : '<button class="ep-b" data-a="bloquea" title="Bloquear con contraseña">' + window.icon('lock-closed') + '</button>'}
+        <button class="ep-b ep-x" data-a="borra" title="Borrar espacio">${window.icon('trash')}</button>`;
+      el.appendChild(acc);
+      acc.addEventListener('click', (ev) => {
+        const b = ev.target.closest('.ep-b'); if (!b) return;
+        ev.stopPropagation();
+        if (b.dataset.a === 'nombre') renombraEspacio(id);
+        else if (b.dataset.a === 'bloquea') bloqueaEspacio(id);
+        else if (bloq) {
+          pideClave(esp, 'Borrar ' + esp.nombre, (clave) => borraEspacio(id, clave),
+            'Se borra el espacio Y todo lo que guardaba: sesiones, cookies y caché. No se puede deshacer.');
+        } else {
+          promptConfirm('¿Borrar ' + esp.nombre + '?', 'Sus pestañas no se cierran: vuelven al General.', () => borraEspacio(id));
+        }
+      });
+    }
+    el.addEventListener('click', (ev) => { if (!ev.target.closest('.ep-acc')) cambiaEspacio(id); });
+    els.espPop.appendChild(el);
+  };
+
+  fila(null);
+  espacios.forEach(fila);
+
+  const nuevoBtn = document.createElement('button');
+  nuevoBtn.className = 'ep-nuevo';
+  nuevoBtn.textContent = '+ Espacio nuevo';
+  nuevoBtn.addEventListener('click', () => {
     const e = creaEspacio();
     cambiaEspacio(e.id);
     createTab();
+    renombraEspacio(e.id);   // recién creado: lo primero es ponerle nombre
   });
+  els.espPop.appendChild(nuevoBtn);
 }
 
 function alternaEspacios() {
@@ -320,7 +477,7 @@ function recordHistory(url, title) {
   if (i >= 0) { history[i].visits++; history[i].ts = Date.now(); if (title) history[i].title = title; }
   else history.push({ url, title: title || url, visits: 1, ts: Date.now() });
   if (history.length > 600) history = history.sort((a, b) => b.ts - a.ts).slice(0, 600);
-  store.set('cobalt.history', history);
+  guardaHistorial();
 }
 
 /* ============ Pestañas ============ */
@@ -379,8 +536,8 @@ let mediaTimer = null;
 function attachWebview(tab, url) {
   const wv = document.createElement('webview');
   wv.setAttribute('allowpopups', '');
-  // Una pestaña de contenedor navega en SU sesión, no en la normal.
-  wv.setAttribute('partition', tab.contenedor ? tab.contenedor.particion : PARTITION);
+  // Contenedor o espacio bloqueado: cada uno navega en SU sesión, no en la normal.
+  wv.setAttribute('partition', particionDeTab(tab));
   wv.src = url;
   tab.webview = wv; tab.kind = 'web'; tab.url = url;
   // Clic dentro de la página = cerrar los popovers de herramientas (esos
@@ -801,7 +958,34 @@ els.urlbar.addEventListener('keydown', (e) => {
 /* ============ Marcadores con carpetas ============ */
 let bookmarks = store.get('cobalt.bookmarks2', migrateOld());
 function migrateOld() { const old = store.get('cobalt.bookmarks', null); return Array.isArray(old) ? old.map((b) => ({ type: 'link', title: b.title, url: b.url })) : []; }
-const saveBm = () => store.set('cobalt.bookmarks2', bookmarks);
+/* ===== Dónde se guardan historial y marcadores =====
+   Con un espacio protegido activo, los dos van a SU archivo cifrado; si no, al
+   almacén de siempre. Todo lo demás de la interfaz sigue leyendo las mismas
+   variables `history` y `bookmarks`, así que el panel del historial, la barra
+   de marcadores y el importador funcionan igual sin enterarse. */
+function espacioProtegidoActivo() {
+  const e = espacioActivo ? espacioPorId(espacioActivo) : null;
+  return (e && e.bloqueado) ? e : null;
+}
+function guardaHistorial() {
+  const e = espacioProtegidoActivo();
+  if (e) { guardaDatosEspacio(e.id); return; }
+  store.set('cobalt.history', history);
+}
+function guardaMarcadores() {
+  const e = espacioProtegidoActivo();
+  if (e) { guardaDatosEspacio(e.id); return; }
+  store.set('cobalt.bookmarks2', bookmarks);
+}
+let guardaEspTimer = null;
+function guardaDatosEspacio(id) {
+  // Se agrupan los guardados: navegar dispara muchos seguidos y cada uno cifra.
+  clearTimeout(guardaEspTimer);
+  guardaEspTimer = setTimeout(() => {
+    window.cobalt.espGuarda(id, { historial: history, marcadores: bookmarks }).catch(() => {});
+  }, 400);
+}
+const saveBm = () => guardaMarcadores();
 function bookmarksFlat() { const o = []; for (const it of bookmarks) { if (it.type === 'link') o.push(it); else if (it.type === 'folder') o.push(...it.children); } return o; }
 function findBookmark(url) { return bookmarksFlat().find((b) => b.url === url); }
 function removeBookmark(url) { bookmarks = bookmarks.filter((it) => !(it.type === 'link' && it.url === url)); bookmarks.forEach((it) => { if (it.type === 'folder') it.children = it.children.filter((c) => c.url !== url); }); saveBm(); }
@@ -909,7 +1093,7 @@ function promptConfirm(title, text, cb) {
   promptCb = () => cb();
 }
 els.promptOk.addEventListener('click', () => { els.promptModal.classList.add('hidden'); const cb = promptCb; promptCb = null; cb?.(els.promptInput.value); });
-els.promptCancel.addEventListener('click', () => els.promptModal.classList.add('hidden'));
+els.promptCancel.addEventListener('click', () => { els.promptModal.classList.add('hidden'); els.promptInput.type = 'text'; promptCb = null; });
 els.promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') els.promptOk.click(); });
 
 /* ============ Accesos del hub (dials) ============ */
@@ -4431,7 +4615,7 @@ function renderHistory() {
     info.innerHTML = `<div class="hist-t">${escapeHtml(h.title || h.url)}</div><div class="hist-u">${escapeHtml(hostOf(h.url))}</div>`;
     const time = document.createElement('span'); time.className = 'hist-time'; time.textContent = new Date(h.ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
     const x = document.createElement('button'); x.className = 'hist-x'; x.title = 'Quitar'; x.innerHTML = window.icon('x-mark');
-    x.addEventListener('click', (e) => { e.stopPropagation(); history = history.filter((y) => y.url !== h.url); store.set('cobalt.history', history); renderHistory(); });
+    x.addEventListener('click', (e) => { e.stopPropagation(); history = history.filter((y) => y.url !== h.url); guardaHistorial(); renderHistory(); });
     item.append(ic, info, time, x);
     item.addEventListener('click', () => navigateActive(h.url));
     els.historyList.appendChild(item);
@@ -4448,7 +4632,7 @@ els.historyFilter.addEventListener('input', () => { histFilter = els.historyFilt
 els.historyClear.addEventListener('click', () => {
   if (!history.length) { toast('El historial ya está vacío'); return; }
   promptConfirm('¿Borrar todo el historial?', `Se eliminarán ${history.length} entradas. No se puede deshacer.`, () => {
-    history = []; store.set('cobalt.history', history); renderHistory(); toast('Historial borrado');
+    history = []; guardaHistorial(); renderHistory(); toast('Historial borrado');
   });
 })
 
@@ -6149,6 +6333,14 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];
   espacios = Array.isArray(settings.espacios) ? settings.espacios : [];
   espacioActivo = settings.espacioActivo || null;
+  window.cobalt.espDesbloqueados().then((lista) => {
+    espDesbloqueados = new Set(lista || []);
+    // Si al arrancar el espacio activo está bloqueado y no se ha abierto en esta
+    // sesión, no se entra: se cae al General. Si no, bastaría reiniciar para ver
+    // dentro sin escribir la contraseña.
+    const esp = espacioActivo ? espacioPorId(espacioActivo) : null;
+    if (esp && esp.bloqueado && !espDesbloqueados.has(esp.id)) { espacioActivo = null; renderTabs(true); }
+  }).catch(() => {});
   // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
   // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
   // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).

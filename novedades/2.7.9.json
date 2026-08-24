@@ -1,0 +1,24 @@
+{
+  "version": "2.7.9",
+  "linea": "estable",
+  "titulo": "Espacios: ponles nombre y protégelos con un código",
+  "entradilla": "Los espacios ya se pueden renombrar, y uno puede quedarse cerrado con un código: con su propia sesión, su propio historial y sus propios marcadores, que siguen ahí aunque cierres Naviris o reinicies el equipo.",
+  "bloques": [
+    {
+      "titulo": "Ponles nombre",
+      "texto": "Un espacio llamado Espacio 1 no dice nada. Ahora, al crear uno te pide el nombre, y puedes cambiarlo cuando quieras con el lápiz que sale al pasar el ratón por encima."
+    },
+    {
+      "titulo": "Espacio protegido",
+      "texto": "El candado te pide un código y a partir de ahí ese espacio es suyo y de nadie más: sesión aparte, historial aparte y marcadores aparte. Lo de dentro no se mezcla con lo de fuera. Te pide el código una vez cada vez que abres Naviris, y otra vez si quieres borrarlo."
+    },
+    {
+      "titulo": "Y de verdad está guardado bajo llave",
+      "texto": "Su historial y sus marcadores se guardan cifrados con ese código. Sin él no se pueden leer, ni desde otro programa ni sacando el disco. Eso también quiere decir que si pierdes el código, se pierden: no hay puerta de atrás. Sus cookies, en cambio, las guarda el motor del navegador como las de cualquier otro sitio: el código impide entrar desde Naviris, no cifra esa parte."
+    },
+    {
+      "titulo": "Y mientras no lo usas, duerme",
+      "texto": "Al salir de un espacio, sus pestañas se duermen y sueltan su proceso entero, así que dejan de gastar memoria. Se despiertan solas al volver. Las de AutoClaim se quedan despiertas a propósito, que para eso están."
+    }
+  ]
+}

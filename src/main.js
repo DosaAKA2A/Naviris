@@ -1191,7 +1191,7 @@ const PARTICIONES_VALIDAS = new Set(['persist:cobalt', 'cobalt-private']);
 const preparadas = new Set();
 function contenedoresGuardados() { return (settings.contenedores || []).map((c) => c.particion); }
 function preparaContenedor(particion) {
-  if (!particion.startsWith('persist:cont-')) return null;
+  if (!/^persist:(cont|esp)-/.test(particion)) return null;
   PARTICIONES_VALIDAS.add(particion);
   const ses = session.fromPartition(particion);
   if (!preparadas.has(particion)) {
@@ -1202,12 +1202,121 @@ function preparaContenedor(particion) {
   return ses;
 }
 ipcMain.handle('cont:prepara', soloUI((_e, particion) => {
-  if (typeof particion !== 'string' || !/^persist:cont-[a-z0-9]{1,24}$/.test(particion)) return { ok: false };
+  if (typeof particion !== 'string' || !/^persist:(cont|esp)-[a-z0-9]{1,24}$/.test(particion)) return { ok: false };
   preparaContenedor(particion);
   return { ok: true };
 }));
+/* ===== Espacios protegidos =====
+   Un espacio protegido es PERMANENTE: su sesión, su historial y sus marcadores
+   siguen ahí al cerrar Naviris y al reiniciar el equipo. Para entrar pide un
+   código, una vez por sesión de Naviris, y el mismo código hace falta para
+   borrarlo (que se lleva todo por delante).
+
+   QUÉ PROTEGE Y QUÉ NO, dicho claro:
+   - Su historial y sus marcadores se guardan CIFRADOS con una clave derivada
+     del código (scrypt + AES-256-GCM). Sin el código no se pueden leer, ni
+     desde otro programa ni sacando el disco. Perder el código es perderlos:
+     no hay puerta de atrás, y eso es justo lo que lo hace valer.
+   - Sus cookies y sesiones las guarda Chromium en su partición, SIN cifrar,
+     igual que hace Chrome con todo. O sea: el código impide entrar desde la
+     interfaz, no protege ese trozo contra alguien que se lleve el disco.
+     Prometer lo contrario sería mentir.
+
+   El código nunca se guarda: se guarda la sal, y comprobarlo es intentar
+   descifrar. Si el descifrado cuadra (GCM lleva su propia comprobación), el
+   código era el bueno. */
+const clavesEnMemoria = new Map();   // id -> clave derivada; al cerrar, se olvida
+const DIR_ESP = () => path.join(app.getPath('userData'), 'espacios');
+const archivoEsp = (id) => path.join(DIR_ESP(), id + '.dat');
+
+function derivaClave(codigo, salBase64) {
+  return crypto.scryptSync(String(codigo), Buffer.from(salBase64, 'base64'), 32, { N: 16384, r: 8, p: 1 });
+}
+function cifra(clave, obj) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', clave, iv);
+  const datos = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return JSON.stringify({ v: 1, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), datos: datos.toString('base64') });
+}
+function descifra(clave, texto) {
+  const j = JSON.parse(texto);
+  const d = crypto.createDecipheriv('aes-256-gcm', clave, Buffer.from(j.iv, 'base64'));
+  d.setAuthTag(Buffer.from(j.tag, 'base64'));
+  return JSON.parse(Buffer.concat([d.update(Buffer.from(j.datos, 'base64')), d.final()]).toString('utf8'));
+}
+function escribeEsp(id, clave, obj) {
+  fs.mkdirSync(DIR_ESP(), { recursive: true });
+  fs.writeFileSync(archivoEsp(id), cifra(clave, obj), 'utf8');
+}
+const espacioDe = (id) => (settings.espacios || []).find((e) => e.id === id);
+
+ipcMain.handle('esp:bloquea', soloUI((_e, { id, clave } = {}) => {
+  const esp = espacioDe(id);
+  if (!esp) return { ok: false, error: 'Ese espacio ya no existe' };
+  if (esp.bloqueado) return { ok: false, error: 'Ese espacio ya está protegido' };
+  if (!clave || String(clave).length < 4) return { ok: false, error: 'El código necesita al menos 4 caracteres' };
+  esp.sal = crypto.randomBytes(16).toString('base64');
+  esp.bloqueado = true;
+  esp.particion = esp.particion || ('persist:esp-' + id);
+  const derivada = derivaClave(clave, esp.sal);
+  clavesEnMemoria.set(id, derivada);
+  escribeEsp(id, derivada, { historial: [], marcadores: [] });
+  preparaContenedor(esp.particion);
+  saveSettings(settings);
+  // Se devuelve el espacio ENTERO: el renderer tiene su propia copia de la
+  // lista y, si no se la lleva, el siguiente guardado borraria la sal y el
+  // espacio quedaria imposible de abrir tras reiniciar.
+  return { ok: true, espacio: JSON.parse(JSON.stringify(esp)) };
+}));
+
+ipcMain.handle('esp:desbloquea', soloUI((_e, { id, clave } = {}) => {
+  const esp = espacioDe(id);
+  if (!esp || !esp.bloqueado) return { ok: true, datos: null };
+  const derivada = derivaClave(clave, esp.sal || '');
+  let datos;
+  try { datos = descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
+  catch { return { ok: false, error: 'Código incorrecto' }; }
+  clavesEnMemoria.set(id, derivada);
+  preparaContenedor(esp.particion);
+  return { ok: true, datos };
+}));
+
+// Historial y marcadores del espacio: solo con la clave ya en memoria.
+ipcMain.handle('esp:datos', soloUI((_e, id) => {
+  const clave = clavesEnMemoria.get(id);
+  if (!clave) return { ok: false, error: 'bloqueado' };
+  try { return { ok: true, datos: descifra(clave, fs.readFileSync(archivoEsp(id), 'utf8')) }; }
+  catch { return { ok: true, datos: { historial: [], marcadores: [] } }; }
+}));
+ipcMain.handle('esp:guarda', soloUI((_e, { id, datos } = {}) => {
+  const clave = clavesEnMemoria.get(id);
+  if (!clave) return { ok: false, error: 'bloqueado' };
+  try { escribeEsp(id, clave, datos || {}); return { ok: true }; }
+  catch (err) { return { ok: false, error: String(err.message || err) }; }
+}));
+
+ipcMain.handle('esp:desbloqueados', soloUI(() => [...clavesEnMemoria.keys()]));
+
+/* Borrar un espacio protegido exige el MISMO código y se lleva TODO: su
+   historial y marcadores cifrados, y las cookies y la caché de su partición. */
+ipcMain.handle('esp:borra', soloUI(async (_e, { id, clave } = {}) => {
+  const esp = espacioDe(id);
+  if (!esp) return { ok: true };
+  if (esp.bloqueado) {
+    const derivada = derivaClave(clave, esp.sal || '');
+    try { descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
+    catch { return { ok: false, error: 'Código incorrecto' }; }
+    try { fs.unlinkSync(archivoEsp(id)); } catch { /* ya no estaba */ }
+  }
+  if (esp.particion) { try { await session.fromPartition(esp.particion).clearStorageData(); } catch { /* nada */ } }
+  settings.espacios = (settings.espacios || []).filter((e) => e.id !== id);
+  saveSettings(settings);
+  clavesEnMemoria.delete(id);
+  return { ok: true };
+}));
+
 ipcMain.handle('cont:borra', soloUI(async (_e, particion) => {
-  if (!PARTICIONES_VALIDAS.has(particion) || !particion.startsWith('persist:cont-')) return { ok: false };
+  if (!PARTICIONES_VALIDAS.has(particion) || !/^persist:(cont|esp)-/.test(particion)) return { ok: false };
   try { await session.fromPartition(particion).clearStorageData(); } catch { /* nada */ }
   return { ok: true };
 }));
@@ -2382,6 +2491,7 @@ app.whenReady().then(async () => {
   // Si no, un contenedor navegaría con otra identidad y otras reglas, que es el
   // tipo de incoherencia que ya costó las verificaciones de Cloudflare.
   for (const p of contenedoresGuardados()) preparaContenedor(p);
+  for (const e of (settings.espacios || [])) if (e.particion) preparaContenedor(e.particion);
   splashProgreso(74);
   createWindow(false, true); // la primera ventana es la que releva al splash
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
