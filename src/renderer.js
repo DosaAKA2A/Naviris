@@ -33,13 +33,94 @@ const els = {};
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
   'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
-  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir'
+  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir', 'sb-espacios', 'esp-pop'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
 // volver ya se había recargado). Edge duerme a las 2 h y Chrome ronda ahí;
 // 30 min es el punto en que ya no molesta y aún libera memoria de verdad.
 let divId = null;   // pestaña acompañante de la pantalla dividida (ver más abajo)
+
+/* ===== Espacios =====
+   Un espacio es un grupo de pestañas: el trabajo por un lado, lo personal por
+   otro. Las pestañas de los demás espacios NO se cierran ni se recargan, solo
+   dejan de dibujarse en la barra; siguen ahí y siguen contando en el panel de
+   rendimiento, que es la verdad y no conviene esconderla.
+   Las pestañas sin espacio son las de General. Cambiar de espacio no cierra
+   nada: si el espacio al que entras está vacío se te abre una pestaña nueva. */
+let espacios = [];        // [{ id, nombre }]
+let espacioActivo = null;
+
+const enEspacio = (t) => (t.espacio || null) === (espacioActivo || null);
+const tabsVisibles = () => tabs.filter(enEspacio);
+
+function guardaEspacios() {
+  window.cobalt.setSettings({ espacios, espacioActivo }).then((s2) => { settings = s2; });
+}
+
+function creaEspacio(nombre) {
+  const e = { id: Math.random().toString(36).slice(2, 8), nombre: nombre || 'Espacio ' + (espacios.length + 1) };
+  espacios.push(e);
+  guardaEspacios();
+  return e;
+}
+
+function cambiaEspacio(id) {
+  espacioActivo = id;
+  guardaEspacios();
+  // Si la pestaña activa ya no se ve, se pasa a la última usada del espacio.
+  const activa = tabs.find((t) => t.id === activeId);
+  if (!activa || !enEspacio(activa)) {
+    const cand = tabsVisibles().sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0))[0];
+    if (cand) activateTab(cand.id);
+    else createTab();
+  }
+  renderTabs(true);
+  pintaEspacios();
+}
+
+function borraEspacio(id) {
+  // Las pestañas del espacio borrado no se pierden: vuelven al general.
+  for (const t of tabs) if (t.espacio === id) t.espacio = null;
+  espacios = espacios.filter((e) => e.id !== id);
+  if (espacioActivo === id) espacioActivo = null;
+  guardaEspacios();
+  renderTabs(true);
+  pintaEspacios();
+}
+
+function pintaEspacios() {
+  if (!els.espPop || els.espPop.classList.contains('hidden')) return;
+  const cuenta = (id) => tabs.filter((t) => (id === null ? !t.espacio : t.espacio === id)).length;
+  const fila = (id, nombre, borrable) => `<div class="ep-fila${espacioActivo === id ? ' activo' : ''}" data-id="${id === null ? '' : id}">
+      <span class="ep-n">${escapeHtml(nombre)}</span><span class="ep-c">${cuenta(id)}</span>
+      ${borrable ? '<button class="ep-x" title="Borrar espacio">' + window.icon('trash') + '</button>' : ''}
+    </div>`;
+  els.espPop.innerHTML = '<div class="ep-tit">Espacios</div>'
+    + fila(null, 'General', false)
+    + espacios.map((e) => fila(e.id, e.nombre, true)).join('')
+    + '<button class="ep-nuevo">+ Espacio nuevo</button>';
+  els.espPop.querySelectorAll('.ep-fila').forEach((f) => {
+    f.addEventListener('click', (ev) => {
+      if (ev.target.closest('.ep-x')) return;
+      cambiaEspacio(f.dataset.id || null);
+    });
+    const x = f.querySelector('.ep-x');
+    if (x) x.addEventListener('click', (ev) => { ev.stopPropagation(); borraEspacio(f.dataset.id); });
+  });
+  els.espPop.querySelector('.ep-nuevo').addEventListener('click', () => {
+    const e = creaEspacio();
+    cambiaEspacio(e.id);
+    createTab();
+  });
+}
+
+function alternaEspacios() {
+  const abrir = els.espPop.classList.contains('hidden');
+  els.espPop.classList.toggle('hidden', !abrir);
+  els.sbEspacios.classList.toggle('open', abrir);
+  if (abrir) { pintaEspacios(); anclarPop(els.espPop, els.sbEspacios); }
+}
 
 /* ===== Contenedores =====
    Un contenedor es una sesión aparte con su propio bote de cookies: sirve para
@@ -257,7 +338,7 @@ function createTab(url = null, activate = true, contenedor = null) {
     getTile(url).then((t) => { if (t?.icon) { tab.favicon = t.icon; renderTabs(); } }).catch(() => {});
     renderTabs(); saveSession(); return tab;
   }
-  const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now(), contenedor: contenedor || null };
+  const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now(), contenedor: contenedor || null, espacio: espacioActivo };
   tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
 }
 // Guarda las URLs abiertas para restaurarlas al reabrir (si el ajuste está activo).
@@ -344,6 +425,7 @@ function activateTab(id) {
   // La de novedades tambien: si no, se quedaba encima al cambiar de pestaña y
   // parecia una pestaña que no se podia cerrar (2026-08-18).
   hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
+  if (tab.espacio && tab.espacio !== espacioActivo) { espacioActivo = tab.espacio; guardaEspacios(); pintaEspacios(); }
   cerrarBuscar();   // la búsqueda es de la página que se deja atrás
   if (divId !== null && divId === id) divId = null;   // no se divide consigo misma
   els.hub.classList.toggle('active', tab.kind === 'hub');
@@ -424,6 +506,10 @@ function menuDePestana(e, tab) {
     { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
     { sep: true },
     ...(web && tab.id !== activeId ? [{ label: 'Abrir en pantalla dividida', icon: 'square-2-stack', action: () => dividirCon(tab) }] : []),
+    ...(espacios.length ? [{ sep: true }] : []),
+    ...espacios.filter((e) => e.id !== tab.espacio).map((e) => ({ label: 'Mover a ' + e.nombre, icon: 'squares-2x2', action: () => { tab.espacio = e.id; renderTabs(true); saveSession(); } })),
+    ...(tab.espacio ? [{ label: 'Sacar del espacio', icon: 'squares-2x2', action: () => { tab.espacio = null; renderTabs(true); saveSession(); } }] : []),
+    ...(espacios.length ? [{ sep: true }] : []),
     ...(web && !IS_PRIVATE ? [{ label: 'Abrir en un contenedor nuevo', icon: 'layers', action: () => abreEnContenedor(tab.url, nuevoContenedor()) }] : []),
     ...(web && !IS_PRIVATE ? contenedores.filter((c) => !tab.contenedor || c.id !== tab.contenedor.id).map((c) => ({ label: 'Abrir en ' + c.nombre, icon: 'layers', action: () => abreEnContenedor(tab.url, c) })) : []),
     ...(divId !== null && tab.id === divId ? [{ label: 'Salir de la pantalla dividida', icon: 'x-mark', action: () => salirDivision() }] : []),
@@ -519,7 +605,8 @@ function reorderTab(fromId, toId) {
 // las pestañas parecían temblar porque el navegador rehacía el layout sin parar.
 function firmaTabs() {
   return tabs.map((t) => [t.id, t.title, t.favicon || '', t.id === activeId, !!t.asleep,
-    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled, !!t.pinned].join('')).join('');
+    !!t.autoLoot, !!t.audible, !!t.muted, !!t.agentControlled, !!t.pinned,
+    t.espacio || '', t.contenedor ? t.contenedor.id : ''].join('')).join('') + '|' + (espacioActivo || '');
 }
 let ultimaFirmaTabs = null;
 function renderTabs(forzar) {
@@ -532,7 +619,7 @@ function renderTabs(forzar) {
   // AutoClaim v2: un solo canal, sin grupo de pestañas acopladas; la pestaña
   // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
-  for (const tab of tabs) els.tabstrip.appendChild(makeTabEl(tab));
+  for (const tab of tabsVisibles()) els.tabstrip.appendChild(makeTabEl(tab));
   ajustaPestanas();
 }
 /* Cuánto le toca a cada pestaña con el ancho que hay: por debajo de cierto
@@ -4183,6 +4270,7 @@ async function pintaPerf() {
   els.perfNota.textContent = 'Dormir una pestaña libera su proceso entero. Naviris ya lo hace solo a los 30 minutos sin usarla.';
 }
 
+els.sbEspacios?.addEventListener('click', alternaEspacios);
 els.sbPerf?.addEventListener('click', () => togglePerf());
 els.perfClose?.addEventListener('click', () => togglePerf(false));
 
@@ -6041,6 +6129,8 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
   contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];
+  espacios = Array.isArray(settings.espacios) ? settings.espacios : [];
+  espacioActivo = settings.espacioActivo || null;
   // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
   // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
   // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).

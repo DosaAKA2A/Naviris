@@ -1,0 +1,20 @@
+{
+  "version": "2.7.7-dev.18",
+  "linea": "dev",
+  "titulo": "Espacios: separa el trabajo de lo tuyo",
+  "entradilla": "Grupos de pestañas independientes. Cambias de espacio y la barra cambia entera, sin cerrar ni recargar nada.",
+  "bloques": [
+    {
+      "titulo": "Dónde está",
+      "texto": "Nuevo icono en la barra lateral. Ahí ves los espacios que tienes, cuántas pestañas hay en cada uno y puedes crear otro. Las pestañas que no están en ningún espacio viven en General."
+    },
+    {
+      "titulo": "No se pierde nada",
+      "texto": "Cambiar de espacio solo cambia lo que se dibuja en la barra: las pestañas del otro siguen abiertas, siguen sonando si estaban sonando y siguen apareciendo en el panel de rendimiento, que para eso está. Si entras en un espacio vacío se te abre una pestaña nueva."
+    },
+    {
+      "titulo": "Mover pestañas",
+      "texto": "Clic derecho en una pestaña para mandarla a otro espacio o sacarla al General. Y si borras un espacio, sus pestañas no se cierran: vuelven al General."
+    }
+  ]
+}
