@@ -27,15 +27,10 @@ const pkg = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8'))
 const VER = pkg.version;
 const ES_DEV = /-dev/i.test(VER);
 const CANAL = ES_DEV ? 'dev.yml' : 'latest.yml';
-/* Una versión ESTABLE alimenta los DOS canales.
-   Motivo: una instalación dev sigue dev.yml, así que si una estable solo
-   escribiera latest.yml, quien esté en dev se quedaría clavado en la última
-   prerelease y no vería nunca la versión buena — tendría que reinstalar a mano.
-   Publicando el mismo build en los dos feeds, cualquiera que esté en cualquier
-   versión salta directo a la última, sin pasar por ninguna intermedia.
-   Al revés NO: una dev no toca latest.yml, o las instalaciones estables se
-   tragarían una prerelease sin pedirlo. */
-const CANALES = ES_DEV ? ['dev.yml'] : ['latest.yml', 'dev.yml'];
+/* Cada línea escribe SOLO su feed: una estable no toca dev.yml, o las
+   instalaciones dev verían una versión de la otra línea. Las dos líneas no se
+   cruzan; si quien está en dev tiene que recibir algo, se publica en dev. */
+const CANALES = [CANAL];
 const TAG = 'v' + VER;
 const [OWNER, REPO] = ['DosaAKA2A', 'Naviris'];
 const DRY = process.argv.includes('--dry');
