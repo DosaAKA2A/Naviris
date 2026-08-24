@@ -934,6 +934,11 @@ const ATAJOS_UI = [
   // atajo de addon solo respondería con el foco en la interfaz, nunca leyendo
   // una página, que es justo cuando hace falta.
   { k: 's', mod: (i) => i.alt && !i.control && !i.shift, cmd: 'addon-s' },
+  // Buscar en la pagina. Tiene que estar AQUI y no solo en el renderer: con el
+  // foco dentro de una web las teclas no llegan a la ventana de Naviris, y
+  // leyendo una pagina es justo cuando se usa Ctrl+F.
+  { k: 'f', mod: (i) => i.control && !i.shift && !i.alt, cmd: 'find' },
+  { k: 'F3', mod: () => true, cmd: 'find' },
   { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
   { k: 'h', mod: (i) => i.control, cmd: 'history' },
   { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },

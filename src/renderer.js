@@ -5642,6 +5642,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
   else if (cmd === 'pip') miniReproductor();
   else if (cmd.startsWith('addon-')) lanzaAtajoAddon(cmd.slice(6));
+  else if (cmd === 'find') abrirBuscar();
   else if (cmd === 'downloads') toggleDownloadsPage();
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();

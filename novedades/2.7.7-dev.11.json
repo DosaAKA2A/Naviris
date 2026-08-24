@@ -1,0 +1,12 @@
+{
+  "version": "2.7.7-dev.11",
+  "linea": "dev",
+  "titulo": "El Ctrl+F ahora sí responde dentro de las webs",
+  "entradilla": "El buscador de página que llegó en la versión anterior solo se abría con el foco en la interfaz de Naviris. Leyendo una web, que es cuando se usa, no hacía nada.",
+  "bloques": [
+    {
+      "titulo": "Qué pasaba",
+      "texto": "Las teclas pulsadas dentro de una web no llegan a la ventana de Naviris: las recibe la propia página. Los atajos que tienen que funcionar mientras lees (Ctrl+T, Ctrl+W, Ctrl+L...) pasan por otro camino, y el Ctrl+F se quedó fuera de esa lista. Ahora está dentro, junto con F3."
+    }
+  ]
+}
