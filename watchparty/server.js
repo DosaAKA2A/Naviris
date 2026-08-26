@@ -64,7 +64,11 @@ function onMessage(sock, str) {
   if (!sock._room) return; // el resto requiere estar en una sala
   if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat') {
     // Reenviar tal cual a los demás de la sala (nunca al emisor: evita eco).
+    // `host` va siempre: el guard del candado de video del receptor descarta
+    // cualquier nav que no venga marcado como del anfitrión (paridad con el
+    // worker de Cloudflare, que lo añade desde 2026-08-15).
     m.from = sock._name;
+    m.host = !!sock._host;
     broadcast(sock._room, m, sock);
   }
 }
