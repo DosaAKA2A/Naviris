@@ -1,0 +1,16 @@
+{
+  "version": "2.7.10-dev.2",
+  "linea": "dev",
+  "titulo": "MOOVIN estrena dominio propio",
+  "entradilla": "La biblioteca ya no vive colgada de la web del estudio: ahora tiene su propia dirección, y Naviris entra por ella.",
+  "bloques": [
+    {
+      "titulo": "El widget entra por moovin.live",
+      "texto": "El acceso del hub llevaba a la dirección vieja, dentro de iris.it.com. Ahora abre moovin.live, que es donde vive MOOVIN, y el pase de la biblioteca se sigue poniendo solo: no hay que escribir nada."
+    },
+    {
+      "titulo": "Watch Party reconoce las dos direcciones",
+      "texto": "El complemento se ilumina igual entres por la dirección nueva o por la vieja, y una misma sala mezcla sin problema a quien llegue por cada una: la película se identifica por su enlace, que no ha cambiado."
+    }
+  ]
+}
