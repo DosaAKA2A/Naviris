@@ -1,6 +1,6 @@
-/* Naviris addon: Watch Party v2.7.1
+/* Naviris addon: Watch Party v2.7.2
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
-   MOOVIN (iris.it.com/moovin).
+   MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia
    cuenta; solo se sincronizan las señales de control (play/pausa/seek) y un
    chat, vía el relay de Cloudflare.
@@ -25,7 +25,9 @@
    español neutro. Requiere Naviris 2.7.3-dev.12+ (el CSP anterior bloqueaba
    la conexión con el servidor de salas y unirse no hacía nada).
 
-   v2.6.0: soporta MOOVIN (iris.it.com/moovin), el reproductor propio de IRIS
+   v2.7.2: MOOVIN tiene dominio propio (moovin.live); se reconoce en los dos,
+   y la identidad del video no cambia, asi que las salas siguen mezclandose.
+   v2.6.0: soporta MOOVIN (entonces iris.it.com/moovin), el reproductor de IRIS
    Studio para ver una película cargada por enlace o archivo local.
    La página habla el mismo protocolo del relay, así que una sala creada allí
    y una creada desde este addon son intercambiables. La identidad del video
@@ -239,7 +241,9 @@
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
-    // MOOVIN: solo la ruta /moovin (el resto de iris.it.com no reproduce).
+    // MOOVIN: en moovin.live es todo el dominio; en iris.it.com (que sigue vivo
+    // por la tele) solo la ruta /moovin, el resto del estudio no reproduce.
+    if (/(^|\.)moovin\.live$/.test(h)) return 'iris';
     if (/(^|\.)iris\.it\.com$/.test(h) && /^\/moovin(\/|$)/.test(p)) return 'iris';
     return null;
   }
@@ -262,9 +266,9 @@
     // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él,
     // la página vacía cuenta como "el mismo sitio" para no forzar navegación
     // cuando el anfitrión reproduce un archivo local.
-    m = /iris\.it\.com\/moovin[^#]*[?&]v=([^&#]+)/i.exec(url || '');
+    m = /(?:moovin\.live|iris\.it\.com\/moovin)[^#]*[?&]v=([^&#]+)/i.exec(url || '');
     if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
-    if (/iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
+    if (/moovin\.live(\/|$|\?)|iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
     return null;
   }
   function fmtT(s) {
@@ -515,7 +519,7 @@
     if (modoActual === 'fuera') {
       if (ui.hint) ui.hint.textContent = site
         ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola a lo que vea el anfitrión.'
-        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o MOOVIN (iris.it.com/moovin) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o MOOVIN (moovin.live) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
       if (ui.crear) ui.crear.disabled = !site;
       if (ui.unirse) ui.unirse.disabled = !site;
       return;

@@ -213,8 +213,12 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
 // que aquí la pantalla del pase no llega a verse. Si la persona lo escribe a mano
 // en la página, se guarda solo para las próximas veces, incluso si luego borra los
 // datos del sitio. El pase no llega a ningún otro dominio: main.js solo lo entrega
-// y solo lo acepta desde iris.it.com.
-if (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0) {
+// y solo lo acepta desde moovin.live y iris.it.com.
+// MOOVIN vive en moovin.live y ahí la biblioteca es la RAÍZ; en iris.it.com sigue
+// colgando de /moovin (la tele todavía descarga la interfaz de esa dirección).
+const enMoovin = /(^|\.)moovin\.live$/.test(location.hostname) ||
+  (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0);
+if (enMoovin) {
   try {
     const pase = ipcRenderer.sendSync('moovin:pase');
     // La clave de la app entra sola aunque esta persona no haya escrito nunca

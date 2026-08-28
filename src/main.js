@@ -1478,14 +1478,17 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
 ipcMain.on('yt-adblock-on', (e, url) => {
   e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
 });
-// Pase de la biblioteca de MOOVIN (iris.it.com/moovin, privada). Naviris lo
-// recuerda a nivel de navegador para que ahí no aparezca la pantalla del pase.
-// A diferencia de los dos de arriba esto SÍ es un secreto, y el preload corre en
-// todos los sitios: solo se entrega y solo se acepta desde iris.it.com. Tampoco
-// entra en la sincronización de la cuenta: no sale de este equipo.
+// Pase de la biblioteca de MOOVIN (moovin.live, y iris.it.com/moovin mientras
+// siga vivo), privada. Naviris lo recuerda a nivel de navegador para que ahí no
+// aparezca la pantalla del pase. A diferencia de los dos de arriba esto SÍ es un
+// secreto, y el preload corre en todos los sitios: solo se entrega y solo se
+// acepta desde esos dos dominios. Tampoco entra en la sincronización de la
+// cuenta: no sale de este equipo.
 const esMoovin = (e) => {
-  try { return /(^|\.)iris\.it\.com$/.test(new URL(e.senderFrame.url).hostname); }
-  catch { return false; }
+  try {
+    const h = new URL(e.senderFrame.url).hostname;
+    return /(^|\.)moovin\.live$/.test(h) || /(^|\.)iris\.it\.com$/.test(h);
+  } catch { return false; }
 };
 ipcMain.on('moovin:pase', (e) => { e.returnValue = esMoovin(e) ? (settings.moovinPase || '') : ''; });
 ipcMain.on('moovin:pase-set', (e, v) => {

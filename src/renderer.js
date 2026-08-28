@@ -3236,7 +3236,7 @@ function renderMoovinW(body) {
     <div class="mv-cartel">${window.icon('tv')}</div>
     <div class="mv-meta"><div class="mv-tit">Moovin</div><div class="mv-sub">Tu biblioteca privada</div></div>
     <button class="mv-play" title="Entrar">${window.icon('play')}</button>`;
-  const abre = (e) => { e?.stopPropagation(); navigateActive('https://iris.it.com/moovin/'); };
+  const abre = (e) => { e?.stopPropagation(); navigateActive('https://moovin.live/'); };
   body.querySelector('.mv-play').addEventListener('click', abre);
   body.addEventListener('click', abre);
 }
