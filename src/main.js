@@ -1096,6 +1096,24 @@ const SCROLLBAR_CSS = `
   ::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; }
 `;
 
+/* La marca del foco de serie (2026-08-29, peticion de Dosa: "que sea muchisimo
+   mas imperceptible, que no sea de un color, solo blanco, nada mas, o gris").
+   El anillo que pinta Chromium por su cuenta es grueso y tirando a dorado, y
+   sobre un fondo negro -el reproductor de MOOVIN- canta mas que el propio
+   control. Aqui se cambia por una linea gris de 1 px, del mismo gris del
+   scrollbar por la misma razon: vale igual en claro y en oscuro.
+
+   Va con :where(), que no suma especificidad: asi le gana al estilo de serie
+   del navegador (basta con ser CSS de autor) pero PIERDE contra cualquier
+   regla de la propia web. Una pagina que se haya disenado su foco se lo
+   queda. */
+const FOCO_CSS = `
+  :where(:focus-visible) {
+    outline: 1px solid rgba(128,128,132,.9);
+    outline-offset: 2px;
+  }
+`;
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     suppressWebAuthn(contents);
@@ -1117,6 +1135,7 @@ app.on('web-contents-created', (_event, contents) => {
       // claro y oscuro sin adivinar el tema de cada web. Va con !important
       // porque compite con el CSS del sitio.
       contents.insertCSS(SCROLLBAR_CSS).catch(() => {});
+      contents.insertCSS(FOCO_CSS).catch(() => {});
       let host = '';
       try { host = new URL(contents.getURL()).hostname; } catch { return; }
       // Ocultado cosmético + scriptlets de las listas de Brave (como uBlock/Brave)
