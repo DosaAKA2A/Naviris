@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('cobalt', {
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
   onMaximized: (cb) => ipcRenderer.on('win:maximized', (_e, v) => cb(v)),
 
+  /* El token de la cuenta de Naviris, para que el main pueda pedirle al
+     worker la prueba de identidad que MOOVIN necesita. Se queda en memoria
+     del main, no se guarda en ningun sitio. */
+  cuentaToken: (t) => ipcRenderer.send('cuenta:token', t || ''),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   restart: () => ipcRenderer.send('app:restart'),

@@ -8,7 +8,7 @@
  * salen del equipo.
  *
  * KV (binding SYNC):
- *   acct:<email>      -> { salt, hash, created }
+ *   acct:<email>      -> { salt, hash, created, nid? }   nid: id opaco para MOOVIN
  *   tok:<sha256(tok)> -> email            (expirationTtl 90 dias)
  *   sync:<email>      -> { data, updatedAt }
  *   av:<email>        -> foto de perfil (data URI, <= 64 KB)
@@ -173,6 +173,50 @@ export default {
           await env.SYNC.put('sync:' + em, JSON.stringify({ data, updatedAt }));
           return json({ ok: true, updatedAt });
         }
+      }
+
+      /* IDENTIDAD PARA MOOVIN.
+         MOOVIN dejo de abrirse con una clave metida en el instalador (eso
+         entraba CUALQUIERA que usara Naviris) y ahora entra a la cuenta de
+         MOOVIN que este atada a esta de Naviris. Aqui se firma la prueba de
+         que quien pregunta es el dueno de esta cuenta.
+
+         Lo que NO se manda es el correo. En Naviris el correo no se verifica
+         nunca -- se registra quien quiera con el de otro -- asi que no prueba
+         identidad y MOOVIN no debe fiarse de el. Va un identificador opaco.
+
+         El identificador se genera la PRIMERA vez y se guarda en la cuenta.
+         No se deriva del correo (seria el correo disfrazado) ni del secreto
+         compartido (rotarlo romperia todos los vinculos de golpe).
+
+         El secreto NAVIRIS_VINCULO_KEY no sale de aqui: firmar en el cliente
+         obligaria a meterlo en el instalador, que es justo el problema del
+         que se viene huyendo. Detalle del formato y del otro lado en
+         moovin/worker/VINCULO-NAVIRIS.md del repo Iris. */
+      if (req.method === 'POST' && url.pathname === '/moovin/identidad') {
+        const em = await auth(env, req);
+        if (!em) return json({ ok: false, error: 'Sesión caducada: vuelve a entrar' }, 401);
+        const secreto = String(env.NAVIRIS_VINCULO_KEY || '').trim();
+        if (!secreto) return json({ ok: false, error: 'El vínculo con MOOVIN no está configurado' }, 503);
+        const acct = JSON.parse((await env.SYNC.get('acct:' + em)) || 'null');
+        if (!acct) return json({ ok: false, error: 'Cuenta no encontrada' }, 404);
+        if (!acct.nid) {
+          acct.nid = 'nav_' + [...crypto.getRandomValues(new Uint8Array(12))]
+            .map((b) => b.toString(16).padStart(2, '0')).join('');
+          await env.SYNC.put('acct:' + em, JSON.stringify(acct));
+        }
+        // Dos minutos: dentro de esa ventana una prueba robada valdria, y la
+        // unica defensa es que la ventana sea corta. MOOVIN ademas rechaza
+        // cualquiera que diga durar mas de diez.
+        const caduca = Math.floor(Date.now() / 1000) + 120;
+        const texto = 'v1.' + acct.nid + '.' + caduca;
+        const clave = await crypto.subtle.importKey(
+          'raw', new TextEncoder().encode(secreto), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        );
+        const f = new Uint8Array(await crypto.subtle.sign('HMAC', clave, new TextEncoder().encode(texto)));
+        let s = ''; for (const b of f) s += String.fromCharCode(b);
+        const firma = btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return json({ ok: true, prueba: texto + '.' + firma });
       }
 
       return json({ ok: false, error: 'Ruta desconocida' }, 404);

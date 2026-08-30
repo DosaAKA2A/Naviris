@@ -3228,9 +3228,10 @@ function actualizaDescargasW() {
 
 
 /* ============ Widget MOOVIN (2026-08-12) ============
-   Acceso a la biblioteca privada de MOOVIN: Naviris ya
-   pone el pase solo al entrar (moovin:pase en main), asi que el widget es la
-   puerta — cartel con play y entrada directa. */
+   Acceso a la biblioteca privada de MOOVIN. Desde 2.7.10-dev.4 Naviris ya NO
+   pone el pase: entra a la cuenta de MOOVIN que este vinculada a esta cuenta
+   de Naviris (ver `moovin:identidad` en main). Sin cuenta, o sin vincular,
+   MOOVIN enseña su pantalla de entrada. El widget sigue siendo la puerta. */
 function renderMoovinW(body) {
   body.innerHTML = `
     <div class="mv-cartel">${window.icon('tv')}</div>
@@ -3625,6 +3626,14 @@ setInterval(() => { wxCache = null; loadWeatherPill(); }, 30 * 60 * 1000); // re
 /* ============ Cuenta Naviris (sincronización de preferencias) ============ */
 const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
 let account = store.get('cobalt.account', null); // { email, token }
+/* El main necesita el token para pedirle al worker la prueba de identidad
+   que MOOVIN cambia por una sesion. Se le pasa al arrancar, al entrar y al
+   salir; el se lo queda solo en memoria. */
+const avisaTokenCuenta = () => {
+  try { cobalt.cuentaToken(account && account.token ? account.token : ''); }
+  catch (e) { /* version del preload sin esto */ }
+};
+avisaTokenCuenta();
 // Qué viaja: preferencias de usuario + marcadores + accesos + widgets + notas +
 // fondo. NUNCA contraseñas, tarjetas, historial ni sesión (locales por diseño).
 const SYNC_SETTINGS = ['lightMode', 'smartSearch', 'xRevealSensitive', 'blockPasskeys', 'restoreSession', 'powerSaver', 'adblockEnabled', 'adblockWhitelist', 'atajos', 'mouseNav'];
@@ -3820,6 +3829,7 @@ async function accAuth(path) {
   if (!r.ok) { accError(r.error || 'No se pudo iniciar sesión'); return; }
   account = { email: r.email, token: r.token };
   store.set('cobalt.account', account);
+  avisaTokenCuenta();
   renderAccountPill();
   // Al entrar: si la cuenta ya tiene datos se cargan aquí (eso es "moverse de PC");
   // si está vacía (recién creada), se sube lo de este equipo.
@@ -3837,6 +3847,7 @@ $('#acc-logout').addEventListener('click', async () => {
   store.set('cobalt.account.foto', null);
   store.set('cobalt.account.nombre', '');
   account = null; store.set('cobalt.account', null); store.set('cobalt.syncStamp', 0);
+  avisaTokenCuenta();
   renderAccountPill(); showAccountModal();
 });
 let lastPushJson = '';
@@ -3845,7 +3856,7 @@ async function accPush() {
   const data = buildSyncData();
   const r = await accRequest('/sync', { method: 'PUT', body: JSON.stringify({ data }) });
   if (r.ok) { lastPushJson = JSON.stringify(data); store.set('cobalt.syncStamp', r.updatedAt); }
-  else if (/Sesión caducada/.test(r.error || '')) { account = null; store.set('cobalt.account', null); renderAccountPill(); }
+  else if (/Sesión caducada/.test(r.error || '')) { account = null; store.set('cobalt.account', null); avisaTokenCuenta(); renderAccountPill(); }
   return r;
 }
 $('#acc-sync').addEventListener('click', async () => {

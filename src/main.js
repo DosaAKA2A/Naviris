@@ -1497,6 +1497,12 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
 ipcMain.on('yt-adblock-on', (e, url) => {
   e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
 });
+/* PUENTE, A QUITAR. Desde 2.7.10-dev.4 el preload YA NO PIDE ni el pase ni la
+   clave de la app: MOOVIN entra por el vinculo de mas abajo. Estos dos
+   manejadores se quedan solo por si hay que volver atras deprisa, y se van
+   -- junto con src/app-key.js y el secreto NAVIRIS_KEY del worker de MOOVIN --
+   cuando esta version lleve un tiempo publicada. Ver
+   moovin/worker/VINCULO-NAVIRIS.md en el repo Iris. */
 // Pase de la biblioteca de MOOVIN (moovin.live, y iris.it.com/moovin mientras
 // siga vivo), privada. Naviris lo recuerda a nivel de navegador para que ahí no
 // aparezca la pantalla del pase. A diferencia de los dos de arriba esto SÍ es un
@@ -1527,6 +1533,35 @@ ipcMain.on('moovin:pase-set', (e, v) => {
 let CLAVE_APP = '';
 try { CLAVE_APP = String(require('./app-key') || '').trim(); } catch { /* sin clave: se pide el pase */ }
 ipcMain.on('moovin:clave-app', (e) => { e.returnValue = esMoovin(e) ? CLAVE_APP : ''; });
+
+/* IDENTIDAD PARA MOOVIN. Sustituye a las dos credenciales de arriba: en vez
+   de abrirle la biblioteca a cualquiera que use Naviris, MOOVIN entra a la
+   cuenta que este ATADA a esta cuenta de Naviris.
+
+   El token de la cuenta vive en el hub (localStorage del renderer). Se copia
+   aqui EN MEMORIA -- nunca a settings ni a disco -- porque quien tiene que
+   hablar con el worker es el main: asi el token no entra jamas en el mundo
+   de la pagina de MOOVIN, que solo recibe la prueba ya firmada y con dos
+   minutos de vida.
+
+   La prueba la firma el worker de Naviris con un secreto que NO viaja en el
+   instalador. Ese es el punto de todo esto. */
+const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
+let TOKEN_CUENTA = '';
+ipcMain.on('cuenta:token', (_e, v) => {
+  TOKEN_CUENTA = (typeof v === 'string' && /^[0-9a-f]{64}$/.test(v)) ? v : '';
+});
+ipcMain.handle('moovin:identidad', async (e) => {
+  if (!esMoovin(e) || !TOKEN_CUENTA) return '';
+  try {
+    const r = await fetch(ACC_API + '/moovin/identidad', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN_CUENTA }
+    });
+    if (!r.ok) return '';
+    const j = await r.json();
+    return String((j && j.prueba) || '');
+  } catch { return ''; }
+});
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());

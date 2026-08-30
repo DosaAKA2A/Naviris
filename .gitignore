@@ -13,3 +13,7 @@ src/app-key.js
 
 # Maquetas de diseno: se miran, no se publican
 diseno/
+
+# Secretos de wrangler dev: NUNCA al repo (main es publico)
+.dev.vars
+**/.dev.vars

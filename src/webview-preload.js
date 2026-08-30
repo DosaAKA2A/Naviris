@@ -220,26 +220,22 @@ const enMoovin = /(^|\.)moovin\.live$/.test(location.hostname) ||
   (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0);
 if (enMoovin) {
   try {
-    const pase = ipcRenderer.sendSync('moovin:pase');
-    // La clave de la app entra sola aunque esta persona no haya escrito nunca
-    // el pase: es lo que hace que MOOVIN se abra directo en cualquier Naviris.
-    // Si el build no lleva clave, viaja vacía y la página pide el pase.
-    const claveApp = ipcRenderer.sendSync('moovin:clave-app');
-    if (pase || claveApp) {
-      contextBridge.executeInMainWorld({
-        func: function (p, c) {
-          if (p) window.__navMoovinPase = p;
-          if (c) window.__navMoovinApp = c;
-        },
-        args: [pase, claveApp]
-      });
-    }
-    window.addEventListener('load', () => {
-      try {
-        const puesto = localStorage.getItem('moovinPase') || '';
-        if (puesto && puesto !== pase) ipcRenderer.send('moovin:pase-set', puesto);
-      } catch (e) { /* nada */ }
-    });
+    /* DESDE 2.7.10-dev.4 Naviris YA NO ENTREGA EL PASE NI LA CLAVE DE LA APP.
+       Las dos abrian la biblioteca a cualquiera que usara Naviris, que es
+       justo lo que Dosa pidio quitar. En su lugar se ofrece una sola funcion
+       que devuelve una prueba firmada de QUE CUENTA de Naviris es esta; MOOVIN
+       la cambia por la sesion de la cuenta que este atada a ella, y si no hay
+       ninguna enseña su pantalla de entrada de siempre.
+
+       El token de la cuenta no pasa por aqui: la prueba la pide el main al
+       worker y lo unico que llega al mundo de la pagina es la cadena firmada,
+       que dura dos minutos y no dice ni el correo.
+
+       Se expone con exposeInMainWorld y no con executeInMainWorld porque la
+       funcion tiene que seguir hablando con ipcRenderer: executeInMainWorld
+       serializa el cuerpo y alli dentro no existe. */
+    contextBridge.exposeInMainWorld('__navMoovinIdentidad',
+      () => ipcRenderer.invoke('moovin:identidad').catch(() => ''));
   } catch (e) { /* nada */ }
 }
 
