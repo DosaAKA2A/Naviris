@@ -33,6 +33,8 @@
    y una creada desde este addon son intercambiables. La identidad del video
    es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:moovin.
 
+   v2.7.3: en la sala se ven las CARAS, no solo iniciales. MOOVIN ya mandaba
+   el avatar en cada mensaje y aquí no se miraba.
    v2.6.2: el reproductor se llama MOOVIN y aquí seguía saliendo el nombre
    anterior. Además el sufijo que se recortaba de "Viendo: …" era el del
    nombre anterior, que la página ya no escribe: ahora pone "— MOOVIN", así
@@ -184,7 +186,8 @@
     /* Chat: ocupa todo el alto; mensajes con avatar (estilo Teleparty) */
     '.nvp-chat{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px}',
     '.nvp-msg{display:flex;gap:9px;align-items:flex-start}',
-    '.nvp-av{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:rgba(10,10,14,.78)}',
+    '.nvp-av{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:rgba(10,10,14,.78);overflow:hidden}',
+    '.nvp-av img{width:100%;height:100%;object-fit:cover;display:block}',
     '.nvp-mb{min-width:0;flex:1;padding-top:1px}',
     '.nvp-who{font-size:12.5px;font-weight:700;color:var(--text,#ececef);line-height:1.4}',
     '.nvp-act{font-size:12px;font-style:italic;color:var(--muted,#8b8d94);line-height:1.5}',
@@ -203,6 +206,18 @@
   document.head.appendChild(css);
 
   /* Color estable por autor (paleta suave, sin depender del core) */
+  /* Avatares del elenco. MOOVIN manda el suyo en el campo `av` de CADA
+     mensaje desde hace tiempo, pero aqui no se miraba: en la sala todo el
+     mundo salia con su inicial mientras en MOOVIN se veian las caras.
+     La lista es CERRADA a proposito: el `av` viene de otra persona de la
+     sala, y con una lista fija nunca se compone una URL con un valor ajeno.
+     Los SVG son publicos (moovin.live/avatares/<id>.svg): no hacen falta ni
+     pase ni cuenta para verlos. */
+  var AVATARES = ['aria', 'pj1', 'pj2', 'pj3', 'pj4', 'pj5', 'pj6', 'pj7', 'pj8', 'pj9', 'pj10', 'pj11'];
+  var avs = {};   // nombre -> id de avatar, aprendido de los mensajes
+  function apuntaAv(who, av) {
+    if (who && AVATARES.indexOf(av) !== -1) avs[who] = av;
+  }
   function nameColor(name) {
     var h = 0; for (var i = 0; i < (name || '?').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     return 'hsl(' + (h % 360) + ', 55%, 72%)';
@@ -435,6 +450,9 @@
       ws.onmessage = function (ev) {
         if (!party || party.ws !== ws) return;
         var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
+        // El avatar viaja en TODO mensaje (join/ev/beat/chat), asi que se
+        // aprende de cualquiera de ellos.
+        if (m.who && m.av) apuntaAv(m.who, m.av);
         if (m.t === 'joined') {
           var volvia = party.everOk;
           party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
@@ -542,9 +560,22 @@
   }
   function avatar(who) {
     var av = document.createElement('span'); av.className = 'nvp-av';
+    var id = avs[who];
+    if (id && AVATARES.indexOf(id) !== -1) {
+      var img = document.createElement('img');
+      img.src = 'https://moovin.live/avatares/' + id + '.svg';
+      img.alt = '';
+      // Si no carga (sin red, o el archivo ya no esta) se cae a la inicial.
+      img.addEventListener('error', function () { av.innerHTML = ''; pintaInicial(av, who); });
+      av.appendChild(img);
+      return av;
+    }
+    pintaInicial(av, who);
+    return av;
+  }
+  function pintaInicial(av, who) {
     av.style.background = nameColor(who);
     av.textContent = (who || '?').trim().charAt(0).toUpperCase() || '?';
-    return av;
   }
   // Chat incremental: solo añade lo nuevo (no se rehace, así no se pierde el
   // scroll ni el foco mientras escribes). Mensajes seguidos de la misma
