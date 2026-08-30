@@ -172,6 +172,176 @@ try {
   });
 } catch (e) { /* nada */ }
 
+
+/* ===== Enlaces ya visitados (el morado de toda la vida) =====
+   Electron NO trae la pieza de Chrome que hace esto: la lista de enlaces
+   visitados vive en el servicio de historial del navegador, que Chromium
+   tiene y Electron no implementa. Medido el 2026-08-30 contra Chrome con la
+   misma pagina: Chrome pinta el visitado en morado y Naviris lo dejaba azul.
+   No hay API de Electron para esto (ni una sola mencion a "visited" en sus
+   tipos), asi que se hace a mano con el historial que Naviris ya guarda.
+
+   DOS REGLAS, y las dos importan:
+
+   1. SOLO ENLACES DEL MISMO SITIO. Es lo que hace Chrome desde que reparte
+      `:visited` por sitio: un enlace se ve visitado solo si se visito DESDE
+      ese mismo sitio. Aqui se aproxima con "el enlace es del mismo sitio que
+      la pagina", y el motivo es de seguridad, no de estetica: la pagina puede
+      leer con `getComputedStyle` el color que le pongamos, asi que marcar
+      enlaces de FUERA seria regalarle el historial a cualquier web. Marcando
+      solo los suyos no se entera de nada que no supiera ya.
+
+   2. SE USA EL `:visited` QUE DEFINA LA PROPIA PAGINA. No se inventa un
+      morado: se buscan sus reglas `a:visited` y se reaplican. Si la pagina no
+      define ninguna, no se toca nada — que es exactamente lo que se veria en
+      Chrome, porque ahi tampoco cambiaria de color. */
+const VIS = { marcados: new WeakSet(), estilo: null, pendiente: 0, encendido: true };
+function reglasVisited() {
+  /* Las declaraciones que la pagina asocia a `a:visited`. Las hojas de otro
+     origen no dejan leer sus reglas (lanzan): se saltan sin ruido. */
+  const trozos = [];
+  /* HAY QUE BAJAR a las reglas anidadas. Wikipedia, por ejemplo, mete su
+     `a:visited` dentro de un `@media`, y mirando solo el primer nivel no se
+     encontraba nada: el enlace quedaba sin marcar aunque todo lo demas de la
+     cadena funcionara. Vale para @media, @supports y @layer. */
+  const recorre = (reglas, prof) => {
+    if (!reglas || prof > 4) return;
+    for (const regla of Array.from(reglas)) {
+      /* El selector SE MIRA PRIMERO. En Chromium moderno una regla normal
+         tambien tiene `cssRules` (viene con el CSS anidado), y es una lista
+         vacia pero CIERTA: comprobandolo antes, todas las reglas se tomaban
+         por bloques de grupo y no se miraba el selector de ninguna. */
+      if (regla.selectorText) {
+        /* Solo el `:visited` a secas. Wikipedia, por ejemplo, define tambien
+           `a:visited:hover`, y como se pegan todas las declaraciones en una
+           sola regla, la ultima gana: el enlace visitado se quedaba SIEMPRE
+           con el color de cuando pasas el raton por encima. */
+        const sel = regla.selectorText;
+        /* Ademas del hover, fuera las reglas con CLASE o ID. Wikipedia define
+           `.new:visited` para los enlaces rotos (rojo) y `.mw-destructive`
+           para otros: si se cuelan, como todo acaba pegado en una sola regla,
+           el ultimo color gana y los enlaces visitados salian rojos. Se busca
+           el `:visited` GENERICO, que es el que describe el caso normal. */
+        const soloVisitado = sel.indexOf(":visited") !== -1
+          && sel.indexOf(":hover") === -1 && sel.indexOf(":active") === -1
+          && sel.indexOf(":focus") === -1
+          && sel.indexOf(".") === -1 && sel.indexOf("#") === -1;
+        if (soloVisitado && regla.style && regla.style.cssText) {
+          trozos.push(regla.style.cssText);
+        }
+        if (regla.cssRules && regla.cssRules.length) recorre(regla.cssRules, prof + 1);
+        continue;
+      }
+      if (regla.cssRules) recorre(regla.cssRules, prof + 1);   // @media, @supports, @layer
+    }
+  };
+  for (const hoja of Array.from(document.styleSheets)) {
+    let reglas = null;
+    try { reglas = hoja.cssRules; } catch (e) { continue; }   // hoja de otro origen
+    recorre(reglas, 0);
+  }
+  return trozos;
+}
+function ponEstilo() {
+  /* El respaldo NO se da por bueno para siempre. Si la primera respuesta
+     llega antes de que la pagina tenga sus hojas listas, se pondria el morado
+     generico y ya no se volveria a mirar; asi, en cuanto se puedan leer sus
+     reglas, se cambia al color que la web quiere. */
+  if (VIS.estilo && !VIS.esRespaldo) return true;
+  const trozos = reglasVisited();
+  if (VIS.estilo && VIS.esRespaldo && !trozos.length) return true;   // sigue sin poder leerse
+  /* Si la pagina define su `:visited`, se usa el suyo y queda igual que en
+     Chrome. Si no se puede leer —muchas hojas son de otro origen y el
+     navegador no deja mirarlas, le pasa a Wikipedia— se cae al morado de toda
+     la vida, eligiendo el tono segun el fondo: el #551A8B clasico sobre claro
+     no se ve en una web oscura. */
+  let css;
+  if (trozos.length) {
+    css = ".nav-visitado{" + trozos.join(";") + "}";
+  } else {
+    let claro = true;
+    try {
+      const f = getComputedStyle(document.body || document.documentElement).backgroundColor;
+      const m = f && f.match(/\d+/g);
+      if (m && m.length >= 3 && !(m[3] === '0')) {
+        claro = (0.299 * (+m[0]) + 0.587 * (+m[1]) + 0.114 * (+m[2])) > 128;
+      }
+    } catch (e) { /* se queda en claro */ }
+    css = ".nav-visitado{color:" + (claro ? "#551A8B" : "#c9a3ff") + " !important}";
+  }
+  if (VIS.estilo) { try { VIS.estilo.remove(); } catch (e) { /* nada */ } }
+  const s = document.createElement("style");
+  s.setAttribute("data-naviris", "visitados");
+  s.textContent = css;
+  (document.head || document.documentElement).appendChild(s);
+  VIS.estilo = s;
+  VIS.esRespaldo = !trozos.length;
+  return true;
+}
+function mismoSitio(a, b) {
+  /* "Mismo sitio" a lo bruto pero suficiente: los dos ultimos tramos del
+     dominio. No hace falta la lista publica de sufijos para lo que se usa. */
+  const corto = (h) => h.split(".").slice(-2).join(".");
+  return corto(a) === corto(b);
+}
+function pideVisitados() {
+  if (!VIS.encendido) return;
+  let urls = [];
+  try {
+    const aqui = location.hostname;
+    for (const a of Array.from(document.querySelectorAll("a[href]")).slice(0, 600)) {
+      if (VIS.marcados.has(a)) continue;
+      let u = null;
+      try { u = new URL(a.href, location.href); } catch (e) { continue; }
+      if (u.protocol !== "http:" && u.protocol !== "https:") continue;
+      if (!mismoSitio(u.hostname, aqui)) continue;   // ver la regla 1 de arriba
+      urls.push(u.href);
+    }
+  } catch (e) { return; }
+  if (!urls.length) return;
+  urls = Array.from(new Set(urls)).slice(0, 400);
+  try { ipcRenderer.sendToHost("cobalt-visitados", { urls }); } catch (e) { /* nada */ }
+}
+ipcRenderer.on("cobalt-visitados-resp", (_e, datos) => {
+  const lista = (datos && datos.urls) || [];
+  if (!lista.length) return;
+  /* Si aun no se pueden leer las hojas de la pagina, se deja para la proxima
+     vuelta: apagarlo del todo aqui era condenar la pagina entera por llegar
+     una respuesta demasiado pronto. */
+  if (!ponEstilo()) return;
+  const set = new Set(lista);
+  for (const a of Array.from(document.querySelectorAll("a[href]"))) {
+    if (VIS.marcados.has(a)) continue;
+    let u = null;
+    try { u = new URL(a.href, location.href).href; } catch (e) { continue; }
+    if (!set.has(u)) continue;
+    a.classList.add("nav-visitado");
+    VIS.marcados.add(a);
+  }
+});
+/* OJO: esto tiene que ser un ACELERADOR, no un antirrebote. Con un
+   `clearTimeout` + `setTimeout` de toda la vida, una pagina que toca el DOM
+   sin parar —Wikipedia, Google, cualquier cosa con carga diferida— reinicia
+   el temporizador antes de que salte y NO SE PREGUNTA NUNCA. Medido el
+   2026-08-30: en la pagina de prueba local funcionaba y en Wikipedia no se
+   marcaba un solo enlace, y esta era la razon. Ahora la primera llamada sale
+   ya, y las siguientes como mucho una vez por segundo y medio. */
+let ultimaRevision = 0;
+function revisaVisitados() {
+  const ahora = Date.now();
+  clearTimeout(VIS.pendiente);
+  if (ahora - ultimaRevision > 1500) { ultimaRevision = ahora; pideVisitados(); return; }
+  VIS.pendiente = setTimeout(() => { ultimaRevision = Date.now(); pideVisitados(); }, 1500);
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", revisaVisitados);
+else revisaVisitados();
+window.addEventListener("load", revisaVisitados);
+/* Las paginas que cargan resultados segun se baja (Google incluida) van
+   metiendo enlaces despues, asi que se vuelve a mirar cuando cambia el DOM. */
+try {
+  new MutationObserver(revisaVisitados).observe(document.documentElement, { childList: true, subtree: true });
+} catch (e) { /* nada */ }
+
 // --- X/Twitter: muro de verificación de edad ("contenido no apto para menores") ---
 // X decide si taparlo con el interruptor rweb_age_assurance_flow_enabled, que viaja en
 // el window.__INITIAL_STATE__ del HTML; su lector es `customOverrides[clave] ??

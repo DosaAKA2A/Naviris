@@ -578,6 +578,14 @@ function attachWebview(tab, url) {
     // al pasar el ratón debe seguir viéndose qué contenido tenía.
     if (tab.asleep || e.url === 'about:blank') return;
     tab.url = e.url; getTile(e.url).then((t) => { tab.favicon = t?.icon || null; renderTabs(); });
+    /* El historial se apunta AL NAVEGAR, que es cuando de verdad se visita
+       algo. Antes solo se apuntaba en `page-title-updated`, o sea que una
+       pagina SIN <title> no entraba en el historial NUNCA — y una en segundo
+       plano tampoco, porque ademas se pedia que fuera la pestaña activa.
+       Encontrado el 2026-08-30 persiguiendo el morado de los enlaces ya
+       visitados, que sale de aqui. El titulo se rellena luego, cuando la
+       pagina lo anuncie: `recordHistory` actualiza la entrada que ya exista. */
+    recordHistory(e.url, tab.title);
     if (tab.autoLoot) {
       const h = hostOf(e.url);
       // Solo se apaga al ir a OTRO sitio real: las URLs intermedias (about:blank,
@@ -5398,6 +5406,18 @@ async function onWebviewMessage(wv, e) {
   if (e.channel === 'cobalt-mouse-nav') {
     const dir = (e.args && e.args[0]) || '';
     if (dir === 'back') irAtras(); else if (dir === 'forward') irAdelante();
+    return;
+  }
+  /* Enlaces ya visitados. La pagina manda SOLO enlaces de su propio sitio (lo
+     filtra el preload, ver alli el porque) y aqui se le devuelven los que
+     estan en el historial. En ventana privada el historial va vacio, asi que
+     no se marca nada, que es lo correcto. */
+  if (e.channel === 'cobalt-visitados') {
+    const urls = (data && data.urls) || [];
+    if (!urls.length) return;
+    const vistas = new Set(history.map((h) => h.url));
+    const hay = urls.filter((u) => vistas.has(u));
+    if (hay.length) { try { wv.send('cobalt-visitados-resp', { urls: hay }); } catch { /* nada */ } }
     return;
   }
   // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
