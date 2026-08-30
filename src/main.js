@@ -830,7 +830,14 @@ function cerrarSplash(win) {
 let ventanaEsperandoUI = null;
 // El renderer avisa cuando la interfaz ya está en pantalla (pestañas, hub y
 // tema aplicados). Es el único hito que sabe de verdad que "ya se puede ver".
-ipcMain.on('ui:listo', () => {
+ipcMain.on('ui:listo', (e) => {
+  // La ventana que acaba de montarse puede traer una pestaña sacada de otra.
+  const suya = BrowserWindow.fromWebContents(e.sender);
+  if (suya && urlPendiente.has(suya.id)) {
+    const url = urlPendiente.get(suya.id);
+    urlPendiente.delete(suya.id);
+    e.sender.send('tab:open-url', { url, background: false });
+  }
   const win = ventanaEsperandoUI;
   if (!win) return;
   ventanaEsperandoUI = null;
@@ -1006,7 +1013,7 @@ function menuContextual(contents) {
       sep();
     }
     if (p.linkURL) {
-      items.push({ label: 'Abrir el enlace en una pestaña nueva', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true }) });
+      items.push({ label: 'Abrir el enlace en una pestaña nueva', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
       items.push({ label: 'Copiar el enlace', click: () => clipboard.writeText(p.linkURL) });
       items.push({ label: 'Guardar el destino como…', click: () => contents.downloadURL(p.linkURL) });
       sep();
@@ -1122,7 +1129,9 @@ app.on('web-contents-created', (_event, contents) => {
     contents.setWindowOpenHandler(({ url, disposition }) => {
       if (url.startsWith('http:') || url.startsWith('https:')) {
         // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano
-        contents.hostWebContents?.send('tab:open-url', { url, background: disposition === 'background-tab' });
+        // `origen` es el webContents que abrio el enlace: con eso la pestaña
+        // nueva se coloca justo detras de la suya y no al final de la barra.
+        contents.hostWebContents?.send('tab:open-url', { url, background: disposition === 'background-tab', origen: contents.id });
       }
       return { action: 'deny' };
     });
@@ -1197,6 +1206,20 @@ ipcMain.on('win:close', (e) => winOf(e)?.close());
 // F11: pantalla completa de la VENTANA (distinto del fullscreen del vídeo)
 ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen(!w.isFullScreen()); });
 ipcMain.on('win:new-private', () => createWindow(true));
+/* Sacar una pestaña de la barra abre una ventana nueva con esa direccion.
+   La ventana tarda en montar su interfaz, asi que la URL se guarda y se le
+   manda cuando ella avisa de que ya esta lista ('ui:listo'). */
+const urlPendiente = new Map();   // id de ventana -> url que tiene que abrir
+ipcMain.on('win:sacar-pestana', (e, url) => {
+  if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
+  // Si sale de una ventana privada, la nueva tambien lo es: no se saca una
+  // pestaña privada a una ventana normal, que dejaria rastro.
+  const dueno = BrowserWindow.fromWebContents(e.sender);
+  let privada = false;
+  try { privada = new URL(dueno.webContents.getURL()).searchParams.get('private') === '1'; } catch { /* nada */ }
+  const win = createWindow(privada);
+  if (win) urlPendiente.set(win.id, url);
+});
 
 ipcMain.handle('settings:get', () => settings);
 // ---------- Información del sitio (popover del candado) ----------
@@ -2089,7 +2112,11 @@ ipcMain.on('downloads:reveal-file', (_e, name) => { const p = downloadsFilePath(
 ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads')));
 
 // Favicon como dataURL
-ipcMain.handle('favicon:fetch', async (_e, pageUrl) => {
+/* `iconUrl` es el que declara la propia pagina (page-favicon-updated). Se
+   prueba PRIMERO porque es el bueno: el servicio de Google devuelve lo que
+   tiene cacheado, que para sitios poco populares es un icono generico o de
+   16 px, y ahi es donde se veian pixelados. */
+ipcMain.handle('favicon:fetch', async (_e, pageUrl, iconUrl) => {
   let host = '';
   try { host = new URL(pageUrl).hostname; } catch { return null; }
   const tryFetch = async (url) => {
@@ -2100,6 +2127,9 @@ ipcMain.handle('favicon:fetch', async (_e, pageUrl) => {
     if (buf.length < 50) throw new Error('vacío');
     return `data:${type};base64,${buf.toString('base64')}`;
   };
+  if (iconUrl && /^https?:/i.test(iconUrl)) {
+    try { return await tryFetch(iconUrl); } catch { /* a por el siguiente */ }
+  }
   try { return await tryFetch(`https://www.google.com/s2/favicons?sz=128&domain=${host}`); }
   catch {
     try { return await tryFetch(`https://${host}/favicon.ico`); }

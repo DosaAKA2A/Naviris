@@ -460,12 +460,26 @@ function dominantColor(dataUrl) {
     img.src = dataUrl;
   });
 }
-async function getTile(url) {
+/* De la lista que da `page-favicon-updated`, la mejor. SVG primero (no se
+   pixela nunca), luego el de Apple (suele ser de 180 px), luego PNG, y el
+   .ico el ultimo: casi siempre son 16 px y es lo que se veia borroso. */
+function mejorIcono(lista) {
+  const nota = (u) => (/\.svg(\?|$)/i.test(u) ? 4 : /apple-touch/i.test(u) ? 3
+    : /\.png(\?|$)/i.test(u) ? 2 : /\.ico(\?|$)/i.test(u) ? 1 : 2);
+  return (lista || []).filter((u) => /^https?:/i.test(u))
+    .sort((a, b) => nota(b) - nota(a))[0] || null;
+}
+async function getTile(url, iconUrl) {
   const host = hostOf(url); if (!host) return null;
-  const c = tileCache[host]; if (c && Date.now() - c.ts < 14 * 864e5) return c;
-  const icon = await window.cobalt.fetchFavicon(url);
+  const c = tileCache[host];
+  /* Con un icono declarado por la pagina se rehace la ficha aunque haya una
+     cacheada: la de antes salio del servicio de Google y esta es la de casa. */
+  if (c && !iconUrl && Date.now() - c.ts < 14 * 864e5) return c;
+  if (c && iconUrl && c.propio && Date.now() - c.ts < 14 * 864e5) return c;
+  const icon = await window.cobalt.fetchFavicon(url, iconUrl);
   const color = icon ? await dominantColor(icon) : null;
-  const entry = { icon, color, ts: Date.now() };
+  const entry = { icon, color, ts: Date.now(), propio: !!iconUrl };
+  if (!icon && c) return c;   // si el de la pagina falla, se deja el que habia
   tileCache[host] = entry; saveTiles(); return entry;
 }
 
@@ -487,16 +501,32 @@ function recordHistory(url, title) {
    pestaña que ni has mirado (pedido de Dosa, 2026-08-12). Reutiliza tal cual
    la mecánica de dormidas del ahorro de energía: despertar = poner el src.
    El título y el icono salen del historial si ya conocemos el sitio. */
-function createTab(url = null, activate = true, contenedor = null) {
+/* Donde entra una pestaña nueva. Sin madre, al final. Con madre, JUSTO
+   DETRAS de ella — y detras de las que esa misma madre haya abierto antes,
+   para que tres enlaces de la misma pagina salgan en el orden en que se
+   pulsaron y todos pegados a ella. Es como se comporta Opera GX, y lo pidio
+   Dosa el 2026-08-30: antes se iban todas al final de la barra y perdias de
+   vista de donde habian salido. */
+function colocaPestana(tab, abridorId) {
+  const i = abridorId == null ? -1 : tabs.findIndex((x) => x.id === abridorId);
+  if (i === -1) { tabs.push(tab); return tab; }
+  tab.abridor = abridorId;
+  let j = i + 1;
+  while (j < tabs.length && tabs[j].abridor === abridorId) j++;
+  tabs.splice(j, 0, tab);
+  return tab;
+}
+function createTab(url = null, activate = true, contenedor = null, abridor = null) {
   if (url && !activate && /^https?:/i.test(url)) {
     const conocido = history.find((h) => h.url === url);
-    const tab = crearDormida({ u: url, t: (conocido && conocido.title) || '' });
+    const tab = crearDormida({ u: url, t: (conocido && conocido.title) || '' }, abridor);
     tab.sinCargar = true;   // dormida por no haberse abierto nunca, no por ahorro
     getTile(url).then((t) => { if (t?.icon) { tab.favicon = t.icon; renderTabs(); } }).catch(() => {});
     renderTabs(); saveSession(); return tab;
   }
   const tab = { id: nextId++, kind: url ? 'web' : 'hub', url: url || '', title: url ? 'Cargando…' : 'Nueva pestaña', webview: null, favicon: null, asleep: false, sleptUrl: null, lastActive: Date.now(), contenedor: contenedor || null, espacio: espacioActivo };
-  tabs.push(tab); if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
+  colocaPestana(tab, abridor);
+  if (url) attachWebview(tab, url); if (activate) activateTab(tab.id); renderTabs(); saveSession(); return tab;
 }
 // Guarda las URLs abiertas para restaurarlas al reabrir (si el ajuste está activo).
 // No aplica en ventana privada. Se llama al crear/cerrar/navegar pestañas.
@@ -518,7 +548,7 @@ function saveSession() {
 /* Pestaña restaurada SIN cargar: se queda dormida hasta que se abre. El
    webview existe (en about:blank) para que despertarla sea solo cambiarle el
    src, igual que hace el ahorro de energía. */
-function crearDormida(dato) {
+function crearDormida(dato, abridor) {
   const url = typeof dato === 'string' ? dato : dato.u;
   const tab = {
     id: nextId++, kind: 'web', url, title: (dato && dato.t) || hostOf(url) || url,
@@ -527,7 +557,7 @@ function crearDormida(dato) {
     espacio: (dato && dato.e) || null,
     contenedor: (dato && dato.c) || null
   };
-  tabs.push(tab);
+  colocaPestana(tab, abridor);
   attachWebview(tab, 'about:blank');
   tab.url = url;          // attachWebview lo había puesto en about:blank
   return tab;
@@ -566,6 +596,17 @@ function attachWebview(tab, url) {
     saveSession();
   };
   wv.addEventListener('page-title-updated', (e) => { if (tab.asleep) return; tab.title = e.title || tab.title; if (tab.id === activeId) recordHistory(tab.url, tab.title); renderTabs(); });
+  /* El icono que declara la propia pagina. Vale mas que el del servicio de
+     Google, que para sitios poco populares devuelve un generico o uno de 16
+     px — que es lo que se veia pixelado en la barra. */
+  wv.addEventListener('page-favicon-updated', (e) => {
+    if (tab.asleep) return;
+    const mejor = mejorIcono(e.favicons);
+    if (!mejor) return;
+    getTile(tab.url, mejor).then((f) => {
+      if (f && f.icon && f.icon !== tab.favicon) { tab.favicon = f.icon; renderTabs(); }
+    }).catch(() => {});
+  });
   wv.addEventListener('did-navigate', onNav);
   wv.addEventListener('did-navigate-in-page', onNav);
   // Buscar en la página: el recuento llega por evento, no en la llamada.
@@ -703,6 +744,7 @@ function menuDePestana(e, tab) {
 }
 function makeTabEl(tab, mini) {
   const el = document.createElement('div');
+  el.dataset.tabId = tab.id;   // para seguirla mientras se arrastra
   el.className = 'tab' + (tab.id === activeId ? ' active' : '') + (tab.asleep ? ' asleep' : '') + (tab.autoLoot ? ' farming' : '') + (tab.pinned ? ' pinned' : '') + (mini ? ' mini loot-member' : '');
   el.title = tab.autoLoot ? 'AutoClaim activo en este canal' + (tab.twitchClaims ? ` · ${tab.twitchClaims} reclamados` : '')
     : tab.asleep ? `${tab.sinCargar ? 'Sin cargar — se abre al entrar' : 'Pestaña dormida'} — ${tab.title}\n${tab.sleptUrl || tab.url}`
@@ -742,31 +784,129 @@ function makeTabEl(tab, mini) {
     // El hub no tiene favicon: fijado se representa con su icono de casa
     if (tab.kind !== 'web') { const h = document.createElement('span'); h.className = 't-fav'; h.innerHTML = window.icon('home'); el.prepend(h); }
   }
-  el.addEventListener('click', () => activateTab(tab.id));
+  el.addEventListener('click', () => { if (!document.body.classList.contains('acaba-de-arrastrar')) activateTab(tab.id); });
   el.addEventListener('auxclick', (e) => { if (e.button === 1 && !tab.pinned) closeTab(tab.id); });
   el.addEventListener('contextmenu', (e) => menuDePestana(e, tab));
-  // Reordenar pestañas arrastrando (no en las mini del grupo AutoLoot ni fijadas)
-  if (!mini && !tab.pinned) {
-    el.draggable = true;
-    el.addEventListener('dragstart', (e) => { dragTabId = tab.id; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-    el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.querySelectorAll('.tab.drag-over').forEach((t) => t.classList.remove('drag-over')); });
-    el.addEventListener('dragover', (e) => { if (dragTabId != null && dragTabId !== tab.id) { e.preventDefault(); el.classList.add('drag-over'); } });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drag-over'); reorderTab(dragTabId, tab.id); dragTabId = null; });
-  }
+  // Arrastrar: reordenar, y sacar la pestaña a su propia ventana.
+  if (!mini) el.addEventListener('pointerdown', (e) => empiezaArrastre(e, tab, el));
   return el;
 }
-let dragTabId = null;
-// Mueve la pestaña arrastrada justo delante de la de destino. Las fijadas
-// forman su propio bloque a la izquierda: no se cruza de un bloque al otro.
-function reorderTab(fromId, toId) {
-  const from = tabs.findIndex((t) => t.id === fromId), to = tabs.findIndex((t) => t.id === toId);
-  if (from === -1 || to === -1 || from === to) return;
-  if (!!tabs[from].pinned !== !!tabs[to].pinned) return;
-  const [moved] = tabs.splice(from, 1);
-  tabs.splice(tabs.findIndex((t) => t.id === toId), 0, moved);
-  renderTabs(); saveSession();
+
+/* ===== Arrastrar pestañas =====
+   Con eventos de PUNTERO, no con el arrastre de HTML5. Dos motivos, los dos
+   pedidos por Dosa el 2026-08-30:
+
+   1. El de HTML5 no dice donde se solto si fue fuera de la ventana, y hacia
+      falta para poder SACAR una pestaña a una ventana nueva.
+   2. Reordenaba mal. La version vieja metia la pestaña siempre DELANTE de la
+      de destino, asi que arrastrarla una posicion a la derecha la dejaba
+      exactamente donde estaba y parecia que no funcionaba nada. Ahora la
+      posicion sale de comparar el puntero con el CENTRO de cada pestaña, que
+      es lo que hace que se sienta natural en las dos direcciones.
+
+   El reordenado es EN VIVO: la barra se repinta mientras se arrastra, asi que
+   los elementos se destruyen y se vuelven a crear. Por eso los escuchas van
+   en `window` y todo se sigue por el id de la pestaña, nunca por el nodo. */
+let arrastre = null;
+const UMBRAL_ARRASTRE = 5;    // px antes de considerarlo arrastre y no un clic
+const UMBRAL_SACAR = 58;      // px por debajo/encima de la barra para sacarla
+
+function empiezaArrastre(e, tab, el) {
+  if (e.button !== 0) return;
+  // Los botones de dentro (cerrar, silenciar) hacen lo suyo.
+  if (e.target.closest('.t-close, .t-mute')) return;
+  arrastre = {
+    id: tab.id, x0: e.clientX, y0: e.clientY, movido: false,
+    fijada: !!tab.pinned, sacando: false
+  };
 }
+
+function posicionDestino(x) {
+  /* La ranura donde caeria ahora mismo: se mira el centro de cada pestaña del
+     mismo bloque (fijadas y sueltas no se mezclan). */
+  const arr = arrastre;
+  const cajas = [...els.tabstrip.querySelectorAll('.tab')]
+    .map((n) => ({ n, id: Number(n.dataset.tabId), r: n.getBoundingClientRect() }))
+    .filter((c) => c.id && c.id !== arr.id);
+  let destino = null, antes = true;
+  for (const c of cajas) {
+    const t = tabs.find((x) => x.id === c.id);
+    if (!t || !!t.pinned !== arr.fijada) continue;
+    if (x < c.r.left + c.r.width / 2) { destino = c.id; antes = true; break; }
+    destino = c.id; antes = false;
+  }
+  return { destino, antes };
+}
+
+function mueveA(fromId, toId, antes) {
+  const from = tabs.findIndex((t) => t.id === fromId);
+  const to = tabs.findIndex((t) => t.id === toId);
+  if (from === -1 || to === -1) return false;
+  if (!!tabs[from].pinned !== !!tabs[to].pinned) return false;
+  const [moved] = tabs.splice(from, 1);
+  // El indice de destino se vuelve a buscar DESPUES de sacarla: si no, al
+  // mover hacia la derecha se cuela una posicion de menos.
+  const j = tabs.findIndex((t) => t.id === toId);
+  if (j === -1) { tabs.splice(from, 0, moved); return false; }
+  tabs.splice(antes ? j : j + 1, 0, moved);
+  return true;
+}
+
+window.addEventListener('pointermove', (e) => {
+  if (!arrastre) return;
+  if (!arrastre.movido) {
+    if (Math.abs(e.clientX - arrastre.x0) < UMBRAL_ARRASTRE
+      && Math.abs(e.clientY - arrastre.y0) < UMBRAL_ARRASTRE) return;
+    arrastre.movido = true;
+    document.body.classList.add('arrastrando-pestana');
+  }
+  const el = els.tabstrip.querySelector('.tab[data-tab-id="' + arrastre.id + '"]');
+  if (el) el.classList.add('dragging');
+
+  /* Fuera de la barra por arriba o por abajo: se va a sacar. Solo si queda
+     mas de una pestaña — sacar la unica que hay no separa nada. */
+  const r = els.tabstrip.getBoundingClientRect();
+  const lejos = e.clientY > r.bottom + UMBRAL_SACAR || e.clientY < r.top - UMBRAL_SACAR;
+  const puede = tabsVisibles().length > 1 && !arrastre.fijada;
+  arrastre.sacando = lejos && puede;
+  document.body.classList.toggle('sacando-pestana', arrastre.sacando);
+  if (arrastre.sacando) return;
+
+  const { destino, antes } = posicionDestino(e.clientX);
+  if (destino != null && destino !== arrastre.id) {
+    if (mueveA(arrastre.id, destino, antes)) renderTabs(true);
+  }
+});
+
+window.addEventListener('pointerup', () => {
+  if (!arrastre) return;
+  const a = arrastre; arrastre = null;
+  document.body.classList.remove('arrastrando-pestana', 'sacando-pestana');
+  document.querySelectorAll('.tab.dragging').forEach((n) => n.classList.remove('dragging'));
+  if (!a.movido) return;             // fue un clic, ya lo trata el click
+  /* El clic llega DESPUES del pointerup. Sin esta marca, soltar una pestaña
+     encima de otra activaba esa otra. */
+  document.body.classList.add('acaba-de-arrastrar');
+  setTimeout(() => document.body.classList.remove('acaba-de-arrastrar'), 0);
+  const tab = tabs.find((x) => x.id === a.id);
+  if (a.sacando && tab) {
+    const url = tab.sleptUrl || tab.url;
+    if (/^https?:/i.test(url)) {
+      window.cobalt.sacarPestana(url);
+      closeTab(tab.id);
+      return;
+    }
+  }
+  renderTabs(true); saveSession();
+});
+// Si el puntero se pierde (alt-tab, la ventana deja de tener el foco) no se
+// queda un arrastre colgado para siempre.
+window.addEventListener('pointercancel', () => {
+  if (!arrastre) return;
+  arrastre = null;
+  document.body.classList.remove('arrastrando-pestana', 'sacando-pestana');
+  renderTabs(true);
+});
 // Firma del estado visible de las pestañas: si no cambia, no se repinta. Antes
 // se recreaba la barra entera en CADA evento (título, favicon, media-started,
 // media-paused...), y en páginas con vídeo eso llegaba varias veces por segundo:
@@ -6264,7 +6404,21 @@ window.cobalt.onTabstripMenu(({ x, y }) => {
     { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabs.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) }
   ]);
 });
-window.cobalt.onOpenUrl((p) => { if (typeof p === 'string') createTab(p); else createTab(p.url, !p.background); });
+/* `origen` es el id de webContents del webview que abrio el enlace. Se
+   traduce a la pestaña para poder colocar la nueva justo detras. */
+function pestanaDeWebContents(id) {
+  if (id == null) return null;
+  for (const t of tabs) {
+    if (!t.webview) continue;
+    try { if (t.webview.getWebContentsId() === id) return t; } catch { /* aun sin montar */ }
+  }
+  return null;
+}
+window.cobalt.onOpenUrl((p) => {
+  if (typeof p === 'string') { createTab(p); return; }
+  const madre = pestanaDeWebContents(p.origen);
+  createTab(p.url, !p.background, null, madre ? madre.id : null);
+});
 /* ===== Buscar la imagen con Google Lens (2026-08-12) =====
    Lens ya no acepta que le pasen la URL de la imagen (ver el comentario de
    lens:imagen en main.js), hay que SUBIRLA, y la subida solo trae resultados

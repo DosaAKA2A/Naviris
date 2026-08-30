@@ -353,9 +353,9 @@ button { font-family: inherit; }
 [data-ico], [data-brand] { display: inline-flex; align-items: center; justify-content: center; }
 [data-ico] svg { width: 16px; height: 16px; }
 .win-controls [data-ico] svg { width: 13px; height: 13px; }
-#newtab-btn svg { width: 14px; height: 14px; }
+#newtab-btn svg { width: 16px; height: 16px; stroke-width: 2.1; }
 #url-secure svg { width: 12px; height: 12px; }
-.tab .t-close svg { width: 11px; height: 11px; }
+.tab .t-close svg { width: 13px; height: 13px; stroke-width: 2.1; }
 #hub-search .g-ico svg { width: 16px; height: 16px; }
 .sb-btn svg { width: 17px; height: 17px; }
 .sb-btn[data-brand] svg { width: 16px; height: 16px; }
@@ -405,18 +405,47 @@ button { font-family: inherit; }
    se quedaba en 4.55:1, justo en el límite y encima con texto de 12.5px.
    Ahora la inactiva va a 8.6:1 y la dormida a 5.3:1, así que se distinguen
    entre sí SIN que ninguna desaparezca. */
-.tab { display: flex; align-items: center; gap: 8px; height: 29px; min-width: 33px; max-width: 210px; padding: 0 8px 0 10px; border-radius: var(--r-s); background: transparent; color: var(--tab-fg); font-size: 12.5px; cursor: pointer; flex: 0 1 200px; transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease); }
+/* Ancha de salida (240) y encogiendo segun se llena la barra, como Brave: el
+   200 de antes dejaba titulos cortados teniendo sitio de sobra.
+   Y el TEXTO NO SE APAGA. Antes la inactiva iba en --tab-fg (#a6a6a6) y
+   costaba leerla; ahora todas llevan el mismo color y lo que distingue a la
+   activa es el FONDO, no la letra. Es lo que hace Brave y se lee mejor. */
+.tab { position: relative; display: flex; align-items: center; gap: 8px; height: 29px; min-width: 33px; max-width: 240px; padding: 0 6px 0 10px; border-radius: var(--r-s); background: transparent; color: var(--tab-hover-fg, var(--text)); font-size: 12.5px; cursor: pointer; flex: 0 1 240px; transition: background var(--dur-2) var(--ease); }
+/* Una linea fina entre pestañas, como en Brave. Se apaga en cuanto una de
+   las dos vecinas esta activa o tiene el raton encima: si no, el fondo
+   claro del hover queda partido por la mitad. */
+.tab + .tab::before {
+  content: ''; position: absolute; left: -2.5px; top: 50%; transform: translateY(-50%);
+  width: 1px; height: 15px; background: var(--line-2); opacity: .7;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.tab:hover::before, .tab.active::before,
+.tab:hover + .tab::before, .tab.active + .tab::before { opacity: 0; }
 .tab.dragging { opacity: .5; }
-.tab.drag-over { box-shadow: inset 2px 0 0 var(--violet, #b98cff); }
+/* Mientras se arrastra: la pestaña que viaja se atenua y el resto no reacciona
+   al raton, que si no la barra parpadea al pasar por encima de cada una. */
+body.arrastrando-pestana .tab { transition: none; }
+body.arrastrando-pestana .tab:hover:not(.active) { background: transparent; }
+body.arrastrando-pestana .tab::before { opacity: 0; }
+/* Bastante abajo como para sacarla: se avisa antes de soltar. */
+body.sacando-pestana .tab.dragging { opacity: .32; box-shadow: inset 0 0 0 1px var(--realce); }
+body.sacando-pestana { cursor: copy; }
 /* Pestaña fijada: comprimida a solo el favicon, en el bloque izquierdo de la barra */
 .tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
-.tab:hover:not(.active) { background: var(--tab-hover-bg); color: var(--realce); }
-/* La pestaña activa remata con un filo de realce arriba, como la tradición
-   de los navegadores gamer, pero al 70%: marca sin gritar */
-.tab.active { background: var(--bg-3); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--line-2), inset 0 3px 0 var(--realce); }
+/* Al pasar por encima se ACLARA EL FONDO y nada mas. Teñir el texto de
+   --realce hacia que la pestaña saltara mas que la activa. */
+.tab:hover:not(.active) { background: var(--tab-hover-bg); }
+/* La activa se distingue por el FONDO, no por un filo de color arriba
+   (peticion de Dosa, 2026-08-30: Brave la aclara y ya). El filo de realce se
+   retiro: con el separador nuevo y el fondo mas claro sobra, y con muchas
+   pestañas era una fila de rayas de colores. */
+.tab.active { background: var(--bg-3); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--line-2); }
 .tab.active:hover { background: var(--hover); }
-.tab .t-fav { width: 15px; height: 15px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.tab .t-fav img { width: 15px; height: 15px; border-radius: 4px; }
+/* 17px y SIN redondear. El `border-radius: 4px` sobre 15px de icono le comia
+   las esquinas a cualquier logo cuadrado, que es lo que se veia deforme; y
+   15px era mas pequeño que en cualquier otro navegador. */
+.tab .t-fav { width: 17px; height: 17px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.tab .t-fav img { width: 17px; height: 17px; object-fit: contain; }
 .tab .t-fav .t-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fav-dot); }
 .tab .t-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Dormida se lee SOLO por el favicon en gris (sin icono de luna, retirado a
@@ -426,9 +455,13 @@ button { font-family: inherit; }
 .tab.asleep .t-fav { opacity: .75; filter: grayscale(1); }
 .tab.asleep:hover .t-title, .tab.asleep.active .t-title { color: inherit; }
 .tab.asleep:hover .t-fav, .tab.asleep.active .t-fav { opacity: 1; filter: none; }
-.tab .t-close { border: none; background: transparent; color: transparent; cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
-.tab:hover .t-close, .tab.active .t-close { color: var(--text-dim); }
-.tab .t-close:hover { background: var(--btn-hover); color: var(--text); }
+/* La X SE VE SIEMPRE. Antes nacia en `color: transparent` y solo aparecia al
+   pasar por encima: habia que adivinar donde estaba y afinar el raton en 18
+   px. Ahora va tenue de serie, en 21 px de zona pinchable, y se enciende al
+   apuntarla. */
+.tab .t-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 6px; width: 21px; height: 21px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .75; transition: background .12s, color .12s, opacity .12s; }
+.tab:hover .t-close, .tab.active .t-close { opacity: 1; }
+.tab .t-close:hover { background: var(--btn-hover); color: var(--text-strong); opacity: 1; }
 /* Pestaña de grupo AutoLoot (colapsa todos los canales en autoloot) */
 .tab.group-tab { border: 1px solid rgba(145,112,214,.4); background: rgba(120,90,190,.1); color: #c4a6ff; }
 .tab.group-tab.active { background: var(--wash-2); }
@@ -481,8 +514,9 @@ button { font-family: inherit; }
 .ctx-item.danger .ctx-ic { color: #e57373; }
 .ctx-ic svg { width: 15px; height: 15px; }
 .ctx-sep { height: 1px; background: var(--line); margin: 4px 6px; }
-#newtab-btn { width: 26px; height: 26px; margin: 0 6px; border: none; border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer; transition: background .12s, color .12s; }
-#newtab-btn:hover { background: var(--bg-3); color: var(--text); }
+/* El + tambien era pequeño y tenue de mas para lo que se usa. */
+#newtab-btn { width: 30px; height: 30px; margin: 0 4px; border: none; border-radius: 8px; background: transparent; color: var(--text); opacity: .8; cursor: pointer; transition: background .12s, opacity .12s; }
+#newtab-btn:hover { background: var(--hover); opacity: 1; }
 /* Controles de ventana al estilo de Windows 11: iconos nítidos, superficie
    completa al pasar por encima y el de cerrar en rojo. */
 .win-controls { display: flex; height: 100%; }

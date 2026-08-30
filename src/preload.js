@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   maximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close'),
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
+  // Sacar una pestaña de la barra a su propia ventana.
+  sacarPestana: (url) => ipcRenderer.send('win:sacar-pestana', url),
   onMaximized: (cb) => ipcRenderer.on('win:maximized', (_e, v) => cb(v)),
 
   /* El token de la cuenta de Naviris, para que el main pueda pedirle al
@@ -44,7 +46,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   onDownloadNew: (cb) => ipcRenderer.on('download:new', (_e, m) => cb(m)),
   onDownloadUpdate: (cb) => ipcRenderer.on('download:update', (_e, m) => cb(m)),
 
-  fetchFavicon: (pageUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl),
+  fetchFavicon: (pageUrl, iconUrl) => ipcRenderer.invoke('favicon:fetch', pageUrl, iconUrl),
 
   toggleFullscreen: () => ipcRenderer.send('win:fullscreen'),
   onShortcut: (cb) => ipcRenderer.on('ui:shortcut', (_e, cmd) => cb(cmd)),
