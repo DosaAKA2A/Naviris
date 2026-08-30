@@ -444,6 +444,11 @@ ipcMain.on('perm:estado', (e, permiso) => {
   e.returnValue = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
 });
 
+/* Dominios de verificación anti-robot. NO se bloquean nunca: bloquearlos no
+   quita publicidad, solo hace que el sitio pida el captcha una y otra vez.
+   Ver el comentario largo dentro de onBeforeRequest. */
+const ES_VERIFICACION = /^https?:\/\/([^/]*\.)?(awswaf\.com|challenges\.cloudflare\.com|hcaptcha\.com|recaptcha\.net)(\/|$|:)/i;
+
 function setupSession(ses) {
   // UA de Chrome puro para navegar: el UA por defecto lleva los tokens
   // "Naviris/x" y "Electron/x", y los sitios que husmean el navegador no lo
@@ -525,6 +530,21 @@ function setupSession(ses) {
     }
     // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
     if (YT_AD_PATHS.some((p) => u.includes(p))) { blockedCount++; return callback({ cancel: true }); }
+    /* VERIFICACIONES DE "no soy un robot". Nunca se bloquean, aunque las listas
+       lo pidan y aunque sus rutas se llamen /telemetry o /report.
+
+       El caso que lo destapó (2026-08-30): Dosa se comía el captcha de las
+       imágenes CADA VEZ que entraba a IMDb, y en Opera GX no. Medido: en una
+       sola carga de IMDb, las listas de Brave tumbaban OCHO peticiones a
+       `*.token.awswaf.com`. Ese dominio no es un rastreador: es de donde el
+       navegador recoge el TOKEN que demuestra que ya pasó la verificación del
+       WAF de Amazon. Sin token no hay prueba de nada, así que el sitio vuelve
+       a preguntar — y no se acaba nunca, porque la respuesta tampoco llega.
+
+       Dejarlos pasar no abre la mano con la publicidad: lo que viaja por aquí
+       es la propia verificación, no un identificador para seguirte por la web.
+       Bloquearlos no protege de nada y rompe el sitio entero. */
+    if (ES_VERIFICACION.test(u)) return callback({});
     // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
     // decide el fallback clásico por dominios.
     const brave = braveAdblock.shouldBlock(details);
