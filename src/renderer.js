@@ -986,16 +986,26 @@ function aplicaVerticales(on) {
   ajustaPestanas();
 }
 
+/* Lo que mide una pestaña con sitio de sobra, y el hueco entre dos. Tienen
+   que ir a la par con `.tab { max-width }` y `#tabstrip { gap }` del CSS. */
+const ANCHO_PESTANA = 240, HUECO_PESTANA = 4;
 function ajustaPestanas() {
   const strip = els.tabstrip;
   // En vertical cada pestaña ocupa el ancho entero: no hay nada que repartir, y
   // los modos compacto/mínimo esconderían el título teniendo sitio de sobra.
-  if (document.documentElement.classList.contains('vtabs')) { strip.classList.remove('compacto', 'minimo'); return; }
+  if (document.documentElement.classList.contains('vtabs')) {
+    strip.classList.remove('compacto', 'minimo'); strip.style.flexBasis = ''; return;
+  }
   const sueltas = strip.querySelectorAll('.tab:not(.pinned)').length;
-  if (!sueltas) { strip.classList.remove('compacto', 'minimo'); return; }
+  if (!sueltas) { strip.classList.remove('compacto', 'minimo'); strip.style.flexBasis = ''; return; }
   let fijas = 0;
-  strip.querySelectorAll('.tab.pinned').forEach((t) => { fijas += t.offsetWidth + 4; });
-  const cada = (strip.clientWidth - fijas) / sueltas - 4;
+  strip.querySelectorAll('.tab.pinned').forEach((t) => { fijas += t.offsetWidth + HUECO_PESTANA; });
+  /* EL ANCHO QUE PIDE LA BARRA. Sin esto se quedaba en la mitad de la ventana
+     y las pestañas salian estrechas con hueco vacio al lado (medido el
+     2026-08-30: 503 px de 1260). Se pide lo que ocuparian todas a su ancho
+     completo; si no cabe, el `flex-shrink` las encoge como siempre. */
+  strip.style.flexBasis = (fijas + sueltas * (ANCHO_PESTANA + HUECO_PESTANA)) + 'px';
+  const cada = (strip.clientWidth - fijas) / sueltas - HUECO_PESTANA;
   strip.classList.toggle('compacto', cada < 108);
   strip.classList.toggle('minimo', cada < 66);
 }

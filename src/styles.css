@@ -390,6 +390,17 @@ button { font-family: inherit; }
    pegado a la última pestaña (antes con flex:1 la barra ocupaba todo el ancho y
    empujaba el + al extremo). Cuando se llena, encoge y las pestañas con ella;
    lo que sobra a la derecha lo coge .tb-drag para arrastrar la ventana. */
+/* MEDIDO el 2026-08-30, y era el fallo de fondo: con `flex: 0 1 auto` la barra
+   se quedaba en 503 px de los 1260 de la ventana -- el hueco de arrastre se
+   llevaba 525 -- y las pestañas se apretaban a 165 px con MEDIA BARRA VACIA.
+
+   Al llevar `overflow-x`, la barra es un contenedor de desplazamiento y su
+   tamaño automatico NO sale del ancho que querrian sus hijas. `max-content`
+   tampoco vale: se probo y devuelve el ancho ya encogido (503), no el que
+   pedirian. Asi que el ancho lo calcula `ajustaPestanas` y lo escribe en
+   `flex-basis`. Sigue con shrink 1: cuando de verdad se llena, encogen todas
+   juntas. Y el + se queda pegado a la ultima, que era el motivo de no dejar
+   crecer la barra sin mas. */
 #tabstrip { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; height: 100%; -webkit-app-region: drag; }
 #tabstrip::-webkit-scrollbar { display: none; }
 #tabstrip > * { -webkit-app-region: no-drag; }
