@@ -33,6 +33,8 @@
    y una creada desde este addon son intercambiables. La identidad del video
    es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:moovin.
 
+   v2.7.4: tu foto de perfil de Naviris sale en la sala, y viaja UNA vez al
+   entrar para que los demas tambien la vean.
    v2.7.3: en la sala se ven las CARAS, no solo iniciales. MOOVIN ya mandaba
    el avatar en cada mensaje y aquí no se miraba.
    v2.6.2: el reproductor se llama MOOVIN y aquí seguía saliendo el nombre
@@ -214,7 +216,27 @@
      Los SVG son publicos (moovin.live/avatares/<id>.svg): no hacen falta ni
      pase ni cuenta para verlos. */
   var AVATARES = ['aria', 'pj1', 'pj2', 'pj3', 'pj4', 'pj5', 'pj6', 'pj7', 'pj8', 'pj9', 'pj10', 'pj11'];
-  var avs = {};   // nombre -> id de avatar, aprendido de los mensajes
+  var avs = {};     // nombre -> id de avatar del elenco
+  var fotos = {};   // nombre -> foto propia, la que manda cada quien al entrar
+
+  /* La foto y el nombre de TU cuenta de Naviris. Los addons de herramienta
+     corren dentro del hub, asi que se leen de su localStorage tal cual: la
+     foto ya esta reducida a 128x128 y guardada como data URI. */
+  function miCuenta() {
+    try {
+      var foto = JSON.parse(localStorage.getItem('cobalt.account.foto') || 'null');
+      var nombre = JSON.parse(localStorage.getItem('cobalt.account.nombre') || 'null');
+      return { foto: fotoValida(foto) ? foto : '', nombre: (nombre || '').trim() };
+    } catch (e) { return { foto: '', nombre: '' }; }
+  }
+  /* Una foto que llega de OTRA persona de la sala solo se pinta si es una
+     imagen de mapa de bits en data URI. Nada de SVG (puede traer script) ni
+     de URLs de fuera, y con tope de tamaño. */
+  function fotoValida(f) {
+    return typeof f === 'string' && f.length < 200000
+      && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(f);
+  }
+  function apuntaFoto(who, f) { if (who && fotoValida(f)) fotos[who] = f; }
   function apuntaAv(who, av) {
     if (who && AVATARES.indexOf(av) !== -1) avs[who] = av;
   }
@@ -421,7 +443,10 @@
     var wv = naviris.activeWebview();
     if (!wv || !activeSite()) { naviris.toast('Abre el video en Crunchyroll, Netflix, Disney+, YouTube o MOOVIN y vuelve a intentarlo'); return; }
     leave(true);
-    var name = (localStorage.__navPartyName || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
+    /* El nombre lo propone tu cuenta de Naviris, que es el que ya elegiste en
+       el hub. Lo escrito a mano sigue mandando. */
+    var name = (localStorage.__navPartyName || miCuenta().nombre
+      || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
     // navLock: por defecto SOLO el anfitrión cambia el video de la sala.
     party = { code: code, host: asHost, wv: wv, ws: null, n: 1, status: 'Conectando…', ok: false, msgs: [], name: name, navLock: true, site: activeSite(), ultimoEp: epIdOf(wv.getURL ? wv.getURL() : '') };
     wv.addEventListener('console-message', onConsole);
@@ -446,13 +471,23 @@
         render(); glow(); return;
       }
       party.ws = ws;
-      ws.onopen = function () { reintento = 0; send({ t: 'join', room: code, name: name, host: asHost }); };
+      ws.onopen = function () {
+        reintento = 0;
+        /* La foto va UNA vez, aqui. En cada mensaje serian kilobytes por
+           latido: el resto del protocolo se queda como estaba. */
+        var yo = miCuenta();
+        var join = { t: 'join', room: code, name: name, host: asHost };
+        if (yo.foto) join.foto = yo.foto;
+        send(join);
+      };
       ws.onmessage = function (ev) {
         if (!party || party.ws !== ws) return;
         var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
         // El avatar viaja en TODO mensaje (join/ev/beat/chat), asi que se
         // aprende de cualquiera de ellos.
         if (m.who && m.av) apuntaAv(m.who, m.av);
+        // La foto viaja SOLO al entrar (pesa), asi que se guarda por nombre.
+        if (m.who && m.foto) apuntaFoto(m.who, m.foto);
         if (m.t === 'joined') {
           var volvia = party.everOk;
           party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
@@ -560,6 +595,17 @@
   }
   function avatar(who) {
     var av = document.createElement('span'); av.className = 'nvp-av';
+    /* La foto manda: la tuya sale de tu cuenta de Naviris y la de los demas
+       de lo que mandaron al entrar. Despues el avatar del elenco de MOOVIN,
+       y en ultimo lugar la inicial de siempre. */
+    var foto = (party && who === party.name) ? miCuenta().foto : fotos[who];
+    if (fotoValida(foto)) {
+      var f = document.createElement('img');
+      f.src = foto; f.alt = '';
+      f.addEventListener('error', function () { av.innerHTML = ''; pintaInicial(av, who); });
+      av.appendChild(f);
+      return av;
+    }
     var id = avs[who];
     if (id && AVATARES.indexOf(id) !== -1) {
       var img = document.createElement('img');
