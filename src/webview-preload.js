@@ -49,8 +49,10 @@ try {
 // cuatro diferencias. No son cosmética: un navegador que dice ser Chrome y no se
 // comporta como tal falla en webs que husmean el entorno, y una de ellas era un
 // fallo de verdad (lo de las notificaciones, abajo).
-//   1. window.chrome estaba VACÍO. En Chrome trae app, csi y loadTimes; es la
-//      comprobación más conocida para distinguir un navegador embebido.
+//   1. (RETIRADO el 2026-08-30) Aquí se fabricaba un window.chrome con app, csi
+//      y loadTimes. Medido contra el WAF de Amazon: era JUSTO ESO lo que hacía
+//      que IMDb mandara el captcha de imágenes en vez del reto silencioso. Ver
+//      el comentario largo donde estaba el bloque.
 //   2. screen.colorDepth daba 32; Chrome en Windows siempre dice 24.
 //   3. navigator.languages iba al revés ("es,es-ES" en vez de "es-ES,es").
 //   4. Notification.permission decía "denied" cuando en realidad estaba SIN
@@ -65,9 +67,7 @@ try {
 //      fallo del punto 4, que solo se había arreglado para las notificaciones,
 //      y tiene el mismo precio: la web ve "denegado" y ni pide el permiso, así
 //      que el diálogo de Naviris no sale y no hay forma de concederlo.
-//   6. window.chrome tenía las claves en otro orden que Chrome (app, csi,
-//      loadTimes en vez de loadTimes, csi, app) y a chrome.app le faltaban
-//      installState y runningState en minúscula, que son funciones.
+//   6. (RETIRADO con el punto 1: iba de afinar el window.chrome inventado.)
 //   7. storage.estimate() devolvía el hueco libre del disco entero (197 GB
 //      aquí); Chrome y Opera GX topan en 10 GB. Además de ser una diferencia,
 //      es una fuga de información del equipo.
@@ -95,26 +95,27 @@ try {
       try {
         var t0 = Date.now();
         var estadoNotif = permisos.notifications;
-        if (!window.chrome || !window.chrome.loadTimes) {
-          // El ORDEN de las claves de window.chrome se ve desde JavaScript, y
-          // en Chrome es loadTimes, csi, app. Se asignan en ese mismo orden.
-          var chrome = window.chrome || {};
-          if (!chrome.loadTimes) chrome.loadTimes = function () {
-            var t = performance.timing || {}, s = (t.navigationStart || t0) / 1000;
-            return { requestTime: s, startLoadTime: s, commitLoadTime: s, finishDocumentLoadTime: s, finishLoadTime: s, firstPaintTime: s, firstPaintAfterLoadTime: 0, navigationType: 'Other', wasFetchedViaSpdy: false, wasNpnNegotiated: true, npnNegotiatedProtocol: 'h2', wasAlternateProtocolAvailable: false, connectionInfo: 'h2' };
-          };
-          if (!chrome.csi) chrome.csi = function () { return { startE: t0, onloadT: t0, pageT: Date.now() - t0, tran: 15 }; };
-          if (!chrome.app) chrome.app = {
-            isInstalled: false,
-            getDetails: function () { return null; },
-            getIsInstalled: function () { return false; },
-            installState: function (cb) { if (typeof cb === 'function') cb('not_installed'); },
-            runningState: function () { return 'cannot_run'; },
-            InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
-            RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
-          };
-          try { Object.defineProperty(window, 'chrome', { configurable: true, enumerable: true, writable: true, value: chrome }); } catch (e) { window.chrome = chrome; }
-        }
+        /* AQUI HABIA UN `window.chrome` DE MENTIRA (loadTimes, csi, app) y se
+           quito el 2026-08-30 porque hacia justo lo contrario de lo que
+           pretendia. Se puso en agosto a ojo, para "parecer mas Chrome" ante el
+           Turnstile de Cloudflare — que nunca llego a pasar por eso.
+
+           MEDIDO contra el WAF de Amazon (IMDb), que responde con una cabecera
+           `x-amzn-waf-action` y da un veredicto limpio sin gastar ningun reto:
+
+             Naviris con este bloque  -> action=captcha   (HTTP 405) muro visual
+             Naviris sin este bloque  -> action=challenge (HTTP 202) entra sola
+             Chrome de verdad         -> action=challenge (HTTP 202) entra sola
+             Electron pelado          -> sin accion, entra directo
+
+           Dos rondas alternadas de cada, con perfil nuevo. O sea: el `chrome`
+           fabricado a mano es lo que lo delataba. Tiene sentido: sus funciones
+           no son codigo nativo y ese objeto es de lo primero que miran los
+           antifraude. Un navegador que NO trae `window.chrome` es raro; uno que
+           trae uno falso es sospechoso, que es peor.
+
+           No volver a inventarlo. Si algun dia hace falta, tendria que venir de
+           Chromium, no de aqui. */
         try {
           // Chrome topa la cuota que informa; Electron soltaba el disco real.
           var TOPE = 10 * 1024 * 1024 * 1024;
