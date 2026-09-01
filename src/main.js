@@ -568,15 +568,22 @@ function setupSession(ses) {
   // (Vacío desde que se descatalogó Valve Rat Tool, que usaba api.skinport.com;
   // se conserva el mecanismo para futuros addons.)
   const CORS_OPEN = [];
-  const HDR_URLS = [...CORS_OPEN.map((h) => 'https://' + h + '/*'), 'https://*.youtube.com/*', 'https://*.youtube-nocookie.com/*'];
-  ses.webRequest.onHeadersReceived({ urls: HDR_URLS }, (details, cb) => {
+  /* Escucha TODAS las respuestas, no solo las de CORS_OPEN, porque hace falta ver
+     el 405 del muro del WAF (abajo). Lo que se toca sigue siendo exactamente lo
+     mismo que antes: si el host no está en CORS_OPEN, la respuesta sale intacta.
+     YouTube ya NO necesita que le borremos la CSP —se hacía porque el pruning se
+     inyectaba con un <script> inline, y desde que va por
+     contextBridge.executeInMainWorld le da igual—, así que cae en ese camino de
+     no tocar nada junto con el resto de la web. */
+  ses.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details, cb) => {
     let host = ''; try { host = new URL(details.url).hostname; } catch { /* nada */ }
-    // YouTube ya NO necesita que le borremos la CSP. Se hacía porque el pruning se
-    // inyectaba con un <script> inline, que la CSP con nonce rechazaba; desde que va
-    // por contextBridge.executeInMainWorld (webview-preload.js) la CSP le da igual.
-    // Borrarla dejaba a todo YouTube sin su política de seguridad mientras el
-    // adblock estuviera activo, que es un precio alto por un truco de inyección.
-    if (/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return cb({});
+    // El muro del WAF se caza aquí porque es donde llegan las cabeceras de la
+    // respuesta; quién lo desactiva es rompeBucleWaf, más abajo.
+    if (details.statusCode === 405 && details.resourceType === 'mainFrame'
+        && details.webContentsId && esMuroWaf(details)) {
+      rompeBucleWaf(details).catch(() => { /* nada */ });
+    }
+    if (!CORS_OPEN.some((d) => hostMatches(host, d))) return cb({});
     const headers = { ...details.responseHeaders };
     for (const k of Object.keys(headers)) if (/^access-control-allow-(origin|methods|headers)$/i.test(k)) delete headers[k];
     headers['Access-Control-Allow-Origin'] = ['*'];
@@ -584,6 +591,92 @@ function setupSession(ses) {
     headers['Access-Control-Allow-Headers'] = ['*'];
     cb({ responseHeaders: headers });
   });
+
+  /* ===== EL MURO DE "CONFIRME QUE ES HUMANO" QUE NO SE ACABABA NUNCA =====
+     (2026-09-01) A Dosa le salía el captcha de las imágenes de Amazon CADA vez
+     que entraba a IMDb. En Chrome no le salía, y en una ventana PRIVADA de
+     Naviris tampoco: eso descarta de golpe la IP y el navegador, y deja al
+     PERFIL como único sospechoso.
+
+     Medido por CDP con la cabecera `x-amzn-waf-action`, que en cada carga dice
+     si el WAF de Amazon manda el reto silencioso o el muro visual. Veredicto
+     binario, sin gastar un solo captcha:
+
+         con  aws-waf-token guardado  ->  405  captcha
+         sin  aws-waf-token           ->  202  challenge  y entra sola
+
+     Y por qué no se acababa nunca: en el localStorage de IMDb la marca
+     `awswaf_captcha_solve_timestamp` seguía clavada dos días atrás aunque el
+     captcha se acabara de resolver. Resolver el muro NO deja un token
+     verificado — deja uno que, al presentarlo, vuelve a disparar el muro. Como
+     la cookie dura cuatro días, el bucle se hereda días enteros: resolverlo era
+     justo lo que condenaba a la siguiente vez.
+
+     Aquí se rompe. Si una navegación principal vuelve 405 con
+     `x-amzn-waf-action: captcha` y HABÍA un token guardado, se tira ese token y
+     se recarga una vez: el intento siguiente sale de un reto limpio y pasa.
+
+     BORRAR LA COOKIE Y RECARGAR NO BASTA, y costó dos intentos descubrirlo: la
+     respuesta del muro trae su propio Set-Cookie con un token igual de inútil, y
+     Chromium lo guarda DESPUÉS de que corran los manejadores de webRequest. O
+     sea que el borrado llegaba siempre antes que la reposición y la recarga se
+     volvía a llevar el token (medido: dos cargas seguidas, las dos con token).
+     Filtrar ese Set-Cookie de la respuesta tampoco vale: igual que la cabecera
+     Cookie no se ve en onBeforeSendHeaders, Chromium se guarda las de cookies
+     aparte y lo que se devuelva aquí no las toca.
+
+     Por eso la limpieza va por EVENTO, no por orden: se abre una ventana corta
+     en la que cualquier token que aparezca para ese sitio se borra según nace,
+     y la recarga se lanza al cerrarla. Así da igual quién llegue primero. La
+     ventana se cierra antes de recargar a propósito: el token bueno que emita
+     el reto limpio tiene que poder guardarse.
+
+     Tres cautelas, porque esto corre solo:
+     - Se borra SOLO la cookie del token. La sesión de Amazon vive en
+       `session-token` y no se toca, así que esto no desloguea de nada. Es justo
+       lo que `site:clear` no puede hacer, porque ese borra el dominio entero.
+     - Si el muro sale SIN token guardado, no se hace nada: es un muro legítimo
+       y recargar sería ponerse a dar vueltas contra el sitio.
+     - Un reintento por sitio cada quince minutos como mucho. */
+  const WAF_TOKEN = 'aws-waf-token';
+  const WAF_ESPERA = 15 * 60 * 1000;
+  const WAF_VENTANA = 400;     // ms purgando lo que reponga el muro
+  const wafUltimo = new Map(); // host -> ts del último reintento
+  const wafPurga = new Set();  // hosts en plena limpieza
+  function esMuroWaf(details) {
+    const h = details.responseHeaders || {};
+    for (const k of Object.keys(h)) {
+      if (k.toLowerCase() !== 'x-amzn-waf-action') continue;
+      return String([].concat(h[k])[0] || '').trim().toLowerCase() === 'captcha';
+    }
+    return false;
+  }
+  const urlDeCookie = (c) => (c.secure ? 'https://' : 'http://') + (c.domain || '').replace(/^\./, '') + (c.path || '/');
+  ses.cookies.on('changed', (_e, cookie, _causa, borrada) => {
+    if (borrada || cookie.name !== WAF_TOKEN || !wafPurga.size) return;
+    const dominio = (cookie.domain || '').replace(/^\./, '');
+    for (const host of wafPurga) {
+      if (!hostMatches(host, dominio)) continue;
+      ses.cookies.remove(urlDeCookie(cookie), cookie.name).catch(() => { /* ya no estaba */ });
+      return;
+    }
+  });
+  async function rompeBucleWaf(details) {
+    let host = '';
+    try { host = new URL(details.url).hostname; } catch { return; }
+    const ahora = Date.now();
+    if (wafPurga.has(host) || ahora - (wafUltimo.get(host) || 0) < WAF_ESPERA) return;
+    const tokens = await ses.cookies.get({ domain: host, name: WAF_TOKEN });
+    if (!tokens.length) return; // muro legítimo: no hay nada viciado que tirar
+    wafUltimo.set(host, ahora);
+    wafPurga.add(host);
+    for (const c of tokens) await ses.cookies.remove(urlDeCookie(c), c.name).catch(() => { /* ya no estaba */ });
+    const wc = webContents.fromId(details.webContentsId);
+    setTimeout(() => {
+      wafPurga.delete(host);   // ANTES de recargar: el token bueno debe poder entrar
+      if (wc && !wc.isDestroyed()) wc.reload();
+    }, WAF_VENTANA);
+  }
 
   ses.on('will-download', (_e, item) => registerDownloadItem(item));
   /* SESIONES QUE NO SE PIERDEN (2026-08-13). Chromium guarda las cookies en

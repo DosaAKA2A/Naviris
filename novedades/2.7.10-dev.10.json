@@ -1,0 +1,16 @@
+{
+  "version": "2.7.10-dev.10",
+  "linea": "dev",
+  "titulo": "Se acabó el \"confirme que es humano\" de cada vez",
+  "entradilla": "IMDb y otras webs de Amazon pedían el captcha de las imágenes en todas las visitas, y resolverlo no servía de nada. Naviris ya rompe ese bucle solo.",
+  "bloques": [
+    {
+      "titulo": "Resolver el captcha era justo lo que lo repetía",
+      "texto": "Al pasar la verificación, el sitio deja guardado un comprobante de que ya eres humano. El que quedaba guardado no valía, así que en la visita siguiente el muro volvía a salir, se resolvía otra vez y volvía a quedar uno igual de inútil. Como ese comprobante dura cuatro días, la rueda no paraba nunca. En una ventana privada no pasaba, porque ahí no hay nada guardado."
+    },
+    {
+      "titulo": "Ahora se tira solo y la página entra",
+      "texto": "Cuando una web responde con ese muro y Naviris ve que el comprobante guardado es el culpable, lo tira y vuelve a pedir la página una vez. El segundo intento sale limpio y pasa sin enseñarte nada. Se toca solo ese dato: la sesión de tu cuenta no se roza, así que no te saca de ningún sitio. Si el muro sale sin que haya nada guardado, es una verificación de verdad y Naviris no se mete."
+    }
+  ]
+}
