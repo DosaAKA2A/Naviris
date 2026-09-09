@@ -1,0 +1,12 @@
+{
+  "version": "2.8.1-dev.6",
+  "linea": "dev",
+  "titulo": "Fuera el morado de los enlaces visitados",
+  "entradilla": "Los enlaces vuelven a verse como los pinta cada web, sin que Naviris les cambie el color.",
+  "bloques": [
+    {
+      "titulo": "Cada web pinta sus enlaces",
+      "texto": "Naviris marcaba en morado los enlaces que ya habías visitado, imitando lo que hace Chrome. Se veía mal, así que se retira: los enlaces se muestran tal y como los define cada página.\n\nCon ello se van también dos problemas que arrastraba. El primero, de privacidad: para decidir qué marcar se comparaban dominios recortando su final, y eso hacía que sitios distintos alojados bajo un mismo dominio compartido —del tipo usuario.github.io— se tomaran por el mismo, con lo que una página podía llegar a averiguar qué otras habías visitado ahí. El segundo, de rendimiento: en páginas que cambian sin parar, el repaso de enlaces se reprogramaba en bucle y no llegaba a ejecutarse nunca.\n\nEl historial sigue funcionando igual: se apunta al navegar y alimenta la barra de direcciones y el panel de historial."
+    }
+  ]
+}
