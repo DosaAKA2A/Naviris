@@ -56,7 +56,6 @@
   --grad-fg: #10130a;
   /* Círculo de reposo de los iconos: cada botón del sidebar vive en su
      pastilla de superficie, como los rieles de la referencia */
-  --sb-chip: rgba(255,255,255,.04);
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #10130a; --accent-hover: #eaff77; --text-strong: #ffffff;
   /* Pestañas del titlebar */
@@ -113,7 +112,6 @@
   --grad-realce: linear-gradient(135deg, #b9a8f0 0%, #f2a0cd 55%, #f9917c 100%);
   --grad-medida: linear-gradient(90deg, #c9bcf7 0%, #f2a0cd 55%, #e0674f 100%);
   --grad-fg: #47203c;
-  --sb-chip: rgba(150,45,95,.06);
   --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
   --tab-active-bg: #ffffff; --tab-active-line: #e2b7cc;
@@ -202,7 +200,6 @@
   --grad-realce: linear-gradient(135deg, #d93a2b 0%, #ea6a2c 55%, #f59a35 100%);
   --grad-medida: linear-gradient(90deg, #f7a53a 0%, #ea6a2c 55%, #b52d1f 100%);
   --grad-fg: #ffffff;
-  --sb-chip: rgba(18,20,26,.05);
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
 :root.light .ctx-item.danger, :root.light .ctx-item.danger .ctx-ic { color: #c62f34; }
@@ -247,7 +244,6 @@
   --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
   --grad-medida: #ffffff;   /* la barra del monitor, BLANCA y sin degradado */
   --grad-fg: #131313;
-  --sb-chip: rgba(255,255,255,.05);
   --tab-fg: #a0a0a0; --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
   --tab-asleep-fg: #7d7d7d; --fav-dot: #666666;
   --tab-active-bg: #343436; --tab-active-line: #4a4a4d;
@@ -302,6 +298,38 @@
 #hub-dock .dk-sep { width: 1px; height: 44px; background: var(--hub-hairline); margin: 0 4px; }
 #hub.estrenando #hub-dock { animation: sp-sube .5s ease-out .34s both; }
 #hub.editing #hub-dock .dial { animation: none; }
+/* ===== SIN SOLAPES (Dosa, 2026-09-09: "veo cómo elementos se superponen") =====
+   El dock, los botones y la versión FLOTAN sobre el hub. Con scroll, el
+   contenido les pasaba POR DEBAJO al desplazarse (no basta con dejar hueco al
+   final: el problema es el recorrido, no el reposo). Solución: cuando hay
+   scroll, .hub-scroll se recorta por encima de una FRANJA reservada donde solo
+   viven el dock y los botones; ahí no entra ningún widget, ni scrolleando.
+   En ventanas estrechas el dock sube sobre los botones y encoge sus tiles.
+   Se mide el ancho del propio hub (container), no el de la ventana. */
+#hub { container-type: inline-size; --franja: 172px; }
+#hub.con-scroll .hub-scroll { inset: 0 0 var(--franja) 0; }
+#hub.con-scroll #widget-grid { padding-bottom: 24px; }
+/* Sitio arriba para la esquina de cuenta/clima/tema cuando el hub va en flujo */
+#hub.reflujo #widget-grid { padding-top: 92px; }
+@container (max-width: 1500px) {
+  /* El dock se sube por encima de la fila de botones: en fila ya no caben */
+  #hub-dock { bottom: 74px; }
+}
+@container (max-width: 1100px) {
+  #hub { --franja: 152px; }
+  #hub-dock { gap: 6px; padding: 8px; border-radius: 22px; }
+  #hub-dock .d-tile { width: 54px; height: 54px; border-radius: 15px; }
+  #hub-dock .d-tile img { --icon-sz: 26px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 26px; height: 26px; } #hub-dock .d-tile .d-letter { font-size: 20px; }
+  #hub-dock .dk-sep { height: 36px; }
+}
+@container (max-width: 800px) {
+  #hub { --franja: 136px; }
+  #hub-dock { gap: 5px; padding: 6px; border-radius: 18px; }
+  #hub-dock .d-tile { width: 44px; height: 44px; border-radius: 12px; }
+  #hub-dock .d-tile img { --icon-sz: 22px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 22px; height: 22px; } #hub-dock .d-tile .d-letter { font-size: 17px; }
+  #hub-dock .dk-sep { height: 30px; }
+}
+
 #hub.editing .hub-corner, #hub.editing #hub-version { opacity: .25; pointer-events: none; }
 :root.mono .tab.mini { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
 :root.mono .tab.mini.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
@@ -524,8 +552,12 @@ body.sacando-pestana { cursor: copy; }
 #sidebar { width: var(--sidebar-w); margin: 8px 4px 10px 8px; border-radius: 22px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
-/* Botones del riel en CÍRCULO (petición 2026-08-11: "lo más redondos posible") */
-.sb-btn { width: 34px; height: 34px; border: none; border-radius: 50%; background: var(--sb-chip); color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
+/* RIEL LIMPIO estilo Opera GX (Dosa, 2026-09-09: "el nuestro tiene círculos, el
+   de ellos es clean y aparece un hover al pasar el puntero"). En reposo el botón
+   es SOLO el icono: nada de pastilla permanente. El realce —un cuadrado de
+   esquinas redondas— aparece al pasar el puntero, y el panel abierto lo deja
+   fijo con el icono en el color del tema. */
+.sb-btn { width: 34px; height: 34px; border: none; border-radius: 10px; background: transparent; color: var(--sb-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform .09s ease; }
 /* El anillo de foco del navegador se teñía del color del icono (el naranja
    del Rat Tool = "borde rojizo"): con ratón no hay anillo, con teclado va
    en el realce del tema */
@@ -533,13 +565,13 @@ body.sacando-pestana { cursor: copy; }
 .sb-btn:focus-visible { outline: 2px solid var(--realce); outline-offset: 2px; }
 /* El icono del botón abierto SIEMPRE en el color del degradado, gane a
    cualquier tinte propio (el naranja del Rat Tool se colaba encima) */
-#sidebar .sb-btn.open { color: var(--grad-fg); }
+#sidebar .sb-btn.open { color: var(--realce); }
 .sb-btn svg { width: 17px; height: 17px; }
-.sb-btn:hover { background: var(--wash-2); color: var(--realce); }
+.sb-btn:hover { background: var(--sb-hover); color: var(--text-strong); }
 .sb-btn:active { transform: scale(.94); }
-/* Estado abierto = squircle relleno con el degradado de realce e icono en
-   blanco, como el riel de la referencia. El squircle ES el indicador. */
-.sb-btn.open { background: var(--grad-realce); color: var(--grad-fg); }
+/* Panel abierto: el mismo realce del hover, pero fijo, con el icono en el
+   color del tema. Sin degradados ni rellenos que griten. */
+.sb-btn.open { background: var(--sb-open); color: var(--realce); }
 /* Spotify en el sidebar: encendido en el color del tema mientras SUENA algo,
    y apagado cuando el reproductor se ha dormido. En pausa se queda normal. */
 #sb-spotify.sonando { color: var(--realce); }
@@ -547,6 +579,14 @@ body.sacando-pestana { cursor: copy; }
   border-radius: 50%; background: var(--realce); }
 #sb-spotify.dormido { opacity: .38; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
+/* Etiqueta del riel (como el "GX Control" de Opera GX): sale al instante al
+   pasar el puntero, en vez del tooltip del sistema, que tarda un segundo y no
+   sigue el tema. El texto lo pone el propio title del botón (ver renderer). */
+#sb-tip { position: fixed; z-index: 900; max-width: 260px; padding: 7px 11px; border-radius: 9px;
+  background: var(--bg-3); color: var(--text); border: 1px solid var(--line-2); font-size: 12px; line-height: 1.45;
+  box-shadow: 0 10px 24px var(--shadow-pop); pointer-events: none;
+  opacity: 0; transform: translateX(-4px); transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease); }
+#sb-tip.on { opacity: 1; transform: none; }
 .sb-spacer { flex: 1; }
 /* Divisor fino y elegante entre grupos del sidebar + etiqueta de grupo */
 .sb-div { width: 18px; height: 1px; margin: 6px 0; background: linear-gradient(90deg, transparent, var(--sb-div) 30%, var(--sb-div) 70%, transparent); }

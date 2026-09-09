@@ -1,0 +1,16 @@
+{
+  "version": "2.8.1-dev.3",
+  "linea": "dev",
+  "titulo": "Nada se pisa y el riel se limpia",
+  "entradilla": "Arreglo del hub nuevo: en ventanas pequeñas los widgets se metían por debajo del dock. Y la barra lateral pierde los círculos, al estilo de Opera GX.",
+  "bloques": [
+    {
+      "titulo": "El dock ya no se come los widgets",
+      "texto": "En ventanas que no daban para la composición entera, el hub pasa a modo lista con desplazamiento, y ahí las tarjetas se colaban por debajo del dock y de los botones de abajo. Ahora la parte inferior es una franja reservada: el contenido se recorta justo encima y nunca cruza por detrás, ni al desplazar.\n\nDe paso, si la ventana es estrecha el dock se sube por encima de los botones y sus iconos encogen, para que las dos filas quepan sin tocarse."
+    },
+    {
+      "titulo": "La barra lateral, limpia",
+      "texto": "Los botones del lateral dejan de llevar un círculo permanente: en reposo son solo el icono. El realce —un cuadrado de esquinas redondas— aparece al pasar el puntero, y el panel que tengas abierto se queda marcado con el icono en el color del tema.\n\nAdemás, al pasar por encima sale al instante una etiqueta con el nombre de la herramienta, en lugar del cartelito del sistema, que tardaba un segundo y no seguía el tema."
+    }
+  ]
+}

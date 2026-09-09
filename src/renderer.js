@@ -21,7 +21,7 @@ const els = {};
   'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-updauto', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat', 'sb-spotify',
-  'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
+  'sidebar', 'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
   'history-panel', 'history-list', 'history-filter', 'history-clear', 'history-close',
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
@@ -4874,6 +4874,32 @@ function renderResList() {
 }
 els.sbRes.addEventListener('click', (e) => { e.stopPropagation(); const open = els.resPop.classList.contains('hidden'); els.resPop.classList.toggle('hidden'); els.sbRes.classList.toggle('open', open); if (open) { renderResList(); anclarPop(els.resPop, els.sbRes); } });
 window.addEventListener('resize', () => applyResponsive());
+
+/* ============ Etiqueta del riel (estilo Opera GX) ============
+   El tooltip del sistema tarda ~1 s y no sigue el tema. Aquí el texto se lee
+   del propio title al entrar y se devuelve al salir: los botones que cambian
+   su title en caliente (AutoClaim, Blockify, los addons) siguen funcionando
+   sin que haya que tocarlos. */
+(() => {
+  const tip = document.createElement('div'); tip.id = 'sb-tip'; document.body.appendChild(tip);
+  let actual = null;
+  const oculta = () => {
+    if (actual && actual.dataset.tip != null) { actual.title = actual.dataset.tip; delete actual.dataset.tip; }
+    actual = null; tip.classList.remove('on');
+  };
+  els.sidebar.addEventListener('mouseover', (e) => {
+    const b = e.target.closest('.sb-btn'); if (!b || b === actual) return;
+    oculta();
+    const txt = (b.title || '').trim(); if (!txt) return;
+    actual = b; b.dataset.tip = b.title; b.title = '';   // sin title no sale el del sistema
+    tip.textContent = txt; tip.classList.add('on');
+    const r = b.getBoundingClientRect();
+    tip.style.left = Math.round(r.right + 10) + 'px';
+    tip.style.top = Math.round(Math.min(window.innerHeight - tip.offsetHeight - 8, Math.max(8, r.top + r.height / 2 - tip.offsetHeight / 2))) + 'px';
+  });
+  els.sidebar.addEventListener('mouseleave', oculta);
+  els.sidebar.addEventListener('click', oculta);
+})();
 
 /* ============ Sidebar home + ajustes ============ */
 els.sbHome.addEventListener('click', () => { const h = tabs.find((t) => t.kind === 'hub'); if (h) activateTab(h.id); else createTab(); });
