@@ -2,16 +2,19 @@
    Muestra el contenido marcado como sensible en X/Twitter sin el aviso de
    "este contenido puede ser delicado": al activarlo, Naviris pulsa por ti el
    "Mostrar" de cada publicación tapada. Un clic en el botón del sidebar lo
-   enciende o apaga; azul encendido = activo. El interruptor de siempre dentro
-   del Rat Tool sigue existiendo y ambos mueven el mismo ajuste. */
+   enciende o apaga; encendido = en el color del tema (Dosa, 2026-09-09: "debe
+   tomar el color del tema, no ser azul"). El interruptor de siempre dentro del
+   Rat Tool sigue existiendo y ambos mueven el mismo ajuste. */
 (function () {
   const ID = 'x-sensitive';
-  const AZUL = '#1d9bf0'; // azul de X: se ve de un vistazo que el modo está activo
+  // El realce del tema activo: el botón encendido va a juego con Naviris en
+  // lugar de meter el azul de X en un riel monocromo.
+  const REALCE = 'var(--realce)';
 
   function pinta(btn, activo) {
     if (!btn) return;
-    btn.style.color = activo ? AZUL : '';
-    btn.style.filter = activo ? 'drop-shadow(0 0 5px rgba(29,155,240,.75))' : '';
+    btn.style.color = activo ? REALCE : '';
+    btn.style.filter = '';
     btn.title = activo
       ? 'Sensibilidad X: ACTIVO — el contenido sensible se muestra sin avisos. Clic para restaurar los avisos.'
       : 'Sensibilidad X: ver el contenido sensible de X/Twitter sin el aviso. Clic para activar.';

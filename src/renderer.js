@@ -18,7 +18,7 @@ const els = {};
   'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
-  'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
+  'dial-modal', 'dial-name', 'dial-url', 'lib-grid', 'op-slider', 'op-valor', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
   'opt-agent', 'opt-updauto', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat', 'sb-spotify',
   'sidebar', 'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -1263,6 +1263,50 @@ const DEFAULT_DIALS = [
   { name: 'Pinterest', url: 'https://www.pinterest.com' }, { name: 'IRIS', url: 'https://iris.it.com' }
 ];
 let dials = store.get('cobalt.dials', DEFAULT_DIALS);
+/* ===== BIBLIOTECA DE SITIOS (2026-09-09) =====
+   Los habituales a un clic, con el logo ya en el tono del tema: si tenemos la
+   marca en brands.js se usa esa, y si no el favicon del sitio con el mismo
+   filtro monocromo que los accesos (getTile ya lo cachea). */
+const LIBRERIA = [
+  { name: 'Google', url: 'https://www.google.com' }, { name: 'YouTube', url: 'https://www.youtube.com' },
+  { name: 'Gmail', url: 'https://mail.google.com' }, { name: 'Drive', url: 'https://drive.google.com' },
+  { name: 'WhatsApp', url: 'https://web.whatsapp.com' }, { name: 'Instagram', url: 'https://www.instagram.com' },
+  { name: 'Facebook', url: 'https://www.facebook.com' }, { name: 'X', url: 'https://x.com' },
+  { name: 'Pinterest', url: 'https://www.pinterest.com' }, { name: 'TikTok', url: 'https://www.tiktok.com' },
+  { name: 'Reddit', url: 'https://www.reddit.com' }, { name: 'Discord', url: 'https://discord.com/app' },
+  { name: 'Twitch', url: 'https://www.twitch.tv' }, { name: 'Spotify', url: 'https://open.spotify.com' },
+  { name: 'Netflix', url: 'https://www.netflix.com' }, { name: 'Crunchyroll', url: 'https://www.crunchyroll.com' },
+  { name: 'Prime Video', url: 'https://www.primevideo.com' }, { name: 'Disney+', url: 'https://www.disneyplus.com' },
+  { name: 'GitHub', url: 'https://github.com' }, { name: 'ChatGPT', url: 'https://chatgpt.com' },
+  { name: 'Claude', url: 'https://claude.ai' }, { name: 'Wikipedia', url: 'https://es.wikipedia.org' },
+  { name: 'Amazon', url: 'https://www.amazon.es' }, { name: 'LinkedIn', url: 'https://www.linkedin.com' },
+  { name: 'Steam', url: 'https://store.steampowered.com' }, { name: 'Telegram', url: 'https://web.telegram.org' },
+  { name: 'Notion', url: 'https://www.notion.so' }, { name: 'Figma', url: 'https://www.figma.com' },
+  { name: 'MOOVIN', url: 'https://moovin.live' }, { name: 'IRIS', url: 'https://iris.it.com' }
+];
+function renderLibreria() {
+  const g = els.libGrid; if (!g) return;
+  g.innerHTML = '';
+  const puestos = new Set(dials.map((d) => hostOf(d.url)));
+  for (const sitio of LIBRERIA) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'lib-item';
+    if (puestos.has(hostOf(sitio.url))) { b.classList.add('puesto'); b.title = 'Ya lo tienes en el hub'; }
+    const ic = document.createElement('span'); ic.className = 'lib-ic';
+    const marca = brandOf(sitio.url);
+    if (/(^|\.)iris\.it\.com$/.test(hostOf(sitio.url))) ic.innerHTML = window.irisFlat(24);
+    else if (marca && window.brandIcon(marca)) ic.innerHTML = window.brandIcon(marca);
+    else { ic.innerHTML = window.icon('star'); getTile(sitio.url).then((t) => { if (t?.icon) { const im = document.createElement('img'); im.src = t.icon; ic.innerHTML = ''; ic.appendChild(im); } }); }
+    const n = document.createElement('span'); n.className = 'lib-nom'; n.textContent = sitio.name;
+    b.append(ic, n);
+    b.addEventListener('click', () => {
+      dials.push({ name: sitio.name, url: sitio.url });
+      store.set('cobalt.dials', dials);
+      els.dialModal.classList.add('hidden');
+      renderHub(); toast(sitio.name + ' añadido al hub');
+    });
+    g.appendChild(b);
+  }
+}
 function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt.dials', dials); renderHub(); }
 
 // Logos de los dials: SIEMPRE monocromos. La opción "Logos a color" se
@@ -1936,7 +1980,7 @@ function renderDock() {
   const sep = document.createElement('div'); sep.className = 'dk-sep'; dock.appendChild(sep);
   const add = document.createElement('div'); add.className = 'dial add'; add.title = 'Añadir acceso';
   add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div>`;
-  add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); });
+  add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; renderLibreria(); els.dialModal.classList.remove('hidden'); els.dialName.focus(); });
   dock.appendChild(add);
   if (!dock.dataset.armado) { armaDock(dock); dock.dataset.armado = '1'; }
 }
@@ -3333,6 +3377,35 @@ function renderPrivadaW(body) {
    Una mini TARJETA de crédito con el degradado del realce: chip, puntos y el
    candado de Windows Hello. No muestra NINGÚN dato real (los datos viven
    cifrados y detrás de Hello); el botón abre el gestor del panel. */
+/* Cada marca con SU color y SU logo, como en Google Wallet (Dosa, 2026-09-09).
+   Mastercard son sus dos círculos; las demás, su palabra — que es como se
+   reconoce una tarjeta de verdad. El número completo no llega nunca aquí: solo
+   la marca y los cuatro últimos, que es lo que devuelve cards:list. */
+const TARJETAS = {
+  'Visa':             { bg: 'linear-gradient(135deg, #2a3a95 0%, #131a4a 100%)', fg: '#ffffff', word: 'VISA', cls: 'visa' },
+  'Mastercard':       { bg: 'linear-gradient(135deg, #2b2b2f 0%, #131315 100%)', fg: '#ffffff', mc: true },
+  'American Express': { bg: 'linear-gradient(135deg, #1a8fd8 0%, #00609c 100%)', fg: '#ffffff', word: 'AMEX' },
+  'Discover':         { bg: 'linear-gradient(135deg, #f28a2e 0%, #d1600a 100%)', fg: '#1b1206', word: 'DISCOVER' },
+  'JCB':              { bg: 'linear-gradient(135deg, #2a7d3f 0%, #14431f 100%)', fg: '#ffffff', word: 'JCB' },
+  'Diners Club':      { bg: 'linear-gradient(135deg, #4a6fa8 0%, #24385c 100%)', fg: '#ffffff', word: 'DINERS' },
+  'UnionPay':         { bg: 'linear-gradient(135deg, #c9332f 0%, #7d1a18 100%)', fg: '#ffffff', word: 'UNIONPAY' }
+};
+const LOGO_MC = '<svg viewBox="0 0 40 24" aria-hidden="true"><circle cx="15" cy="12" r="9" fill="#eb001b"/><circle cx="25" cy="12" r="9" fill="#f79e1b" fill-opacity=".85"/></svg>';
+function pintaTarjetaW(body, c) {
+  const t = (c && TARJETAS[c.brand]) || null;
+  const tj = body.querySelector('.wl-tarjeta');
+  if (t) { tj.style.setProperty('--tj', t.bg); tj.style.setProperty('--tj-fg', t.fg); }
+  else { tj.style.removeProperty('--tj'); tj.style.removeProperty('--tj-fg'); }
+  const marca = tj.querySelector('.wl-marca');
+  if (!c) { marca.textContent = 'Naviris'; return; }
+  marca.innerHTML = t && t.mc ? `<span class="wl-logo">${LOGO_MC}</span>`
+    : `<span class="wl-word ${(t && t.cls) || ''}">${escapeHtml((t && t.word) || c.brand)}</span>`;
+  const num = document.createElement('div'); num.className = 'wl-num'; num.textContent = '•••• ' + c.last4;
+  const cad = document.createElement('div'); cad.className = 'wl-cuenta'; cad.textContent = String(c.expMonth).padStart(2, '0') + '/' + String(c.expYear).slice(-2);
+  // Idempotente: repintar la misma tarjeta no debe apilar números viejos.
+  tj.querySelectorAll('.wl-puntos, .wl-num, .wl-cuenta').forEach((x) => x.remove());
+  tj.append(num, cad);
+}
 function renderWalletW(body) {
   body.innerHTML = `
     <div class="wl-tarjeta">
@@ -3351,6 +3424,9 @@ function renderWalletW(body) {
   };
   body.querySelector('.wl-ver').addEventListener('click', abre);
   body.addEventListener('click', abre);
+  // La primera tarjeta guardada manda el color y el logo. Sin tarjetas, la
+  // neutra del tema; si el cifrado no está disponible, tampoco pasa nada.
+  window.cobalt.cardsList().then((l) => { if (body.isConnected) pintaTarjetaW(body, l && l[0]); }).catch(() => {});
 }
 
 /* ============ Widget de códigos 2FA (TOTP) ============
@@ -4082,6 +4158,25 @@ window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer
   const m = medidasMalla();
   if (m.cw !== CELDA_W || m.cols !== ultimoCols || !!m.reflujo !== els.hub.classList.contains('reflujo')) renderHub();
 }, 250); });
+/* ===== TRANSPARENCIA DE LAS BALDOSAS (2026-09-09) =====
+   Un solo número (0 = opacas, 65 = muy transparentes) que el CSS reparte entre
+   todas las superficies del hub con color-mix. El desenfoque solo se enciende
+   por debajo del 100 % de opacidad: quien deje el hub opaco no paga nada. */
+function aplicaOpacidad(pct) {
+  const p = Math.max(0, Math.min(65, Number(pct) || 0));
+  els.hub.style.setProperty('--hub-op', (1 - p / 100).toFixed(3));
+  els.hub.classList.toggle('translucido', p > 0);
+  if (els.opValor) els.opValor.textContent = p + ' %';
+  if (els.opSlider && Number(els.opSlider.value) !== p) els.opSlider.value = p;
+  return p;
+}
+if (els.opSlider) {
+  els.opSlider.addEventListener('input', () => {
+    store.set('cobalt.hubTransparencia', aplicaOpacidad(els.opSlider.value));
+  });
+}
+aplicaOpacidad(store.get('cobalt.hubTransparencia', 0));
+
 function renderBgPresets() {
   els.bgPresets.innerHTML = '';
   // Solo degradados: el aspecto del hub es plano. Las fotos de src/temas/ son
@@ -6185,6 +6280,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
     els.dialName.value = datos.titulo || hostOf(datos.url) || '';
     els.dialUrl.value = datos.url || '';
     els.sbHome.click();
+    renderLibreria();
     els.dialModal.classList.remove('hidden');
     els.dialName.focus(); els.dialName.select();
     return;

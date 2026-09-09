@@ -1,0 +1,24 @@
+{
+  "version": "2.8.1-dev.4",
+  "linea": "dev",
+  "titulo": "Transparencia a tu gusto, tarjetas con su marca y sitios a un clic",
+  "entradilla": "Vuelve el efecto de cristal, pero cuando tú lo pidas y con la intensidad que quieras. Además: biblioteca de sitios al añadir un acceso, la tarjeta con el color de su marca y un riel más compacto.",
+  "bloques": [
+    {
+      "titulo": "Tú decides cuánta transparencia",
+      "texto": "En Aspecto del hub hay un deslizador nuevo. Al 0 % las baldosas son opacas, como hasta ahora; al subirlo se vuelven translúcidas y se enciende el desenfoque, recuperando el efecto de cristal que tenía el hub antes.\n\nEl desenfoque solo se activa si lo usas: quien deje el hub opaco no paga ese trabajo extra de dibujado. El ajuste se recuerda."
+    },
+    {
+      "titulo": "Sitios habituales al añadir un acceso",
+      "texto": "El botón «+» del dock ya no te deja delante de dos campos vacíos: ahora abre una biblioteca con treinta sitios conocidos —Google, YouTube, Instagram, Facebook, X, Pinterest, TikTok, Netflix, GitHub, ChatGPT y más— cada uno con su logo, en el tono del tema. Un clic y está en el hub. Los que ya tienes salen apagados, para que no los dupliques.\n\nDebajo siguen los campos de siempre para cualquier otra dirección."
+    },
+    {
+      "titulo": "La tarjeta, con la cara de su marca",
+      "texto": "El widget de tarjetas deja de ser una pieza genérica: toma el color de la marca de tu tarjeta y enseña su logo, los cuatro últimos dígitos y la caducidad, como en una cartera del móvil. Visa en azul marino, Mastercard con sus dos círculos, American Express en azul, y así con el resto.\n\nEl número completo sigue sin salir de ahí: hace falta Windows Hello, igual que antes."
+    },
+    {
+      "titulo": "Detalles",
+      "texto": "El widget de monitor se cortaba por abajo cuando medía dos celdas: ya cabe entero.\n\nLos iconos de la barra lateral estaban demasiado separados; ahora van juntos dentro de cada grupo y son los separadores los que ponen el aire, con más distancia alrededor de las herramientas de addons.\n\nY el botón de Sensibilidad X deja de encenderse en azul: toma el color del tema, como el resto del riel."
+    }
+  ]
+}

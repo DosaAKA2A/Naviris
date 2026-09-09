@@ -39,10 +39,10 @@
     {
       "id": "x-sensitive",
       "name": "Sensibilidad X",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "tool",
       "icon": "eye",
-      "description": "Muestra el contenido marcado como sensible en X/Twitter sin el aviso de 'este contenido puede ser delicado': Naviris pulsa el 'Mostrar' por ti en cada publicación tapada. Un clic en el botón del sidebar lo activa o desactiva (azul = activo) y el cambio se aplica al recargar la pestaña de X. Antes vivía en Ajustes; ahora lo instalas solo si lo quieres.",
+      "description": "Muestra el contenido marcado como sensible en X/Twitter sin el aviso de 'este contenido puede ser delicado': Naviris pulsa el 'Mostrar' por ti en cada publicación tapada. Un clic en el botón del sidebar lo activa o desactiva (encendido = color del tema) y el cambio se aplica al recargar la pestaña de X. Antes vivía en Ajustes; ahora lo instalas solo si lo quieres.",
       "entry": "https://naviris.site/addons/x-sensitive.js"
     },
     {

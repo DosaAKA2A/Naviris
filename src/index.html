@@ -172,6 +172,10 @@
             <div class="hp-title">Aspecto del hub</div>
             <div id="bg-presets"></div>
             <button class="wp-custom" type="button">Imagen propia…</button>
+            <!-- Transparencia de las baldosas (2026-09-09): al 100 % son opacas;
+                 al bajarlo se vuelven translúcidas y se enciende el desenfoque. -->
+            <div class="hp-fila"><span>Transparencia</span><b id="op-valor">0 %</b></div>
+            <input id="op-slider" type="range" min="0" max="65" step="5" value="0" title="Cuánto se transparentan los widgets del hub" />
           </div>
         </section>
 
@@ -422,7 +426,14 @@
   <!-- ===== Panel Loot (recompensas de auto-reclamo) ===== -->
 
   <!-- ===== Modales ===== -->
-  <div id="dial-modal" class="modal hidden"><div class="modal-card"><h3>Añadir acceso al hub</h3><input id="dial-name" type="text" placeholder="Nombre (ej. YouTube)" /><input id="dial-url" type="text" placeholder="https://..." /><div class="modal-actions"><button id="dial-cancel">Cancelar</button><button id="dial-save" class="primary">Añadir</button></div></div></div>
+  <div id="dial-modal" class="modal hidden"><div class="modal-card"><h3>Añadir acceso al hub</h3>
+    <!-- Biblioteca de sitios conocidos: un clic y ya está (la pinta renderLibreria) -->
+    <div class="lib-tit">Sitios habituales</div>
+    <div id="lib-grid" class="lib-grid"></div>
+    <div class="lib-sep"></div>
+    <div class="lib-manual">Otro sitio</div>
+    <input id="dial-name" type="text" placeholder="Nombre (ej. YouTube)" /><input id="dial-url" type="text" placeholder="https://..." />
+    <div class="modal-actions"><button id="dial-cancel">Cancelar</button><button id="dial-save" class="primary">Añadir</button></div></div></div>
 
   <div id="prompt-modal" class="modal hidden"><div class="modal-card"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
 

@@ -288,9 +288,9 @@
    escritorio: tiles de 66 px sin nombre (el nombre va en el tooltip), la misma
    magnificación al pasar el ratón (armaDock) y el mismo arrastre para reordenar
    en modo Editar. El "+" añade un acceso. */
-#hub-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 26px; background: var(--hub-card); border: 1px solid var(--hub-fab-line); }
+#hub-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 26px; background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-fab-line); }
 #hub-dock .dial { gap: 0; }
-#hub-dock .d-tile { width: 66px; height: 66px; border-radius: 18px; background: var(--tile-default); border: 1px solid var(--tile-line); }
+#hub-dock .d-tile { width: 66px; height: 66px; border-radius: 18px; background: color-mix(in srgb, var(--tile-default) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--tile-line); }
 #hub-dock .d-tile img { --icon-sz: 30px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 30px; height: 30px; } #hub-dock .d-tile .d-letter { font-size: 24px; }
 #hub-dock .d-name { display: none; }
 #hub-dock .dial.add .d-tile { background: transparent; border: 1.5px dashed var(--dial-add-line); color: var(--dim); }
@@ -307,6 +307,34 @@
    En ventanas estrechas el dock sube sobre los botones y encoge sus tiles.
    Se mide el ancho del propio hub (container), no el de la ventana. */
 #hub { container-type: inline-size; --franja: 172px; }
+/* ===== TRANSPARENCIA REGULABLE (Dosa, 2026-09-09) =====
+   Las baldosas son opacas de fábrica, pero el deslizador de "Aspecto del hub"
+   baja --hub-op y todas se vuelven translúcidas a la vez. Solo por debajo del
+   100 % se enciende el desenfoque (#hub.translucido): así quien no lo use no
+   paga el coste de un backdrop-filter que hay que recalcular en cada capa.
+   Es la vuelta VOLUNTARIA del efecto de cristal que tenía el hub. */
+#hub { --hub-op: 1; --hub-blur: 18px; }
+#hub.translucido .w-card, #hub.translucido .w-searchwrap, #hub.translucido .d-tile,
+#hub.translucido #hub-dock, #hub.translucido .hub-pill, #hub.translucido .hub-fab,
+#hub.translucido #hub-addons, #hub.translucido #hub-version {
+  -webkit-backdrop-filter: blur(var(--hub-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--hub-blur)) saturate(1.5);
+}
+/* Con las superficies translúcidas el texto vuelve a competir con la foto: se
+   le devuelve la sombra mínima que lo despega, solo en ese modo. */
+#hub.translucido .w-clock .time, #hub.translucido .w-head, #hub.translucido .d-name,
+#hub.translucido .hub-pill, #hub.translucido #hub-version { text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+#hub.bg-claro.translucido .w-clock .time, #hub.bg-claro.translucido .w-head,
+#hub.bg-claro.translucido .d-name, #hub.bg-claro.translucido .hub-pill,
+#hub.bg-claro.translucido #hub-version { text-shadow: 0 1px 3px rgba(255,255,255,.55); }
+/* Deslizador del panel de aspecto */
+.hp-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 2px 6px; font-size: 12px; color: var(--text); }
+.hp-fila b { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+#op-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; cursor: pointer; }
+#op-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--track); }
+#op-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--realce); margin-top: -5px; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: transform var(--dur-1) var(--spring); }
+#op-slider:hover::-webkit-slider-thumb { transform: scale(1.15); }
 #hub.con-scroll .hub-scroll { inset: 0 0 var(--franja) 0; }
 #hub.con-scroll #widget-grid { padding-bottom: 24px; }
 /* Sitio arriba para la esquina de cuenta/clima/tema cuando el hub va en flujo */
@@ -549,7 +577,10 @@ body.sacando-pestana { cursor: copy; }
 /* Sidebar */
 /* Sidebar CÁPSULA FLOTANTE (referencia bee_ui 2026-08-11: el riel despegado
    de los bordes, no una barra de navegador corriente) */
-#sidebar { width: var(--sidebar-w); margin: 8px 4px 10px 8px; border-radius: 22px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 0; flex-shrink: 0; }
+/* Iconos JUNTOS dentro de cada grupo y los grupos bien separados (Dosa,
+   2026-09-09: "demasiado separados… manteniendo más distancia funciones de
+   addons"). El aire lo ponen los separadores, no el hueco entre botones. */
+#sidebar { width: var(--sidebar-w); margin: 8px 4px 10px 8px; border-radius: 22px; background: var(--sb-capsule); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 0; flex-shrink: 0; }
 /* Herramientas del sidebar: mismo criterio de contraste que la navbar, y el
    panel abierto se marca con una pastilla clara + guía a la izquierda. */
 /* RIEL LIMPIO estilo Opera GX (Dosa, 2026-09-09: "el nuestro tiene círculos, el
@@ -578,7 +609,7 @@ body.sacando-pestana { cursor: copy; }
 #sb-spotify.sonando::after { content: ''; position: absolute; right: 6px; top: 8px; width: 6px; height: 6px;
   border-radius: 50%; background: var(--realce); }
 #sb-spotify.dormido { opacity: .38; }
-.sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
+.sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 9px 0; }
 /* Etiqueta del riel (como el "GX Control" de Opera GX): sale al instante al
    pasar el puntero, en vez del tooltip del sistema, que tarda un segundo y no
    sigue el tema. El texto lo pone el propio title del botón (ver renderer). */
@@ -589,7 +620,7 @@ body.sacando-pestana { cursor: copy; }
 #sb-tip.on { opacity: 1; transform: none; }
 .sb-spacer { flex: 1; }
 /* Divisor fino y elegante entre grupos del sidebar + etiqueta de grupo */
-.sb-div { width: 18px; height: 1px; margin: 6px 0; background: linear-gradient(90deg, transparent, var(--sb-div) 30%, var(--sb-div) 70%, transparent); }
+.sb-div { width: 18px; height: 1px; margin: 11px 0; background: linear-gradient(90deg, transparent, var(--sb-div) 30%, var(--sb-div) 70%, transparent); }
 
 /* Panel web lateral */
 
@@ -992,7 +1023,7 @@ body.sacando-pestana { cursor: copy; }
 /* REFORMA 2.8.1 (2026-09-09, Dosa eligió la composición "Mosaico + dock"): la
    tarjeta es una BALDOSA opaca de radio 18, sin cristal, sin sombra y sin
    transform. Funciona igual sobre el degradado del tema y sobre cualquier foto. */
-.w-card { background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: var(--hub-r); overflow: hidden; padding: 18px; height: 100%; }
+.w-card { background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-card-line); border-radius: var(--hub-r); overflow: hidden; padding: 18px; height: 100%; }
 .w-clock { padding: 18px 16px 14px 20px; }
 /* Accesos: tarjeta transparente — SIN overflow:hidden ni translateZ (son del
    vidrio; aqui solo CORTABAN los tiles al elevarse con el hover). */
@@ -1014,7 +1045,7 @@ body.sacando-pestana { cursor: copy; }
    foco (y en el color de realce) */
 /* El buscador es una baldosa más (reforma 2.8.1): el contenedor del widget lleva
    la superficie y el formulario va a todo su ancho, sin borde propio. */
-.w-searchwrap { background: var(--hub-card); border: 1px solid var(--hub-card-line); border-radius: var(--hub-r); padding: 0 8px; }
+.w-searchwrap { background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-card-line); border-radius: var(--hub-r); padding: 0 8px; }
 .w-searchwrap:focus-within { border-color: var(--hub-hairline); }
 #hub-search { display: flex; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 0 14px; background: transparent; border: none; }
 #hub-search kbd { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--chip); color: var(--text-dim); }
@@ -1163,6 +1194,23 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    su trabajo; solo se le quita el botón. */
 .hub-fab svg { width: 15px; height: 15px; }
 .hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 14px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; max-height: 70vh; overflow-y: auto; }
+/* ===== BIBLIOTECA DE SITIOS (modal Añadir acceso) =====
+   Una rejilla de sitios conocidos con su logo ya en el tono del tema: los que
+   tienen marca propia salen de brands.js y el resto usa su favicon con el
+   mismo filtro monocromo que los accesos del hub. Un clic lo añade. */
+.lib-tit { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); margin: 4px 0 10px; }
+.lib-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 232px; overflow-y: auto; margin-bottom: 6px; }
+.lib-item { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px 4px 8px; border: 1px solid transparent; border-radius: 12px; background: var(--bg-2); color: var(--text); cursor: pointer; font: inherit; transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.lib-item:hover { background: var(--hover); border-color: var(--line-2); transform: translateY(-1px); }
+.lib-item:active { transform: translateY(0) scale(.97); }
+.lib-item.puesto { opacity: .4; pointer-events: none; }
+.lib-ic { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; color: var(--text); }
+.lib-ic svg { width: 24px; height: 24px; }
+.lib-ic img { width: 24px; height: 24px; object-fit: contain; filter: var(--fav-filter); }
+.lib-nom { font-size: 10.5px; color: var(--text-dim); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-sep { height: 1px; background: var(--line); margin: 12px 0 10px; }
+.lib-manual { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+#dial-modal .modal-card { width: 520px; max-width: calc(100vw - 40px); }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }
 #palette-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pal-item { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .12s, background .12s; }
@@ -1315,7 +1363,12 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* Botones de herramientas registrados por addons: viven en el sidebar,
    después de las herramientas nativas (Rat Tool siempre va primero) */
+/* Las herramientas de addon son el grupo de en medio: se les da su propio aire
+   arriba y abajo sin sacarlas del flujo del riel (display:contents las deja
+   como hijas directas, así que el margen va en los botones de los extremos). */
 #addon-tools { display: contents; }
+#addon-tools .sb-btn:first-child { margin-top: 9px; }
+#addon-tools .sb-btn:last-child { margin-bottom: 9px; }
 
 /* Botón Addons del hub: misma placa de VIDRIO que los demás FABs, con el
    borde de gradiente en la gama del tema (antes era una placa opaca con los
@@ -1808,13 +1861,24 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* ===== Widget TARJETAS: mini tarjeta de credito (sin datos reales) ===== */
 .w-wallet { padding: 14px; height: 100%; display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
-.wl-tarjeta { position: relative; flex: 1; min-height: 74px; border-radius: 14px; background: var(--grad-realce); color: var(--grad-fg);
+/* La tarjeta toma el COLOR DE SU MARCA, como en Google Wallet (Dosa,
+   2026-09-09). --tj es el color de la marca; si no hay tarjetas guardadas, se
+   queda la neutra del tema. */
+.wl-tarjeta { position: relative; flex: 1; min-height: 74px; border-radius: 14px; background: var(--tj, var(--grad-realce)); color: var(--tj-fg, var(--grad-fg));
   padding: 12px 14px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 20px -10px rgba(0,0,0,.4); }
 .wl-tarjeta::after { content: ''; position: absolute; inset: 0; background-image: var(--grain); background-size: 90px 90px; opacity: .1; mix-blend-mode: soft-light; pointer-events: none; }
 .wl-chip { width: 26px; height: 19px; border-radius: 5px; background: linear-gradient(140deg, rgba(255,255,255,.85), rgba(255,255,255,.45));
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
 .wl-puntos { display: flex; gap: 10px; margin-top: 10px; font-size: 13px; font-weight: 700; letter-spacing: 2px; opacity: .85; }
-.wl-marca { position: absolute; right: 12px; bottom: 9px; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; opacity: .8; }
+.wl-marca { position: absolute; right: 12px; bottom: 9px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; opacity: .92; }
+/* Logo de la marca: Mastercard son sus dos círculos; el resto, su palabra, que
+   es como se lee una tarjeta de verdad. */
+.wl-logo { display: inline-flex; align-items: center; }
+.wl-logo svg { width: 30px; height: 19px; }
+.wl-word { font-size: 13px; font-weight: 800; letter-spacing: .5px; }
+.wl-word.visa { font-style: italic; letter-spacing: 1px; }
+.wl-num { position: absolute; left: 14px; bottom: 9px; font-size: 11.5px; font-variant-numeric: tabular-nums; letter-spacing: 1.2px; opacity: .85; }
+.wl-cuenta { position: absolute; right: 12px; top: 11px; font-size: 10.5px; opacity: .75; }
 .wl-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .wl-hello { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-dim); }
 .wl-hello svg { width: 13px; height: 13px; }
@@ -1988,14 +2052,18 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #widget-grid { position: relative; }
 .widget { z-index: 1; }
 /* ===== Widget MONITOR ===== */
-.w-mon { padding: 16px; height: 100%; display: flex; flex-direction: column; gap: 9px; }
+/* El contenido tiene que CABER: la tarjeta recorta, y a 2×1 (148 px de alto) el
+   monitor se pasaba 12 px y se le cortaban los botones. Medido, no ajustado a
+   ojo: cabecera + dos medidas + botonera con estos números suman 146. */
+.w-mon { padding: 13px 14px; height: 100%; display: flex; flex-direction: column; gap: 7px; }
+.w-mon .w-head { margin-bottom: 0; }
 /* barras en VERDE (degradado del logo: lima -> verde), pedido de Dosa */
 /* Reforma 2.8.1: cada medida es un DATO GRANDE con su etiqueta encima y un riel
    fino debajo, las dos en columnas (la referencia que eligió Dosa). */
 .mon-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; flex: 1; align-content: center; }
-.mon-stat { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.mon-stat { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .mon-k { font-size: 10.5px; letter-spacing: .4px; color: var(--dim); }
-.mon-v { font-size: 26px; font-weight: 300; letter-spacing: -.5px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.mon-v { font-size: 23px; font-weight: 300; letter-spacing: -.5px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 .mon-riel { height: 3px; border-radius: 99px; background: var(--chip); overflow: hidden; }
 .mon-riel i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--grad-medida, var(--grad-realce)); transition: width .5s var(--ease); }
 .w-mon.t-1x1 .mon-stats { grid-template-columns: 1fr; gap: 6px; } .w-mon.t-1x1 .mon-v { font-size: 17px; }
@@ -2049,7 +2117,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-moov.t-2x1 .mv-cartel svg { width: 32px; height: 32px; }
 
 /* ===== Botones de accion del Monitor (modo juego / liberar) ===== */
-.mon-acc { display: flex; gap: 6px; margin-top: auto; } /* pegados abajo: el hueco se reparte arriba */
+.mon-acc { display: flex; gap: 6px; margin-top: auto; flex-shrink: 0; } /* pegados abajo: el hueco se reparte arriba */
 .mon-b { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: 11px; font-weight: 600; padding: 8px 10px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
 .mon-b svg { width: 12px; height: 12px; }
 .mon-b:hover { background: var(--chip-hover); transform: translateY(-1px); }
