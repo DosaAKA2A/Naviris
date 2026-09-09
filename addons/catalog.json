@@ -62,15 +62,6 @@
       "icon": "layers",
       "description": "Un colador de enlaces: le pegas el del acortador en el panel del sidebar y te devuelve el enlace final, resolviendo la pasarela por detrás para que sus anuncios no lleguen a verse. Con el interruptor puesto también lo hace solo: si caes en una pasarela conocida, la pestaña salta sola al destino. Alt+S lo fuerza en la página que estés viendo. La lista de sitios se actualiza sola desde naviris.site. Requiere Naviris 2.7.6-dev.4 o superior.",
       "entry": "https://naviris.site/addons/strainer.js"
-    },
-    {
-      "id": "long-screenshot",
-      "name": "Captura larga",
-      "version": "1.1.0",
-      "kind": "tool",
-      "icon": "camera",
-      "description": "Captura la página que estás viendo eligiendo cuánto abarcar: solo lo visible, dos o cuatro pantallas, la página completa o un número a tu medida. Une todos los tramos en un único PNG a resolución real, listo para guardar o compartir donde quieras.",
-      "entry": "https://naviris.site/addons/long-screenshot.js"
     }
   ]
 }

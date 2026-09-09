@@ -5742,7 +5742,9 @@ async function loadToolAddons() {
   // actualizaciones.
   // 'salta-pasarelas' vivió unas horas el 2026-08-16: es el mismo addon que
   // ahora se llama Strainer, con otro id. Se desinstala para que no queden dos.
-  for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper', 'salta-pasarelas']) {
+  // 'long-screenshot' (Captura larga) se descatalogó el 2026-09-09: sale del
+  // catálogo y se desinstala a quien lo tuviera puesto.
+  for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper', 'salta-pasarelas', 'long-screenshot']) {
     if (installed[retirado]) { try { await window.cobalt.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
   }
   // Migración 2.7.3: la sensibilidad de X salió de Ajustes y ahora es el addon

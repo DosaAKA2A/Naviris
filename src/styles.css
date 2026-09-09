@@ -1277,7 +1277,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* Botones de herramientas registrados por addons: viven en el sidebar,
    después de las herramientas nativas (Rat Tool siempre va primero) */
 #addon-tools { display: contents; }
-#addon-tools .sb-btn.busy { color: var(--ok); pointer-events: none; }
 
 /* Botón Addons del hub: misma placa de VIDRIO que los demás FABs, con el
    borde de gradiente en la gama del tema (antes era una placa opaca con los
