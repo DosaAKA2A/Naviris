@@ -1,0 +1,16 @@
+{
+  "version": "2.8.1-dev.5",
+  "linea": "dev",
+  "titulo": "Editar el hub también en pantallas de 1080p",
+  "entradilla": "En un monitor Full HD el hub se reordenaba solo y el botón Editar quedaba bloqueado con un «agranda la ventana» que no llevaba a ninguna parte, ni a pantalla completa. Ya no.",
+  "bloques": [
+    {
+      "titulo": "El hub cabe donde antes no cabía",
+      "texto": "El hub conserva tu composición mientras sus celdas no bajen de cierto tamaño; por debajo se reordena en columnas, y ahí componer no tiene sentido porque lo que ves no es tu maqueta. El listón estaba puesto justo por encima de lo que da un monitor de 1920×1080, así que en la pantalla más común de todas el hub siempre se reordenaba y no se dejaba editar, ni maximizado ni en pantalla completa.\n\nAhora el listón está donde toca: en Full HD la composición se mantiene y Editar funciona con normalidad."
+    },
+    {
+      "titulo": "Los widgets se adaptan a su tamaño",
+      "texto": "Con celdas más pequeñas, algunas tarjetas no daban de sí: al monitor se le iban los botones y al reloj la fecha. Ahora cada uno se mide contra su propio alto y va soltando lo accesorio —primero la botonera, luego la fecha— en vez de recortar el contenido.\n\nEn pantallas grandes no cambia nada: siguen mostrándolo todo."
+    }
+  ]
+}

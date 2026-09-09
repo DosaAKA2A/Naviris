@@ -1032,7 +1032,11 @@ body.sacando-pestana { cursor: copy; }
 /* Widget: reloj */
 /* Reloj-tarjeta del bento (2026-08-11): vidrio en ::before con scoop para el
    chip del día; texto a la IZQUIERDA (se acabo el todo-centrado). */
-.w-clock { text-align: left; position: relative; display: flex; flex-direction: column; justify-content: center; }
+/* El reloj también se mide contra SU alto: con celdas pequeñas (1080p da
+   122 px) la hora de 44 px más el saludo y la fecha no caben. */
+.w-clock { container: ck / size; text-align: left; position: relative; display: flex; flex-direction: column; justify-content: center; }
+@container ck (max-height: 132px) { .w-clock .time { font-size: 34px; } .ck-fecha { display: none; } }
+@container ck (max-height: 100px) { .w-clock .time { font-size: 26px; } .w-clock .greet { display: none; } }
 .ck-chip { display: none; }
 .ck-fecha { color: var(--text-dim); font-size: 12px; margin-top: 10px; }
 /* Jerarquía: el reloj es EL dato grande de la portada (referencias: número
@@ -2055,7 +2059,12 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* El contenido tiene que CABER: la tarjeta recorta, y a 2×1 (148 px de alto) el
    monitor se pasaba 12 px y se le cortaban los botones. Medido, no ajustado a
    ojo: cabecera + dos medidas + botonera con estos números suman 146. */
-.w-mon { padding: 13px 14px; height: 100%; display: flex; flex-direction: column; gap: 7px; }
+/* El monitor se adapta a SU propia altura, no a la talla nominal: con celdas
+   pequeñas (1080p da 116 px) la botonera no cabe y antes se recortaba. Aquí la
+   tarjeta es su propio contenedor y va soltando piezas según encoge. */
+.w-mon { container: mon / size; padding: 13px 14px; height: 100%; display: flex; flex-direction: column; gap: 7px; }
+@container mon (max-height: 138px) { .mon-acc { display: none; } }
+@container mon (max-height: 104px) { .w-mon .w-head { display: none; } .mon-v { font-size: 19px; } }
 .w-mon .w-head { margin-bottom: 0; }
 /* barras en VERDE (degradado del logo: lima -> verde), pedido de Dosa */
 /* Reforma 2.8.1: cada medida es un DATO GRANDE con su etiqueta encima y un riel

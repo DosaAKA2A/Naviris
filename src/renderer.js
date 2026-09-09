@@ -1563,7 +1563,17 @@ function tallaValida(w) {
    rompen. Así que la maqueta no se pinta nunca por debajo de 150, y si no
    cabe se prueba la composición estrecha y, si tampoco, reflujo — donde los
    widgets también van a 150 y el buscador y los accesos mandan. */
-const CELDA_DISENO = 150;  // tamaño de los widgets Y suelo: no se baja de aquí
+const CELDA_DISENO = 150;  // tamaño con el que están dibujados los widgets
+/* SUELO REAL (2026-09-09): por debajo de esto sí se reordena en columnas. Antes
+   el suelo ERA la celda de diseño, y eso dejaba 1920×1080 —la pantalla más
+   común— siempre en modo lista: la celda le sale a 122 px, así que el hub se
+   reordenaba y Editar quedaba bloqueado ("no le deja editar"). Con 116 la
+   composición aguanta en 1080p y solo se reordena de verdad cuando no cabe. */
+const CELDA_MINIMA = 116;
+/* Lo que se reserva arriba y abajo, en CONSTANTES y no leyendo el padding vivo:
+   el padding cambia con la clase .con-scroll, que a su vez depende de esta
+   cuenta — leerlo hacía que las dos se persiguieran y la celda oscilara. */
+const RESERVA_SUP = 24, RESERVA_INF = 130;
 let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
   // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
@@ -1572,14 +1582,15 @@ function medidasMalla() {
   const anchoHub = els.hub.clientWidth || (window.innerWidth - 48);
   const altoHub = els.hub.clientHeight || (window.innerHeight - 116);
   const anchoUtil = anchoHub * 0.94;
-  const csG = getComputedStyle(els.widgetGrid);
-  const altoUtil = altoHub - (parseFloat(csG.paddingTop) || 24) - (parseFloat(csG.paddingBottom) || 90);
+  const altoUtil = altoHub - RESERVA_SUP - RESERVA_INF;
   const C = COLS_MAESTRA, F = FILAS_MAESTRA;
   const cwAncho = Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C);
   const cwAlto = Math.floor((altoUtil - (F - 1) * CELDA_GAP) / F);
-  if (cwAncho >= CELDA_DISENO) {
-    // La maqueta se conserva. Si el alto no da, celda de diseño y scroll: mucho
+  if (cwAncho >= CELDA_MINIMA) {
+    // La maqueta se conserva. Si el alto no da, celda mínima y scroll: mucho
     // mejor que reordenar los widgets por una ventana un poco baja.
+    // El SUELO solo decide si se reordena; el TAMAÑO sigue mandándolo la celda
+    // de diseño, para que en pantallas grandes los widgets no encojan.
     const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_DISENO));
     return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
   }
