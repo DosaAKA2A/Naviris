@@ -1,0 +1,25 @@
+{
+  "version": "2.8.0",
+  "linea": "estable",
+  "titulo": "Naviris 2.8",
+  "entradilla": "Una versión de limpieza a fondo antes de seguir creciendo: arranque nuevo, tú decides cuándo actualizar, y por dentro menos código y más seguro.",
+  "bloques": [
+    {
+      "titulo": "Arranca con otra cara",
+      "texto": "La ventana de arranque cambia por completo. Se acabó la barra de colores: ahora es el logo dentro de un anillo que se va cerrando, en un solo tono, y debajo una línea que dice qué está preparando en cada momento: la reproducción protegida, el bloqueador de anuncios, tus sesiones y espacios, la interfaz.\n\nEl anillo no es adorno. Cada tramo llega cuando ese paso del arranque termina de verdad, así que lo que ves avanzar es lo que está pasando.",
+      "imagen": "https://naviris.site/novedades/img/2.8.0/arranque.png"
+    },
+    {
+      "titulo": "Tú decides cuándo actualizar",
+      "texto": "En Ajustes hay un interruptor nuevo: Actualizaciones automáticas. Encendido, todo sigue igual que hasta ahora: las versiones nuevas se descargan solas y se instalan al cerrar. Apagado, Naviris sigue mirando si hay algo nuevo, pero no descarga nada: te avisa con un punto en el menú y una entrada arriba del todo, Actualizar a la X, y la instalas cuando quieras.\n\nViene encendido. Si lo apagas y luego lo vuelves a encender, comprueba en el acto sin esperar al siguiente arranque."
+    },
+    {
+      "titulo": "Menos código, más seguro",
+      "texto": "Se han retirado 268 líneas que ya no hacían nada: un motor de efectos que se había reescrito, estilos de paneles que dejaron de existir, y cinco canales internos que nadie usaba. Menos superficie expuesta y menos que mantener.\n\nY se cerró una puerta: el icono que declara un sitio web llegaba a la interfaz sin filtrar, y un sitio malintencionado podía aprovecharlo para colar código dentro del propio navegador. Ahora solo se aceptan iconos de tipos de imagen conocidos, con un tamaño máximo, y se pintan por una vía que no interpreta nada."
+    },
+    {
+      "titulo": "Captura larga se retira",
+      "texto": "El addon Captura larga sale del catálogo. Si lo tenías instalado, se desinstala solo al arrancar esta versión, para que no quede código sin actualizaciones. El resto del catálogo sigue igual: Minireproductor, Sound Booster, Watch Party, Inspector de diseño, Sensibilidad X, Blockify y Strainer."
+    }
+  ]
+}
