@@ -889,7 +889,7 @@ function ytDownload({ url, mode, quality }) {
 let splashWin = null;
 let splashPct = 0;          // último tramo, por si el splash aún no ha cargado
 let splashDesde = 0;        // cuándo se mostró: sirve para el mínimo en pantalla
-const SPLASH_MINIMO = 1250; // ms que la barra necesita para leerse de inicio a fin
+const SPLASH_MINIMO = 1600; // ms para que el anillo y sus cinco etapas se lean de inicio a fin (320 ms cada una)
 
 function crearSplash() {
   splashWin = new BrowserWindow({

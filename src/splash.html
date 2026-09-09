@@ -7,53 +7,50 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
   <title>Naviris</title>
   <style>
-    /* Paleta IRIS del logo: el arranque es momento de MARCA, no del tema (con el
-       tema lima salía todo verde y parecía otra aplicación). */
-    :root { --iris-1: #b9aae6; --iris-2: #9dc3e6; --iris-3: #a4d9c2; --iris-4: #e6d6a4; --iris-5: #e6a9b4; }
+    /* Arranque 2026-09-09: anillo con etapas. Un solo tono, sin el degradado de
+       cinco colores: el arranque es momento de MARCA, y la marca aquí es la forma
+       del isotipo, no su paleta. */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    /* La VENTANA es el cuadrado: nada de una placa dentro de otra caja. El
-       degradado radial le da profundidad sin pedirle nada al compositor. */
     html, body { width: 100%; height: 100%; overflow: hidden; }
     body {
-      background: radial-gradient(ellipse at 50% 40%, #16161b 0%, #08080a 78%);
+      background: #0a0a0c;
       color: #cfd0d5;
       font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
       user-select: none; cursor: default;
       /* Toda la superficie arrastra: es una ventana sin marco y sin botones. */
       -webkit-app-region: drag;
       border-radius: 16px;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
     }
     /* Entrada UNA vez y termina: ninguna animación queda viva (regla del proyecto). */
-    .marca { animation: entra .55s cubic-bezier(.2,.9,.3,1) both; line-height: 0; }
-    .marca svg { width: 76px; height: 76px; }
-    @keyframes entra { 0% { transform: translateY(10px) scale(.94); opacity: 0; } 100% { transform: none; opacity: 1; } }
-    .nombre {
-      font-size: 14px; font-weight: 600; letter-spacing: 7px; text-indent: 7px;
-      margin-top: 20px; animation: entra .5s cubic-bezier(.2,.9,.3,1) .12s both;
-    }
-    /* La barra es la única pieza que se mueve, y se mueve porque el arranque
-       AVANZA de verdad: cada tramo lo manda el proceso principal. */
-    .barra {
-      width: 132px; height: 3px; margin-top: 22px; border-radius: 3px;
-      background: rgba(255,255,255,.08); overflow: hidden;
-      animation: entra .5s ease-out .22s both;
-    }
-    .barra i {
-      display: block; height: 100%; width: 100%; border-radius: 3px;
-      transform: scaleX(0); transform-origin: left center;
-      background: linear-gradient(90deg, var(--iris-1), var(--iris-2), var(--iris-3), var(--iris-4), var(--iris-5));
-      transition: transform .45s cubic-bezier(.32,.72,.28,1);
-    }
-    .pie { position: absolute; bottom: 18px; font-size: 10px; letter-spacing: .4px; color: #55565e; }
+    @keyframes entra { 0% { transform: translateY(8px) scale(.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
+    .anillo { position: relative; width: 148px; height: 148px; animation: entra .5s cubic-bezier(.2,.9,.3,1) both; }
+    .anillo svg.aro { position: absolute; inset: 0; transform: rotate(-90deg); }
+    /* El arco AVANZA con los hitos reales del proceso principal (ver splash.js);
+       la transición solo suaviza el salto entre uno y otro. */
+    .anillo .aro .avance { transition: stroke-dashoffset .45s cubic-bezier(.32,.72,.28,1); }
+    .anillo .centro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; line-height: 0; }
+    .anillo .iris-logo path { fill: #ececef; }
+    /* La etapa cambia de texto con un fundido corto; cada cambio es una animación
+       que termina, no un bucle. */
+    .etapa { font-size: 12.5px; color: #9a9ba3; min-height: 16px; animation: entra .5s cubic-bezier(.2,.9,.3,1) .1s both; }
+    .etapa.cambia { animation: aparece .28s ease-out both; }
+    @keyframes aparece { 0% { opacity: 0; transform: translateY(3px); } 100% { opacity: 1; transform: none; } }
+    .pie { position: absolute; bottom: 16px; font-size: 10px; letter-spacing: .4px; color: #55565e; }
   </style>
 </head>
 <body>
-  <div class="marca" id="marca"></div>
-  <div class="nombre">NAVIRIS</div>
-  <div class="barra"><i id="fill"></i></div>
+  <div class="anillo">
+    <svg class="aro" viewBox="0 0 148 148" width="148" height="148" aria-hidden="true">
+      <circle cx="74" cy="74" r="70" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>
+      <circle class="avance" id="avance" cx="74" cy="74" r="70" fill="none" stroke="#e8e8ec" stroke-width="1.5" stroke-linecap="round"
+              stroke-dasharray="439.82" stroke-dashoffset="439.82"/>
+    </svg>
+    <div class="centro" id="marca"></div>
+  </div>
+  <div class="etapa" id="etapa"></div>
   <div class="pie" id="pie"></div>
   <script src="icons.js"></script>
   <script src="splash.js"></script>
