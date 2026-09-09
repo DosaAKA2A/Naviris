@@ -1,0 +1,12 @@
+{
+  "version": "2.8.1-dev.1",
+  "linea": "dev",
+  "titulo": "El sidebar se centra",
+  "entradilla": "Primera dev tras la 2.8 estable: los iconos de la barra lateral dejan de amontonarse abajo y quedan centrados en vertical.",
+  "bloques": [
+    {
+      "titulo": "Los iconos, en el medio",
+      "texto": "Hasta ahora la barra lateral tenía el hub arriba, un hueco enorme y todas las herramientas apiladas contra el fondo. Ahora el hub sigue arriba y el menú sigue abajo, pero el bloque de herramientas y funciones queda centrado en vertical, a la altura de la mano.\n\nEs el primer cambio de la reforma del hub que viene en esta serie dev: las propuestas están sobre la mesa y la elegida llegará en las próximas versiones."
+    }
+  ]
+}
