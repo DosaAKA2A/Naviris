@@ -117,6 +117,7 @@ const DEFAULT_SETTINGS = {
   adblockEnabled: true,
   adblockWhitelist: [],
   agentMode: false,
+  updatesAuto: true,        // las actualizaciones se bajan solas; apagado = avisa y el usuario decide
   smartSearch: true,        // autocompletado inteligente de la barra
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   moovinPase: '',             // pase de la biblioteca privada de iris.it.com/moovin
@@ -1613,6 +1614,9 @@ ipcMain.handle('settings:set', soloUI((_e, patch) => {
   settings = { ...settings, ...patch }; saveSettings(settings);
   // Cambiar el modo claro retematiza también las webs abiertas (prefers-color-scheme)
   if ('lightMode' in patch) nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
+  // Al volver a automático no se espera al reloj de 2 h: se mira ya, y si hay
+  // versión nueva se baja sola como en cualquier arranque.
+  if ('updatesAuto' in patch && settings.updatesAuto && app.isPackaged) { chequeoSilencioso = true; autoUpdater.checkForUpdates().catch(() => {}); }
   // El muro de edad de X no necesita nada aquí: el renderer recarga la pestaña de X
   // al mover el ajuste y el preload consulta 'x:age-gate-on' en cada carga.
   return settings;
@@ -2409,8 +2413,12 @@ function friendlyUpdateError(err) {
    interfaz de actualización es la notificación en tiempo real. */
 let chequeoSilencioso = false;   // el arranque o el reloj, no una elección del usuario
 let bajandoSolo = false;         // evita relanzar la descarga en cada aviso
+/* Descargar sin preguntar solo si el usuario no lo ha apagado en Ajustes. Con
+   el ajuste en manual el reloj sigue MIRANDO (para poder avisar de que hay
+   versión nueva), pero no baja nada: el menú enseña "Actualizar a la X" y ahí
+   decide él. */
 function actualizacionSolaPermitida() {
-  return app.isPackaged;
+  return app.isPackaged && settings.updatesAuto !== false;
 }
 autoUpdater.on('checking-for-update', () => broadcast('update:status', { state: 'checking' }));
 autoUpdater.on('update-available', (info) => {

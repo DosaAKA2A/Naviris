@@ -259,11 +259,13 @@
     <label class="menu-toggle"><span>Botones laterales del ratón<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
+    <label class="menu-toggle"><span>Actualizaciones automáticas<br /><small>Se bajan solas y se instalan al cerrar · apagado: te avisa y decides tú</small></span><input type="checkbox" id="opt-updauto" /></label>
     <hr />
     <!-- Sin "Buscar actualizaciones" (Dosa, 2026-08-18): las dos líneas se
-         actualizan solas en su canal. Esta entrada vive OCULTA y solo aparece,
-         ya como "Reiniciar e instalar la X", cuando hay una versión bajada
-         esperando — es la parte persistente de la notificación. -->
+         actualizan solas en su canal. Esta entrada vive OCULTA y solo aparece
+         cuando hay algo que hacer: "Reiniciar e instalar la X" si ya se bajó
+         sola, o "Actualizar a la X" si el usuario tiene las actualizaciones en
+         manual (Ajustes, 2026-09-09) — es la parte persistente del aviso. -->
     <button id="menu-update" data-action="update" class="hidden">Buscar actualizaciones</button>
     <button data-action="novedades">Novedades de esta versión</button>
     <button data-action="about">Acerca de Naviris</button>

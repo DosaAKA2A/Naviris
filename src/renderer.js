@@ -19,7 +19,7 @@ const els = {};
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
   'dial-modal', 'dial-name', 'dial-url', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
-  'opt-agent', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
+  'opt-agent', 'opt-updauto', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat', 'sb-spotify',
   'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
   'sb-loot', 'loot-panel', 'loot-close', 'loot-tab-ses', 'loot-tab-hist', 'loot-body',
@@ -5283,6 +5283,7 @@ document.getElementById('hub-theme').addEventListener('click', async () => {
 });
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
+els.optUpdauto.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ updatesAuto: els.optUpdauto.checked }); toast(els.optUpdauto.checked ? 'Naviris se actualizará solo' : 'Te avisaré cuando haya versión nueva; la instalas tú desde el menú'); });
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 
@@ -5818,10 +5819,11 @@ function marcaActualizacion(version) {
   const boton = $('#nav-menu');
   if (boton) { boton.classList.add('hay-update'); boton.title = 'Menú — hay una versión nueva (' + version + ')'; }
   const pop = $('#menu-pop'), entrada = $('#menu-update');
-  if (pop && entrada && pop.firstElementChild !== entrada) {
+  if (pop && entrada) {
+    entrada.classList.remove('hidden'); // nace oculta: sin esto el aviso manual no se veía
     entrada.classList.add('destacado');
     entrada.textContent = 'Actualizar a la ' + version;
-    pop.insertBefore(entrada, pop.firstElementChild);
+    if (pop.firstElementChild !== entrada) pop.insertBefore(entrada, pop.firstElementChild);
   }
 }
 /* La versión nueva ya se ha descargado sola y se instalará al cerrar. Se avisa
@@ -5851,7 +5853,7 @@ window.cobalt.onUpdateStatus((s) => {
       // marca el boton del menu con un punto, que no caduca, y la entrada de
       // actualizar sube ARRIBA del todo mientras haya version nueva.
       marcaActualizacion(s.version);
-      if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible (menú → Buscar actualizaciones)');
+      if ($('#about-modal').classList.contains('hidden')) toast('Nueva versión de Naviris disponible: menú → Actualizar');
       return;
     }
     setUpd('Descargando ' + UPD_LABEL[updChosen] + ' v' + s.version + '…'); updBar.classList.remove('hidden');
@@ -6469,7 +6471,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
 (async function init() {
   migraFondoPorTema(); // antes de applyTheme(): el es quien aplica el fondo del tema
   settings = await window.cobalt.getSettings();
-  els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode;
+  els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode; els.optUpdauto.checked = settings.updatesAuto !== false;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
   contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];
