@@ -1,0 +1,24 @@
+{
+  "version": "2.8.1-dev.2",
+  "linea": "dev",
+  "titulo": "El hub, rehecho",
+  "entradilla": "Se acabó el cristal. El hub pasa a ser un mosaico de baldosas opacas con los accesos en un dock, funciona igual sobre cualquier fondo, y la pestaña activa por fin se distingue.",
+  "bloques": [
+    {
+      "titulo": "Baldosas en vez de cristal",
+      "texto": "Cada widget es ahora una baldosa opaca de esquinas redondas, sin transparencias ni desenfoques. Se ve igual de bien sobre el degradado del tema que sobre la foto que pongas de fondo: si la foto es clara, las baldosas se vuelven blancas con el texto oscuro; si es oscura, se quedan en carbón. Y el navegador trabaja menos: ya no hay que desenfocar nada en cada fotograma."
+    },
+    {
+      "titulo": "Los accesos viven en un dock",
+      "texto": "Tus sitios favoritos salen de la cuadrícula y se colocan en un dock abajo, al centro, como en un escritorio: solo el icono, el nombre al pasar el ratón, y el mismo empuje al acercarte. Se siguen añadiendo con el «+», y en Editar se reordenan arrastrando y se quitan con la equis."
+    },
+    {
+      "titulo": "Una composición nueva de fábrica",
+      "texto": "La página de inicio arranca con un bloque compacto: buscador, reloj y clima arriba; tendencias, monitor y descargas; notas y portapapeles. Es un punto de partida, no una jaula: en Editar puedes mover, redimensionar, quitar y añadir cualquier widget de la paleta como hasta ahora. Tu composición anterior no se pierde: queda guardada en el equipo por si hubiera que recuperarla.\n\nEl buscador se enfoca pulsando la tecla / desde cualquier punto del hub."
+    },
+    {
+      "titulo": "La pestaña activa se ve",
+      "texto": "Con varias pestañas abiertas costaba saber cuál era la activa. Ahora su fondo es claramente más claro que la barra, en los cuatro temas, sin apagar el texto de las demás."
+    }
+  ]
+}

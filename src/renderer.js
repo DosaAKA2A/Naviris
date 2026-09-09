@@ -32,7 +32,7 @@ const els = {};
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
-  'sb-perf', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
+  'sb-perf', 'hub-dock', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
   'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir', 'sb-espacios', 'esp-pop'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
@@ -1357,7 +1357,6 @@ function makeDialEl(d) {
 const WIDGET_TYPES = {
   clock: { name: 'Reloj', icon: 'clock', span: 6 },
   search: { name: 'Buscador', icon: 'magnifying-glass', span: 6 },
-  shortcuts: { name: 'Accesos', icon: 'squares-2x2', span: 6 },
   date: { name: 'Fecha', icon: 'clock', span: 2 },
   weather: { name: 'Clima', icon: 'cloud', span: 2 },
   region: { name: 'Región', icon: 'map-pin', span: 2 },
@@ -1390,7 +1389,7 @@ const WIDGET_TYPES = {
    no cabe, se recoloca TEMPORALMENTE sin tocar la composicion. Ventana rara
    (vertical): modo flujo con scroll. */
 let CELDA_W = 160, CELDA_H = 160;
-const CELDA_GAP = 18;
+const CELDA_GAP = 12; // reforma 2.8.1: baldosas más juntas
 const FILAS_LOGICAS = 5;
 let ultimoBucket = 'm', ultimasFilas = FILAS_LOGICAS; // 'm' = la unica maqueta
 const TAMANOS = {
@@ -1579,25 +1578,30 @@ function primerHueco(occ, w, h, cols) {
    del monitor, no por cuál tiene más widgets (2026-08-18).
    Las imagenes salen del tema (`slot` -> temas/<tema>/<slot>.jpg); las que
    añada el usuario van sin slot y piden archivo. */
+/* COMPOSICIÓN DE FÁBRICA (reforma 2.8.1, 2026-09-09): la "Mosaico + dock" que
+   eligió Dosa. Un bloque de 6×3 celdas centrado (std: columnas 4-9 de 13;
+   uw: 6-11 de 17; filas 3-5 de 7): buscador, reloj y clima arriba; tendencias
+   en 2×2, monitor y descargas; notas y portapapeles. Los accesos ya no son un
+   widget: viven en el dock (renderDock). */
 const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wse",
     "type": "search",
-    "col": 5,
-    "row": 1,
-    "w": 5,
+    "col": 4,
+    "row": 3,
+    "w": 3,
     "h": 1,
     "geo": {
       "std": {
-        "col": 5,
-        "row": 1,
-        "w": 5,
+        "col": 4,
+        "row": 3,
+        "w": 3,
         "h": 1
       },
       "uw": {
-        "col": 7,
-        "row": 1,
-        "w": 5,
+        "col": 6,
+        "row": 3,
+        "w": 3,
         "h": 1
       }
     }
@@ -1605,402 +1609,158 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
   {
     "id": "wck",
     "type": "clock",
-    "col": 5,
-    "row": 2,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 5,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      },
-      "uw": {
-        "col": 7,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "wi1",
-    "type": "imagen",
-    "col": 12,
-    "row": 5,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 12,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 16,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      }
-    },
-    "slot": 1
-  },
-  {
-    "id": "wus",
-    "type": "user",
-    "col": 12,
-    "row": 2,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 12,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      },
-      "uw": {
-        "col": 16,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "wsc",
-    "type": "shortcuts",
-    "col": 5,
-    "row": 3,
-    "w": 5,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 5,
-        "row": 3,
-        "w": 5,
-        "h": 1
-      },
-      "uw": {
-        "col": 7,
-        "row": 3,
-        "w": 5,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "wdescargas1786480816361",
-    "type": "descargas",
-    "col": 1,
-    "row": 5,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 1,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 1,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "w1011786484898580",
-    "type": "calendar",
-    "col": 10,
-    "row": 2,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 10,
-        "row": 2,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 14,
-        "row": 2,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "w1071786484934841",
-    "type": "privada",
-    "col": 8,
-    "row": 4,
-    "w": 1,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 8,
-        "row": 4,
-        "w": 1,
-        "h": 1
-      },
-      "uw": {
-        "col": 10,
-        "row": 4,
-        "w": 1,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "w1081786484952003",
-    "type": "wallet",
-    "col": 5,
-    "row": 4,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 5,
-        "row": 4,
-        "w": 2,
-        "h": 1
-      },
-      "uw": {
-        "col": 7,
-        "row": 4,
-        "w": 2,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "w1091786484963058",
-    "type": "spotify",
-    "col": 12,
-    "row": 3,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 12,
-        "row": 3,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 16,
-        "row": 3,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "w1021786485486556",
-    "type": "imagen",
     "col": 7,
-    "row": 2,
-    "w": 3,
+    "row": 3,
+    "w": 2,
     "h": 1,
     "geo": {
       "std": {
         "col": 7,
-        "row": 2,
-        "w": 3,
+        "row": 3,
+        "w": 2,
         "h": 1
       },
       "uw": {
         "col": 9,
-        "row": 2,
-        "w": 3,
+        "row": 3,
+        "w": 2,
         "h": 1
       }
-    },
-    "slot": 2
+    }
   },
   {
-    "id": "wweather1786486269253",
+    "id": "wwx",
     "type": "weather",
-    "col": 3,
-    "row": 2,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 3,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      },
-      "uw": {
-        "col": 3,
-        "row": 2,
-        "w": 2,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "w1011786486744553",
-    "type": "mail",
-    "col": 10,
-    "row": 4,
-    "w": 2,
-    "h": 3,
-    "geo": {
-      "std": {
-        "col": 10,
-        "row": 4,
-        "w": 2,
-        "h": 3
-      },
-      "uw": {
-        "col": 14,
-        "row": 4,
-        "w": 2,
-        "h": 3
-      }
-    }
-  },
-  {
-    "id": "wxt1786486762568",
-    "type": "xtrends",
-    "col": 1,
-    "row": 2,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 1,
-        "row": 2,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 1,
-        "row": 2,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "wmonitor1786495950984",
-    "type": "monitor",
-    "col": 1,
-    "row": 4,
-    "w": 2,
-    "h": 1,
-    "geo": {
-      "std": {
-        "col": 1,
-        "row": 4,
-        "w": 2,
-        "h": 1
-      },
-      "uw": {
-        "col": 1,
-        "row": 4,
-        "w": 2,
-        "h": 1
-      }
-    }
-  },
-  {
-    "id": "wclip1786495950984",
-    "type": "clip",
-    "col": 3,
-    "row": 3,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 3,
-        "row": 3,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 3,
-        "row": 3,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "wnotes1786495950984",
-    "type": "notes",
-    "col": 3,
-    "row": 5,
-    "w": 2,
-    "h": 2,
-    "geo": {
-      "std": {
-        "col": 3,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      },
-      "uw": {
-        "col": 3,
-        "row": 5,
-        "w": 2,
-        "h": 2
-      }
-    }
-  },
-  {
-    "id": "wmoov1786496464075",
-    "type": "moovin",
     "col": 9,
-    "row": 4,
+    "row": 3,
     "w": 1,
     "h": 1,
     "geo": {
       "std": {
         "col": 9,
-        "row": 4,
+        "row": 3,
         "w": 1,
         "h": 1
       },
       "uw": {
         "col": 11,
-        "row": 4,
+        "row": 3,
         "w": 1,
         "h": 1
       }
     }
   },
   {
-    "id": "wdeco1786498510113",
-    "type": "deco",
-    "col": 7,
+    "id": "wxt",
+    "type": "xtrends",
+    "col": 4,
     "row": 4,
-    "w": 1,
+    "w": 2,
+    "h": 2,
+    "geo": {
+      "std": {
+        "col": 4,
+        "row": 4,
+        "w": 2,
+        "h": 2
+      },
+      "uw": {
+        "col": 6,
+        "row": 4,
+        "w": 2,
+        "h": 2
+      }
+    }
+  },
+  {
+    "id": "wmon",
+    "type": "monitor",
+    "col": 6,
+    "row": 4,
+    "w": 2,
     "h": 1,
     "geo": {
       "std": {
-        "col": 7,
+        "col": 6,
         "row": 4,
-        "w": 1,
+        "w": 2,
         "h": 1
       },
       "uw": {
-        "col": 9,
+        "col": 8,
         "row": 4,
-        "w": 1,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wdl",
+    "type": "descargas",
+    "col": 8,
+    "row": 4,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 8,
+        "row": 4,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 10,
+        "row": 4,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wnt",
+    "type": "notes",
+    "col": 6,
+    "row": 5,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 6,
+        "row": 5,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 8,
+        "row": 5,
+        "w": 2,
+        "h": 1
+      }
+    }
+  },
+  {
+    "id": "wcl",
+    "type": "clip",
+    "col": 8,
+    "row": 5,
+    "w": 2,
+    "h": 1,
+    "geo": {
+      "std": {
+        "col": 8,
+        "row": 5,
+        "w": 2,
+        "h": 1
+      },
+      "uw": {
+        "col": 10,
+        "row": 5,
+        "w": 2,
         "h": 1
       }
     }
   }
-]));
+]))
 /* MIGRACION A LA GRILLA (2026-08-12) — lo que descuadro la maqueta de Dosa:
    las maquetas de antes de la grilla de celdas guardaban SOLO `span` (el ancho
    en doceavos de una fila), sin col/row ni geo. La grilla no tiene nada que
@@ -2021,6 +1781,15 @@ function migraMaquetaVieja(lista) {
   return nueva;
 }
 let widgets = migraMaquetaVieja(store.get('cobalt.widgets', null));
+/* REFORMA 2.8.1 (2026-09-09): la composición de fábrica cambia para todos UNA
+   vez. La maqueta anterior se guarda en cobalt.widgets.pre-v3 por si hay que
+   volver, y el widget de accesos desaparece (ahora es el dock). */
+if (!store.get('cobalt.hub.v3', false)) {
+  if (!deFabrica) store.set('cobalt.widgets.pre-v3', widgets);
+  widgets = DEFAULT_WIDGETS(); deFabrica = true;
+  store.set('cobalt.widgets', widgets); store.del('cobalt.maqueta'); store.set('cobalt.hub.v3', true);
+}
+widgets = widgets.filter((w) => w && w.type !== 'shortcuts');
 // migracion: la geometria plana (col/row) se convierte en geo.std
 widgets.forEach((w) => {
   if (!w.geo && w.col >= 1 && w.row >= 1) w.geo = { std: { col: w.col, row: w.row, w: w.w, h: w.h } };
@@ -2156,7 +1925,23 @@ const saveWidgets = () => store.set('cobalt.widgets', widgets);
 let widgetSeq = 100;
 
 let ultimoCols = 0, dragId = null;
+/* El DOCK de accesos (reforma 2.8.1): los mismos .dial de siempre (makeDialEl:
+   navegar, reordenar arrastrando en Editar, quitar), en una barra abajo al
+   centro. armaDock se engancha UNA vez al contenedor: sus listeners buscan los
+   .dial vivos en cada evento, así que repintar el contenido no los duplica. */
+function renderDock() {
+  const dock = els.hubDock; if (!dock) return;
+  dock.innerHTML = '';
+  dials.forEach((d) => { const el = makeDialEl(d); el.title = d.name; dock.appendChild(el); });
+  const sep = document.createElement('div'); sep.className = 'dk-sep'; dock.appendChild(sep);
+  const add = document.createElement('div'); add.className = 'dial add'; add.title = 'Añadir acceso';
+  add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div>`;
+  add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); });
+  dock.appendChild(add);
+  if (!dock.dataset.armado) { armaDock(dock); dock.dataset.armado = '1'; }
+}
 function renderHub() {
+  renderDock();
   els.widgetGrid.innerHTML = '';
   const m = medidasMalla();
   ultimoBucket = m.bucket; ultimasFilas = m.filas;
@@ -2205,7 +1990,9 @@ function renderHub() {
     // Buscador y accesos, a todo el ancho en reflujo (no se guarda: es solo
     // como se muestran mientras la ventana no da para la maqueta real).
     if (reflujo && (w.type === 'search' || w.type === 'shortcuts')) {
-      tw = cols;
+      // El buscador ya es una baldosa (reforma 2.8.1): a todo lo ancho salia una
+      // losa gigante. Cuatro celdas bastan y sigue yendo el primero.
+      tw = w.type === 'search' ? Math.min(4, cols) : cols;
       // A todo lo ancho los accesos caben en menos filas: se recalcula el alto
       // SOLO para pintar (guardarlo sería tocar la maqueta real), si no queda
       // un boquete debajo del tamaño que tienen en tu composición.
@@ -2234,7 +2021,7 @@ function renderHub() {
       // Reloj-TARJETA del bento (2026-08-11): texto a la izquierda y chip del
       // día FUNDIDO en la esquina (scoop). Deja de ser un texto suelto centrado.
       body.className = 'w-card w-clock';
-      body.innerHTML = `<div class="ck-chip" title="Hoy"><span id="w-dnum"></span></div><div class="time" id="w-time"></div><div class="greet" id="w-greet"></div><div class="ck-fecha" id="w-fecha"></div>`;
+      body.innerHTML = `<div class="time" id="w-time"></div><div class="greet" id="w-greet"></div><div class="ck-fecha" id="w-fecha"></div>`;
     }
     else if (w.type === 'search') { body.className = 'w-searchwrap'; body.appendChild(buildSearch()); }
     else if (w.type === 'shortcuts') { body.className = 'w-card w-shortcuts'; const g = document.createElement('div'); g.className = 'sc-grid'; dials.forEach((d) => g.appendChild(makeDialEl(d))); const add = document.createElement('div'); add.className = 'dial add'; add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir</div>`; add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); }); g.appendChild(add); body.appendChild(g); armaDock(g); }
@@ -2461,10 +2248,17 @@ function armaDnd() {
 }
 function buildSearch() {
   const form = document.createElement('form'); form.id = 'hub-search';
-  form.innerHTML = `<span class="g-ico">${window.icon('magnifying-glass')}</span><input id="hub-search-input" type="text" spellcheck="false" placeholder="Buscar en Google" />`;
+  form.innerHTML = `<span class="g-ico">${window.icon('magnifying-glass')}</span><input id="hub-search-input" type="text" spellcheck="false" placeholder="Buscar en Google" /><kbd title="Pulsa / para buscar">/</kbd>`;
   form.addEventListener('submit', (e) => { e.preventDefault(); const inp = form.querySelector('input'); navigateActive(inp.value); inp.value = ''; });
   return form;
 }
+// "/" enfoca el buscador del hub (como en GitHub o YouTube), si no estás escribiendo
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!els.hub.classList.contains('active')) return;
+  const a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+  const inp = document.getElementById('hub-search-input'); if (inp) { e.preventDefault(); inp.focus(); }
+});
 function renderDate(el) {
   const now = new Date(); const day = now.getDate();
   const wd = now.toLocaleDateString('es', { weekday: 'long' }); const mo = now.toLocaleDateString('es', { month: 'long', year: 'numeric' });
@@ -3407,8 +3201,10 @@ let monTimer = null;
 function renderMonitorW(body) {
   body.innerHTML = `
     <div class="w-head">${window.icon('res-scale')} Monitor</div>
-    <div class="mon-fila"><span class="mon-k">RAM</span><div class="mon-riel"><i class="mon-ram"></i></div><span class="mon-v mon-ram-v">—</span></div>
-    <div class="mon-fila"><span class="mon-k">CPU</span><div class="mon-riel"><i class="mon-cpu"></i></div><span class="mon-v mon-cpu-v">—</span></div>
+    <div class="mon-stats">
+      <div class="mon-stat"><span class="mon-k">RAM</span><span class="mon-v mon-ram-v">—</span><div class="mon-riel"><i class="mon-ram"></i></div></div>
+      <div class="mon-stat"><span class="mon-k">CPU</span><span class="mon-v mon-cpu-v">—</span><div class="mon-riel"><i class="mon-cpu"></i></div></div>
+    </div>
     <div class="mon-pie"><span class="mon-app">Naviris —</span><span class="mon-proc"></span></div>
     <div class="mon-acc">
       <button class="mon-b mon-juego" title="Duerme pestañas de fondo y silencia el ruido">${window.icon('play')}<span>Modo juego</span></button>
@@ -4189,7 +3985,7 @@ const BACKGROUNDS_ROSA = [
    selector siga ofreciendo diez miniaturas distintas. Misma identidad
    canonica (el valor del tema Acid). */
 const BACKGROUNDS_MONO = [
-  'radial-gradient(130% 100% at 80% 0%, #2b2b2b 0%, #1e1e1e 45%, #141414 100%)', // Carbon (predeterminado)
+  'radial-gradient(130% 100% at 80% 0%, #1c1c1e 0%, #121214 45%, #0b0b0c 100%)', // Carbon (predeterminado; más oscuro desde 2.8.1: las baldosas van encima)
   'linear-gradient(135deg, #3a3a3a 0%, #1f1f1f 100%)',                 // Grafito
   'radial-gradient(120% 80% at 50% -10%, #353535 0%, #171717 62%)',    // Cenit
   'radial-gradient(120% 80% at 20% 0%, #2e2e2e 0%, #161616 62%)',      // Esquina
@@ -4249,12 +4045,8 @@ function applyBackground(v) {
   els.hub.style.setProperty('--hub-bg', bgForTheme(v));
   store.set(bgThemeKey(), v);
   // Liquid glass Fase 2: la refracción SVG solo vale la pena sobre una FOTO
-  // (un degradado liso no tiene textura que refractar) → se enciende sola
   // cuando el fondo es una imagen del usuario (valor url(...)).
-  els.hub.classList.toggle('refract', typeof v === 'string' && v.startsWith('url('));
-  ajustarVidrioAlFondo(v);
-  generaFondoBlur();
-  lgProgramar(); // el motor de lentes pone o quita los filtros por pieza
+  ajustarVidrioAlFondo(v); // mide el brillo de la foto → #hub.bg-claro (baldosas blancas)
   document.querySelectorAll('.bg-thumb').forEach((t) => t.classList.toggle('sel', t.dataset.bg === v));
 }
 /* El tinte del vidrio sigue al FONDO, no al tema (2026-08-11): sobre una foto
@@ -4282,100 +4074,14 @@ function ajustarVidrioAlFondo(v) {
   img.src = m[1];
 }
 
-/* ===== GRANO SIN COSTURAS (2026-08-11) =====
-   El grano era un mosaico SVG de 120px: sus juntas, invisibles a pelo, se
-   convierten en LINEAS al pasar por el blur del vidrio (lo vio Dosa varias
-   veces). Ahora el ruido se genera AL TAMANO EXACTO del hub — una sola pieza,
-   nada que empalmar. El data-URI es minusculo (solo cambian W/H). */
-/* ===== VIDRIO SIN backdrop-filter (2026-08-11, fin de las lineas) =====
-   En la GPU de este equipo, el blur en vivo de Chromium trocea el backdrop en
-   teselas y sus juntas aparecen como lineas blancas en cada cristal (+lag).
-   Solucion definitiva: el fondo del hub es NUESTRO y estatico — se genera UNA
-   copia ya desenfocada (canvas) y los cristales la muestran alineada por
-   viewport (background-attachment: fixed). Cero blur en vivo. */
-function generaFondoBlur() {
-  const v = store.get(bgThemeKey(), defaultBgTema());
-  const m = typeof v === 'string' && v.match(/url\("?([^")]+)"?\)/);
-  if (!m) { els.hub.style.setProperty('--hub-bg-blur', bgForTheme(v)); return; } // un degradado ya es suave
-  const img = new Image();
-  img.onload = () => {
-    // Aspecto del HUB, no de la ventana (2026-08-21): el fondo nitido ya se
-    // centra sobre el hub, y esta copia se estira a --vidrio-tam, que tambien
-    // es el hub. Con el aspecto de la ventana salia deformada respecto al
-    // fondo real y el vidrio no cuadraba con lo que hay detras.
-    const rh = els.hub.getBoundingClientRect();
-    const W = Math.max(640, Math.round((rh.width || window.innerWidth) / 2));
-    const H = Math.max(360, Math.round((rh.height || window.innerHeight) / 2));
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    const x = c.getContext('2d');
-    x.filter = 'blur(22px) saturate(1.6)';
-    const r = Math.max(W / img.width, H / img.height);
-    const dw = img.width * r, dh = img.height * r;
-    x.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    els.hub.style.setProperty('--hub-bg-blur', `url("${c.toDataURL('image/jpeg', 0.72)}")`);
-  };
-  img.onerror = () => els.hub.style.setProperty('--hub-bg-blur', 'none');
-  img.src = m[1];
-}
-
-function pintaGrano() {
-  // Al tamano del HUB (2026-08-21): el grano va a 100% 100% del ::before, que
-  // desde este cambio se resuelve contra el hub y no contra la ventana. Con las
-  // medidas de la ventana el ruido salia estirado.
-  const rh = els.hub.getBoundingClientRect();
-  const w = Math.ceil(rh.width || window.innerWidth);
-  const h = Math.ceil(rh.height || window.innerHeight);
-  if (!w || !h) return;
-  const svg = `%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='${w}' height='${h}' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E`;
-  els.hub.style.setProperty('--grano-vivo', `url("data:image/svg+xml,${svg}")`);
-}
-let granoTimer = null;
-window.addEventListener('resize', () => { clearTimeout(granoTimer); granoTimer = setTimeout(() => {
-  pintaGrano(); generaFondoBlur();
+/* Al cambiar de tamaño la ventana, el hub se recompone si cambia la celda, el
+   número de columnas o el modo (reflujo). Antes aquí se regeneraban también el
+   grano y la copia desenfocada del fondo: reforma 2.8.1, ya no existen. */
+let resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => {
   const m = medidasMalla();
   if (m.cw !== CELDA_W || m.cols !== ultimoCols || !!m.reflujo !== els.hub.classList.contains('reflujo')) renderHub();
 }, 250); });
-pintaGrano();
-generaFondoBlur();
-
-/* ===== MOTOR DE LENTES · liquid glass (2026-08-11; motor nuevo 2026-08-21) =====
-   El primer motor generaba un mapa de desplazamiento POR FORMA (SDF de
-   rectángulo redondeado, banda con perfil suavizado) y lo aplicaba con
-   backdrop-filter: url(#filtro). Se abandonó: en esta GPU el backdrop-filter
-   troceaba el cristal. El motor de ahora no aplica NINGÚN filtro — ancla la
-   capa desenfocada de cada pieza a coordenadas del hub (--vidrio-pos), que es
-   determinista en cualquier compositor. Ver lgAplicar. */
-const LG = { init: false, mo: null, ro: null, prog: false };
-function lgAplicar() {
-  LG.prog = false;
-  if (!LG.init) {
-    LG.init = true;
-    LG.ro = new ResizeObserver(() => lgProgramar());
-    LG.mo = new MutationObserver(() => lgProgramar());
-    LG.mo.observe(els.hub, { childList: true, subtree: true });
-  }
-  // El motor ya no aplica filtros (backdrop-filter troceaba en esta GPU):
-  // ahora ANCLA la capa desenfocada de cada cristal a coordenadas de viewport
-  // (--vidrio-pos = -x -y del elemento). Determinista en cualquier compositor.
-  /* Coordenadas del HUB (2026-08-21), antes del viewport: el fondo nitido ya
-     no se ancla a la ventana, asi que la copia desenfocada tiene que medirse y
-     posicionarse contra la misma caja o el vidrio ensena un trozo que no es el
-     que tiene detras. */
-  const rHub = els.hub.getBoundingClientRect();
-  els.hub.style.setProperty('--vidrio-tam', `${Math.round(rHub.width)}px ${Math.round(rHub.height)}px`);
-  LG.ro.disconnect();
-  const piezas = els.hub.querySelectorAll('.d-tile, #hub-search, .hub-pill, .hub-fab, #hub-addons, .w-clock, .w-sp, .w-user, .w-card:not(.w-shortcuts):not(.w-wx):not(.w-mail)');
-  piezas.forEach((el) => {
-    el.style.webkitBackdropFilter = ''; el.style.backdropFilter = ''; // restos del motor viejo
-    const r = el.getBoundingClientRect();
-    el.style.setProperty('--vidrio-pos', `${-Math.round(r.left - rHub.left)}px ${-Math.round(r.top - rHub.top)}px`);
-    LG.ro.observe(el);
-  });
-}
-function lgProgramar() {
-  if (LG.prog) return; LG.prog = true;
-  requestAnimationFrame(lgAplicar);
-}
 function renderBgPresets() {
   els.bgPresets.innerHTML = '';
   // Solo degradados: el aspecto del hub es plano. Las fotos de src/temas/ son
