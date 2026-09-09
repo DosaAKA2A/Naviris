@@ -1,4 +1,8 @@
 name = "naviris-party"
+# Cuenta de Studio Iris. Sin esto, un CLOUDFLARE_API_TOKEN/ACCOUNT_ID del entorno
+# (el de la cuenta personal) manda el deploy a la cuenta equivocada (paso el
+# 2026-09-09: quedo un worker suelto que hubo que borrar).
+account_id = "3c4b0210e56bcb194140be2d6a491cc9"
 main = "worker.js"
 compatibility_date = "2026-07-01"
 

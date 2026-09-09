@@ -2,7 +2,8 @@
    ---------------------------------------------------------------------------
    Port del server.js de Node al runtime de Workers. Mismo protocolo de
    aplicación (join / ev / beat / chat, respuestas joined / peers / error):
-   el addon no distingue entre ambos servidores.
+   el addon no distingue entre ambos servidores. Lo hablan el addon de Naviris
+   y la página de MOOVIN; cualquier cambio va en los DOS servidores.
 
    Un único Durable Object ("global") gestiona todas las salas; los sockets
    usan la API de hibernación (webSocketMessage/webSocketClose) para que el
@@ -59,11 +60,29 @@ export class PartyRoom {
       const code = String(m.room || '').toUpperCase().slice(0, 12).replace(/[^A-Z0-9]/g, '');
       if (!code) { this.send(ws, { t: 'error', msg: 'sala invalida' }); return; }
       this.leave(ws);
-      const meta = { room: code, name: String(m.name || 'anon').slice(0, 32), host: !!m.host };
+      /* `sid` identifica la SESIÓN del cliente (lo genera él al entrar y lo
+         repite al reconectar). Si en la sala queda un socket viejo con el
+         mismo sid — el portátil se suspendió, la red dio un bache — se cierra
+         aquí en silencio: sin él la sala contaba a la misma persona dos veces
+         ("3 personas" con dos dentro) y al morir el viejo anunciaba un "salió"
+         de alguien que seguía ahí. `again` va en el aviso para que el chat
+         diga "volvió a conectarse" y no "se unió". */
+      const sid = String(m.sid || '').slice(0, 40);
+      let again = !!m.again;
+      if (sid) {
+        for (const w of this.members(code)) {
+          if (w !== ws && this.meta(w).sid === sid) {
+            w.serializeAttachment({});   // sin sala: su cierre no anuncia nada
+            try { w.close(1000, 'reemplazado'); } catch { /* ya muerto */ }
+            again = true;
+          }
+        }
+      }
+      const meta = { room: code, name: String(m.name || 'anon').slice(0, 32), host: !!m.host, sid };
       ws.serializeAttachment(meta);
       const n = this.members(code).length;
       this.send(ws, { t: 'joined', room: code, n, host: meta.host });
-      this.broadcast(code, { t: 'peers', n, who: meta.name, joined: true }, ws);
+      this.broadcast(code, { t: 'peers', n, who: meta.name, joined: true, again }, ws);
       return;
     }
     const meta = this.meta(ws);

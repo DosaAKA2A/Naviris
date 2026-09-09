@@ -55,10 +55,20 @@ function onMessage(sock, str) {
     const code = String(m.room || '').toUpperCase().slice(0, 12).replace(/[^A-Z0-9]/g, '');
     if (!code) { sendJSON(sock, { t: 'error', msg: 'sala invalida' }); return; }
     leave(sock);
-    sock._room = code; sock._name = String(m.name || 'anon').slice(0, 32); sock._host = !!m.host;
-    const s = roomOf(code); s.add(sock);
+    // Sesión del cliente: un socket viejo con el mismo sid es la misma persona
+    // reconectando; se cierra en silencio (paridad con el worker de Cloudflare).
+    const sid = String(m.sid || '').slice(0, 40);
+    let again = !!m.again;
+    const s = roomOf(code);
+    if (sid) {
+      for (const c of [...s]) {
+        if (c !== sock && c._sid === sid) { s.delete(c); c._room = null; try { c.end(); } catch (e) { /* muerto */ } again = true; }
+      }
+    }
+    sock._room = code; sock._name = String(m.name || 'anon').slice(0, 32); sock._host = !!m.host; sock._sid = sid;
+    s.add(sock);
     sendJSON(sock, { t: 'joined', room: code, n: s.size, host: sock._host });
-    broadcast(code, { t: 'peers', n: s.size, who: sock._name, joined: true }, sock);
+    broadcast(code, { t: 'peers', n: s.size, who: sock._name, joined: true, again }, sock);
     return;
   }
   if (!sock._room) return; // el resto requiere estar en una sala

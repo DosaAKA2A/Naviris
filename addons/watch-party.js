@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.7.2
+/* Naviris addon: Watch Party v2.8.0
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia
@@ -7,61 +7,52 @@
 
    Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
    El botón se ilumina con el color del sitio de la pestaña activa y abre un
-   panel lateral con sala, chat y estado. En la página solo se inyecta un
-   agente mínimo que controla el <video> y avisa de los eventos por
-   console-message. En YouTube se usa su API de reproductor
+   panel lateral acoplado (estilo Teleparty) con sala, chat y estado. En la
+   página solo se inyecta un agente mínimo que controla el <video> y avisa de
+   los eventos por console-message. En YouTube se usa su API de reproductor
    (playVideo/pauseVideo/seekTo) y los anuncios se detectan para no
    sincronizar con el tiempo del anuncio.
 
    Anfitrión-autoritativo: quien crea la sala late con su tiempo cada 2 s; los
-   demás corrigen si se desvían más de 1,5 s. Al unirse, el invitado navega
-   solo al episodio del anfitrión; el chat narra cada acción; y el anfitrión
-   decide quién controla la reproducción y quién puede cambiar el video.
+   demás corrigen si se desvían más de 1,5 s. El invitado navega solo al video
+   del anfitrión; el chat narra cada acción; y el anfitrión decide quién
+   controla la reproducción y quién puede cambiar el video.
 
-   v2.5.0: panel acoplado al borde derecho a altura completa (estilo
-   Teleparty): el contenido se encoge en vez de taparse, el chat ocupa todo el
-   alto con avatares por persona y las acciones (puso play, se unió…) se
-   narran en cursiva junto al nombre; entrada de mensaje fija abajo. Textos en
-   español neutro. Requiere Naviris 2.7.3-dev.12+ (el CSP anterior bloqueaba
-   la conexión con el servidor de salas y unirse no hacía nada).
+   Habla el MISMO protocolo que el Watch Party integrado en MOOVIN (join / ev /
+   beat / chat): una sala creada allí y una creada aquí son intercambiables.
+   La identidad de un video de MOOVIN es su ?v= (iris:<url>); la página vacía
+   es iris:moovin. Esos identificadores son protocolo compartido: no cambiar.
 
-   v2.7.2: MOOVIN tiene dominio propio (moovin.live); se reconoce en los dos,
-   y la identidad del video no cambia, asi que las salas siguen mezclandose.
-   v2.6.0: soporta MOOVIN (entonces iris.it.com/moovin), el reproductor de IRIS
-   Studio para ver una película cargada por enlace o archivo local.
-   La página habla el mismo protocolo del relay, así que una sala creada allí
-   y una creada desde este addon son intercambiables. La identidad del video
-   es el parámetro ?v= (iris:<url>); sin él, la página vacía es iris:moovin.
-
-   v2.7.4: tu foto de perfil de Naviris sale en la sala, y viaja UNA vez al
-   entrar para que los demas tambien la vean.
-   v2.7.3: en la sala se ven las CARAS, no solo iniciales. MOOVIN ya mandaba
-   el avatar en cada mensaje y aquí no se miraba.
-   v2.6.2: el reproductor se llama MOOVIN y aquí seguía saliendo el nombre
-   anterior. Además el sufijo que se recortaba de "Viendo: …" era el del
-   nombre anterior, que la página ya no escribe: ahora pone "— MOOVIN", así
-   que el título salía sin recortar.
-
-   v2.7.0: la página se mudó de /cine a /moovin y la anterior ya no existe.
-   Cambian con ella la detección del sitio y la identidad de la sala sin
-   película (ahora iris:moovin), así que ESTA VERSIÓN NO ES COMPATIBLE con
-   salas creadas desde la anterior: hay que actualizar en ambos lados. La
-   identidad con película sigue siendo el ?v= (la URL del video), que no
-   depende de la ruta, así que esas salas sí siguen entendiéndose.
-
-   v2.7.1: al cambiar de episodio, a los invitados no se les cambiaba.
-   El aviso de cambio de video se mandaba bien, pero el receptor lo tiraba: el
-   guard descartaba el cambio salvo que fueras el anfitrión, y el anfitrión es
-   justo quien nunca lo recibe. Faltaba saber de quién venía, así que ahora el
-   relay marca `host` al reenviar (va del attachment del join, no del cliente)
-   y el guard mira ese dato. Hasta ahora solo colaba por el latido, con hasta
-   2 s de retraso y únicamente con el candado de video puesto.
-   Además: la URL del latido se lee fuera del executeJavaScript (al cambiar de
-   episodio la promesa se rompe y se perdía justo el latido con la URL nueva) y
-   el WebSocket se reconecta solo con espera creciente, que antes un corte
-   dejaba la sala pintada sin sincronizar nada.
-   Necesita el relay actualizado: sin `host` en el reenvío, el cambio sigue
-   llegando solo por el latido.
+   v2.8.0 (2026-09-09): revisión completa tras "no le carga nada".
+   - Se puede entrar a una sala DESDE CUALQUIER PESTAÑA, el hub incluido: el
+     addon abre solo el video del anfitrión (antes el botón de unirse estaba
+     apagado si no estabas ya en un sitio soportado, así que un invitado que
+     entraba desde el hub con el código de una sala de MOOVIN no iba a ningún
+     lado). Crear una sala sigue pidiendo tener el video delante.
+   - Se navega UNA vez por destino. Si la pestaña no aterriza en el video
+     (Netflix sin sesión manda a /title/, perfil sin elegir, título que no
+     existe en tu país) antes se volvía a cargar cada 15 s, sin tregua: no
+     había forma de iniciar sesión ni de elegir perfil. Ahora avisa y deja un
+     botón para volver a intentarlo cuando estés listo.
+   - Play, pausa y salto solo se aplican si estás en el MISMO video que el
+     anfitrión; antes el latido tocaba cualquier <video> de la página (el
+     tráiler del catálogo, la previsualización de YouTube).
+   - Las URL que viajan son canónicas (Netflix sin trackId/tctx del anfitrión)
+     y NINGUNA URL que llega de la sala se carga sin comprobar que es https y
+     de un sitio soportado: el relay reenvía lo que le manden.
+   - Sesión (`sid`) en el join: al reconectar, el relay cierra el socket viejo
+     en silencio, y el chat dice "volvió a conectarse" en vez de "se unió",
+     sin el "3 personas" con dos en la sala ni el "salió" fantasma después.
+   - En MOOVIN, cambiar de capítulo ya no recarga la página del invitado: se
+     le pide a la propia página (__moovinAbre) y solo si no está se recarga.
+   - Corregido: tras seguir un cambio de video remoto, el siguiente cambio
+     propio se tragaba (un flag que se quedaba puesto).
+   v2.7.x: MOOVIN con dominio propio; caras en la sala (avatar del elenco y
+   foto de la cuenta de Naviris, que viaja una vez al entrar); el relay marca
+   `host` al reenviar para que el candado de video funcione; reconexión con
+   espera creciente.
+   Requiere Naviris 2.8.0+ (unirse desde el hub usa naviris.abrePestana, de la
+   2.7.6-dev.5; el CSP anterior a 2.7.3-dev.12 vetaba la conexión).
 */
 (function () {
   var SERVER = localStorage.__navPartyServer || 'wss://naviris-party.studio-iris2026.workers.dev';
@@ -97,10 +88,11 @@
     'function doSeek(t){if(isNf){var p=nf();if(p){try{p.seek(Math.round(t*1000));return}catch(e){}}}' +
     'if(isYt){var y=yt();if(y){try{y.seekTo(t,true);return}catch(e){}}}' +
     'var v=vid();if(v)v.currentTime=t}' +
-    // has:false durante un anuncio de YouTube -> el resto de la sala no se
-    // sincroniza con el tiempo del anuncio ni se le corrige el suyo.
-    'window.__navPartyState=function(){var v=vid();var ad=isYt&&ytAnuncio();' +
-    'return{time:v?v.currentTime:0,paused:v?v.paused:true,has:!!v&&!ad,ad:!!ad}};' +
+    // has:false durante un anuncio de YouTube (nadie se sincroniza con el tiempo
+    // del anuncio) y también con un <video> SIN fuente (MOOVIN antes de elegir
+    // película): un latido con tiempo 0 de un reproductor vacío pausaba a todos.
+    'window.__navPartyState=function(){var v=vid();var ad=isYt&&ytAnuncio();var src=!!v&&(v.readyState>0||!!v.currentSrc);' +
+    'return{time:v?v.currentTime:0,paused:v?v.paused:true,has:src&&!ad,ad:!!ad}};' +
     'window.__navPartyApply=function(m){mute=Date.now()+' + ECHO_MS + ';var st=window.__navPartyState();' +
     'if(m.kind==="seek")doSeek(m.time);' +
     'else if(m.kind==="play"){if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + ')doSeek(m.time);doPlay()}' +
@@ -109,6 +101,9 @@
     'if(m.paused&&!st.paused){mute=Date.now()+' + ECHO_MS + ';doPause()}' +
     'else if(!m.paused&&st.paused){mute=Date.now()+' + ECHO_MS + ';doPlay()}' +
     'if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + '){mute=Date.now()+' + ECHO_MS + ';doSeek(m.time)}};' +
+    // MOOVIN: cambiar de película sin recargar la página. Devuelve true si la
+    // página ofrece el gancho (__moovinAbre, desde 2026-09-09) y se usó.
+    'window.__navPartyAbre=function(v){try{if(typeof window.__moovinAbre==="function"){window.__moovinAbre(v);return true}}catch(e){}return false};' +
     'var wired=null,last={k:"",at:0};' +
     'function emit(kind){return function(){if(Date.now()<mute)return;' +
     'if(isYt&&ytAnuncio())return;' + // los play/pause del anuncio no son tuyos: no difundir
@@ -141,7 +136,7 @@
     '#nvp-panel.nvp-plegado{flex-basis:0!important;width:0!important;border-left-width:0!important}',
     /* El contenido se maqueta UNA VEZ al ancho final y anclado a la derecha:
        el pliegue solo lo recorta (overflow hidden) — sin remaquetado del texto
-       durante la animacion (el "temblor" que señalo Dosa). */
+       durante la animación. */
     '#nvp-panel{align-items:flex-end}',
     '#nvp-panel>*{width:301px;flex-shrink:0}',
     '#nvp-panel.hidden{display:none!important}',
@@ -182,6 +177,10 @@
     '.nvp-status.err{color:#e6a9b4}',
     '.nvp-status.err .dot{background:#e6a9b4}',
     '.nvp-watch{margin-top:7px;font-size:11.5px;color:var(--dim,#5c5e64);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    /* Fuera de sintonía: el invitado no está en el video del anfitrión */
+    '.nvp-ir{display:none;width:100%;margin-top:9px;border:1px solid var(--violet,#b98cff);background:none;color:var(--violet,#b98cff);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:background .12s}',
+    '.nvp-ir:hover{background:rgba(185,140,255,.12)}',
+    '.nvp-ir.visible{display:block}',
     '.nvp-lock{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11.8px;color:var(--muted,#8b8d94);cursor:pointer;user-select:none}',
     '.nvp-lock:hover{color:var(--text,#ececef)}',
     '.nvp-lock input{accent-color:var(--violet,#b98cff);margin:0}',
@@ -207,21 +206,18 @@
   ].join('\n');
   document.head.appendChild(css);
 
-  /* Color estable por autor (paleta suave, sin depender del core) */
-  /* Avatares del elenco. MOOVIN manda el suyo en el campo `av` de CADA
-     mensaje desde hace tiempo, pero aqui no se miraba: en la sala todo el
-     mundo salia con su inicial mientras en MOOVIN se veian las caras.
-     La lista es CERRADA a proposito: el `av` viene de otra persona de la
-     sala, y con una lista fija nunca se compone una URL con un valor ajeno.
-     Los SVG son publicos (moovin.live/avatares/<id>.svg): no hacen falta ni
-     pase ni cuenta para verlos. */
+  /* ---------- Caras de la sala ----------
+     Avatares del elenco de MOOVIN: la página manda el suyo en el campo `av`
+     de cada mensaje. La lista es CERRADA a propósito: el `av` viene de otra
+     persona de la sala, y con una lista fija nunca se compone una URL con un
+     valor ajeno. Los SVG son públicos (moovin.live/avatares/<id>.svg). */
   var AVATARES = ['aria', 'pj1', 'pj2', 'pj3', 'pj4', 'pj5', 'pj6', 'pj7', 'pj8', 'pj9', 'pj10', 'pj11'];
   var avs = {};     // nombre -> id de avatar del elenco
   var fotos = {};   // nombre -> foto propia, la que manda cada quien al entrar
 
   /* La foto y el nombre de TU cuenta de Naviris. Los addons de herramienta
-     corren dentro del hub, asi que se leen de su localStorage tal cual: la
-     foto ya esta reducida a 128x128 y guardada como data URI. */
+     corren dentro del hub, así que se leen de su localStorage tal cual: la
+     foto ya está reducida a 128x128 y guardada como data URI. */
   function miCuenta() {
     try {
       var foto = JSON.parse(localStorage.getItem('cobalt.account.foto') || 'null');
@@ -229,17 +225,15 @@
       return { foto: fotoValida(foto) ? foto : '', nombre: (nombre || '').trim() };
     } catch (e) { return { foto: '', nombre: '' }; }
   }
-  /* Una foto que llega de OTRA persona de la sala solo se pinta si es una
-     imagen de mapa de bits en data URI. Nada de SVG (puede traer script) ni
-     de URLs de fuera, y con tope de tamaño. */
+  /* Una foto que llega de OTRA persona solo se pinta si es un mapa de bits en
+     data URI. Nada de SVG (puede traer script) ni de URLs de fuera, y con
+     tope de tamaño. */
   function fotoValida(f) {
     return typeof f === 'string' && f.length < 200000
       && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(f);
   }
   function apuntaFoto(who, f) { if (who && fotoValida(f)) fotos[who] = f; }
-  function apuntaAv(who, av) {
-    if (who && AVATARES.indexOf(av) !== -1) avs[who] = av;
-  }
+  function apuntaAv(who, av) { if (who && AVATARES.indexOf(av) !== -1) avs[who] = av; }
   function nameColor(name) {
     var h = 0; for (var i = 0; i < (name || '?').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     return 'hsl(' + (h % 360) + ', 55%, 72%)';
@@ -265,13 +259,9 @@
   panel.querySelector('#nvp-ico').innerHTML = ICON_EYE;
   panel.querySelector('#nvp-close').innerHTML = ICON_X;
 
-  /* ---------- Estado ---------- */
-  var party = null;      // { code, host, wv, ws, n, status, ok, msgs, name }
-  var beatTimer = null;
-
-  var SITIOS = {
-    netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube', iris: 'MOOVIN'
-  };
+  /* ---------- Sitios e identidad del video ---------- */
+  var SITIOS = { netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube', iris: 'MOOVIN' };
+  var LISTA_SITIOS = 'Crunchyroll, Netflix, Disney+, YouTube o MOOVIN';
   function siteOf(url) {
     var h = '', p = ''; try { var u = new URL(url); h = u.hostname; p = u.pathname; } catch (e) { return null; }
     if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
@@ -285,8 +275,7 @@
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
-  // aunque cambien locale o slug): crunchyroll.com/../watch/GXXXX/..,
-  // netflix.com/watch/123456
+  // aunque cambien locale, slug o parámetros de seguimiento).
   function epIdOf(url) {
     var m = /crunchyroll\.com\/(?:[a-z-]+\/)?watch\/([A-Z0-9]+)/i.exec(url || '');
     if (m) return 'cr:' + m[1].toUpperCase();
@@ -297,17 +286,34 @@
     if (m) return 'dp:' + m[1].toLowerCase();
     // YouTube: watch?v=ID, youtu.be/ID, /live/ID, /embed/ID, /shorts/ID
     m = /[?&]v=([\w-]{6,})/.exec(url || '');
-    if (m) return 'yt:' + m[1];
+    if (m && /youtube\.com|youtu\.be/.test(url)) return 'yt:' + m[1];
     m = /(?:youtu\.be|youtube\.com\/(?:live|embed|shorts))\/([\w-]{6,})/i.exec(url || '');
     if (m) return 'yt:' + m[1];
-    // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él,
-    // la página vacía cuenta como "el mismo sitio" para no forzar navegación
+    // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él, la
+    // página vacía cuenta como "el mismo sitio" para no forzar navegación
     // cuando el anfitrión reproduce un archivo local.
     m = /(?:moovin\.live|iris\.it\.com\/moovin)[^#]*[?&]v=([^&#]+)/i.exec(url || '');
     if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
     if (/moovin\.live(\/|$|\?)|iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
     return null;
   }
+  /* La URL que se manda a la sala, limpia. La de Netflix lleva trackId y tctx
+     (el contexto de navegación del anfitrión) y la de YouTube la lista o el
+     origen; nada de eso es el video, y al invitado solo le sirve el video. */
+  function canonUrl(url) {
+    var ep = epIdOf(url); if (!ep) return url;
+    var id = ep.slice(3);
+    if (ep.indexOf('nf:') === 0) return 'https://www.netflix.com/watch/' + id;
+    if (ep.indexOf('yt:') === 0) return 'https://www.youtube.com/watch?v=' + id;
+    if (ep.indexOf('cr:') === 0 || ep.indexOf('dp:') === 0) return url.split(/[?#]/)[0];
+    return url;   // MOOVIN: origen + ruta + ?v= ya es la forma canónica
+  }
+  /* Lo que llega de la sala lo ha mandado otra persona y el relay lo reenvía
+     tal cual: solo se carga una URL https de un sitio soportado. */
+  function urlSegura(u) {
+    try { return typeof u === 'string' && new URL(u).protocol === 'https:' && !!siteOf(u); } catch (e) { return false; }
+  }
+  function tituloLimpio(t) { return String(t || '').replace(/ - Crunchyroll.*$| - Netflix.*$| - YouTube$| — MOOVIN$/i, ''); }
   function fmtT(s) {
     if (typeof s !== 'number' || !isFinite(s)) return '';
     s = Math.max(0, Math.round(s));
@@ -320,29 +326,105 @@
     var wv = naviris.activeWebview(); if (!wv) return null;
     try { return siteOf(wv.getURL()); } catch (e) { return null; }
   }
+
+  /* ---------- Estado ---------- */
+  var party = null;      // ver start()
+  var beatTimer = null;
+
+  function wvUrl() { try { return party && party.wv ? party.wv.getURL() : ''; } catch (e) { return ''; } }
+  function wvTitulo() { try { return party && party.wv ? (party.wv.getTitle() || '') : ''; } catch (e) { return ''; } }
+  /* ¿Estás en el mismo video que el anfitrión? Mientras no lo estés, su play,
+     pausa y salto no se aplican: antes le llegaban a cualquier <video> de la
+     página (el tráiler del catálogo, la previsualización de YouTube). El
+     anfitrión siempre está en sintonía consigo mismo. */
+  function enSintonia() {
+    if (!party || party.host) return true;
+    var want = epIdOf(party.hostUrl); if (!want) return true;
+    return epIdOf(wvUrl()) === want;
+  }
   function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
   function pushMsg(m) { if (!party) return; party.msgs.push(m); if (party.msgs.length > 200) { party.msgs.shift(); ui.pintados = Math.max(0, (ui.pintados || 0) - 1); } render(); }
   // Aviso de sala (línea divisoria, sin persona): estados, permisos…
   function logSys(text) { pushMsg({ text: text, sys: true, t: Date.now() }); }
-  // Acción de una persona (cursiva junto a su avatar, estilo Teleparty):
-  // "puso play", "se unió a la sala"…
+  // Acción de una persona (cursiva junto a su avatar): "puso play", "se unió"…
   function logAct(who, text) { pushMsg({ who: who || '?', text: text, act: true, t: Date.now() }); }
   function logChat(who, text) { pushMsg({ who: who, text: text, t: Date.now() }); }
   // Narración filtrada: sin duplicados seguidos y sin los pausa/play espurios
   // que el reproductor dispara al bufferizar justo después de un salto.
   var narr = { kind: '', at: 0 };
-  function narrate(kind, who, text) {
+  function narrate(kind, who, time) {
     var now = Date.now();
     if ((kind === 'play' || kind === 'pause') && narr.kind === 'seek' && now - narr.at < 2500) return;
     if (narr.kind === kind && now - narr.at < 1500) return;
     narr = { kind: kind, at: now };
-    logAct(who, text);
+    logAct(who, kind === 'play' ? 'puso play' : kind === 'pause' ? 'pausó en ' + fmtT(time) : 'saltó a ' + fmtT(time));
   }
   function inject(wv) { try { wv.executeJavaScript(AGENT).catch(function () {}); } catch (e) { /* nada */ } }
+
+  /* ---------- La pestaña de la sala ----------
+     El invitado puede entrar sin pestaña (desde el hub): la sala se ata a la
+     pestaña en cuanto hay que abrir el video del anfitrión. */
+  function enlaza(wv) {
+    if (!party || !wv || party.wv === wv) return;
+    desenlaza();
+    party.wv = wv;
+    wv.addEventListener('console-message', onConsole);
+    wv.addEventListener('did-navigate', onRenav);
+    wv.addEventListener('did-navigate-in-page', onRenav);
+    wv.addEventListener('dom-ready', onRenav);
+    wv.addEventListener('destroyed', onGone);
+    party.ultimoEp = epIdOf(wvUrl());
+    inject(wv);
+  }
+  function desenlaza() {
+    var wv = party && party.wv; if (!wv) return;
+    try {
+      wv.removeEventListener('console-message', onConsole);
+      wv.removeEventListener('did-navigate', onRenav);
+      wv.removeEventListener('did-navigate-in-page', onRenav);
+      wv.removeEventListener('dom-ready', onRenav);
+      wv.removeEventListener('destroyed', onGone);
+    } catch (e) { /* nada */ }
+    try { wv.executeJavaScript('window.__navPartyStop&&__navPartyStop()').catch(function () {}); } catch (e) { /* nada */ }
+    party.wv = null;
+  }
+  /* Abre una URL de la sala en la pestaña de la sala; si no hay (se entró
+     desde el hub), en una pestaña nueva que pasa a ser la de la sala. */
+  function irA(url) {
+    if (!party || !urlSegura(url)) return;
+    if (party.wv) {
+      // En MOOVIN se le pide a la propia página que cambie de película: sin
+      // recargar, sin volver a pedir el pase ni el catálogo. Si la página no
+      // trae el gancho (versión anterior), se recarga como siempre.
+      var v = epIdOf(url), aqui = siteOf(wvUrl());
+      if (aqui === 'iris' && v && v.indexOf('iris:') === 0 && v !== 'iris:moovin') {
+        var wv = party.wv;
+        try {
+          wv.executeJavaScript('window.__navPartyAbre?__navPartyAbre(' + JSON.stringify(v.slice(5)) + '):false')
+            .then(function (ok) { if (!ok && party && party.wv === wv) wv.loadURL(url); })
+            .catch(function () { try { if (party && party.wv === wv) wv.loadURL(url); } catch (e) { /* nada */ } });
+          return;
+        } catch (e) { /* cae a loadURL */ }
+      }
+      try { party.wv.loadURL(url); } catch (e) { /* nada */ }
+      return;
+    }
+    naviris.abrePestana(url, true);
+    var intentos = 0;
+    (function busca() {
+      if (!party || party.wv) return;
+      var wv = naviris.activeWebview();
+      if (wv) { enlaza(wv); render(); glow(); return; }
+      if (intentos++ < 20) setTimeout(busca, 100);
+    })();
+  }
 
   function onConsole(e) {
     if (!party || typeof e.message !== 'string' || e.message.indexOf('NAVPARTY|') !== 0) return;
     var m; try { m = JSON.parse(e.message.slice(9)); } catch (x) { return; }
+    // Lo que hagas en OTRO video (mientras la pestaña no está en el del
+    // anfitrión) es cosa tuya: no se difunde ni se narra.
+    if (!enSintonia()) return;
     // Control exclusivo: las acciones de los invitados no se difunden (y el
     // siguiente latido del anfitrión las revierte). Aviso sin spamear.
     if (party.lock && !party.host) {
@@ -350,76 +432,82 @@
       return;
     }
     send({ t: 'ev', kind: m.kind, time: m.time, at: Date.now() });
-    narrate(m.kind, party.name, m.kind === 'play' ? 'puso play' : m.kind === 'pause' ? 'pausó en ' + fmtT(m.time) : 'saltó a ' + fmtT(m.time));
+    narrate(m.kind, party.name, m.time);
   }
   function onRenav() {
-    if (!party) return;
+    if (!party || !party.wv) return;
     inject(party.wv);
     // Cambio de video: si el anfitrión lo permite (o eres tú el anfitrión), al
     // abrir otro video se lleva a toda la sala. Con navLock activo, solo el
     // anfitrión puede; a los invitados el latido les devuelve al suyo.
-    var url = ''; try { url = party.wv.getURL(); } catch (e) { return; }
+    // `ultimoEp` ya se pone al SEGUIR un cambio remoto, así que ese no se
+    // vuelve a difundir (antes había además un flag que se quedaba puesto y
+    // se tragaba el siguiente cambio propio).
+    var url = wvUrl();
     var ep = epIdOf(url);
     if (!ep || ep === party.ultimoEp) return;
-    var puedo = party.host || !party.navLock;
     party.ultimoEp = ep;
-    if (puedo && !party.aplicandoNav) {
-      send({ t: 'ev', kind: 'nav', url: url, at: Date.now() });
+    if (party.host || !party.navLock) {
+      send({ t: 'ev', kind: 'nav', url: canonUrl(url), at: Date.now() });
       logAct(party.name, 'cambió el video de la sala');
     }
-    party.aplicandoNav = false;
   }
   function onGone() { if (party) { leave(true); naviris.toast('Watch Party terminada: se cerró la pestaña'); } }
 
   function applyRemote(m) {
     if (!party) return;
     var who = m.from || 'Alguien';
-    // Alguien cambió el video de la sala: se sigue si el anfitrión lo permite
-    // (el propio anfitrión siempre acepta el cambio de un invitado cuando
-    // tiene el cambio de video abierto).
     if (m.kind === 'nav') {
       // Sala cerrada: solo se sigue al anfitrión. `m.host` lo pone el servidor
-      // al reenviar, así que es de fiar; antes no venía y el guard miraba
-      // `party.host`, con lo que un invitado descartaba TODOS los cambios,
-      // incluidos los del anfitrión, y nunca le seguía de episodio.
+      // al reenviar (del attachment del join), así que es de fiar.
       if (party.navLock && !m.host && !party.host) return;
+      if (!urlSegura(m.url)) return;
       var want = epIdOf(m.url); if (!want) return;
-      var cur = ''; try { cur = party.wv.getURL(); } catch (e) { /* nada */ }
-      if (epIdOf(cur) === want) return;
+      if (epIdOf(wvUrl()) === want) return;
       logAct(who, 'cambió el video de la sala');
-      party.aplicandoNav = true; party.ultimoEp = want;
-      try { party.wv.loadURL(m.url); } catch (e) { /* nada */ }
+      party.ultimoEp = want; party.objetivo = want; party.intento = Date.now(); marcaDesync(false);
+      irA(m.url);
       return;
     }
-    narrate(m.kind, who, m.kind === 'play' ? 'puso play' : m.kind === 'pause' ? 'pausó en ' + fmtT(m.time) : 'saltó a ' + fmtT(m.time));
+    if (m.kind !== 'play' && m.kind !== 'pause' && m.kind !== 'seek') return;   // órdenes de otros clientes (el mando de MOOVIN)
+    narrate(m.kind, who, m.time);
+    if (!party.wv || !enSintonia()) return;
     try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
   }
-  // Invitados: seguir el episodio del anfitrión (la URL viaja en su latido). Si
-  // el capítulo no coincide, la pestaña navega sola al del anfitrión.
+  /* Invitados: seguir el video del anfitrión (su URL viaja en el latido).
+     Se navega UNA vez por destino. Si la pestaña no aterriza en él (Netflix
+     sin sesión manda a /title/, un perfil sin elegir, un título que no existe
+     en tu país), se avisa y queda el botón para reintentar: antes se volvía a
+     cargar cada 15 s y no había forma de iniciar sesión ni de elegir perfil. */
   function syncEpisode(url) {
-    if (!party || party.host || !url) return;
+    if (!party || party.host || !urlSegura(url)) return;
     var want = epIdOf(url); if (!want) return;
-    var cur = ''; try { cur = party.wv.getURL(); } catch (e) { return; }
-    if (epIdOf(cur) === want) { party.navving = 0; return; }
-    if (party.navving && Date.now() - party.navving < 15000) return; // ya está navegando
-    party.navving = Date.now();
-    logSys('Abriendo el episodio del anfitrión…');
-    try { party.wv.loadURL(url); } catch (e) { /* nada */ }
+    if (epIdOf(wvUrl()) === want) { party.objetivo = want; marcaDesync(false); return; }
+    if (party.objetivo === want) {
+      if (!party.desync && Date.now() - (party.intento || 0) > 12000) {
+        marcaDesync(true);
+        logSys('No se pudo abrir el video del anfitrión. Inicia sesión o elige tu perfil y toca «Ir al video del anfitrión»');
+      }
+      return;
+    }
+    party.objetivo = want; party.intento = Date.now(); marcaDesync(false);
+    logSys('Abriendo el video del anfitrión…');
+    irA(url);
   }
+  function marcaDesync(v) { if (party && party.desync !== v) { party.desync = v; render(); } }
   function applyBeat(m) {
-    if (!party) return;
+    if (!party || !party.wv || !enSintonia()) return;
     try { party.wv.executeJavaScript('window.__navPartyBeat&&__navPartyBeat(' + JSON.stringify({ time: m.time, paused: !!m.paused }) + ')').catch(function () {}); } catch (e) { /* nada */ }
   }
   function beatStart() {
     beatStop();
     var tick = function () {
-      if (!party) return;
+      if (!party || !party.wv) return;
       // La URL se lee FUERA del executeJavaScript: al cambiar de episodio el
       // mundo JS de la página se destruye y la promesa se rompe, que es
       // justo el latido que llevaba la URL nueva. Se manda igual, con el
       // tiempo si se pudo consultar y sin él si no.
-      var url = ''; try { url = party.wv.getURL(); } catch (e) { /* nada */ }
-      var base = { t: 'beat', url: url, lock: !!party.lock, nlock: !!party.navLock, at: Date.now() };
+      var base = { t: 'beat', url: canonUrl(wvUrl()), tit: tituloLimpio(wvTitulo()).slice(0, 120), lock: !!party.lock, nlock: !!party.navLock, at: Date.now() };
       var mandado = false;
       var manda = function (st) {
         if (mandado || !party) return;
@@ -437,32 +525,43 @@
     beatTimer = setInterval(tick, 2000);
   }
   function beatStop() { if (beatTimer) { clearInterval(beatTimer); beatTimer = null; } }
-  function randomCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '', i; for (i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
+  function randomCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '', i; for (i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
+  // Identificador de ESTA sesión en la sala: al reconectar, el relay cierra el
+  // socket viejo con el mismo sid en silencio (sin "salió" fantasma ni contar
+  // dos veces a la misma persona).
+  function nuevoSid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
   function start(code, asHost) {
     var wv = naviris.activeWebview();
-    if (!wv || !activeSite()) { naviris.toast('Abre el video en Crunchyroll, Netflix, Disney+, YouTube o MOOVIN y vuelve a intentarlo'); return; }
+    // Crear una sala pide tener el video delante: es lo que va a ver la sala.
+    // Unirse no: el video lo pone el anfitrión y se abre solo.
+    if (asHost && (!wv || !activeSite())) { naviris.toast('Abre el video en ' + LISTA_SITIOS + ' y vuelve a intentarlo'); return; }
     leave(true);
     /* El nombre lo propone tu cuenta de Naviris, que es el que ya elegiste en
        el hub. Lo escrito a mano sigue mandando. */
     var name = (localStorage.__navPartyName || miCuenta().nombre
       || (asHost ? 'Anfitrión' : 'Invitado')).slice(0, 32);
-    // navLock: por defecto SOLO el anfitrión cambia el video de la sala.
-    party = { code: code, host: asHost, wv: wv, ws: null, n: 1, status: 'Conectando…', ok: false, msgs: [], name: name, navLock: true, site: activeSite(), ultimoEp: epIdOf(wv.getURL ? wv.getURL() : '') };
-    wv.addEventListener('console-message', onConsole);
-    wv.addEventListener('did-navigate', onRenav);
-    wv.addEventListener('did-navigate-in-page', onRenav);
-    wv.addEventListener('dom-ready', onRenav);
-    wv.addEventListener('destroyed', onGone);
-    inject(wv);
+    party = {
+      code: code, host: asHost, wv: null, ws: null, sid: nuevoSid(),
+      n: 1, status: 'Conectando…', ok: false, everOk: false, msgs: [], name: name,
+      lock: false, navLock: true,          // por defecto SOLO el anfitrión cambia el video
+      site: activeSite(), ultimoEp: null,
+      hostUrl: '', hostTit: '',            // lo que ve el anfitrión (del latido)
+      objetivo: null, intento: 0, desync: false
+    };
+    // El invitado se ata a la pestaña activa si es una página (aunque no sea
+    // un sitio soportado: es la que va a navegar al video). Desde el hub no
+    // hay pestaña: se abre una al llegar el primer latido.
+    if (wv) enlaza(wv);
 
     /* El socket se abre aquí dentro para poder repetirlo: si se cae (el Durable
        Object se redespliega, el portátil se suspende, un bache de red) antes se
        quedaba la sala pintada con su código mientras ya no se sincronizaba
        nada, que por fuera se ve igual que "no me cambia el episodio". */
     var reintento = 0, reTimer = null;
+    var miParty = party;
     function abreSocket() {
-      if (!party) return;
+      if (party !== miParty) return;
       var ws;
       try { ws = new WebSocket(SERVER); } catch (e) {
         // El CSP del renderer puede vetar la conexión (Naviris < 2.7.3-dev.12).
@@ -472,22 +571,24 @@
       }
       party.ws = ws;
       ws.onopen = function () {
+        var volvia = reintento > 0;
         reintento = 0;
-        /* La foto va UNA vez, aqui. En cada mensaje serian kilobytes por
+        /* La foto va UNA vez, aquí. En cada mensaje serían kilobytes por
            latido: el resto del protocolo se queda como estaba. */
         var yo = miCuenta();
-        var join = { t: 'join', room: code, name: name, host: asHost };
+        var join = { t: 'join', room: code, name: name, host: asHost, sid: party.sid };
+        if (volvia) join.again = true;
         if (yo.foto) join.foto = yo.foto;
         send(join);
       };
       ws.onmessage = function (ev) {
         if (!party || party.ws !== ws) return;
         var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
-        // El avatar viaja en TODO mensaje (join/ev/beat/chat), asi que se
-        // aprende de cualquiera de ellos.
-        if (m.who && m.av) apuntaAv(m.who, m.av);
-        // La foto viaja SOLO al entrar (pesa), asi que se guarda por nombre.
-        if (m.who && m.foto) apuntaFoto(m.who, m.foto);
+        // El avatar viaja en TODO mensaje (join/ev/beat/chat), así que se
+        // aprende de cualquiera de ellos; la foto solo al entrar (pesa).
+        var quien = m.who || m.from;
+        if (quien && m.av) apuntaAv(quien, m.av);
+        if (quien && m.foto) apuntaFoto(quien, m.foto);
         if (m.t === 'joined') {
           var volvia = party.everOk;
           party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
@@ -498,7 +599,11 @@
           }
           if (asHost) beatStart();
         }
-        else if (m.t === 'peers') { party.n = m.n; if (m.joined && m.who) logAct(m.who, 'se unió a la sala'); else if (m.left && m.who) logAct(m.who, 'salió de la sala'); }
+        else if (m.t === 'peers') {
+          party.n = m.n;
+          if (m.joined && m.who) logAct(m.who, m.again ? 'volvió a conectarse' : 'se unió a la sala');
+          else if (m.left && m.who) logAct(m.who, 'salió de la sala');
+        }
         else if (m.t === 'ev') applyRemote(m);
         else if (m.t === 'beat') {
           if (!party.host) {
@@ -506,9 +611,12 @@
             if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión activó el control exclusivo' : 'El anfitrión desactivó el control exclusivo');
             var hadNav = !!party.navLock; party.navLock = m.nlock !== false;
             if (party.navLock !== hadNav) logSys(party.navLock ? 'Ahora solo el anfitrión puede cambiar el video' : 'Ahora cualquiera puede cambiar el video');
-            // Solo se te devuelve al video del anfitrión si la sala está cerrada;
-            // si está abierta, el video lo manda quien lo haya cambiado.
-            if (party.navLock) syncEpisode(m.url);
+            if (urlSegura(m.url)) party.hostUrl = m.url;
+            party.hostTit = typeof m.tit === 'string' ? m.tit.slice(0, 120) : '';
+            // Al entrar se va SIEMPRE a lo que ve el anfitrión. Después, con la
+            // sala cerrada el latido te devuelve a su video; abierta, el video
+            // lo manda quien lo haya cambiado (llega como `nav`).
+            if (party.navLock || !party.objetivo) syncEpisode(m.url);
             if (typeof m.time === 'number') applyBeat(m);
           }
         }
@@ -518,20 +626,19 @@
       };
       // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
       // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
-      var neverOk = function () { return !party.everOk; };
       ws.onclose = function () {
         if (!party || party.ws !== ws) return;
         party.ok = false; beatStop();
-        if (neverOk()) { party.status = 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); return; }
+        if (!party.everOk) { party.status = 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); return; }
         // Ya había conectado alguna vez: es un corte, se vuelve a entrar sola.
         reintento++;
         var espera = Math.min(30000, 1000 * Math.pow(2, reintento - 1));
         party.status = 'Reconectando…';
         if (reTimer) clearTimeout(reTimer);
-        reTimer = setTimeout(function () { if (party) abreSocket(); }, espera);
+        reTimer = setTimeout(function () { reTimer = null; abreSocket(); }, espera);
         render();
       };
-      ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = neverOk() ? 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)' : 'Sin conexión con el servidor'; render(); } };
+      ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = party.everOk ? 'Sin conexión con el servidor' : 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); } };
       render(); glow();
     }
     party.paraReconexion = function () { if (reTimer) { clearTimeout(reTimer); reTimer = null; } };
@@ -541,10 +648,7 @@
     if (!party) return;
     beatStop();
     try { party.paraReconexion && party.paraReconexion(); } catch (e) { /* nada */ }
-    var wv = party.wv;
-    try { wv.removeEventListener('console-message', onConsole); } catch (e) { /* nada */ }
-    try { wv.removeEventListener('did-navigate', onRenav); wv.removeEventListener('did-navigate-in-page', onRenav); wv.removeEventListener('dom-ready', onRenav); wv.removeEventListener('destroyed', onGone); } catch (e) { /* nada */ }
-    try { wv.executeJavaScript('window.__navPartyStop&&__navPartyStop()').catch(function () {}); } catch (e) { /* nada */ }
+    desenlaza();
     try { party.ws && party.ws.close(); } catch (e) { /* nada */ }
     party = null;
     if (!silent) naviris.toast('Saliste de la sala');
@@ -571,10 +675,9 @@
     var site = activeSite();
     if (modoActual === 'fuera') {
       if (ui.hint) ui.hint.textContent = site
-        ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno: la pestaña saltará sola a lo que vea el anfitrión.'
-        : 'Abre Crunchyroll, Netflix, Disney+, YouTube o MOOVIN (moovin.live) en la pestaña activa (el botón se ilumina con el color del sitio) y vuelve aquí.';
+        ? 'Listo: la sala usará ' + (SITIOS[site] || '') + ' en esta pestaña. Crea una sala y comparte el código, o únete con uno.'
+        : 'Para crear una sala, abre el video en ' + LISTA_SITIOS + ' (el botón se ilumina con el color del sitio). Para unirte basta el código: la pestaña saltará sola a lo que vea el anfitrión.';
       if (ui.crear) ui.crear.disabled = !site;
-      if (ui.unirse) ui.unirse.disabled = !site;
       return;
     }
     if (!party) return;
@@ -585,19 +688,22 @@
         + ' · ' + (party.host ? 'eres el anfitrión' : 'invitado') + ' · ' + party.status;
     }
     if (ui.viendo) {
-      var title = ''; try { title = party.wv.getTitle() || party.wv.getURL(); } catch (e) { /* nada */ }
-      ui.viendo.textContent = title ? 'Viendo: ' + title.replace(/ - Crunchyroll.*$| - Netflix.*$| - YouTube$| — MOOVIN$/i, '') : '';
-      ui.viendo.style.display = title ? '' : 'none';
+      var texto = '';
+      if (party.wv && enSintonia()) { var t = tituloLimpio(wvTitulo() || wvUrl()); if (t) texto = 'Viendo: ' + t; }
+      else if (party.hostTit || party.hostUrl) texto = 'El anfitrión ve: ' + (party.hostTit || party.hostUrl);
+      ui.viendo.textContent = texto;
+      ui.viendo.style.display = texto ? '' : 'none';
     }
+    if (ui.ir) ui.ir.classList.toggle('visible', !!party.desync && !!party.hostUrl);
     if (ui.lock && ui.lock.checked !== !!party.lock) ui.lock.checked = !!party.lock;
     if (ui.navLock && ui.navLock.checked !== !!party.navLock) ui.navLock.checked = !!party.navLock;
     pintarChat();
   }
   function avatar(who) {
     var av = document.createElement('span'); av.className = 'nvp-av';
-    /* La foto manda: la tuya sale de tu cuenta de Naviris y la de los demas
-       de lo que mandaron al entrar. Despues el avatar del elenco de MOOVIN,
-       y en ultimo lugar la inicial de siempre. */
+    /* La foto manda: la tuya sale de tu cuenta de Naviris y la de los demás
+       de lo que mandaron al entrar. Después el avatar del elenco de MOOVIN,
+       y en último lugar la inicial de siempre. */
     var foto = (party && who === party.name) ? miCuenta().foto : fotos[who];
     if (fotoValida(foto)) {
       var f = document.createElement('img');
@@ -611,7 +717,7 @@
       var img = document.createElement('img');
       img.src = 'https://moovin.live/avatares/' + id + '.svg';
       img.alt = '';
-      // Si no carga (sin red, o el archivo ya no esta) se cae a la inicial.
+      // Si no carga (sin red, o el archivo ya no está) se cae a la inicial.
       img.addEventListener('error', function () { av.innerHTML = ''; pintaInicial(av, who); });
       av.appendChild(img);
       return av;
@@ -688,8 +794,11 @@
       var lbl = document.createElement('div'); lbl.className = 'nvp-lbl'; lbl.textContent = 'O únete a una sala'; setup.appendChild(lbl);
       var joinRow = document.createElement('div'); joinRow.className = 'nvp-row';
       var codeIn = document.createElement('input'); codeIn.id = 'nvp-codein'; codeIn.className = 'nvp-in code'; codeIn.maxLength = 12; codeIn.placeholder = 'Código';
-      var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; joinBtn.disabled = !site; ui.unirse = joinBtn;
-      var doJoin = function () { var c = codeIn.value.trim().toUpperCase(); if (!c) return; localStorage.__navPartyName = nameIn.value.trim(); start(c, false); };
+      var joinBtn = document.createElement('button'); joinBtn.className = 'nvp-btn'; joinBtn.textContent = 'Unirse'; ui.unirse = joinBtn;
+      var doJoin = function () {
+        var c = codeIn.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!c) return;
+        localStorage.__navPartyName = nameIn.value.trim(); start(c, false);
+      };
       joinBtn.addEventListener('click', doJoin);
       codeIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') doJoin(); });
       joinRow.appendChild(codeIn); joinRow.appendChild(joinBtn); setup.appendChild(joinRow);
@@ -713,6 +822,17 @@
       room.appendChild(st);
       var w = document.createElement('div'); w.className = 'nvp-watch';
       room.appendChild(w); ui.viendo = w;
+      if (!party.host) {
+        // Solo sale cuando la pestaña no llegó al video del anfitrión.
+        var ir = document.createElement('button'); ir.className = 'nvp-ir'; ir.textContent = 'Ir al video del anfitrión';
+        ir.addEventListener('click', function () {
+          if (!party || !party.hostUrl) return;
+          party.objetivo = epIdOf(party.hostUrl); party.intento = Date.now(); marcaDesync(false);
+          logSys('Abriendo el video del anfitrión…');
+          irA(party.hostUrl);
+        });
+        room.appendChild(ir); ui.ir = ir;
+      }
       if (party.host) {
         // Dos permisos distintos: quién controla la reproducción y quién puede
         // cambiar el video que ve la sala.
@@ -791,10 +911,10 @@
 
   // Panel acoplado: se abre y se cierra solo desde su botón o la X (nada de
   // cerrarse al hacer clic fuera: el chat convive con el video, como Teleparty).
-  // Empuje VISCOSO (2026-08-11): el panel comprime la página al abrirse, así
-  // que el ancho se anima (flex-basis 0 -> 302) con una curva con rebote en
-  // vez de aparecer de golpe. Al cerrar, primero se pliega y luego se oculta;
-  // si el usuario reabre a mitad de pliegue, el temporizador lo respeta.
+  // El panel comprime la página al abrirse, así que el ancho se anima
+  // (flex-basis 0 -> 302) con una curva con rebote en vez de aparecer de golpe.
+  // Al cerrar, primero se pliega y luego se oculta; si el usuario reabre a
+  // mitad de pliegue, el temporizador lo respeta.
   function togglePanel(force) {
     var open = force !== undefined ? force : panel.classList.contains('hidden');
     if (open) {
