@@ -27,7 +27,7 @@ const els = {};
   'pw-panel', 'pw-list', 'pw-form', 'pw-site', 'pw-user', 'pw-pass', 'pw-addbtn', 'pw-import', 'pw-cancel',
   'res-label', 'private-badge', 'toast', 'suggest',   'rat-pop', 'rat-url', 'rat-plat', 'rat-video', 'rat-audio', 'rat-note', 'rat-detect', 'rat-detect-logo',
   'rat-detect-name', 'rat-detect-url', 'rat-xtoggle', 'rat-xcheck', 'rat-qrow', 'rat-quality', 'dl-panel', 'dl-list',
-  'rat-normal', 'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder', 'dlp-active',
+  'rat-headsub', 'dl-page', 'dlp-filters', 'dlp-list', 'dlp-folder', 'dlp-active',
   'bm-page', 'bm-tree', 'bm-newfolder', 'bm-import', 'bm-filter', 'prompt-modal', 'prompt-title', 'prompt-input',
   'prompt-ok', 'prompt-cancel',   'perm-bar', 'perm-text', 'perm-remember', 'perm-allow', 'perm-block', 'perm-modal', 'perm-list', 'perm-clear-all', 'perm-modal-close',
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
@@ -4338,74 +4338,18 @@ window.addEventListener('resize', () => { clearTimeout(granoTimer); granoTimer =
 pintaGrano();
 generaFondoBlur();
 
-/* ===== MOTOR DE LENTES · liquid glass real (2026-08-11) =====
-   Investigación (kube.io / Liquid Glass de Apple): la refracción de un cristal
-   vive SOLO en la banda del bisel del canto — el interior es plano (gris 128 en
-   el mapa = desplazamiento cero). Desplazar toda la superficie con ruido (lo
-   que hacíamos) da el efecto "derretido". Aquí se genera un mapa de
-   desplazamiento POR FORMA (SDF de rectángulo redondeado, banda con perfil
-   suavizado) y se aplica con backdrop-filter: url(#filtro) — Chromium lo
-   soporta. Solo activo con foto de fondo (#hub.refract); con degradados, las
-   piezas usan su backdrop-filter de CSS (blur + saturate). */
-const LG = { host: null, cache: new Map(), n: 0, mo: null, ro: null, prog: false };
-function lgMapa(w, h, r, band) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const x = c.getContext('2d'); const img = x.createImageData(w, h);
-  const bx = w / 2 - r, by = h / 2 - r;
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    const px = i + .5 - w / 2, py = j + .5 - h / 2;
-    const qx = Math.abs(px) - bx, qy = Math.abs(py) - by;
-    const ax = Math.max(qx, 0), ay = Math.max(qy, 0);
-    const d = Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - r; // SDF: <0 dentro
-    let vx = 0, vy = 0; const t = -d;
-    if (d <= 0 && t < band) {
-      let nx, ny;
-      if (ax > 0 || ay > 0) { const L = Math.hypot(ax, ay) || 1; nx = Math.sign(px) * ax / L; ny = Math.sign(py) * ay / L; }
-      else if (qx > qy) { nx = Math.sign(px); ny = 0; } else { nx = 0; ny = Math.sign(py); }
-      const u = 1 - t / band; const m = u * u * (3 - 2 * u); // smoothstep hacia el borde
-      vx = nx * m; vy = ny * m; // hacia FUERA: lente convexa (el fondo se comprime en el canto)
-    }
-    const k = (j * w + i) * 4;
-    img.data[k] = 128 + vx * 127; img.data[k + 1] = 128 + vy * 127; img.data[k + 2] = 128; img.data[k + 3] = 255;
-  }
-  x.putImageData(img, 0, 0);
-  return c.toDataURL();
-}
-function lgFiltro(el) {
-  const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight);
-  if (!w || !h) return;
-  let r = parseFloat(getComputedStyle(el).borderRadius) || 12; r = Math.min(r, w / 2, h / 2);
-  const band = Math.max(6, Math.min(14, Math.round(Math.min(w, h) * .22)));
-  const key = w + 'x' + h + 'r' + Math.round(r);
-  let id = LG.cache.get(key);
-  if (!id) {
-    id = 'lg-' + (++LG.n);
-    const SVG = 'http://www.w3.org/2000/svg';
-    const f = document.createElementNS(SVG, 'filter');
-    f.setAttribute('id', id);
-    f.setAttribute('filterUnits', 'userSpaceOnUse');
-    f.setAttribute('x', 0); f.setAttribute('y', 0); f.setAttribute('width', w); f.setAttribute('height', h);
-    // sRGB OBLIGATORIO: en linearRGB el 128 del mapa deja de ser "quieto" y todo se desplaza
-    f.setAttribute('color-interpolation-filters', 'sRGB');
-    f.innerHTML = '<feImage href="' + lgMapa(w, h, Math.round(r), band) + '" x="0" y="0" width="' + w + '" height="' + h + '" result="map"/>'
-      + '<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="soft"/>'
-      + '<feDisplacementMap in="soft" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G" result="ref"/>'
-      + '<feColorMatrix in="ref" type="saturate" values="1.6"/>';
-    LG.host.appendChild(f);
-    LG.cache.set(key, id);
-  }
-  el.style.webkitBackdropFilter = 'url(#' + id + ')';
-  el.style.backdropFilter = 'url(#' + id + ')';
-}
+/* ===== MOTOR DE LENTES · liquid glass (2026-08-11; motor nuevo 2026-08-21) =====
+   El primer motor generaba un mapa de desplazamiento POR FORMA (SDF de
+   rectángulo redondeado, banda con perfil suavizado) y lo aplicaba con
+   backdrop-filter: url(#filtro). Se abandonó: en esta GPU el backdrop-filter
+   troceaba el cristal. El motor de ahora no aplica NINGÚN filtro — ancla la
+   capa desenfocada de cada pieza a coordenadas del hub (--vidrio-pos), que es
+   determinista en cualquier compositor. Ver lgAplicar. */
+const LG = { init: false, mo: null, ro: null, prog: false };
 function lgAplicar() {
   LG.prog = false;
-  if (!LG.host) {
-    const SVG = 'http://www.w3.org/2000/svg';
-    const s = document.createElementNS(SVG, 'svg');
-    s.setAttribute('width', 0); s.setAttribute('height', 0);
-    s.setAttribute('aria-hidden', 'true'); s.style.position = 'absolute';
-    LG.host = document.createElementNS(SVG, 'defs'); s.appendChild(LG.host);
-    document.body.appendChild(s);
+  if (!LG.init) {
+    LG.init = true;
     LG.ro = new ResizeObserver(() => lgProgramar());
     LG.mo = new MutationObserver(() => lgProgramar());
     LG.mo.observe(els.hub, { childList: true, subtree: true });
@@ -4613,7 +4557,7 @@ async function pintaPerf() {
       : f.comparten > 1 ? `${host} — comparte proceso con ${f.comparten - 1} más`
         : host;
     fila.innerHTML = `
-      <img class="perf-fav" src="${t.favicon || ''}" alt="" />
+      <img class="perf-fav" alt="" />
       <div class="perf-info">
         <div class="perf-tit">${escapeHtml(t.title || host || 'Pestaña')}</div>
         <div class="perf-sub">${escapeHtml(sub)}</div>
@@ -4632,6 +4576,7 @@ async function pintaPerf() {
       try { t.sleptUrl = t.webview.getURL() || t.url; t.webview.src = 'about:blank'; t.asleep = true; renderTabs(); pintaPerf(); } catch { /* nada */ }
     });
     const favImg = fila.querySelector('.perf-fav');
+    if (t.favicon) favImg.src = t.favicon; // por .src, NUNCA interpolado en el HTML
     favImg.addEventListener('error', () => { favImg.style.visibility = 'hidden'; });
     els.perfList.appendChild(fila);
   }
@@ -4925,7 +4870,6 @@ cardEls.number.addEventListener('input', () => {
 });
 
 /* ============ Rat Tool ============ */
-const GRABBABLE = ['youtube.com', 'youtu.be', 'twitter.com', 'x.com', 'tiktok.com', 'instagram.com', 'facebook.com', 'twitch.tv', 'vimeo.com', 'dailymotion.com', 'reddit.com'];
 const PLAT_MAP = { 'youtube.com': ['YouTube', 'youtube'], 'youtu.be': ['YouTube', 'youtube'], 'instagram.com': ['Instagram', 'instagram'], 'twitter.com': ['X', 'x'], 'x.com': ['X', 'x'], 'tiktok.com': ['TikTok', null], 'twitch.tv': ['Twitch', 'twitch'], 'facebook.com': ['Facebook', null], 'vimeo.com': ['Vimeo', null], 'reddit.com': ['Reddit', 'reddit'], 'dailymotion.com': ['Dailymotion', null] };
 function platOf(url) { const h = hostOf(url); for (const d in PLAT_MAP) if (h === d || h.endsWith('.' + d)) return PLAT_MAP[d]; return null; }
 // Extrae la URL del vídeo que se está viendo. En el feed de TikTok (/foryou) la
@@ -6240,9 +6184,10 @@ async function pintaOtras() {
     const host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch { return t.url || ''; } })();
     const fila = document.createElement('div');
     fila.className = 'fo-fila';
-    fila.innerHTML = `<img src="${t.favicon || ''}" alt="" />
+    fila.innerHTML = `<img alt="" />
       <div class="fo-info"><div class="fo-t">${escapeHtml(t.title || host || 'Pestaña')}</div><div class="fo-h">${escapeHtml(host)}</div></div>
       <span class="fo-n">${n}</span>`;
+    if (t.favicon) fila.querySelector('img').src = t.favicon; // igual que en perf: por .src
     fila.addEventListener('click', () => {
       cierraOtras();
       activateTab(t.id);

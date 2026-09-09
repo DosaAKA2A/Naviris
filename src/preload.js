@@ -54,7 +54,6 @@ contextBridge.exposeInMainWorld('cobalt', {
   // ('system-context-menu') y manda las coordenadas ya en píxeles de la página
   onTabstripMenu: (cb) => ipcRenderer.on('ui:tabstrip-menu', (_e, p) => cb(p)),
 
-  updateCheck: () => ipcRenderer.invoke('update:check'),
   updateChannels: () => ipcRenderer.invoke('update:channels'),
   updateChoose: (line) => ipcRenderer.invoke('update:choose', line),
   updateDownload: () => ipcRenderer.invoke('update:download'),
@@ -63,7 +62,6 @@ contextBridge.exposeInMainWorld('cobalt', {
 
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
-  openExternal: (url) => ipcRenderer.send('shell:open-external', url),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
   pwAvailable: () => ipcRenderer.invoke('pw:available'),
@@ -92,7 +90,6 @@ contextBridge.exposeInMainWorld('cobalt', {
   espDatos: (id) => ipcRenderer.invoke('esp:datos', id),
   espGuarda: (id, datos) => ipcRenderer.invoke('esp:guarda', { id, datos }),
   espBorra: (id, clave) => ipcRenderer.invoke('esp:borra', { id, clave }),
-  contBorra: (part) => ipcRenderer.invoke('cont:borra', part),
   totpList: () => ipcRenderer.invoke('totp:list'),
   totpAdd: (datos) => ipcRenderer.invoke('totp:add', datos),
   totpDelete: (id) => ipcRenderer.invoke('totp:delete', id),
@@ -104,12 +101,10 @@ contextBridge.exposeInMainWorld('cobalt', {
   addonsInstall: (meta) => ipcRenderer.invoke('addons:install', meta),
   addonsUninstall: (id) => ipcRenderer.invoke('addons:uninstall', id),
   addonsToggle: (id, on) => ipcRenderer.invoke('addons:toggle', { id, on }),
-  addonsCode: (id) => ipcRenderer.invoke('addons:code', id),
   savePng: (dataUrl, suggestedName) => ipcRenderer.invoke('file:save-png', { dataUrl, suggestedName }),
   // Fondo del hub a resolución completa: copia el archivo a userData.
   // filePath usa webUtils porque File.path se retiró en Electron 32+.
   filePath: (f) => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
-  setWallpaper: (ruta) => ipcRenderer.invoke('hub:set-wallpaper', ruta),
   pickWallpaper: () => ipcRenderer.invoke('hub:pick-wallpaper'),
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),

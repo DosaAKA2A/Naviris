@@ -160,11 +160,9 @@
 }
 /* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
    con un halo suave, que le da el toque más femenino sin tocar el resto. */
-:root.rosa .hub-fab.on, :root.rosa .cta, :root.rosa .btn.red { box-shadow: 0 0 0 1px rgba(216,79,150,.30), 0 6px 18px rgba(216,79,150,.18); }
+:root.rosa .hub-fab.on, :root.rosa .btn.red { box-shadow: 0 0 0 1px rgba(216,79,150,.30), 0 6px 18px rgba(216,79,150,.18); }
 /* Colores que sobre superficies claras necesitan su propio valor (mismo motivo
    que en :root.light: los tonos pensados para fondo oscuro no contrastan) */
-:root.rosa .sb-btn.accent { color: #a05f37; }
-:root.rosa .sb-btn.accent:hover { color: #8a4c28; background: var(--hover); }
 :root.rosa .ctx-item.danger, :root.rosa .ctx-item.danger .ctx-ic { color: #c9294f; }
 :root.rosa .adp-badge.on { border-color: #bfe3cd; }
 :root.rosa .adp-btn.danger:hover { border-color: #e3a5b0; color: #b3283e; }
@@ -230,8 +228,6 @@
   --sb-chip: rgba(18,20,26,.05);
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
-:root.light .sb-btn.accent { color: #a05f37; }
-:root.light .sb-btn.accent:hover { color: #8a4c28; background: var(--hover); }
 :root.light .ctx-item.danger, :root.light .ctx-item.danger .ctx-ic { color: #c62f34; }
 :root.light .adp-badge.on { border-color: #bfe3cd; }
 :root.light .adp-btn.danger:hover { border-color: #e3a5b0; color: #b3283e; }
@@ -299,24 +295,15 @@
   --fav-filter: grayscale(1) brightness(1.6);
 }
 /* Lo cromatico que NO sale de un token y hay que apagar a mano */
-:root.mono .tab.drag-over { box-shadow: inset 2px 0 0 #cfcfcf; }
-:root.mono .tab.group-tab { border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.05); color: #d6d6d6; }
-:root.mono .tab.group-tab .gt-ic, :root.mono .tab.group-tab .gt-caret { color: #bdbdbd; }
-:root.mono .tab.group-tab .t-title { color: #e8e8e8; }
-:root.mono .tab.group-tab.open { background: rgba(255,255,255,.10); }
 :root.mono .tab.mini { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
 :root.mono .tab.mini.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
 :root.mono .tab.farming .t-fav { filter: grayscale(1) drop-shadow(0 0 4px rgba(255,255,255,.55)); }
-:root.mono .loot-ic, :root.mono #nav-loot, :root.mono .lp-title span[data-ico] svg, :root.mono .sb-btn.twitch-mode { color: #d6d6d6; }
-:root.mono .sb-btn.twitch-mode::after { background: #d6d6d6; }
+:root.mono .lp-title span[data-ico] svg { color: #d6d6d6; }
 :root.mono #sb-loot.on-twitch { color: #ffffff; }
 :root.mono .loot-go { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: #131313; }
-:root.mono .hp-alpha input[type="range"] { accent-color: #ffffff; }
 :root.mono .wp-custom.sel { border-color: #ffffff; }
 :root.mono .ctx-item.danger, :root.mono .ctx-item.danger .ctx-ic { color: #ffffff; }
 :root.mono .ctx-item.danger:hover { background: rgba(255,255,255,.12); }
-:root.mono .sb-btn.accent { color: #d6d6d6; }
-:root.mono .sb-btn.accent:hover { color: #ffffff; background: var(--hover); }
 :root.mono #win-close:active { background: #d0d0d0; color: #131313; }
 /* Modo agente: sin ambar ni verde. Activo = contorno, conectado = relleno. */
 :root.mono #agent-badge { color: #e0e0e0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.32); }
@@ -474,14 +461,6 @@ body.sacando-pestana { cursor: copy; }
 .tab:hover .t-close, .tab.active .t-close { opacity: 1; }
 .tab .t-close:hover { background: var(--btn-hover); color: var(--text-strong); opacity: 1; }
 /* Pestaña de grupo AutoLoot (colapsa todos los canales en autoloot) */
-.tab.group-tab { border: 1px solid rgba(145,112,214,.4); background: rgba(120,90,190,.1); color: #c4a6ff; }
-.tab.group-tab.active { background: var(--wash-2); }
-.tab.group-tab .gt-ic { display: flex; color: #b98cff; flex-shrink: 0; }
-.tab.group-tab .gt-ic svg { width: 14px; height: 14px; }
-.tab.group-tab .gt-caret { display: flex; color: #9a7fd0; flex-shrink: 0; }
-.tab.group-tab .gt-caret svg { width: 12px; height: 12px; }
-.tab.group-tab .t-title { color: #d3c1ff; }
-.tab.group-tab.open { background: rgba(140,105,215,.16); }
 /* Mini-pestañas del grupo AutoLoot al desplegarse (a la derecha de la cabecera) */
 .tab.mini { max-width: 150px; background: rgba(120,90,190,.06); border: 1px solid rgba(145,112,214,.22); animation: loot-slide .18s cubic-bezier(.2,.8,.3,1) both; }
 .tab.mini.active { background: rgba(140,105,215,.2); border-color: rgba(145,112,214,.5); }
@@ -490,22 +469,9 @@ body.sacando-pestana { cursor: copy; }
 
 /* Panel Loot */
 #loot-list { flex: 1; overflow-y: auto; padding: 6px 10px 14px; }
-.loot-sum { display: flex; gap: 10px; margin: 4px 0 12px; }
-.loot-stat { flex: 1; background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; }
-.loot-stat .ls-n { display: block; font-size: 22px; font-weight: 700; color: var(--text); }
-.loot-stat .ls-l { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; }
 .loot-empty { color: var(--dim); font-size: 12.5px; line-height: 1.5; padding: 8px 4px; }
-.loot-row { display: flex; align-items: center; gap: 11px; padding: 9px 6px; border-radius: 8px; }
-.loot-row:hover { background: var(--bg-2); }
-.loot-ic { display: flex; color: #b98cff; flex-shrink: 0; }
-.loot-ic svg { width: 16px; height: 16px; }
-.loot-info { min-width: 0; }
-.loot-info .loot-t { font-size: 13px; }
-.loot-info .loot-u { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Slider de opacidad para el fondo transparente */
-.hp-alpha { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
-.hp-alpha input[type="range"] { width: 100%; accent-color: #9170d6; cursor: pointer; }
 .wp-custom.sel { border-style: solid; border-color: #9170d6; color: var(--text); }
 
 /* Fondo del hub transparente: deja ver el escritorio (acrílico de Windows) */
@@ -569,13 +535,10 @@ body.sacando-pestana { cursor: copy; }
 #sb-spotify.sonando::after { content: ''; position: absolute; right: 6px; top: 8px; width: 6px; height: 6px;
   border-radius: 50%; background: var(--realce); }
 #sb-spotify.dormido { opacity: .38; }
-.sb-btn.accent { color: #b98266; }
-.sb-btn.accent:hover { color: #d59b7f; background: #16161a; }
 .sb-sep { width: 22px; height: 1px; background: var(--sb-sep); margin: 4px 0; }
 .sb-spacer { flex: 1; }
 /* Divisor fino y elegante entre grupos del sidebar + etiqueta de grupo */
 .sb-div { width: 18px; height: 1px; margin: 6px 0; background: linear-gradient(90deg, transparent, var(--sb-div) 30%, var(--sb-div) 70%, transparent); }
-.sb-group-label { font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); margin: 2px 0 1px; text-align: center; user-select: none; }
 
 /* Panel web lateral */
 
@@ -701,11 +664,6 @@ body.sacando-pestana { cursor: copy; }
 .rp-title { font-size: 13.5px; font-weight: 600; }
 .rp-sub { font-size: 11.5px; color: var(--text-dim); margin: 3px 0 10px; line-height: 1.5; }
 #res-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: min(52vh, 420px); overflow-y: auto; padding-right: 2px; }
-.rp-item { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border: none; background: transparent; color: var(--text); font-size: 12.5px; text-align: left; padding: 7px 9px; border-radius: 7px; cursor: pointer; transition: background .12s; }
-.rp-item:hover { background: var(--hover); }
-.rp-item.sel { background: var(--active); box-shadow: inset 2px 0 0 var(--accent); }
-.rp-item .rp-note { color: var(--dim); font-size: 10.5px; }
-.rp-item .rp-dim { font-variant-numeric: tabular-nums; color: var(--text-dim); }
 
 /* Rat Tool */
 #rat-pop { left: calc(var(--sidebar-w) + 8px); bottom: 92px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -732,14 +690,8 @@ body.sacando-pestana { cursor: copy; }
 .rat-btn:hover { background: var(--hover); border-color: var(--line-3); }
 .rat-note { font-size: 11px; color: var(--dim); line-height: 1.5; }
 /* Rat Tool: modo normal / modo Twitch comparten la disposición en columna */
-#rat-normal, #rat-twitch { display: flex; flex-direction: column; gap: 10px; }
-.rat-tw-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px; cursor: pointer; }
-.rat-tw-row span:first-child { display: flex; flex-direction: column; gap: 2px; }
-.rat-tw-row b { font-size: 13px; font-weight: 600; }
-.rat-tw-row small { font-size: 11px; color: var(--text-dim); }
+#rat-normal { display: flex; flex-direction: column; gap: 10px; }
 /* Rat Tool detecta Twitch en la pestaña activa: acento sutil */
-.sb-btn.twitch-mode { color: #b98cff; }
-.sb-btn.twitch-mode::after { content: ""; position: absolute; top: 5px; right: 5px; width: 5px; height: 5px; border-radius: 50%; background: #b98cff; }
 .sb-btn { position: relative; }
 
 /* Switch */
@@ -1021,7 +973,6 @@ body.sacando-pestana { cursor: copy; }
 .w-clock .greet { color: var(--text-dim); font-size: 12.5px; margin-top: 10px; letter-spacing: .2px; }
 
 /* Widget: búsqueda */
-.w-search { grid-column: span 6; }
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
    foco (y en el color de realce) */
 #hub-search { display: flex; align-items: center; gap: 10px; width: min(580px, 100%); margin: 0 auto; padding: 0 20px; height: 50px; border-radius: 999px; background: var(--hub-input); border: none; overflow: hidden; transform: translateZ(0); backface-visibility: hidden; backdrop-filter: blur(var(--glass-blur)) saturate(1.8); box-shadow: var(--glass-rim), var(--glass-lift); transition: box-shadow var(--dur-2) var(--ease); }
@@ -1104,10 +1055,9 @@ body.sacando-pestana { cursor: copy; }
 /* Modo edición de widgets */
 .widget .w-tools { position: absolute; top: -10px; right: -8px; z-index: 5; display: none; gap: 4px; }
 #hub.editing .widget .w-tools { display: flex; }
-#hub.editing .widget .w-card, #hub.editing .w-search #hub-search { outline: 1.5px dashed var(--line-3); outline-offset: 3px; border-radius: 18px; }
+#hub.editing .widget .w-card { outline: 1.5px dashed var(--line-3); outline-offset: 3px; border-radius: 18px; }
 #hub.editing .widget { cursor: grab; }
 #hub.editing .widget.dragging { opacity: .4; }
-#hub.editing .widget.drop-target::before { content: ""; position: absolute; inset: -8px; border: 2px dashed var(--accent); border-radius: 20px; pointer-events: none; }
 .w-tools button { width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg-3); color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,.5); }
 .w-tools button:hover { color: var(--text); background: var(--active); }
 .w-tools button.rm:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
@@ -1172,7 +1122,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* El botón de "Sensibilidad X" (addon x-sensitive) que se cuela en el sidebar
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */
-#adt-x-sensitive { display: none !important; }
 .hub-fab svg { width: 15px; height: 15px; }
 .hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 14px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; max-height: 70vh; overflow-y: auto; }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }
@@ -1188,12 +1137,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wp-custom { display: block; text-align: center; font-size: 12.5px; padding: 8px; border-radius: 8px; border: 1px dashed var(--line-3); color: var(--text-dim); cursor: pointer; transition: color .12s, border-color .12s; }
 .wp-custom:hover { color: var(--text); border-color: var(--focus); }
 /* Fila de ajuste dentro de un panel del hub (interruptor a la derecha) */
-.hp-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 12.5px; color: var(--text); cursor: pointer; }
-.hp-toggle small { color: var(--text-dim); font-size: 11px; }
-.ts-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); cursor: pointer; font-size: 12.5px; transition: border-color .12s; }
-.ts-item:hover { border-color: var(--line-3); }
-.ts-item.sel { border-color: var(--accent); }
-.ts-swatch { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; }
 
 /* Página de marcadores */
 .overlay-page { position: absolute; inset: 0; display: none; background: var(--page-bg); overflow-y: auto; z-index: 6; }
@@ -1362,9 +1305,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 
 /* AutoLoot: botón propio en la topbar (solo visible en Twitch) */
-#nav-loot { color: #b98cff; }
-#nav-loot.on { color: var(--ok); }
-#nav-loot.hidden { display: none; }
 #loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 #loot-pop .sp-count { line-height: 1.5; }
 
@@ -1407,10 +1347,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .loot-ses .ls-n { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; font-weight: 600; color: var(--ok); }
 .ls-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 3px 5px; }
 .ls-btn.stop { color: #e6a9b4; }
-.loot-hrow { display: flex; align-items: center; gap: 9px; font-size: 11.5px; padding: 6px 2px; border-bottom: 1px solid var(--line); }
-.loot-hrow .lh-ic svg { width: 13px; height: 13px; color: var(--muted); }
-.loot-hrow .lh-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loot-hrow .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; color: var(--dim, #5c5e64); }
 /* Historial agrupado por canal */
 .loot-hgroup { margin: 8px 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .loot-hgroup .lhg-head { display: flex; align-items: baseline; gap: 8px; padding: 9px 11px; background: var(--line, rgba(255,255,255,.03)); }
@@ -1484,13 +1420,12 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #hub-search:hover:not(:focus-within) { border-color: transparent; box-shadow: var(--glass-rim), var(--glass-lift), 0 0 0 1px rgba(255,255,255,.14); }
 #hub-search:focus-within { border-color: transparent; box-shadow: var(--glass-rim), var(--glass-lift), 0 0 0 3px rgba(255,255,255,.16); }
 #hub .tema-op.on { color: var(--text-strong); }
-#hub .bg-thumb.sel, #hub .ts-item.sel { border-color: rgba(255,255,255,.75); }
+#hub .bg-thumb.sel { border-color: rgba(255,255,255,.75); }
 #hub .wp-custom:hover { border-color: rgba(255,255,255,.45); }
 #hub .wp-custom:focus-visible { outline-color: rgba(255,255,255,.7); }
 #hub .dial.add .d-tile { border-color: rgba(255,255,255,.28); }
 :root.light #hub .hub-fab.on, :root.rosa #hub .hub-fab.on { background: rgba(255,255,255,.72); color: var(--text-strong); }
 :root.light #hub .bg-thumb.sel, :root.rosa #hub .bg-thumb.sel,
-:root.light #hub .ts-item.sel, :root.rosa #hub .ts-item.sel { border-color: rgba(30,20,30,.55); }
 
 /* Contraste del texto sobre vidrio: las piezas del hub llevan el texto fuerte */
 .hub-fab, .hub-pill { color: var(--text-strong); }
@@ -1897,12 +1832,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .dlw-aro { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
 .dlw-anillo { width: 72px; height: 72px; transform: rotate(-90deg); }
 .dlw-riel { fill: none; stroke: var(--chip); stroke-width: 6; }
-.dlw-avance { fill: none; stroke: url(#dlw-grad); stroke: var(--realce); stroke-width: 6; stroke-linecap: round;
+.dlw-avance { fill: none; stroke: var(--realce); stroke-width: 6; stroke-linecap: round;
   stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .4s var(--ease); }
 .dlw-centro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
 .dlw-centro svg { width: 22px; height: 22px; }
 .dlw-pct { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.w-dlw.con-activa .dlw-centro { color: var(--text); }
 .dlw-meta { min-width: 0; }
 .dlw-nombre { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dlw-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
@@ -2053,7 +1987,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 26px; cursor: pointer;
   transition: transform var(--dur-1) var(--spring), filter var(--dur-1) var(--ease); }
 .novp-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
-.novp-cargando, .novp-fallo { font-size: 13px; color: var(--text-dim); text-align: center; padding: 30px 0; }
 
 /* Alta de cuenta */
 .au-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
@@ -2216,7 +2149,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    bajando, la tarjeta no pintaba nada. Ahora ensena el icono de su cabecera. */
 .w-dlw.t-1x1 .w-head { display: flex; justify-content: center; margin: 0; }
 .w-dlw.t-1x1 .w-head svg { width: 36px; height: 36px; color: var(--text-dim); }
-.w-dlw.t-1x1.con-activa .w-head { display: none; }
 /* ===== TAMANOS a 1x1 (2026-08-21) =====
    Medido en la app: privada y moovin ensenan su icono a 38px y se leen bien;
    el resto arrastraba los tamanos de la tarjeta grande — el avatar de la

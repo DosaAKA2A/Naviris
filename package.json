@@ -13,6 +13,7 @@
   "scripts": {
     "start": "electron .",
     "icon": "electron build/render-icon.js",
+    "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
     "dist": "electron-builder --win",
     "release": "npm run dist && node build/publish-release.js",

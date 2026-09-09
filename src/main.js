@@ -1470,11 +1470,6 @@ ipcMain.handle('esp:borra', soloUI(async (_e, { id, clave } = {}) => {
   return { ok: true };
 }));
 
-ipcMain.handle('cont:borra', soloUI(async (_e, particion) => {
-  if (!PARTICIONES_VALIDAS.has(particion) || !/^persist:(cont|esp)-/.test(particion)) return { ok: false };
-  try { await session.fromPartition(particion).clearStorageData(); } catch { /* nada */ }
-  return { ok: true };
-}));
 ipcMain.handle('site:data', soloUI(async (_e, { url, partition }) => {
   try {
     if (!PARTICIONES_VALIDAS.has(partition)) return { ok: false };
@@ -1701,7 +1696,6 @@ ipcMain.handle('moovin:identidad', async (e) => {
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
-ipcMain.on('shell:open-external', (_e, url) => { if (/^https?:/.test(url)) shell.openExternal(url); });
 ipcMain.handle('clipboard:read', () => { try { return clipboard.readText(); } catch { return ''; } });
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
@@ -2232,12 +2226,21 @@ ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads'
 ipcMain.handle('favicon:fetch', async (_e, pageUrl, iconUrl) => {
   let host = '';
   try { host = new URL(pageUrl).hostname; } catch { return null; }
+  /* El content-type lo decide el SITIO y acaba dentro de un data: que la
+     interfaz pinta. Sin lista blanca, un `Content-Type: image/png" onerror="…`
+     sale del atributo y se convierte en marcado dentro del renderer, que es
+     quien tiene el IPC. Y sin tope, un "icono" de varios MB se guarda en
+     base64 en localStorage. */
+  const TIPOS_OK = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon']);
+  const TOPE_ICONO = 512 * 1024;
   const tryFetch = async (url) => {
     const res = await net.fetch(url);
     if (!res.ok) throw new Error('http ' + res.status);
-    const type = res.headers.get('content-type') || 'image/png';
+    const type = (res.headers.get('content-type') || 'image/png').split(';')[0].trim().toLowerCase();
+    if (!TIPOS_OK.has(type)) throw new Error('tipo no permitido: ' + type);
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length < 50) throw new Error('vacío');
+    if (buf.length > TOPE_ICONO) throw new Error('icono demasiado grande');
     return `data:${type};base64,${buf.toString('base64')}`;
   };
   if (iconUrl && /^https?:/i.test(iconUrl)) {
@@ -2323,11 +2326,6 @@ ipcMain.handle('addons:toggle', soloUI((_e, { id, on }) => {
   return settings.addons || {};
 }));
 
-ipcMain.handle('addons:code', soloUI((_e, id) => {
-  if (!settings.addons || !settings.addons[id] || !settings.addons[id].enabled) return null;
-  try { return fs.readFileSync(addonFile(id), 'utf8'); } catch { return null; }
-}));
-
 // Guardado de imágenes generado por addons (p. ej. capturas largas)
 /* Fondo del hub elegido por el usuario: se COPIA a userData a resolución
    completa y el hub apunta al archivo. Antes se reescalaba a 1920 px y se
@@ -2356,18 +2354,6 @@ async function guardarFondo(origen) {
   fs.copyFileSync(origen, destino);
   return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
 }
-ipcMain.handle('hub:set-wallpaper', async (e, origen) => {
-  try {
-    if (!origen || !fs.existsSync(origen)) return { ok: false, message: 'No se encontró la imagen' };
-    const dir = path.join(app.getPath('userData'), 'fondos');
-    fs.mkdirSync(dir, { recursive: true });
-    // Nombre único: al cambiar de fondo, el anterior se retira
-    for (const viejo of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, viejo)); } catch { /* en uso */ } }
-    const destino = path.join(dir, 'hub-' + Date.now() + path.extname(origen).toLowerCase());
-    fs.copyFileSync(origen, destino);
-    return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
-  } catch (err) { return { ok: false, message: String(err.message || err) }; }
-});
 ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
   try {
     const r = await dialog.showSaveDialog(winOf(e), {
@@ -2446,16 +2432,6 @@ autoUpdater.on('download-progress', (p) => broadcast('update:status', { state: '
 autoUpdater.on('update-downloaded', (info) => broadcast('update:status', { state: 'downloaded', version: info.version, auto: bajandoSolo }));
 autoUpdater.on('error', (err) => broadcast('update:status', { state: 'error', message: friendlyUpdateError(err), auto: bajandoSolo }));
 
-ipcMain.handle('update:check', async () => {
-  if (!app.isPackaged) return { state: 'dev' };
-  chequeoSilencioso = false; // lo pide el usuario: nada se baja sin que lo mande
-  applyUpdateChannel(); // el ajuste puede haber cambiado sin reiniciar
-  // Una comprobación normal vuelve a mirar TODAS las releases: si antes se
-  // eligió una línea, el feed quedó clavado en aquel tag y aquí no vale.
-  autoUpdater.setFeedURL({ provider: 'github', owner: 'DosaAKA2A', repo: 'Naviris', releaseType: 'prerelease' });
-  try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
-  catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
-});
 /* LAS DOS LÍNEAS NO SE CRUZAN (regla de Dosa).
    Quien usa dev recibe dev; quien usa estable recibe estable. Hubo un intento
    (2026-08-24) de que una instalación dev saltara a la estable cuando esta era
