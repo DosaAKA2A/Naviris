@@ -21,7 +21,7 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.8.0",
+      "version": "2.8.1",
       "kind": "tool",
       "icon": "eye-fill",
       "description": "Crea una sala, comparte el código y vean lo mismo a la vez en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN (moovin.live), el reproductor de IRIS Studio. Para unirte basta el código, desde cualquier pestaña: se abre solo el video del anfitrión y desde ahí todo va sincronizado, incluidos los cambios de capítulo. El chat acompaña al video en un panel lateral y narra cada acción, y el anfitrión decide quién controla y quién puede cambiar el video. Nadie transmite nada: cada persona reproduce con su propia cuenta. Requiere Naviris 2.8.0 o superior.",

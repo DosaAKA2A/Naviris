@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.8.0
+/* Naviris addon: Watch Party v2.8.1
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia
@@ -23,6 +23,11 @@
    La identidad de un video de MOOVIN es su ?v= (iris:<url>); la página vacía
    es iris:moovin. Esos identificadores son protocolo compartido: no cambiar.
 
+   v2.8.1 (2026-09-19): el chat se ve a pantalla completa. El panel vive en
+   el hub y el video en pantalla completa lo tapa todo, así que lo que decía
+   la sala se perdía hasta salir. Ahora el agente pinta cada mensaje y cada
+   acción como aviso flotante DENTRO del elemento en pantalla completa de la
+   página (con capa propia, o el video lo tapa) mientras dure.
    v2.8.0 (2026-09-09): revisión completa tras "no le carga nada".
    - Se puede entrar a una sala DESDE CUALQUIER PESTAÑA, el hub incluido: el
      addon abre solo el video del anfitrión (antes el botón de unirse estaba
@@ -104,6 +109,18 @@
     // MOOVIN: cambiar de película sin recargar la página. Devuelve true si la
     // página ofrece el gancho (__moovinAbre, desde 2026-09-09) y se usó.
     'window.__navPartyAbre=function(v){try{if(typeof window.__moovinAbre==="function"){window.__moovinAbre(v);return true}}catch(e){}return false};' +
+    // A pantalla completa el panel del hub queda tapado por el video: los
+    // mensajes se pintan aquí, dentro del propio elemento en pantalla completa.
+    // translateZ(0) no es adorno: sin capa propia el video (capa de hardware)
+    // los tapa igual. position:fixed va contra la ventana, que a pantalla
+    // completa es el propio elemento.
+    'var fsBox=null;window.__navPartyAviso=function(who,text){var fe=document.fullscreenElement;if(!fe)return false;' +
+    'if(!fsBox||fsBox.parentNode!==fe){if(fsBox)fsBox.remove();fsBox=document.createElement("div");' +
+    'fsBox.style.cssText="position:fixed;left:24px;bottom:96px;z-index:2147483647;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:min(420px,60vw);font:13px/1.45 system-ui,sans-serif;transform:translateZ(0);will-change:transform";fe.appendChild(fsBox)}' +
+    'var l=document.createElement("div");l.style.cssText="background:rgba(10,10,14,.82);color:#ececef;border-radius:10px;padding:8px 12px;overflow-wrap:anywhere";' +
+    'if(who){var b=document.createElement("b");b.textContent=who+" ";l.appendChild(b)}l.appendChild(document.createTextNode(text));fsBox.appendChild(l);' +
+    'while(fsBox.children.length>4)fsBox.firstChild.remove();setTimeout(function(){l.remove()},6000);return true};' +
+    'document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&fsBox){fsBox.remove();fsBox=null}});' +
     'var wired=null,last={k:"",at:0};' +
     'function emit(kind){return function(){if(Date.now()<mute)return;' +
     'if(isYt&&ytAnuncio())return;' + // los play/pause del anuncio no son tuyos: no difundir
@@ -114,7 +131,7 @@
     // "seeked" de forma fiable en saltos programáticos.
     'function wire(){var v=vid();if(!v||v===wired)return;wired=v;v.addEventListener("play",emit("play"));v.addEventListener("pause",emit("pause"));v.addEventListener("seeking",emit("seek"))}' +
     'var iv=setInterval(wire,1500);wire();' +
-    'window.__navPartyStop=function(){clearInterval(iv);wired=null;window.__navPartyAgent=0};' +
+    'window.__navPartyStop=function(){clearInterval(iv);wired=null;window.__navPartyAgent=0;if(fsBox){fsBox.remove();fsBox=null}};' +
     '})();';
 
   /* ---------- Estilos (panel propio acoplado; tokens del core con fallback) ---------- */
@@ -343,7 +360,14 @@
     return epIdOf(wvUrl()) === want;
   }
   function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
-  function pushMsg(m) { if (!party) return; party.msgs.push(m); if (party.msgs.length > 200) { party.msgs.shift(); ui.pintados = Math.max(0, (ui.pintados || 0) - 1); } render(); }
+  function pushMsg(m) { if (!party) return; party.msgs.push(m); if (party.msgs.length > 200) { party.msgs.shift(); ui.pintados = Math.max(0, (ui.pintados || 0) - 1); } render(); avisaFs(m); }
+  // Copia del mensaje para la página: solo la pinta si está a pantalla completa
+  // (ver __navPartyAviso en el agente). Los avisos de sala (sys) van sin nombre.
+  function avisaFs(m) {
+    if (!party || !party.wv) return;
+    var who = m.sys ? '' : String(m.who || ''), text = String(m.text || '');
+    try { party.wv.executeJavaScript('window.__navPartyAviso&&__navPartyAviso(' + JSON.stringify(who) + ',' + JSON.stringify(text) + ')').catch(function () {}); } catch (e) { /* nada */ }
+  }
   // Aviso de sala (línea divisoria, sin persona): estados, permisos…
   function logSys(text) { pushMsg({ text: text, sys: true, t: Date.now() }); }
   // Acción de una persona (cursiva junto a su avatar): "puso play", "se unió"…
