@@ -133,6 +133,14 @@ const DEFAULT_SETTINGS = {
 
 // Registra un autenticador virtual (vía CDP interno) para que las peticiones
 // WebAuthn no invoquen Windows Hello. Método estándar de Playwright/Puppeteer.
+// El transporte es 'usb' A PROPÓSITO: con 'internal' el navegador anunciaba un
+// autenticador de plataforma (isUserVerifyingPlatformAuthenticatorAvailable
+// = true) y Microsoft arrancaba solo el inicio de sesión con clave de acceso,
+// que aquí no puede completarse: Outlook se quedaba en "No pudimos iniciar su
+// sesión… clave de acceso" con Reintentar, sin llegar nunca a la contraseña
+// (Dosa, 2026-09-19). Con 'usb' los sitios no ven passkey de plataforma y
+// ofrecen contraseña o código; verificado: uvpaa=false y sin relleno
+// automático de passkeys en github.com y login.live.com.
 function suppressWebAuthn(contents) {
   // Con el modo agente activo, el depurador lo usa el agente externo: no atacamos aquí.
   if (!settings.blockPasskeys || settings.agentMode) return;
@@ -141,7 +149,7 @@ function suppressWebAuthn(contents) {
   } catch { return; }
   contents.debugger.sendCommand('WebAuthn.enable')
     .then(() => contents.debugger.sendCommand('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
+      options: { protocol: 'ctap2', transport: 'usb', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
     }))
     .then((r) => console.log('[Naviris] Autenticador virtual registrado (Windows Hello desactivado):', r && r.authenticatorId))
     .catch((e) => console.log('[Naviris] WebAuthn suppress error:', e.message));
@@ -1709,14 +1717,62 @@ function savePasswords(list) { try { fs.writeFileSync(pwPath(), JSON.stringify(l
 let pwSeq = Date.now();
 
 // Verifica identidad con Windows Hello (PIN/biometría). Devuelve true si "Verified".
+// El cuadro se pide ANCLADO a la ventana de Naviris (IUserConsentVerifierInterop,
+// RequestVerificationForWindowAsync con su HWND): con RequestVerificationAsync a
+// secas, desde un proceso que no es UWP, el cuadro salía como ventana suelta y
+// se quedaba DETRÁS de Naviris — "se abre pero no se antepone" (Dosa,
+// 2026-09-19). Anclado es ventana hija (owner = Naviris) y sale delante.
+// Verificado por user32: la ventana "Seguridad de Windows" (clase Credential
+// Dialog Xaml Host) lleva owner = el HWND de Naviris. Si no hay ventana o el
+// interop falla, se cae al método suelto de antes.
+function hwndDeNaviris() {
+  try {
+    const w = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
+    if (!w) return '0';
+    const b = w.getNativeWindowHandle();
+    return String(b.length >= 8 ? b.readBigUInt64LE(0) : b.readUInt32LE(0));
+  } catch { return '0'; }
+}
 function verifyWindowsHello(reason) {
   return new Promise((resolve) => {
     const msg = String(reason || 'Naviris te pide verificar tu identidad').replace(/'/g, ' ');
+    const hwnd = hwndDeNaviris();
     const script = `
 [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[ComImport, Guid("39E050C3-4E74-441A-8DC0-B81104DF949C"), InterfaceType(ComInterfaceType.InterfaceIsIInspectable)]
+public interface IUserConsentVerifierInterop {
+  [return: MarshalAs(UnmanagedType.IInspectable)]
+  object RequestVerificationForWindowAsync(IntPtr appWindow, [MarshalAs(UnmanagedType.HString)] string message, [In] ref Guid riid);
+}
+public static class HelloInterop {
+  [DllImport("combase.dll", CharSet = CharSet.Unicode)] static extern int WindowsCreateString(string s, int len, out IntPtr hstring);
+  [DllImport("combase.dll")] static extern int WindowsDeleteString(IntPtr hstring);
+  [DllImport("combase.dll")] static extern int RoGetActivationFactory(IntPtr classId, ref Guid iid, out IntPtr factory);
+  public static object Pedir(IntPtr hwnd, string mensaje, Guid riidOp) {
+    IntPtr h; WindowsCreateString("Windows.Security.Credentials.UI.UserConsentVerifier", 51, out h);
+    Guid iid = typeof(IUserConsentVerifierInterop).GUID;
+    IntPtr f; int hr = RoGetActivationFactory(h, ref iid, out f);
+    WindowsDeleteString(h);
+    if (hr != 0) throw new COMException("RoGetActivationFactory", hr);
+    var interop = (IUserConsentVerifierInterop)Marshal.GetObjectForIUnknown(f);
+    Marshal.Release(f);
+    return interop.RequestVerificationForWindowAsync(hwnd, mensaje, ref riidOp);
+  }
+}
+'@
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
-$op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('${msg}')
+$op = $null
+if (${hwnd} -ne 0) {
+  try {
+    $riid = [Windows.Security.Credentials.UI.UserConsentVerifier].GetMethod('RequestVerificationAsync').ReturnType.GUID
+    $op = [HelloInterop]::Pedir([IntPtr]${hwnd}, '${msg}', $riid)
+  } catch { $op = $null }
+}
+if ($op -eq $null) { $op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('${msg}') }
 $task = $asTask.MakeGenericMethod([Windows.Security.Credentials.UI.UserConsentVerificationResult]).Invoke($null, @($op))
 $task.Wait()
 [Console]::Out.Write('RESULT=' + $task.Result)`;
