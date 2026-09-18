@@ -208,6 +208,30 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
     }
   } catch (e) { /* nada */ }
 }
+// --- Microsoft (login.live.com y compañía): sin claves de acceso ---
+// Microsoft entra por defecto con una passkey (Windows Hello) si el navegador
+// dice que tiene autenticador de plataforma. Naviris lo dice (Chromium lo
+// trae), pero la ceremonia no se completa aquí y la página se queda en
+// "No pudimos iniciar su sesión… clave de acceso" con Reintentar, sin llegar
+// nunca a la contraseña (Dosa, 2026-09-19). Se le dice a Microsoft que no hay
+// autenticador ni relleno automático de passkeys: ofrece contraseña o código
+// al correo, que sí funcionan. Solo en sus dominios de entrada.
+if (/(^|\.)(login\.live\.com|login\.microsoftonline\.com|login\.microsoft\.com|account\.live\.com|account\.microsoft\.com|signup\.live\.com)$/.test(location.hostname)) {
+  try {
+    contextBridge.executeInMainWorld({
+      func: function () {
+        try {
+          var P = window.PublicKeyCredential; if (!P) return;
+          var no = function () { return Promise.resolve(false); };
+          P.isUserVerifyingPlatformAuthenticatorAvailable = no;
+          P.isConditionalMediationAvailable = no;
+          if (P.getClientCapabilities) P.getClientCapabilities = function () { return Promise.resolve({}); };
+        } catch (e) { /* nada */ }
+      }
+    });
+  } catch (e) { /* nada */ }
+}
+
 
 // --- MOOVIN: pase de la biblioteca ---
 // La biblioteca de iris.it.com/moovin es privada: su worker no suelta ni el catálogo
