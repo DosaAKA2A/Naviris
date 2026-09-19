@@ -208,6 +208,32 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
     }
   } catch (e) { /* nada */ }
 }
+// --- Passkeys bloqueadas: la página no ve autenticador de plataforma ---
+// Con el ajuste blockPasskeys, main.js registra un autenticador virtual (por
+// el depurador interno) para que WebAuthn no invoque Windows Hello. Pero con
+// el MODO AGENTE activo ese depurador lo usa el agente externo y el virtual
+// no se registra: Chromium anunciaba Windows Hello de verdad y Microsoft
+// arrancaba solo el inicio con clave de acceso, que aquí no se completa —
+// "No pudimos iniciar su sesión… clave de acceso" (Dosa, 2026-09-19, con
+// modo agente puesto). Esto no depende del depurador: se responde que no
+// hay autenticador de plataforma ni relleno automático de passkeys, y los
+// sitios ofrecen contraseña o código. En TODOS los sitios, como el ajuste.
+try {
+  if (ipcRenderer.sendSync('passkeys:bloqueadas')) {
+    contextBridge.executeInMainWorld({
+      func: function () {
+        try {
+          var P = window.PublicKeyCredential; if (!P) return;
+          var no = function () { return Promise.resolve(false); };
+          P.isUserVerifyingPlatformAuthenticatorAvailable = no;
+          P.isConditionalMediationAvailable = no;
+          if (P.getClientCapabilities) P.getClientCapabilities = function () { return Promise.resolve({}); };
+        } catch (e) { /* nada */ }
+      }
+    });
+  }
+} catch (e) { /* nada */ }
+
 // --- MOOVIN: pase de la biblioteca ---
 // La biblioteca de iris.it.com/moovin es privada: su worker no suelta ni el catálogo
 // ni un solo archivo sin pase. Naviris lo recuerda a nivel de navegador y lo pone

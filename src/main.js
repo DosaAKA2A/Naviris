@@ -256,7 +256,9 @@ if (settings.appVersion !== app.getVersion()) {
 if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
 
 // ---------- Modo agente: Chrome DevTools Protocol en localhost ----------
-if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', '9223');
+// NAVIRIS_CDP_PORT solo sirve para las builds de prueba: con el Naviris del
+// usuario en modo agente ocupando el 9223, otra instancia no podía escuchar.
+if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', process.env.NAVIRIS_CDP_PORT || '9223');
 
 // ---------- Rendimiento y seguridad ----------
 // (Se quitó renderer-process-limit: limitaba procesos y debilitaba el aislamiento
@@ -405,6 +407,9 @@ const UA_CH = {
     : process.platform === 'darwin' ? '"macOS"' : '"Linux"'
 };
 ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
+// El preload de cada web pregunta si las passkeys están bloqueadas: con el
+// ajuste puesto, la página no ve autenticador de plataforma (ver webview-preload).
+ipcMain.on('passkeys:bloqueadas', (e) => { e.returnValue = !!settings.blockPasskeys; });
 
 /* Accept-Language con la MISMA forma que la de Chrome: el idioma completo y
    detrás el idioma a secas con q=0.9 ("es-ES,es;q=0.9").
