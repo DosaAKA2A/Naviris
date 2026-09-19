@@ -573,6 +573,16 @@ function attachWebview(tab, url) {
   // Clic dentro de la página = cerrar los popovers de herramientas (esos
   // clics no burbujean hasta el document; el foco del webview sí avisa)
   wv.addEventListener('focus', () => { try { cerrarPopsHerramientas(); } catch { /* aún no cargó */ } });
+  /* Al salir del fullscreen HTML (el video de MOOVIN, YouTube…) la página se
+     quedaba con la geometría de pantalla completa para el RATÓN: el cursor
+     sobre "Siguiente capítulo" encendía el hover del botón de pantalla
+     completa (Dosa, 2026-09-19). Es cosa de Chromium con <webview>: el guest
+     no vuelve a preguntar dónde está en pantalla hasta que cambia de tamaño.
+     Se le obliga: un píxel menos de alto y vuelta, dos frames después. */
+  wv.addEventListener('leave-html-full-screen', () => {
+    wv.style.height = 'calc(100% - 1px)';
+    requestAnimationFrame(() => requestAnimationFrame(() => { wv.style.height = ''; }));
+  });
   const onNav = (e) => {
     // Dormir una pestaña la manda a about:blank: NO pisar url/título/favicon,
     // al pasar el ratón debe seguir viéndose qué contenido tenía.
