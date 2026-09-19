@@ -180,7 +180,7 @@ const DEFAULT_SETTINGS = {
   moovinPase: '',             // pase de la biblioteca privada de iris.it.com/moovin
   atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
   mouseNav: true,           // botones laterales del ratón para atrás/adelante
-  blockPasskeys: true,      // evita el prompt de Windows Hello (claves de acceso)
+  blockPasskeys: true,      // las webs no ven passkey de plataforma (preload); si una insiste, Windows Hello real
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
   devUpdates: null,         // canal de actualizaciones: null = según la versión instalada; true/false = elección del usuario
@@ -188,29 +188,19 @@ const DEFAULT_SETTINGS = {
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
 };
 
-// Registra un autenticador virtual (vía CDP interno) para que las peticiones
-// WebAuthn no invoquen Windows Hello. Método estándar de Playwright/Puppeteer.
-// El transporte es 'usb' A PROPÓSITO: con 'internal' el navegador anunciaba un
-// autenticador de plataforma (isUserVerifyingPlatformAuthenticatorAvailable
-// = true) y Microsoft arrancaba solo el inicio de sesión con clave de acceso,
-// que aquí no puede completarse: Outlook se quedaba en "No pudimos iniciar su
-// sesión… clave de acceso" con Reintentar, sin llegar nunca a la contraseña
-// (Dosa, 2026-09-19). Con 'usb' los sitios no ven passkey de plataforma y
-// ofrecen contraseña o código; verificado: uvpaa=false y sin relleno
-// automático de passkeys en github.com y login.live.com.
-function suppressWebAuthn(contents) {
-  // Con el modo agente activo, el depurador lo usa el agente externo: no atacamos aquí.
-  if (!settings.blockPasskeys || settings.agentMode) return;
-  try {
-    if (!contents.debugger.isAttached()) contents.debugger.attach('1.3');
-  } catch { return; }
-  contents.debugger.sendCommand('WebAuthn.enable')
-    .then(() => contents.debugger.sendCommand('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'usb', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
-    }))
-    .then((r) => console.log('[Naviris] Autenticador virtual registrado (Windows Hello desactivado):', r && r.authenticatorId))
-    .catch((e) => console.log('[Naviris] WebAuthn suppress error:', e.message));
-}
+// Claves de acceso (blockPasskeys). Hasta 2.8.1-dev.10 esto registraba un
+// autenticador VIRTUAL por el depurador interno (método de Playwright) para
+// que WebAuthn no invocara Windows Hello. Ese autenticador falso es justo lo
+// que rompía Outlook: cuando la cuenta tiene una passkey, Microsoft llama a
+// navigator.credentials.get() diga lo que diga isUVPAA, el autenticador
+// falso responde sin la credencial y la página se queda en "No pudimos
+// iniciar su sesión… clave de acceso". Con el modo agente (que no registra
+// el falso) Outlook ENTRABA: el gesto real de Windows Hello sí funciona
+// (Dosa, 2026-09-19). Así que ya no se registra nada: el ajuste se cumple
+// desde el preload, que dice a las webs que no hay autenticador de
+// plataforma ni relleno automático de passkeys (no las ofrecen por defecto),
+// y si una web insiste, sale el Windows Hello de verdad, que funciona.
+function suppressWebAuthn() { /* ver arriba: el bloqueo vive en webview-preload */ }
 
 // X/Twitter: el muro de verificación de edad ("contenido no apto para menores") lo
 // desactiva ahora el PRELOAD de la webview (webview-preload.js), que fija el
