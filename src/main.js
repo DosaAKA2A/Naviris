@@ -62,10 +62,67 @@ function downloadTo(url, dest, onProgress) {
   });
 }
 
+/* yt-dlp envejece mal: YouTube, Instagram y X cambian cada pocas semanas y una
+   copia de dos meses (la de Dosa era del 2026-07-04 en septiembre) deja de
+   sacar formatos o de entrar. `yt-dlp -U` se actualiza a sí mismo; se lanza en
+   silencio como mucho una vez cada tres días, al abrir el Rat Tool. */
+const YTDLP_REVISION_MS = 3 * 24 * 60 * 60 * 1000;
+let ytDlpUpdate = null;
+// Devuelve una promesa y la descarga la ESPERA: `-U` reescribe el propio
+// yt-dlp.exe, y lanzar una descarga mientras tanto arranca un binario a
+// medias ("Error -3 while decompressing data", visto en la prueba). Con
+// descargas en marcha no se actualiza.
+function actualizaYtDlp() {
+  if (ytDlpUpdate) return ytDlpUpdate;
+  if (!fs.existsSync(ytDlpPath()) || ytJobs.size) return Promise.resolve();
+  if (Date.now() - (settings.ytDlpRevisado || 0) < YTDLP_REVISION_MS) return Promise.resolve();
+  ytDlpUpdate = new Promise((resolve) => {
+    let p;
+    try { p = spawn(ytDlpPath(), ['-U'], { windowsHide: true }); } catch { ytDlpUpdate = null; resolve(); return; }
+    const fin = () => { settings.ytDlpRevisado = Date.now(); saveSettings(settings); ytDlpUpdate = null; resolve(); };
+    p.on('close', fin);
+    p.on('error', () => { ytDlpUpdate = null; resolve(); });
+    setTimeout(() => { try { p.kill(); } catch { /* ya acabó */ } }, 60000);
+  });
+  return ytDlpUpdate;
+}
+
+/* Cookies de la sesión para yt-dlp, en formato Netscape. Instagram no suelta
+   nada sin sesión y X esconde los vídeos "sensibles" o de cuentas privadas:
+   por línea de comandos "no se puede descargar" cuando en el navegador se
+   está viendo. Se pasan SOLO las del dominio del enlace (y su alias: x.com
+   y twitter.com comparten sesión) en un archivo temporal que se borra al
+   terminar. */
+async function cookiesParaYtDlp(url) {
+  let host; try { host = new URL(url).hostname; } catch { return null; }
+  const raiz = host.split('.').slice(-2).join('.');
+  const dominios = new Set([raiz]);
+  if (/(^|\.)(x\.com|twitter\.com)$/.test(host)) { dominios.add('x.com'); dominios.add('twitter.com'); }
+  const lineas = ['# Netscape HTTP Cookie File'];
+  try {
+    const ses = session.fromPartition('persist:cobalt');
+    for (const d of dominios) {
+      const cs = await ses.cookies.get({ domain: d }).catch(() => []);
+      for (const c of cs) {
+        const dom = c.domain.startsWith('.') ? c.domain : (c.hostOnly ? c.domain : '.' + c.domain);
+        const exp = c.expirationDate ? Math.floor(c.expirationDate) : 0;
+        lineas.push([(c.httpOnly ? '#HttpOnly_' : '') + dom, dom.startsWith('.') ? 'TRUE' : 'FALSE', c.path || '/', c.secure ? 'TRUE' : 'FALSE', exp, c.name, c.value].join('\t'));
+      }
+    }
+  } catch { return null; }
+  if (lineas.length < 2) return null;
+  try {
+    const f = path.join(app.getPath('temp'), 'naviris-cookies-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.txt');
+    fs.writeFileSync(f, lineas.join('\n') + '\n', 'utf8');
+    return f;
+  } catch { return null; }
+}
+const borraCookies = (f) => { if (f) { try { fs.rmSync(f, { force: true }); } catch { /* nada */ } } };
+
 let binsPromise = null;
 function ensureBins() {
   const missing = ['yt-dlp.exe', 'ffmpeg.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
-  if (!missing.length) return Promise.resolve(true);
+  if (!missing.length) return actualizaYtDlp().then(() => true);
   if (binsPromise) return binsPromise;
   binsPromise = (async () => {
     const dir = binDir();
@@ -808,7 +865,7 @@ ipcMain.handle('sec:status', () => ({
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
 
-function ytDownload({ url, mode, quality }) {
+async function ytDownload({ url, mode, quality }) {
   const id = 'yt' + (++downloadSeq);
   const outDir = app.getPath('downloads');
   const meta = {
@@ -826,7 +883,11 @@ function ytDownload({ url, mode, quality }) {
   }
 
   const outTmpl = path.join(outDir, '%(title).120s [%(id)s].%(ext)s');
-  const common = ['--no-playlist', '--newline', '--no-part', '--ffmpeg-location', ffmpegPath(), '-o', outTmpl];
+  // Con la sesión del navegador y su mismo user agent: lo que se ve en la
+  // pestaña se puede bajar (Instagram, X). Ver cookiesParaYtDlp.
+  const cookies = await cookiesParaYtDlp(url);
+  const common = ['--no-playlist', '--newline', '--no-part', '--ffmpeg-location', ffmpegPath(), '-o', outTmpl, '--user-agent', UA_LIMPIO];
+  if (cookies) common.push('--cookies', cookies);
   const isTikTok = /tiktok\.com/.test(url);
   let args;
   if (mode === 'audio') {
@@ -872,6 +933,7 @@ function ytDownload({ url, mode, quality }) {
   child.stderr.on('data', handle);
   child.on('error', (e) => { lastError = e.message; });
   child.on('close', (code) => {
+    borraCookies(cookies);
     ytJobs.delete(id);
     meta.state = code === 0 ? 'completed' : 'interrupted';
     meta.percent = code === 0 ? 100 : meta.percent;
@@ -2224,14 +2286,21 @@ ipcMain.handle('import:bookmarks', (_e, key) => {
 });
 
 // Lista las alturas de vídeo disponibles (1080, 720, …) para el selector de calidad
-ipcMain.handle('yt:formats', (_e, url) => new Promise((resolve) => {
-  if (!/^https?:/.test(url) || !fs.existsSync(ytDlpPath())) return resolve([]);
-  const child = spawn(ytDlpPath(), ['--no-playlist', '--no-warnings', '--dump-single-json', url], { windowsHide: true });
+ipcMain.handle('yt:formats', async (_e, url) => {
+  if (!/^https?:/.test(url) || !fs.existsSync(ytDlpPath())) return [];
+  // Mismas cookies y user agent que la descarga: si no, Instagram y X no
+  // enseñan calidades para un vídeo que luego sí bajaría.
+  const cookies = await cookiesParaYtDlp(url);
+  return new Promise((resolve) => {
+  const args = ['--no-playlist', '--no-warnings', '--dump-single-json', '--user-agent', UA_LIMPIO];
+  if (cookies) args.push('--cookies', cookies);
+  args.push(url);
+  const child = spawn(ytDlpPath(), args, { windowsHide: true });
   let out = ''; const timer = setTimeout(() => { try { child.kill(); } catch {} resolve([]); }, 20000);
   child.stdout.on('data', (d) => { out += d.toString(); });
-  child.on('error', () => { clearTimeout(timer); resolve([]); });
+  child.on('error', () => { clearTimeout(timer); borraCookies(cookies); resolve([]); });
   child.on('close', () => {
-    clearTimeout(timer);
+    clearTimeout(timer); borraCookies(cookies);
     try {
       const info = JSON.parse(out);
       const heights = new Set();
@@ -2239,7 +2308,8 @@ ipcMain.handle('yt:formats', (_e, url) => new Promise((resolve) => {
       resolve([...heights].filter((h) => h >= 144).sort((a, b) => b - a));
     } catch { resolve([]); }
   });
-}));
+  });
+});
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
   if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }

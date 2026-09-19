@@ -116,7 +116,13 @@ function cosmeticsFor(url) {
     const r = engine.urlCosmeticResources(url);
     if (!r) return null;
     let css = '';
-    const sel = r.hide_selectors || [];
+    /* Los avisos de cookies NO se esconden. Las listas de Brave tapan el de
+       YouTube (`##ytd-consent-bump-renderer`, `div[class^="ytd-consent"]`),
+       pero el aviso sigue montado y su componente PAUSA el reproductor cada
+       100 ms mientras esté ahí (`pausePlayer` de la app): el video arrancaba y
+       se quedaba parado a los 0,5 s sin que se viera por qué (Dosa,
+       2026-09-19). Con el aviso a la vista se acepta una vez y no vuelve. */
+    const sel = (r.hide_selectors || []).filter((s) => !/consent/i.test(s));
     for (let i = 0; i < sel.length; i += 200) css += sel.slice(i, i + 200).join(',') + '{display:none !important}\n';
     return { css, script: r.injected_script || '' };
   } catch (e) { return null; }
