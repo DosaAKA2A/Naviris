@@ -344,6 +344,31 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
               set: function (n) { _v = prune(n, 0); }
             });
           } catch (e) { /* nada */ }
+          // Vídeos con anuncio cosido en el servidor (SSAP, `daiConfig`): al
+          // podarles los campos de anuncio, el reproductor se queda en
+          // "unstarted" (estado -1) esperando un anuncio que ya no está y el
+          // video aparece cargado pero en pausa a 0:00 (Dosa, con cuenta,
+          // 2026-09-19; playVideo() lo arranca y nadie lo vuelve a pausar).
+          // Se vigila cada carga: si a los 1,5 s sigue sin arrancar y la
+          // pestaña se ve, se le da al play UNA vez por video.
+          try {
+            var ultimo = '';
+            function arranca() {
+              try {
+                var p = document.getElementById('movie_player');
+                if (!p || !p.getPlayerState || document.visibilityState !== 'visible') return;
+                var vid = (new URLSearchParams(location.search)).get('v') || location.pathname;
+                if (vid === ultimo || location.pathname.indexOf('/watch') !== 0) return;
+                if (p.getPlayerState() !== -1) { ultimo = vid; return; }
+                var r = p.getPlayerResponse && p.getPlayerResponse();
+                if (r && r.playabilityStatus && r.playabilityStatus.status !== 'OK') { ultimo = vid; return; }
+                ultimo = vid; p.playVideo();
+              } catch (e) { /* nada */ }
+            }
+            var vigila = function () { setTimeout(arranca, 1500); setTimeout(arranca, 4000); };
+            window.addEventListener('yt-navigate-finish', vigila);
+            if (document.readyState === 'complete') vigila(); else window.addEventListener('load', vigila);
+          } catch (e) { /* nada */ }
         }
       });
     }
