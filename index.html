@@ -18,14 +18,14 @@
   <meta property="og:description" content="Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin instalar una sola extensión. Gratis, para Windows y Android." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://naviris.site/" />
-  <meta property="og:image" content="https://naviris.site/assets/og.png?v=2" />
+  <meta property="og:image" content="https://naviris.site/assets/og.png?v=3" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="Naviris — el navegador que trae las herramientas dentro" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Naviris — El navegador que trabaja por ti" />
   <meta name="twitter:description" content="Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin extensiones." />
-  <meta name="twitter:image" content="https://naviris.site/assets/og.png?v=2" />
+  <meta name="twitter:image" content="https://naviris.site/assets/og.png?v=3" />
   <link rel="icon" href="./assets/iris-favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,7 +34,7 @@
     :root{
       --bg:#08080a; --bg-2:#0e0e12; --panel:#131317; --panel-2:#1a1a20; --line:#232327; --line-2:#2c2c33;
       --text:#ececef; --muted:#8b8d94; --dim:#5c5e64; --accent:#e8e9ec;
-      --violet:#b98cff; --green:#9ee2b8;
+      --violet:#d6d7dc; --green:#e6e7eb;
       --font:'Inter',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace;
       --maxw:1180px;
     }
@@ -50,21 +50,21 @@
     .tira img{display:block;width:100%;height:auto}
     .tira figcaption{padding:14px 18px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
     @media(max-width:760px){.tiras{grid-template-columns:1fr}}
-    ::selection{background:rgba(185,140,255,.28)}
+    ::selection{background:rgba(255,255,255,.22)}
     :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:6px}
 
     /* Grano ambiental sutil */
     body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.04;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:150px 150px}
     .glow{position:fixed;top:-16%;left:50%;transform:translateX(-50%);width:1100px;height:620px;z-index:0;pointer-events:none;
-      background:radial-gradient(50% 50% at 50% 50%,rgba(140,110,215,.16),transparent 70%);filter:blur(24px)}
+      background:radial-gradient(50% 50% at 50% 50%,rgba(180,186,200,.11),transparent 70%);filter:blur(24px)}
 
     /* Gradiente del logo: estático; el color solo gira en hover, como en la app */
     .logo{transition:filter .6s ease}
     a:hover>.logo{filter:hue-rotate(140deg)}
 
     /* Barra de progreso de lectura (la mueve GSAP con el scroll) */
-    #bar{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:linear-gradient(90deg,var(--violet),#a4d9c2);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
+    #bar{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:linear-gradient(90deg,#ffffff,#7a7b82);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
 
     /* ===== Nav ===== */
     header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(8,8,10,.72);border-bottom:1px solid rgba(35,35,39,.6)}
@@ -84,7 +84,7 @@
     .hero{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:46px;
       min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:48px 28px 0}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
-    .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(185,140,255,.7)}
+    .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px rgba(255,255,255,.55)}
     h1{font-size:clamp(42px,7vw,92px);font-weight:900;letter-spacing:-0.035em;line-height:.98;text-wrap:balance;color:#fff}
     .hero p.lead{margin:18px auto 26px;max-width:44ch;color:var(--muted);font-size:17px;line-height:1.55}
     .cta-row{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
@@ -112,7 +112,7 @@
     .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
     .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
     .m-tab svg{width:12px;height:12px}
-    .m-tab.farm{color:var(--green);border:1px solid rgba(158,226,184,.35);background:rgba(158,226,184,.07)}
+    .m-tab.farm{color:var(--green);border:1px solid rgba(230,231,235,.35);background:rgba(230,231,235,.07)}
     .m-nav{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;background:#0e0e12;color:var(--dim)}
     .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim);white-space:nowrap;overflow:hidden}
     .m-body{position:absolute;inset:72px 0 0 34px;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
@@ -153,7 +153,7 @@
     .v-t{display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9px;background:#17171b;border:1px solid #232327;font-size:12px;color:var(--muted)}
     .v-t .d{width:8px;height:8px;border-radius:50%;background:#45464c}
     .v-t svg{width:14px;height:14px}
-    .v-t.farm{color:var(--green);border-color:rgba(158,226,184,.4);background:rgba(158,226,184,.08);font-weight:600}
+    .v-t.farm{color:#fff;border-color:rgba(255,255,255,.38);background:rgba(255,255,255,.09);font-weight:600}
     .v-toast{margin-top:18px;display:inline-flex;align-items:center;gap:9px;padding:10px 15px;border-radius:11px;background:#0d0d10;border:1px solid var(--line-2);font-size:13px;color:var(--text)}
     .v-toast .pill{font-family:var(--mono);font-size:11px;color:var(--violet)}
     .v-loot{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
@@ -178,7 +178,7 @@
     .v-room{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .v-room .t{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
     .v-room .t svg{width:16px;height:16px;color:var(--violet)}
-    .v-code{font-family:var(--mono);letter-spacing:.18em;font-size:14px;color:var(--violet);border:1px dashed rgba(145,112,214,.45);border-radius:9px;padding:6px 12px}
+    .v-code{font-family:var(--mono);letter-spacing:.18em;font-size:14px;color:#fff;border:1px dashed rgba(255,255,255,.35);border-radius:9px;padding:6px 12px}
     .v-chat{display:flex;flex-direction:column;gap:8px;margin-top:16px}
     .v-sys{font-family:var(--mono);font-size:11px;color:var(--dim)}
     .v-msg{align-self:flex-start;background:#17171b;border:1px solid #232327;border-radius:10px;padding:7px 11px;font-size:12.5px;color:var(--text);max-width:85%}
@@ -192,15 +192,15 @@
     .v-sp{display:flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:10px;background:#17171b;border:1px solid #232327;font-size:13px;color:var(--muted)}
     .v-sp .d{width:8px;height:8px;border-radius:50%;background:#45464c}
     .v-sp svg{width:13px;height:13px}
-    .v-sp.on{color:var(--violet);border-color:rgba(185,140,255,.45);background:rgba(185,140,255,.08);font-weight:600}
+    .v-sp.on{color:#fff;border-color:rgba(255,255,255,.38);background:rgba(255,255,255,.09);font-weight:600}
 
     /* Rejilla de características: microcopys, una línea por tarjeta */
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;transition:border-color .25s,transform .25s,background .25s,box-shadow .25s}
     .card:hover{border-color:#3a3b42;transform:translateY(-4px);background:#141418;box-shadow:0 16px 38px rgba(0,0,0,.4)}
     .card .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);transition:transform .3s cubic-bezier(.2,.7,.2,1),color .3s,border-color .3s,background .3s}
-    .card:hover .ic{transform:translateY(-3px) scale(1.08) rotate(-3deg);color:var(--violet);border-color:rgba(145,112,214,.4);background:rgba(120,90,190,.12)}
-    .card.hl .ic{background:rgba(120,90,190,.14);border-color:rgba(145,112,214,.35);color:var(--violet)}
+    .card:hover .ic{transform:translateY(-3px) scale(1.08) rotate(-3deg);color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1)}
+    .card.hl .ic{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.26);color:#fff}
     .card .ic svg{width:20px;height:20px}
     .card h3{font-size:15.5px;margin-bottom:5px;font-weight:600}
     .card p{font-size:13.5px;color:var(--muted);line-height:1.55}
@@ -214,7 +214,7 @@
     /* ===== Descarga (bottom hero) ===== */
     #descargar{padding-bottom:84px}
     .dl-panel{position:relative;background:linear-gradient(160deg,#111114,#0a0a0c);border:1px solid var(--line);border-radius:22px;padding:56px;text-align:center;overflow:hidden}
-    .dl-panel::before{content:"";position:absolute;top:-40%;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(50% 50% at 50% 50%,rgba(140,110,215,.12),transparent 70%);pointer-events:none}
+    .dl-panel::before{content:"";position:absolute;top:-40%;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(50% 50% at 50% 50%,rgba(180,186,200,.09),transparent 70%);pointer-events:none}
     .dl-panel>*{position:relative}
     .dl-panel .logo-big{width:76px;height:76px;margin:0 auto 22px}
     .dl-panel h2{margin-bottom:10px}
@@ -329,7 +329,7 @@
            una maqueta a mano solo puede envejecer mal — ahora va la captura de
            verdad, y se actualiza volviendo a capturar. -->
       <div class="mock">
-        <img src="./assets/captura-hub.jpg" width="1600" height="900" alt="Naviris abierto en su hub: buscador, accesos, clima, tendencias, calendario y más widgets" />
+        <img src="./assets/captura-hub.jpg?v=3" width="2560" height="1440" alt="Naviris abierto en su hub: fondo propio, buscador, reloj, clima, notas, autenticador, monitor y tarjetas, con los accesos en el dock" />
       </div>
       </div>
     </div>
@@ -448,13 +448,13 @@
         </div>
         <div class="tiras">
           <figure class="tira">
-            <img src="./assets/captura-hub.jpg" width="1600" height="900" loading="lazy"
-                 alt="El hub de Naviris: reloj, clima, tendencias, calendario y accesos rápidos en tarjetas" />
-            <figcaption>El hub. Los widgets los colocas tú y la maqueta se adapta a la ventana sin descuadrarse.</figcaption>
+            <img src="./assets/captura-hub.jpg?v=3" width="2560" height="1440" loading="lazy"
+                 alt="El hub de Naviris: reloj, clima, notas, autenticador, monitor y tarjetas sobre un fondo propio, con los accesos en el dock" />
+            <figcaption>El hub. Baldosas opacas sobre el fondo que quieras, los widgets donde tú los pongas y los accesos en un dock.</figcaption>
           </figure>
           <figure class="tira">
-            <img src="./assets/captura-addons.jpg" width="1600" height="900" loading="lazy"
-                 alt="Catálogo de addons de Naviris con Minireproductor, Sound Booster y Watch Party" />
+            <img src="./assets/captura-addons.jpg?v=3" width="1690" height="951" loading="lazy"
+                 alt="Catálogo de addons de Naviris: Minireproductor, Sound Booster, Watch Party, Inspector de diseño, Sensibilidad X, Blockify y Strainer" />
             <figcaption>El catálogo de addons. Crece sin que tengas que actualizar el navegador.</figcaption>
           </figure>
         </div>

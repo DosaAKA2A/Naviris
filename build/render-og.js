@@ -21,8 +21,8 @@ const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     font-family:Inter,'Segoe UI Variable Display','Segoe UI',system-ui,sans-serif;color:#ececef}
   /* Resplandor iris detrás del navegador: da profundidad sin tapar nada */
   .aura{position:absolute;right:-140px;top:-120px;width:820px;height:820px;border-radius:50%;
-    background:conic-gradient(from 210deg,#b9aae6,#9dc3e6,#a4d9c2,#e6d6a4,#e6a9b4,#b9aae6);
-    filter:blur(170px);opacity:.34}
+    background:radial-gradient(circle,#aeb6c8 0%,#5c6474 45%,transparent 70%);
+    filter:blur(170px);opacity:.30}
   .grano{position:absolute;inset:0;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E")}
   /* El navegador, inclinado y saliéndose por la derecha */
   .marco{position:absolute;right:-96px;top:104px;width:760px;border-radius:16px;overflow:hidden;
@@ -59,7 +59,7 @@ const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       </svg>
       <div class="nombre">Naviris</div>
     </div>
-    <div class="lema">Descargas, adblock, drops de Twitch y watch parties. Sin instalar una sola extensión.</div>
+    <div class="lema">Descargas, drops de Twitch, watch parties y espacios protegidos. Sin instalar una sola extensión.</div>
     <div class="chips"><span class="chip">WINDOWS</span><span class="chip">ANDROID</span><span class="chip">GRATIS</span></div>
   </div>
   <div class="sitio">naviris.site</div>
