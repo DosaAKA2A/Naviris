@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Naviris — El navegador que trabaja por ti</title>
-  <meta name="description" content="Naviris: navegador con las herramientas dentro. Descarga vídeo y audio, reclama drops de Twitch, mira series en compañía, busca imágenes con Google Lens y bloquea anuncios sin instalar extensiones. Gratis, para Windows y Android." />
+  <meta name="description" content="Naviris: navegador con las herramientas dentro. Descarga video y audio, reclama drops de Twitch, mira series en compañía, separa tu vida en espacios protegidos, genera tus códigos de verificación y bloquea anuncios sin instalar extensiones. Gratis, para Windows y Android." />
   <!-- PREVISUALIZACIÓN DEL ENLACE (2026-08-13). Sin og:image, al pegar
        naviris.site en Discord, WhatsApp, X o Slack salía un enlace pelado: la
        imagen es obligatoria para que se pinte la tarjeta. Debe ser ABSOLUTA;
@@ -15,7 +15,7 @@
   <meta property="og:site_name" content="Naviris" />
   <meta property="og:locale" content="es_ES" />
   <meta property="og:title" content="Naviris — El navegador que trabaja por ti" />
-  <meta property="og:description" content="Descargas, drops de Twitch, watch parties, Google Lens y adblock — sin instalar una sola extensión. Gratis, para Windows y Android." />
+  <meta property="og:description" content="Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin instalar una sola extensión. Gratis, para Windows y Android." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://naviris.site/" />
   <meta property="og:image" content="https://naviris.site/assets/og.png?v=2" />
@@ -24,7 +24,7 @@
   <meta property="og:image:alt" content="Naviris — el navegador que trae las herramientas dentro" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Naviris — El navegador que trabaja por ti" />
-  <meta name="twitter:description" content="Descargas, drops de Twitch, watch parties, Google Lens y adblock — sin extensiones." />
+  <meta name="twitter:description" content="Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin extensiones." />
   <meta name="twitter:image" content="https://naviris.site/assets/og.png?v=2" />
   <link rel="icon" href="./assets/iris-favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -187,6 +187,13 @@
     .v-svc{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 11px;transition:color .2s,border-color .2s,transform .2s}
     .v-svc:hover{color:var(--text);border-color:#3a3b42;transform:translateY(-2px)}
 
+    /* Visual Espacios */
+    .v-spaces{display:flex;gap:8px;flex-wrap:wrap}
+    .v-sp{display:flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:10px;background:#17171b;border:1px solid #232327;font-size:13px;color:var(--muted)}
+    .v-sp .d{width:8px;height:8px;border-radius:50%;background:#45464c}
+    .v-sp svg{width:13px;height:13px}
+    .v-sp.on{color:var(--violet);border-color:rgba(185,140,255,.45);background:rgba(185,140,255,.08);font-weight:600}
+
     /* Rejilla de características: microcopys, una línea por tarjeta */
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;transition:border-color .25s,transform .25s,background .25s,box-shadow .25s}
@@ -292,6 +299,7 @@
       <a class="link" href="#features">Características</a>
       <a class="link" href="#autoclaim">Twitch</a>
       <a class="link" href="#party">Watch Party</a>
+      <a class="link" href="#espacios">Espacios</a>
       <a class="link" href="#android">Android</a>
       <span class="spacer"></span>
       <a class="btn btn-sm" href="#descargar">Descargar</a>
@@ -303,7 +311,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">IRIS Studio · Navegador</span></div>
         <h1>El navegador que trabaja por ti.</h1>
-        <p class="lead">Descargas, drops de Twitch, watch parties, Google Lens y adblock — sin instalar una sola extensión. Y un hub de widgets que montas tú.</p>
+        <p class="lead">Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin instalar una sola extensión. Y un hub de widgets que montas tú.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -358,7 +366,7 @@
           <div class="spot-txt">
             <div class="tag">Descargas</div>
             <h3>Cualquier video, en tu carpeta. Sin sitios raros.</h3>
-            <p>Rat Tool detecta el video de la página y lo baja en MP4 o MP3, con la resolución que elijas. YouTube, TikTok sin marca de agua, X e Instagram.</p>
+            <p>Rat Tool detecta el video de la página y lo baja en MP4 o MP3, con la resolución que elijas. YouTube, TikTok sin marca de agua, X, Instagram y Twitch.</p>
           </div>
           <div class="visual">
             <div class="v-pop">
@@ -383,7 +391,7 @@
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Addon oficial</div>
             <h3>Serie nueva, sala nueva. Vean juntos.</h3>
-            <p>Comparte un código y la reproducción se sincroniza sola en Crunchyroll, Netflix, Disney+ o YouTube. Cada quien con su cuenta.</p>
+            <p>Comparte un código y la reproducción se sincroniza sola en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN, incluidos los cambios de capítulo. El chat acompaña al video y cada quien entra con su cuenta.</p>
           </div>
           <div class="visual">
             <div class="v-room">
@@ -397,8 +405,34 @@
               <div class="v-msg"><b>Vera:</b> qué buen arranque de temporada</div>
             </div>
             <div class="v-svcs">
-              <span class="v-svc">Crunchyroll</span><span class="v-svc">Netflix</span><span class="v-svc">Disney+</span><span class="v-svc">YouTube</span>
+              <span class="v-svc">Crunchyroll</span><span class="v-svc">Netflix</span><span class="v-svc">Disney+</span><span class="v-svc">YouTube</span><span class="v-svc">MOOVIN</span>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Spotlight: Espacios ===== -->
+    <section id="espacios" style="padding-top:16px">
+      <div class="wrap">
+        <div class="spot rev">
+          <div class="spot-txt">
+            <div class="tag"><span class="dot"></span>Espacios</div>
+            <h3>Separa el trabajo de lo tuyo. Y cierra con llave lo que quieras.</h3>
+            <p>Cada espacio es un grupo de pestañas con su propio historial y sus marcadores. Si lo proteges con un código, además tiene sesión aparte: lo de dentro no se mezcla con lo de fuera, ni al cerrar Naviris ni al reiniciar el equipo.</p>
+          </div>
+          <div class="visual">
+            <div class="v-spaces">
+              <div class="v-sp"><span class="d"></span>Personal</div>
+              <div class="v-sp on"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg>Trabajo</div>
+              <div class="v-sp"><span class="d"></span>Estudio</div>
+            </div>
+            <div class="v-tabs" style="margin-top:14px">
+              <div class="v-t">Correo del trabajo</div>
+              <div class="v-t">Notion</div>
+              <div class="v-t">Figma</div>
+            </div>
+            <div class="v-toast"><span class="pill">PROTEGIDO</span> Sesión, historial y marcadores propios</div>
           </div>
         </div>
       </div>
@@ -447,12 +481,32 @@
           <div class="card hl">
             <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
             <h3>Watch Party</h3>
-            <p>Salas sincronizadas en Crunchyroll, Netflix, Disney+ y YouTube.</p>
+            <p>Salas sincronizadas en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN.</p>
           </div>
           <div class="card hl">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><circle cx="11" cy="11" r="2.6"/></svg></div>
             <h3>Google Lens</h3>
             <p>Clic derecho en cualquier imagen y búscala. Como en Chrome, sin Chrome.</p>
+          </div>
+          <div class="card hl">
+            <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
+            <h3>Espacios protegidos</h3>
+            <p>Grupos de pestañas con historial y marcadores propios. Los que cierres con un código tienen también su sesión aparte.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.6A4.2 4.2 0 0 1 21 18.6"/></svg></div>
+            <h3>Contenedores</h3>
+            <p>Dos cuentas del mismo sitio abiertas a la vez, cada una en su pestaña y sin cerrar sesión en la otra.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></div>
+            <h3>Autenticador</h3>
+            <p>Tus códigos de verificación en dos pasos, generados en el navegador y rellenados donde hacen falta.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.2 18.4a6.5 6.5 0 0 1 11.6 0"/></svg></div>
+            <h3>Cuenta Naviris</h3>
+            <p>Marcadores, widgets y ajustes sincronizados entre tus equipos. Nunca contraseñas, historial ni sesiones.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
@@ -476,13 +530,13 @@
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><use href="#icoKey"/></svg></div>
-            <h3>Gestor de contraseñas</h3>
-            <p>Cifradas en tu equipo. Verlas exige Windows Hello.</p>
+            <h3>Contraseñas y tarjetas</h3>
+            <p>Cifradas en tu equipo, con tu cuenta de Windows. Verlas exige Windows Hello.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
             <h3>Addons</h3>
-            <p>Watch Party, Sound Booster, Captura larga y más. Solo si los quieres.</p>
+            <p>Watch Party, Sound Booster, Blockify, Strainer y más. Se instalan desde el catálogo, solo si los quieres.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></div>
@@ -492,12 +546,22 @@
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
             <h3>Hub que se adapta</h3>
-            <p>Veinte widgets, fondos y temas. Cambia el tamaño de la ventana y tu maqueta sigue intacta.</p>
+            <p>Una veintena de widgets, fondos y temas. Cambia el tamaño de la ventana y tu maqueta sigue intacta.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/></svg></div>
+            <h3>Pantalla dividida</h3>
+            <p>Dos pestañas lado a lado en la misma ventana. Y si prefieres verlas en columna, la barra de pestañas se pone en vertical.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="11" cy="11" r="3.2"/><path d="m13.4 13.4 3.1 3.1"/></svg></div>
+            <h3>Buscar en la página</h3>
+            <p>Ctrl+F busca dentro de la web que estás viendo, y también en las pestañas que tienes abiertas de fondo.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
             <h3>Ligero</h3>
-            <p>Duerme las pestañas que no usas, y las que abres de fondo ni siquiera cargan: nada se pone a sonar solo.</p>
+            <p>Duerme las pestañas que no usas y te muestra qué gasta cada una. Las que abres de fondo ni siquiera cargan.</p>
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -506,8 +570,8 @@
           </div>
           <div class="card">
             <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99M19.969 14.135a8.25 8.25 0 0 1-13.803 3.7l-3.181-3.182m0 4.99v-4.99" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h3>Se actualiza solo</h3>
-            <p>Estable o NavirisDev, directo desde GitHub.</p>
+            <h3>Actualizaciones a tu ritmo</h3>
+            <p>Se instalan solas al cerrar, sin asistentes. Si prefieres decidir tú, apágalas y Naviris solo te avisa.</p>
           </div>
         </div>
       </div>
@@ -520,7 +584,7 @@
           <div>
             <span class="label">Android</span>
             <h2 style="margin-top:10px">Llévalo en el bolsillo.</h2>
-            <p>Rat Tool, marcadores, bloqueador y descargas propias, también en tu teléfono. No es el mismo programa: es una app nativa con lo esencial.</p>
+            <p>Rat Tool, marcadores, bloqueador de anuncios, descargas y un gestor de contraseñas que se abre con tu huella, también en tu teléfono. No es el mismo programa: es una app nativa con lo esencial.</p>
           </div>
           <a id="dl-apk" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18a1 1 0 0 0 1 1h1v3.5a1.5 1.5 0 0 0 3 0V19h2v3.5a1.5 1.5 0 0 0 3 0V19h1a1 1 0 0 0 1-1V8H6v10ZM3.5 8A1.5 1.5 0 0 0 2 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 3.5 8Zm17 0A1.5 1.5 0 0 0 19 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 20.5 8ZM17.4 4.2l1.06-1.06a.4.4 0 1 0-.57-.57l-1.2 1.2A6.47 6.47 0 0 0 12 3a6.47 6.47 0 0 0-4.69 1.77l-1.2-1.2a.4.4 0 1 0-.57.57L6.6 4.2A6.5 6.5 0 0 0 5.5 8h13a6.5 6.5 0 0 0-1.1-3.8ZM9.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/></svg>
@@ -536,7 +600,7 @@
         <div class="dl-panel">
           <svg class="logo-big" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
           <h2>Te mereces un navegador que trabaje por ti.</h2>
-          <p>Gratis, de código abierto y se actualiza solo. Abre y ya está: tu hub, tus herramientas y ni una extensión que instalar.</p>
+          <p>Gratis, de código abierto y se actualiza solo. Abre y ya está: tu hub, tus espacios, tus herramientas y ni una extensión que instalar.</p>
           <div class="dl-actions">
             <a id="dl-main" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
               <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
