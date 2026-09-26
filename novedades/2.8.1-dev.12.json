@@ -1,0 +1,24 @@
+{
+  "version": "2.8.1-dev.12",
+  "linea": "dev",
+  "titulo": "Vuelve a entrar en Google y a bajar de YouTube",
+  "entradilla": "Google y YouTube dejan iniciar sesión otra vez, el Rat Tool descarga de YouTube de nuevo, Ctrl+rueda hace zoom y F5 recarga siempre.",
+  "bloques": [
+    {
+      "titulo": "Iniciar sesión en Google y YouTube",
+      "texto": "Google cortaba el inicio de sesión con «Es posible que este navegador o esta aplicación no sean seguros». Reconocía a Naviris como navegador incrustado porque le faltaba una pieza que Chrome sí trae en sus páginas. Esa pieza se pone ahora solo en las páginas de acceso de Google (accounts.google.com y accounts.youtube.com), y en ninguna otra web: en agosto se comprobó que llevarla a todas partes hacía que otros sitios, como IMDb, pidieran captchas de imágenes.\n\nAdemás se apaga una API de identidad (FedCM) que Electron expone sin la ventana que la acompaña, con lo que «Iniciar sesión con Google» en webs de terceros fallaba sin más; ahora esos sitios usan la ventana emergente de siempre."
+    },
+    {
+      "titulo": "Rat Tool: YouTube otra vez",
+      "texto": "YouTube protege ahora los enlaces de sus formatos con retos en JavaScript, y yt-dlp necesita un motor de JS externo para resolverlos. Sin él faltaban casi todas las calidades y la descarga fallaba. Naviris baja ese motor (Deno, unos 42 MB) la primera vez que abras el Rat Tool, igual que ya hacía con yt-dlp y ffmpeg; si ya tenías el motor de descargas, solo se baja esa pieza. Con ello vuelven todas las calidades, hasta 4K."
+    },
+    {
+      "titulo": "Ctrl+rueda para hacer zoom",
+      "texto": "Ctrl+rueda del ratón sube o baja el zoom de la web como en Chrome, con sus mismos escalones (de 25 % a 500 %), y Ctrl+«+», Ctrl+«-» y Ctrl+0 usan los mismos. El zoom se recuerda por sitio durante la sesión: otra pestaña del mismo dominio abre al mismo nivel y otro dominio vuelve al 100 %. En pantalla dividida se hace zoom en la mitad que hay bajo el ratón. Las webs que usan Ctrl+rueda para lo suyo (mapas, editores) se lo quedan."
+    },
+    {
+      "titulo": "F5 recarga siempre",
+      "texto": "En páginas que avisan antes de salir (editores, chats, formularios a medias), F5, el botón de recargar, Atrás/Adelante y escribir otra dirección no hacían nada: Electron cancelaba la navegación en silencio. Ahora Naviris pregunta «¿Recargar o salir de esta página?», como Chrome, y si aceptas la navegación sigue.\n\nTambién se corrige que, con los atajos de teclado desactivados en Ajustes, Ctrl+W, Ctrl+T o F5 siguieran actuando cuando el foco estaba dentro de una web."
+    }
+  ]
+}
