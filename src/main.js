@@ -1251,6 +1251,11 @@ function atajosDeWebview(contents) {
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const tecla = input.key;
+    // Mismo criterio que el listener del renderer: con los atajos desactivados
+    // solo quedan los de ventana (F11, F12). Antes este camino no miraba el
+    // ajuste, así que con el foco dentro de una web Ctrl+W o Ctrl+T seguían
+    // actuando aunque el usuario los hubiera apagado.
+    if (settings.atajos === false && tecla !== 'F11' && tecla !== 'F12') return;
     for (const a of ATAJOS_UI) {
       if (tecla !== a.k && tecla.toLowerCase() !== a.k.toLowerCase()) continue;
       if (!a.mod(input)) continue;
@@ -1263,6 +1268,52 @@ function atajosDeWebview(contents) {
       event.preventDefault();
       contents.hostWebContents?.send('ui:shortcut', 'tab-' + tecla);
     }
+  });
+
+  /* Ctrl+rueda = zoom, como en Chrome (2026-09-26, Dosa: "el control + scroll
+     no permite hacer zoom in ni zoom out"). Medido antes del cambio: Ctrl+rueda
+     real sobre una web no hacía NADA, ni zoom ni scroll. Chromium ya resuelve
+     el gesto: si la página no se queda la rueda con Ctrl (Google Maps, Figma
+     y compañía sí lo hacen, y ahí manda la web), la marca como zoom de página,
+     no la desplaza y se la pasa al navegador, que en Electron llega como
+     'zoom-changed' ('in'/'out')... y nadie lo escuchaba.
+     Se usa este evento y no un listener de 'wheel' en webview-preload porque
+     el preload tendría que llamar a preventDefault antes que la página: le
+     robaría Ctrl+rueda a las webs que lo usan para lo suyo y dispararía el
+     zoom por cada evento suelto de un touchpad de precisión; aquí llega un
+     aviso por cada "muesca" ya acumulada. Va con el id del webContents para
+     que el renderer haga zoom en la web que hay BAJO EL RATÓN (la otra mitad
+     de la pantalla dividida, por ejemplo) y no en otra. No depende de
+     settings.atajos: es un gesto de ratón, no un atajo de teclado. */
+  contents.on('zoom-changed', (_e, dir) => {
+    contents.hostWebContents?.send('ui:shortcut', (dir === 'in' ? 'rueda-in:' : 'rueda-out:') + contents.id);
+  });
+
+  /* F5 que no recargaba (2026-09-26, Dosa: "el F5 no reinicia o relodea la
+     página"). Medido con F5 real y el foco dentro de la web: el main SÍ
+     reenvía 'reload' y el renderer SÍ llama a wv.reload(), pero la página no
+     se recargaba si tenía un 'beforeunload' registrado (editores, chats,
+     formularios, reproductores… en cuanto has interactuado con ellos). Chrome
+     pregunta "¿Volver a cargar el sitio?"; Electron, si nadie atiende
+     'will-prevent-unload', CANCELA la navegación en silencio: ni recarga ni
+     aviso. Pasaba igual con el botón de recargar, Atrás/Adelante o al escribir
+     otra dirección en esa pestaña. Se hace lo de Chrome: preguntar, y si el
+     usuario acepta, preventDefault() ignora el beforeunload y la navegación
+     sigue. */
+  contents.on('will-prevent-unload', (event) => {
+    const win = contents.hostWebContents ? BrowserWindow.fromWebContents(contents.hostWebContents) : null;
+    const opciones = {
+      type: 'question',
+      buttons: ['Salir de la página', 'Cancelar'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: 'Naviris',
+      message: '¿Recargar o salir de esta página?',
+      detail: 'Es posible que no se guarden los cambios que hayas hecho.'
+    };
+    const r = win ? dialog.showMessageBoxSync(win, opciones) : dialog.showMessageBoxSync(opciones);
+    if (r === 0) event.preventDefault();
   });
 }
 
