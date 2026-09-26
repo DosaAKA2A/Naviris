@@ -372,7 +372,11 @@ if (settings.agentMode) app.commandLine.appendSwitch('remote-debugging-port', pr
 //  ocultan solos y se adaptan al tema de la página, en la UI y en todas las webs
 //  (los sitios con scrollbar propio por CSS conservan el suyo).
 app.commandLine.appendSwitch('enable-features', 'BackForwardCache,ReduceUserAgent,HttpsUpgrades,MemoryPurgeOnFreeze,FluentScrollbar,FluentOverlayScrollbar');
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+// FedCm: Chromium en Electron expone la API FedCM pero sin la interfaz del diálogo,
+//  así que navigator.credentials.get({identity}) ("Iniciar sesión con Google" en
+//  webs de terceros) fallaba siempre con "Error retrieving a token". Apagada, los
+//  proveedores caen al flujo de ventana emergente/redirección, que sí funciona.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,FedCm');
 // AutoLoot: evita que Chromium suspenda el vídeo/temporizadores de pestañas en segundo
 // plano, para que el tiempo de drops siga contando aunque la pestaña no esté visible.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
