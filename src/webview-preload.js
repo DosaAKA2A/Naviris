@@ -44,6 +44,108 @@ try {
   }
 } catch (e) { /* nada */ }
 
+// --- window.chrome completo, SOLO en las páginas de inicio de sesión de Google ---
+// Usuarios sin poder entrar en su cuenta de Google ni en YouTube: Google corta en
+// accounts.google.com con "No se ha podido iniciar sesión — Es posible que este
+// navegador o esta aplicación no sean seguros" (rrk=46 en la URL). Causa (la misma
+// que encontraron otros navegadores Electron, Zenium PR #142): Electron da a las
+// páginas un `window.chrome = {}` pelado, y un UA de Chrome con un `window.chrome`
+// sin `app` / `csi` / `loadTimes` es la marca con la que Google reconoce un
+// navegador incrustado.
+// MEDIDO el 2026-09-26 (perfil nuevo, mismo correo inexistente en el paso del
+// correo): sin este bloque -> /v3/signin/rejected?...&rrk=46; con él -> sigue el
+// flujo normal ("No se ha podido encontrar esta cuenta", o sea, Google ya evalúa
+// la cuenta en vez de vetar el navegador).
+// Es el mismo objeto que se retiró el 2026-08-30 (puntos 1 y 6 de abajo) porque el
+// WAF de Amazon (IMDb) lo tomaba por sospechoso y sacaba el captcha de imágenes.
+// Por eso vuelve SOLO aquí: únicamente en los hosts del login de Google, donde
+// sin él no se puede entrar, y en ninguna otra web. No ampliar la lista a otros
+// sitios sin medirlo antes (lección de Amazon).
+// Solo se rellena el `window.chrome` que ya trae Electron: si no existe, no se
+// inventa. Orden de miembros como en Chrome: app, csi, loadTimes y luego lo que
+// hubiera.
+const HOSTS_LOGIN_GOOGLE = ['accounts.google.com', 'accounts.youtube.com'];
+if (HOSTS_LOGIN_GOOGLE.indexOf(location.hostname) !== -1) {
+  try {
+    contextBridge.executeInMainWorld({
+      func: function () {
+        try {
+          var c = window.chrome;
+          if (!c || typeof c !== 'object' || c.app) return;
+          // Tiempos de la navegación en el formato de Chrome, calculados al
+          // llamarlas (en document_start aún no existen).
+          var nav = function () {
+            var e = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+            return e || {};
+          };
+          var origen = performance.timeOrigin || Date.now();
+          var seg = function (ms) { return ms ? (origen + ms) / 1000 : 0; };
+          var app = {
+            isInstalled: false,
+            InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+            RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+            getDetails: function getDetails() { return null; },
+            getIsInstalled: function getIsInstalled() { return false; },
+            installState: function installState(cb) {
+              if (typeof cb === 'function') setTimeout(function () { cb('not_installed'); }, 0);
+            },
+            runningState: function runningState() { return 'cannot_run'; }
+          };
+          var csi = function csi() {
+            var n = nav();
+            return {
+              startE: Math.round(origen),
+              onloadT: n.loadEventEnd ? Math.round(origen + n.loadEventEnd) : 0,
+              pageT: performance.now(),
+              tran: 15
+            };
+          };
+          var loadTimes = function loadTimes() {
+            var n = nav();
+            var proto = n.nextHopProtocol || '';
+            var spdy = proto === 'h2' || proto === 'h3' || proto.indexOf('quic') === 0;
+            var pintado = 0;
+            try {
+              var p = performance.getEntriesByName('first-paint')[0];
+              if (p) pintado = seg(p.startTime);
+            } catch (e) { /* nada */ }
+            return {
+              requestTime: seg(n.requestStart || 0.001),
+              startLoadTime: seg(n.startTime || 0.001),
+              commitLoadTime: seg(n.responseStart),
+              finishDocumentLoadTime: seg(n.domContentLoadedEventEnd),
+              finishLoadTime: seg(n.loadEventEnd),
+              firstPaintTime: pintado,
+              firstPaintAfterLoadTime: 0,
+              navigationType: n.type === 'reload' ? 'Reload' : n.type === 'back_forward' ? 'BackForward' : 'Other',
+              wasFetchedViaSpdy: spdy,
+              wasNpnNegotiated: spdy,
+              npnNegotiatedProtocol: spdy ? proto : 'unknown',
+              wasAlternateProtocolAvailable: false,
+              connectionInfo: proto || 'http/1.1'
+            };
+          };
+          // Para dejar app/csi/loadTimes delante, se sacan los miembros que ya
+          // hubiera y se vuelven a poner detrás, con sus descriptores.
+          var previos = [];
+          Object.getOwnPropertyNames(c).forEach(function (k) {
+            var d = Object.getOwnPropertyDescriptor(c, k);
+            if (d && d.configurable) { previos.push([k, d]); delete c[k]; }
+          });
+          var pon = function (k, v) {
+            Object.defineProperty(c, k, { value: v, writable: true, enumerable: true, configurable: true });
+          };
+          pon('app', app);
+          pon('csi', csi);
+          pon('loadTimes', loadTimes);
+          previos.forEach(function (p) { Object.defineProperty(c, p[0], p[1]); });
+        } catch (e) { /* si no se puede, se queda el de Electron */ }
+      },
+      args: []
+    });
+  } catch (e) { /* nada */ }
+}
+
 // --- Piezas de Chromium que Electron no trae y que delatan al navegador ---
 // Comparado señal a señal con el Chrome instalado en la misma máquina, quedaban
 // cuatro diferencias. No son cosmética: un navegador que dice ser Chrome y no se
@@ -52,7 +154,10 @@ try {
 //   1. (RETIRADO el 2026-08-30) Aquí se fabricaba un window.chrome con app, csi
 //      y loadTimes. Medido contra el WAF de Amazon: era JUSTO ESO lo que hacía
 //      que IMDb mandara el captcha de imágenes en vez del reto silencioso. Ver
-//      el comentario largo donde estaba el bloque.
+//      el comentario largo donde estaba el bloque. MATIZ (2026-09-26): vuelve
+//      SOLO en accounts.google.com / accounts.youtube.com (bloque de arriba),
+//      porque sin él Google no deja iniciar sesión; en el resto de webs sigue
+//      sin existir.
 //   2. screen.colorDepth daba 32; Chrome en Windows siempre dice 24.
 //   3. navigator.languages iba al revés ("es,es-ES" en vez de "es-ES,es").
 //   4. Notification.permission decía "denied" cuando en realidad estaba SIN
@@ -67,7 +172,8 @@ try {
 //      fallo del punto 4, que solo se había arreglado para las notificaciones,
 //      y tiene el mismo precio: la web ve "denegado" y ni pide el permiso, así
 //      que el diálogo de Naviris no sale y no hay forma de concederlo.
-//   6. (RETIRADO con el punto 1: iba de afinar el window.chrome inventado.)
+//   6. (RETIRADO con el punto 1: iba de afinar el window.chrome inventado. Lo
+//      que queda de él es el bloque solo-Google de arriba.)
 //   7. storage.estimate() devolvía el hueco libre del disco entero (197 GB
 //      aquí); Chrome y Opera GX topan en 10 GB. Además de ser una diferencia,
 //      es una fuga de información del equipo.
@@ -114,8 +220,15 @@ try {
            antifraude. Un navegador que NO trae `window.chrome` es raro; uno que
            trae uno falso es sospechoso, que es peor.
 
-           No volver a inventarlo. Si algun dia hace falta, tendria que venir de
-           Chromium, no de aqui. */
+           No volver a inventarlo AQUI (para todas las webs). Si algun dia hace
+           falta en general, tendria que venir de Chromium, no de aqui.
+
+           MATIZ del 2026-09-26: si hizo falta en un sitio concreto. Sin
+           `app`/`csi`/`loadTimes`, Google rechaza el inicio de sesion ("este
+           navegador o esta aplicacion no son seguros", rrk=46). Por eso hay un
+           bloque aparte, al principio del archivo, que lo rellena SOLO en
+           accounts.google.com y accounts.youtube.com. Fuera de esos hosts todo
+           sigue como dice este comentario. */
         try {
           // Chrome topa la cuota que informa; Electron soltaba el disco real.
           var TOPE = 10 * 1024 * 1024 * 1024;
