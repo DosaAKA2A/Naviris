@@ -6,7 +6,7 @@ Naviris por **Iris Studio** — navegador ligero sobre motor Chromium (Electron)
 
 - **Hub personalizable** con widgets (reloj, buscador, accesos, fecha, clima, región, notas) en una grilla editable.
 - **Accesos rápidos** con logos monocromáticos y un sidebar con paneles web (WhatsApp, Discord, Claude…).
-- **Rat Tool** — descarga vídeo (MP4) y audio (MP3) de YouTube, Instagram, X, TikTok (sin marca de agua), Twitch y más, con yt-dlp + ffmpeg integrados.
+- **Rat Tool** — descarga vídeo (MP4) y audio (MP3) de YouTube, Instagram, X, TikTok (sin marca de agua), Twitch y más, con yt-dlp + ffmpeg integrados. YouTube exige ahora resolver retos en JavaScript para dar sus formatos, así que el Rat Tool baja también Deno, el motor de JS que yt-dlp usa por defecto (la primera vez que se abre, o solo Deno en instalaciones que ya tenían lo demás).
 - **Bloqueador de anuncios** funcional, incluido un saltador de anuncios de YouTube ligero que no ralentiza la reproducción.
 - **Detector de recursos gráficos** con previsualización y descarga.
 - **Contenido sensible de X** revelable de forma nativa.
@@ -20,7 +20,7 @@ Naviris por **Iris Studio** — navegador ligero sobre motor Chromium (Electron)
 
 ```bash
 npm install
-npm run fetch-bin   # descarga yt-dlp.exe y ffmpeg.exe a resources/bin
+npm run fetch-bin   # descarga yt-dlp.exe, ffmpeg.exe y deno.exe a resources/bin
 npm start
 ```
 
