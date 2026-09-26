@@ -5888,13 +5888,33 @@ function recargar(forzado) {
 function irAtras() { const wv = activeWv(); try { if (wv?.canGoBack()) wv.goBack(); } catch { /* nada */ } }
 function irAdelante() { const wv = activeWv(); try { if (wv?.canGoForward()) wv.goForward(); } catch { /* nada */ } }
 function pararCarga() { const wv = activeWv(); try { wv?.stop(); } catch { /* nada */ } }
-// Zoom por pestaña (como los navegadores: se recuerda mientras viva la pestaña)
-function zoom(delta) {
-  const tab = activeTab(); const wv = activeWv(); if (!wv || !tab) return;
-  const nivel = delta === 0 ? 0 : Math.max(-5, Math.min(5, (tab.zoom || 0) + delta));
-  tab.zoom = nivel;
-  try { wv.setZoomLevel(nivel); } catch { /* nada */ }
-  toast(nivel === 0 ? 'Zoom al 100 %' : 'Zoom ' + Math.round(Math.pow(1.2, nivel) * 100) + ' %');
+/* Zoom (Ctrl+'+', Ctrl+'-', Ctrl+0 y Ctrl+rueda), con los escalones de Chrome.
+   Antes se sumaba ±1 a un tab.zoom propio (niveles de 1,2x: 83 %, 69 %…), pero
+   Chromium guarda el zoom POR SITIO en la sesión (medido: tras subir el zoom en
+   example.com, otra pestaña nueva de example.com ya abría al mismo nivel, y
+   al navegar a otro dominio volvía a 0). El tab.zoom se quedaba viejo al
+   cambiar de web y el siguiente Ctrl+'+' saltaba desde un nivel que no era el
+   de la página. Ahora se parte siempre del zoom real del webview y es
+   Chromium quien lo recuerda por sitio, como hace Chrome.
+   `wv` permite apuntar a una web concreta (Ctrl+rueda: la que está bajo el
+   ratón); si no, la pestaña activa. */
+const ZOOM_PASOS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+function zoom(delta, wv = activeWv()) {
+  if (!wv) return;
+  let actual = 1;
+  try { actual = wv.getZoomFactor(); } catch { return; }   // webview aún sin adjuntar
+  let f = 1;
+  if (delta > 0) f = ZOOM_PASOS.find((p) => p > actual + 0.001) ?? ZOOM_PASOS[ZOOM_PASOS.length - 1];
+  else if (delta < 0) f = [...ZOOM_PASOS].reverse().find((p) => p < actual - 0.001) ?? ZOOM_PASOS[0];
+  try { wv.setZoomFactor(f); } catch { /* nada */ }
+  toast(f === 1 ? 'Zoom al 100 %' : 'Zoom ' + Math.round(f * 100) + ' %');
+}
+// Ctrl+rueda llega del main con el id del webContents donde se giró la rueda.
+// Solo se hace zoom si es una pestaña: en los widgets del hub o el panel de
+// Spotify el zoom lo lleva cada uno (el de Spotify lo calcula aplicaSpAncho).
+function zoomRueda(delta, idWc) {
+  const tab = tabs.find((t) => { try { return t.kind === 'web' && t.webview?.getWebContentsId() === idWc; } catch { return false; } });
+  if (tab) zoom(delta, tab.webview);
 }
 function recordarCerrada(tab) {
   if (!tab || tab.kind !== 'web' || !tab.url) return;
@@ -6190,6 +6210,7 @@ window.cobalt.onShortcut((cmd) => {
   else if (cmd === 'zoom-in') zoom(1);
   else if (cmd === 'zoom-out') zoom(-1);
   else if (cmd === 'zoom-reset') zoom(0);
+  else if (cmd.startsWith('rueda-')) zoomRueda(cmd.startsWith('rueda-in:') ? 1 : -1, Number(cmd.slice(cmd.indexOf(':') + 1)));
   else if (cmd === 'devtools') alternarDevtools();
   else if (cmd === 'next-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + 1) % v.length]; if (n) activateTab(n.id); }
   else if (cmd === 'prev-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + v.length - 1) % v.length]; if (n) activateTab(n.id); }
