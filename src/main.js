@@ -29,10 +29,12 @@ try {
   if (fs.existsSync(oldProfile) && !fs.existsSync(newProfile)) fs.renameSync(oldProfile, newProfile);
 } catch (e) { console.log('[Naviris] No se pudo migrar el perfil:', e.message); }
 
-// ---------- Rutas de binarios (yt-dlp / ffmpeg) ----------
+// ---------- Rutas de binarios (yt-dlp / ffmpeg / deno) ----------
 // Desde v2.2.3 los binarios NO van en el instalador (~100 MB menos): se
 // descargan a userData/bin la primera vez que se usa el Rat Tool. Las
 // instalaciones antiguas que ya los traían en resources/bin los siguen usando.
+// deno.exe vive en la misma carpeta que yt-dlp.exe (ver ensureBins): así una
+// instalación antigua lo recibe junto a su yt-dlp y no queda repartido.
 function binDir() {
   if (!app.isPackaged) return path.join(__dirname, '..', 'resources', 'bin');
   const legacy = path.join(process.resourcesPath, 'bin');
@@ -41,9 +43,16 @@ function binDir() {
 }
 const ytDlpPath = () => path.join(binDir(), 'yt-dlp.exe');
 const ffmpegPath = () => path.join(binDir(), 'ffmpeg.exe');
+const denoPath = () => path.join(binDir(), 'deno.exe');
+// Argumentos para que yt-dlp use nuestro Deno en los retos JS de YouTube. yt-dlp
+// ya mira si hay un deno.exe junto a él, pero se le pasa la ruta completa para no
+// depender de esa búsqueda ni del PATH del usuario. Va por los args de spawn, sin
+// shell, así que la ruta con espacios no necesita comillas.
+const denoArgs = () => (fs.existsSync(denoPath()) ? ['--js-runtimes', 'deno:' + denoPath()] : []);
 
 const BIN_YTDLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
 const BIN_FFMPEG_URL = 'https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip';
+const BIN_DENO_URL = 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip';
 
 function downloadTo(url, dest, onProgress) {
   return new Promise((resolve, reject) => {
@@ -65,7 +74,12 @@ function downloadTo(url, dest, onProgress) {
 /* yt-dlp envejece mal: YouTube, Instagram y X cambian cada pocas semanas y una
    copia de dos meses (la de Dosa era del 2026-07-04 en septiembre) deja de
    sacar formatos o de entrar. `yt-dlp -U` se actualiza a sí mismo; se lanza en
-   silencio como mucho una vez cada tres días, al abrir el Rat Tool. */
+   silencio como mucho una vez cada tres días, al abrir el Rat Tool.
+   Desde la 2026.08 ya no basta con tenerlo al día: YouTube protege los enlaces
+   de los formatos con retos en JavaScript y yt-dlp necesita un motor de JS
+   externo para resolverlos (EJS). Sin él avisa "No supported JavaScript runtime
+   could be found", faltan casi todos los formatos y la descarga falla; por eso
+   ensureBins baja también Deno. */
 const YTDLP_REVISION_MS = 3 * 24 * 60 * 60 * 1000;
 let ytDlpUpdate = null;
 // Devuelve una promesa y la descarga la ESPERA: `-U` reescribe el propio
@@ -119,24 +133,52 @@ async function cookiesParaYtDlp(url) {
 }
 const borraCookies = (f) => { if (f) { try { fs.rmSync(f, { force: true }); } catch { /* nada */ } } };
 
+/* Binarios del Rat Tool: yt-dlp (el descargador), ffmpeg (une vídeo y audio y
+   saca el mp3) y Deno. Deno hace falta desde que YouTube resuelve los enlaces de
+   los formatos con retos en JavaScript: yt-dlp 2026.08 ya no los descifra solo y
+   pide un motor de JS externo (https://github.com/yt-dlp/yt-dlp/wiki/EJS). Se usa
+   Deno porque es el único que yt-dlp activa por defecto, es un solo .exe sin
+   instalador, y los scripts que resuelven los retos ya vienen dentro de
+   yt-dlp.exe (no hace falta --remote-components). Probado: con
+   --js-runtimes deno:<ruta> desaparece el aviso y salen todos los formatos hasta
+   1080p y más. Las instalaciones que ya tenían yt-dlp y ffmpeg bajan solo Deno
+   (~42 MB en zip): la lista `missing` decide qué se descarga. */
 let binsPromise = null;
 function ensureBins() {
-  const missing = ['yt-dlp.exe', 'ffmpeg.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
+  const missing = ['yt-dlp.exe', 'ffmpeg.exe', 'deno.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
   if (!missing.length) return actualizaYtDlp().then(() => true);
   if (binsPromise) return binsPromise;
   binsPromise = (async () => {
     const dir = binDir();
     fs.mkdirSync(dir, { recursive: true });
     // Aparece como una descarga normal en el panel, con su progreso
-    const meta = { id: 'naviris-bins', name: 'Motor de descargas de Naviris (solo la primera vez)', percent: 0, state: 'progressing', kind: 'video' };
+    // Si solo falta Deno (instalaciones de antes de este cambio) el nombre lo
+    // dice, para que no parezca que se vuelve a bajar todo el motor.
+    const soloDeno = missing.length === 1 && missing[0] === 'deno.exe';
+    const meta = {
+      id: 'naviris-bins',
+      name: soloDeno ? 'Motor de descargas de Naviris: componente para YouTube' : 'Motor de descargas de Naviris (solo la primera vez)',
+      percent: 0, state: 'progressing', kind: 'video'
+    };
     broadcast('download:new', meta);
+    // El progreso se reparte entre lo que falta según su tamaño aproximado
+    // (yt-dlp ~18 MB, ffmpeg ~80 MB en zip, Deno ~42 MB en zip), dejando un 5 %
+    // para descomprimir: cada tramo empieza donde acabó el anterior.
+    const PESO = { 'yt-dlp.exe': 18, 'ffmpeg.exe': 80, 'deno.exe': 42 };
+    const pesoTotal = missing.reduce((a, b) => a + PESO[b], 0);
+    let base = 0;
+    const tramo = (bin) => {
+      const ini = base, ancho = 95 * PESO[bin] / pesoTotal;
+      base += ancho;
+      return (p) => { meta.percent = Math.round(ini + p * ancho); broadcast('download:update', meta); };
+    };
     try {
       if (missing.includes('yt-dlp.exe')) {
-        await downloadTo(BIN_YTDLP_URL, path.join(dir, 'yt-dlp.exe'), (p) => { meta.percent = Math.round(p * 25); broadcast('download:update', meta); });
+        await downloadTo(BIN_YTDLP_URL, path.join(dir, 'yt-dlp.exe'), tramo('yt-dlp.exe'));
       }
       if (missing.includes('ffmpeg.exe')) {
         const zip = path.join(dir, 'ffmpeg.zip');
-        await downloadTo(BIN_FFMPEG_URL, zip, (p) => { meta.percent = 25 + Math.round(p * 70); broadcast('download:update', meta); });
+        await downloadTo(BIN_FFMPEG_URL, zip, tramo('ffmpeg.exe'));
         const tmp = path.join(dir, '_ff');
         require('child_process').execSync(`powershell -NoProfile -Command "Expand-Archive -Force '${zip}' '${tmp}'"`, { windowsHide: true });
         const findFf = (d) => {
@@ -150,6 +192,19 @@ function ensureBins() {
         const found = findFf(tmp);
         if (!found) throw new Error('ffmpeg no encontrado en el zip');
         fs.copyFileSync(found, path.join(dir, 'ffmpeg.exe'));
+        fs.rmSync(tmp, { recursive: true, force: true });
+        fs.rmSync(zip, { force: true });
+      }
+      if (missing.includes('deno.exe')) {
+        // El zip de Deno trae un único deno.exe en la raíz; se extrae aparte y se
+        // copia, igual que ffmpeg, para no dejar a medias el deno.exe final.
+        const zip = path.join(dir, 'deno.zip');
+        await downloadTo(BIN_DENO_URL, zip, tramo('deno.exe'));
+        const tmp = path.join(dir, '_deno');
+        require('child_process').execSync(`powershell -NoProfile -Command "Expand-Archive -Force '${zip}' '${tmp}'"`, { windowsHide: true });
+        const found = path.join(tmp, 'deno.exe');
+        if (!fs.existsSync(found)) throw new Error('deno no encontrado en el zip');
+        fs.copyFileSync(found, path.join(dir, 'deno.exe'));
         fs.rmSync(tmp, { recursive: true, force: true });
         fs.rmSync(zip, { force: true });
       }
@@ -876,7 +931,8 @@ async function ytDownload({ url, mode, quality }) {
   // Con la sesión del navegador y su mismo user agent: lo que se ve en la
   // pestaña se puede bajar (Instagram, X). Ver cookiesParaYtDlp.
   const cookies = await cookiesParaYtDlp(url);
-  const common = ['--no-playlist', '--newline', '--no-part', '--ffmpeg-location', ffmpegPath(), '-o', outTmpl, '--user-agent', UA_LIMPIO];
+  // --js-runtimes: sin Deno YouTube solo deja formatos sueltos o ninguno (ver ensureBins).
+  const common = ['--no-playlist', '--newline', '--no-part', '--ffmpeg-location', ffmpegPath(), ...denoArgs(), '-o', outTmpl, '--user-agent', UA_LIMPIO];
   if (cookies) common.push('--cookies', cookies);
   const isTikTok = /tiktok\.com/.test(url);
   let args;
@@ -2282,7 +2338,9 @@ ipcMain.handle('yt:formats', async (_e, url) => {
   // enseñan calidades para un vídeo que luego sí bajaría.
   const cookies = await cookiesParaYtDlp(url);
   return new Promise((resolve) => {
-  const args = ['--no-playlist', '--no-warnings', '--dump-single-json', '--user-agent', UA_LIMPIO];
+  // Con Deno, como la descarga: sin él YouTube no enseña 1080p y el selector
+  // ofrecería calidades que no son las reales.
+  const args = ['--no-playlist', '--no-warnings', '--dump-single-json', ...denoArgs(), '--user-agent', UA_LIMPIO];
   if (cookies) args.push('--cookies', cookies);
   args.push(url);
   const child = spawn(ytDlpPath(), args, { windowsHide: true });
