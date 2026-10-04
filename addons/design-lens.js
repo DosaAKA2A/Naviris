@@ -48,10 +48,11 @@
 
   // Selector de elemento: resalta al pasar el ratón, informa al hacer clic
   // (console.log con prefijo NAVLENS|) y se limpia solo. Escape cancela.
-  var PICKER = '(' + function () {
+  // El resaltado va en el realce del tema, que la página no conoce: se le pasa.
+  var PICKER = function (color) { return '(' + function (C) {
     if (window.__navLens) return; window.__navLens = 1;
     var box = document.createElement('div');
-    box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:1.5px solid #b98cff;background:rgba(185,140,255,.14);border-radius:3px';
+    box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:1.5px solid ' + C + ';background:color-mix(in srgb, ' + C + ' 14%, transparent);border-radius:3px';
     document.documentElement.appendChild(box);
     var move = function (e) { var r = e.target.getBoundingClientRect(); box.style.left = r.left + 'px'; box.style.top = r.top + 'px'; box.style.width = r.width + 'px'; box.style.height = r.height + 'px'; };
     var fin = function () { removeEventListener('mousemove', move, true); removeEventListener('click', clic, true); removeEventListener('keydown', esc, true); box.remove(); delete window.__navLens; };
@@ -71,7 +72,7 @@
     };
     var esc = function (e) { if (e.key === 'Escape') { fin(); console.log('NAVLENS|CANCEL'); } };
     addEventListener('mousemove', move, true); addEventListener('click', clic, true); addEventListener('keydown', esc, true);
-  } + ')()';
+  } + ')(' + JSON.stringify(color) + ')'; };
 
   /* ---------- Estilos (reusa side-panel-left y lp- del core) ---------- */
   var css = document.createElement('style');
@@ -83,22 +84,22 @@
     '.nvl-lbl:first-child{margin-top:6px}',
     '.nvl-hint{font-size:12.5px;color:var(--muted,#8b8d94);line-height:1.6;margin:4px 2px 2px}',
     '.nvl-row{display:flex;gap:8px;margin-top:10px}',
-    '.nvl-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);transition:background .12s}',
-    '.nvl-btn:hover{background:rgba(255,255,255,.15)}',
+    '.nvl-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--btn, rgba(255,255,255,.08));color:var(--text,#ececef);transition:background .12s}',
+    '.nvl-btn:hover{background:var(--btn-hover, rgba(255,255,255,.15))}',
     /* Fichas clicables: cualquier valor se copia con un clic */
     '.nvl-chips{display:flex;flex-wrap:wrap;gap:6px}',
-    '.nvl-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line,#232327);border-radius:8px;padding:4px 9px;font-size:11.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);cursor:pointer;transition:border-color .12s}',
+    '.nvl-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line,#232327);border-radius:8px;padding:4px 9px;font-size:11.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);background:none;cursor:pointer;transition:border-color .12s}',
     '.nvl-chip:hover{border-color:var(--muted,#8b8d94)}',
     '.nvl-chip .n{color:var(--dim,#5c5e64);font-size:10px}',
-    '.nvl-chip .sw{width:11px;height:11px;border-radius:3px;border:1px solid rgba(255,255,255,.25);flex:none}',
+    '.nvl-chip .sw{width:11px;height:11px;border-radius:3px;border:1px solid var(--line-2, rgba(255,255,255,.25));flex:none}',
     /* Ficha del elemento elegido */
     '.nvl-ficha{border:1px solid var(--line,#232327);border-radius:11px;padding:10px 12px;margin-top:8px}',
-    '.nvl-ficha .t{font-family:var(--mono,ui-monospace,monospace);font-size:12px;color:var(--violet,#b98cff);margin-bottom:6px}',
+    '.nvl-ficha .t{font-family:var(--mono,ui-monospace,monospace);font-size:12px;color:var(--realce, #b98cff);margin-bottom:6px}',
     '.nvl-kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2.5px 0;cursor:pointer;border-radius:5px}',
-    '.nvl-kv:hover{background:rgba(255,255,255,.05)}',
+    '.nvl-kv:hover{background:var(--hover, rgba(255,255,255,.05))}',
     '.nvl-kv .k{color:var(--muted,#8b8d94);flex:none}',
     '.nvl-kv .v{font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.nvl-picking{color:var(--violet,#b98cff)!important}'
+    '.nvl-picking{color:var(--realce, #b98cff)!important}'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -116,7 +117,7 @@
   var ICON_RULER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 2.5 21.5 6.5 6.5 21.5 2.5 17.5Z"/><path d="M14.5 5.5 16 7M11.5 8.5 13 10M8.5 11.5 10 13M5.5 14.5 7 16"/></svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6L18 18"/></svg>';
   panel.querySelector('#nvl-ico').innerHTML = ICON_RULER;
-  panel.querySelector('#nvl-ico').style.cssText = 'display:inline-flex;width:15px;height:15px;color:var(--violet,#b98cff)';
+  panel.querySelector('#nvl-ico').style.cssText = 'display:inline-flex;width:15px;height:15px;color:var(--realce, #b98cff)';
   panel.querySelector('#nvl-close').innerHTML = ICON_X;
   panel.querySelector('#nvl-close').addEventListener('click', function () { panel.classList.add('hidden'); });
 
@@ -131,6 +132,8 @@
     var h = '#' + [m[1], m[2], m[3]].map(function (x) { return (+x).toString(16).padStart(2, '0'); }).join('');
     return m[4] !== undefined && +m[4] < 1 ? h + ' ' + Math.round(+m[4] * 100) + '%' : h;
   }
+  // Un color computado tal cual (rgb(), color(srgb …), #hex…): nada que pueda colar una url() en el estilo.
+  function esColor(c) { return typeof c === 'string' && /^((rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([\d.,%\s\/a-z-]*\)|#[0-9a-f]{3,8})$/i.test(c); }
   function copiar(v) { navigator.clipboard.writeText(v).then(function () { naviris.toast('Copiado: ' + v); }, function () { naviris.toast('No se pudo copiar'); }); }
 
   function chips(pares, conMuestra) {
@@ -138,7 +141,7 @@
     pares.forEach(function (p) {
       var val = conMuestra ? hex(p[0]) : p[0];
       var ch = document.createElement('button'); ch.className = 'nvl-chip'; ch.title = 'Copiar ' + val;
-      ch.innerHTML = (conMuestra ? '<span class="sw" style="background:' + esc(p[0]) + '"></span>' : '') + esc(val) + '<span class="n">×' + p[1] + '</span>';
+      ch.innerHTML = (conMuestra && esColor(p[0]) ? '<span class="sw" style="background:' + esc(p[0]) + '"></span>' : '') + esc(val) + '<span class="n">×' + (+p[1] || 0) + '</span>';
       ch.addEventListener('click', function () { copiar(val); });
       div.appendChild(ch);
     });
@@ -149,7 +152,7 @@
   function pintaResumen(d) {
     body.innerHTML = '';
     var intro = document.createElement('div'); intro.className = 'nvl-hint';
-    intro.textContent = d.titulo ? d.titulo + ' — ' + d.vw + '×' + d.vh + ' px, ' + d.nodos + ' elementos' : d.vw + '×' + d.vh + ' px';
+    intro.textContent = d.titulo ? d.titulo + ' — ' + d.vw + '×' + d.vh + ' px, ' + d.nodos + (d.nodos === 1 ? ' elemento' : ' elementos') : d.vw + '×' + d.vh + ' px';
     body.appendChild(intro);
     body.appendChild(botonera());
     if (d.fuentes.length) { seccion('Tipografías'); body.appendChild(chips(d.fuentes)); }
@@ -169,7 +172,7 @@
       var val = copia === 'hex' ? hex(v) : v;
       return '<div class="nvl-kv" data-copy="' + esc(val) + '"><span class="k">' + esc(k) + '</span><span class="v" title="' + esc(val) + '">' + esc(val) + '</span></div>';
     };
-    ficha.innerHTML = '<div class="t">&lt;' + esc(f.tag) + '&gt;' + (f.clase ? ' .' + esc(f.clase.split(' ')[0]) : '') + ' — ' + f.ancho + '×' + f.alto + ' px</div>' +
+    ficha.innerHTML = '<div class="t">&lt;' + esc(f.tag) + '&gt;' + (f.clase ? ' .' + esc(f.clase.split(' ')[0]) : '') + ' — ' + (+f.ancho || 0) + '×' + (+f.alto || 0) + ' px</div>' +
       kv('Fuente', f.fuente) + kv('Tamaño', f.tam) + kv('Peso', f.peso) + kv('Interlineado', f.interlineado) +
       kv('Tracking', f.tracking) + kv('Color', f.color, 'hex') + kv('Fondo', f.fondo === 'rgba(0, 0, 0, 0)' ? '' : f.fondo, 'hex') +
       kv('Margen', f.margen) + kv('Relleno', f.relleno) + kv('Radio', f.radio === '0px' ? '' : f.radio) + kv('Sombra', f.sombra);
@@ -181,6 +184,9 @@
 
   /* ---------- Acciones ---------- */
   var escuchados = new WeakSet(); // webviews con listener de console-message ya puesto
+  // La webview en la que hay una selección en curso. Fuera de eso, un NAVLENS|
+  // es una página cualquiera escribiendo en la consola, y no se escucha.
+  var eligiendo = null;
   function conWebview() {
     var wv = naviris.activeWebview();
     if (!wv) { naviris.toast('Abre una página para inspeccionarla'); return null; }
@@ -188,7 +194,8 @@
       escuchados.add(wv);
       wv.addEventListener('console-message', function (ev) {
         var m = ev.message || '';
-        if (m.slice(0, 8) !== 'NAVLENS|') return;
+        if (m.slice(0, 8) !== 'NAVLENS|' || eligiendo !== wv) return;
+        eligiendo = null;
         var raw = m.slice(8);
         var btn = document.getElementById('nvl-pick'); if (btn) btn.classList.remove('nvl-picking');
         if (raw === 'CANCEL') return;
@@ -205,7 +212,9 @@
     var wv = conWebview(); if (!wv) return;
     var btn = document.getElementById('nvl-pick'); if (btn) btn.classList.add('nvl-picking');
     naviris.toast('Haz clic en un elemento de la página (Escape cancela)');
-    wv.executeJavaScript(PICKER, true).catch(function () { naviris.toast('No se pudo activar el selector'); });
+    eligiendo = wv;
+    var realce = getComputedStyle(document.documentElement).getPropertyValue('--realce').trim() || '#b98cff';
+    wv.executeJavaScript(PICKER(realce), true).catch(function () { eligiendo = null; naviris.toast('No se pudo activar el selector'); });
   }
   function botonera() {
     var row = document.createElement('div'); row.className = 'nvl-row';

@@ -9,7 +9,7 @@
    Chromium rechaza la llamada con NotAllowedError. */
 (function () {
   const ID = 'minireproductor';
-  const ROSA = 'var(--accent)'; // acento del tema: el botón encendido se ve al tono de la interfaz
+  const REALCE = 'var(--realce, var(--accent))'; // realce del tema: el botón encendido va al tono de la interfaz
 
   const PIP_JS = `(() => {
     const v = Array.from(document.querySelectorAll('video'))
@@ -28,16 +28,20 @@
   // aunque el usuario esté mirando otra.
   let wvPip = null;
   let panel = null;
+  let fuera = null;   // listener de "clic fuera" del panel abierto
 
   function pinta(btn, activo) {
     if (!btn) return;
-    btn.style.color = activo ? ROSA : '';
+    btn.style.color = activo ? REALCE : '';
     btn.title = activo
       ? 'Minireproductor: ACTIVO — clic para el volumen y devolver el video a la página.'
       : 'Minireproductor: saca el video de la pestaña a una ventanita que queda por encima de todo.';
   }
 
-  function cerrarPanel() { if (panel) { panel.remove(); panel = null; } }
+  function cerrarPanel() {
+    if (panel) { panel.remove(); panel = null; }
+    if (fuera) { document.removeEventListener('mousedown', fuera, true); fuera = null; }
+  }
 
   async function volumenActual() {
     try {
@@ -66,7 +70,7 @@
         '<span style="font-weight:600;">Minireproductor</span>' +
         '<span id="mrp-pct" style="color:var(--text-dim);">' + vol + '%</span>' +
       '</div>' +
-      '<input id="mrp-vol" type="range" min="0" max="100" step="1" value="' + vol + '" style="width:100%;accent-color:var(--accent);display:block;">' +
+      '<input id="mrp-vol" type="range" min="0" max="100" step="1" value="' + vol + '" style="width:100%;accent-color:' + REALCE + ';display:block;">' +
       '<button id="mrp-back" style="margin-top:11px;width:100%;border:1px solid var(--line-2);background:var(--btn);color:var(--text);' +
         'border-radius:8px;padding:6px 0;cursor:pointer;font-family:inherit;font-size:12.5px;">Devolver a la página</button>';
     document.body.appendChild(panel);
@@ -78,9 +82,13 @@
       cerrarPanel(); wvPip = null; pinta(btn, false);
       naviris.toast('Video devuelto a la página');
     });
-    // Se cierra al clicar fuera (como los popovers de Naviris)
+    // Se cierra al clicar fuera (como los popovers de Naviris). El botón no
+    // cuenta como fuera aunque el clic caiga en su icono: si no, el mousedown
+    // lo cerraba y el click lo volvía a abrir. El listener se quita al cerrar,
+    // se cierre como se cierre.
     setTimeout(() => {
-      const fuera = (e) => { if (panel && !panel.contains(e.target) && e.target !== btn) { cerrarPanel(); document.removeEventListener('mousedown', fuera, true); } };
+      if (!panel || fuera) return;
+      fuera = (e) => { if (panel && !panel.contains(e.target) && !btn.contains(e.target)) cerrarPanel(); };
       document.addEventListener('mousedown', fuera, true);
     }, 0);
   }

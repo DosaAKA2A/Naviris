@@ -1,7 +1,7 @@
 /* Naviris Watch Party — servidor de sincronización en Cloudflare Workers
    ---------------------------------------------------------------------------
    Port del server.js de Node al runtime de Workers. Mismo protocolo de
-   aplicación (join / ev / beat / chat, respuestas joined / peers / error):
+   aplicación (join / ev / beat / chat / perfil, respuestas joined / peers / error):
    el addon no distingue entre ambos servidores. Lo hablan el addon de Naviris
    y la página de MOOVIN; cualquier cambio va en los DOS servidores.
 
@@ -87,12 +87,17 @@ export class PartyRoom {
     }
     const meta = this.meta(ws);
     if (!meta.room) return; // el resto requiere estar en una sala
-    if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat') {
+    // `perfil` lleva la foto de la cuenta, una vez al entrar: el join no se
+    // reenvía y en cada mensaje serían kilobytes por latido. Los clientes que no
+    // lo conocen lo ignoran.
+    if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat' || m.t === 'perfil') {
       // Reenviar tal cual a los demás de la sala (nunca al emisor: evita eco).
       // `host` lo pone el servidor desde el attachment del join, no el cliente:
       // es el único dato de quién manda en el que el receptor puede confiar, y
       // sin él no puede distinguir un cambio de video del anfitrión de uno de
-      // otro invitado (y acababa descartando los dos).
+      // otro invitado (y acababa descartando los dos). Por lo mismo, el `who`
+      // que mande el cliente se borra: quién habla lo dice `from`.
+      delete m.who;
       m.from = meta.name;
       m.host = !!meta.host;
       this.broadcast(meta.room, m, ws);

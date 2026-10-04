@@ -145,20 +145,14 @@
     '#' + BTN_ID + '.nvp-youtube{color:#ff4444}',
     '#' + BTN_ID + '.nvp-iris{color:#dc402a}',
     '#' + BTN_ID + '{position:relative}',
-    '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#9ee2b8}',
-    '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube):not(.nvp-iris){color:#9ee2b8}',
+    '#' + BTN_ID + '.nvp-live::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--realce, #9ee2b8)}',
+    '#' + BTN_ID + '.nvp-live:not(.nvp-netflix):not(.nvp-crunchy):not(.nvp-disney):not(.nvp-youtube):not(.nvp-iris){color:var(--realce, #9ee2b8)}',
     /* Panel: columna acoplada al borde derecho, altura completa (el contenido
        se encoge; nada queda tapado, como la barra de Teleparty) */
-    '#nvp-panel{flex:0 0 302px;width:302px;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg-2,#121217);border-left:1px solid var(--line,#26262d);overflow:hidden;transition:flex-basis .45s cubic-bezier(.3,1.22,.4,1),width .45s cubic-bezier(.3,1.22,.4,1),border-left-width .45s ease}',
-    '#nvp-panel.nvp-plegado{flex-basis:0!important;width:0!important;border-left-width:0!important}',
-    /* El contenido se maqueta UNA VEZ al ancho final y anclado a la derecha:
-       el pliegue solo lo recorta (overflow hidden) — sin remaquetado del texto
-       durante la animación. */
-    '#nvp-panel{align-items:flex-end}',
-    '#nvp-panel>*{width:301px;flex-shrink:0}',
+    '#nvp-panel{flex:0 0 302px;width:302px;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg-2,#121217);border-left:1px solid var(--line,#26262d);overflow:hidden}',
     '#nvp-panel.hidden{display:none!important}',
     '.nvp-head{display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--line,#26262d);flex:none}',
-    '.nvp-head .ico{display:inline-flex;width:16px;height:16px;color:var(--violet,#b98cff)}',
+    '.nvp-head .ico{display:inline-flex;width:16px;height:16px;color:var(--realce, #b98cff)}',
     '.nvp-head .ico svg{width:16px;height:16px}',
     '.nvp-head .t{font-size:13.5px;font-weight:700;color:var(--text,#ececef)}',
     '.nvp-x{margin-left:auto;border:none;background:none;color:var(--muted,#8b8d94);cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px}',
@@ -172,10 +166,10 @@
     '.nvp-hint{font-size:12.5px;color:var(--muted,#8b8d94);line-height:1.6;margin:2px 2px 6px}',
     '.nvp-row{display:flex;gap:8px}',
     '.nvp-in{flex:1;min-width:0;background:var(--bg,#0a0a0c);color:var(--text,#ececef);border:1px solid var(--line-2,#2c2c33);border-radius:10px;padding:11px 13px;font-size:13px;outline:none;transition:border-color .12s}',
-    '.nvp-in:focus{border-color:var(--violet,#b98cff)}',
+    '.nvp-in:focus{border-color:var(--realce, #b98cff)}',
     '.nvp-in::placeholder{color:var(--dim,#5c5e64)}',
     '.nvp-in.code{text-transform:uppercase;font-family:var(--mono,ui-monospace,monospace);letter-spacing:3px;font-weight:700}',
-    '.nvp-cta{width:100%;margin-top:14px;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;background:var(--violet,#b98cff);color:var(--bg,#0a0a0c);transition:filter .12s}',
+    '.nvp-cta{width:100%;margin-top:14px;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;background:var(--realce, #b98cff);color:var(--accent-fg, #0a0a0c);transition:filter .12s}',
     '.nvp-cta:hover{filter:brightness(1.08)}',
     '.nvp-cta:disabled{background:var(--line-2,#2c2c33);color:var(--dim,#5c5e64);cursor:default;filter:none}',
     '.nvp-btn{border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(128,128,140,.14);color:var(--text,#ececef);flex:0 0 auto;transition:background .12s}',
@@ -187,20 +181,20 @@
     '.nvp-code{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:none;border:1px dashed var(--line-2,#2c2c33);border-radius:9px;cursor:pointer;font-family:var(--mono,ui-monospace,monospace);font-size:17px;font-weight:800;letter-spacing:6px;color:var(--text,#ececef);transition:background .12s,border-color .12s}',
     '.nvp-code:hover{background:rgba(128,128,140,.1);border-color:var(--muted,#8b8d94)}',
     '.nvp-code svg{width:13px;height:13px;color:var(--muted,#8b8d94);letter-spacing:0}',
-    '.nvp-leave{margin-left:auto;border:none;background:none;color:#e6a9b4;font-size:11.5px;font-weight:700;cursor:pointer;padding:6px 8px;border-radius:8px}',
-    '.nvp-leave:hover{background:rgba(230,169,180,.1)}',
+    '.nvp-leave{margin-left:auto;border:none;background:none;color:var(--danger, #e6a9b4);font-size:11.5px;font-weight:700;cursor:pointer;padding:6px 8px;border-radius:8px}',
+    '.nvp-leave:hover{background:color-mix(in srgb, var(--danger, #e6a9b4) 10%, transparent)}',
     '.nvp-status{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11.5px;color:var(--muted,#8b8d94)}',
-    '.nvp-status .dot{width:7px;height:7px;border-radius:50%;background:#9ee2b8;flex:none}',
-    '.nvp-status.err{color:#e6a9b4}',
-    '.nvp-status.err .dot{background:#e6a9b4}',
+    '.nvp-status .dot{width:7px;height:7px;border-radius:50%;background:var(--realce, #9ee2b8);flex:none}',
+    '.nvp-status.err{color:var(--danger, #e6a9b4)}',
+    '.nvp-status.err .dot{background:var(--danger, #e6a9b4)}',
     '.nvp-watch{margin-top:7px;font-size:11.5px;color:var(--dim,#5c5e64);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     /* Fuera de sintonía: el invitado no está en el video del anfitrión */
-    '.nvp-ir{display:none;width:100%;margin-top:9px;border:1px solid var(--violet,#b98cff);background:none;color:var(--violet,#b98cff);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:background .12s}',
-    '.nvp-ir:hover{background:rgba(185,140,255,.12)}',
+    '.nvp-ir{display:none;width:100%;margin-top:9px;border:1px solid var(--realce, #b98cff);background:none;color:var(--realce, #b98cff);border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:background .12s}',
+    '.nvp-ir:hover{background:color-mix(in srgb, var(--realce, #b98cff) 12%, transparent)}',
     '.nvp-ir.visible{display:block}',
     '.nvp-lock{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11.8px;color:var(--muted,#8b8d94);cursor:pointer;user-select:none}',
     '.nvp-lock:hover{color:var(--text,#ececef)}',
-    '.nvp-lock input{accent-color:var(--violet,#b98cff);margin:0}',
+    '.nvp-lock input{accent-color:var(--realce, #b98cff);margin:0}',
     /* Chat: ocupa todo el alto; mensajes con avatar (estilo Teleparty) */
     '.nvp-chat{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px}',
     '.nvp-msg{display:flex;gap:9px;align-items:flex-start}',
@@ -208,7 +202,7 @@
     '.nvp-av img{width:100%;height:100%;object-fit:cover;display:block}',
     '.nvp-mb{min-width:0;flex:1;padding-top:1px}',
     '.nvp-who{font-size:12.5px;font-weight:700;color:var(--text,#ececef);line-height:1.4}',
-    '.nvp-act{font-size:12px;font-style:italic;color:var(--muted,#8b8d94);line-height:1.5}',
+    '.nvp-act{font-size:12px;color:var(--muted,#8b8d94);line-height:1.5}',
     '.nvp-tx{font-size:12.8px;color:var(--text,#ececef);line-height:1.55;word-wrap:break-word;padding:1px 0}',
     '.nvp-sys{display:flex;align-items:center;gap:8px;color:var(--dim,#5c5e64);font-size:11px;line-height:1.5}',
     '.nvp-sys::before,.nvp-sys::after{content:"";flex:1;height:1px;background:var(--line,#26262d)}',
@@ -217,7 +211,7 @@
     /* Entrada de mensaje fija abajo */
     '.nvp-compose{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line,#26262d);flex:none}',
     '.nvp-compose .nvp-in{border-radius:999px;padding:10px 15px}',
-    '.nvp-send{flex:none;width:38px;height:38px;border:none;border-radius:50%;cursor:pointer;background:var(--violet,#b98cff);color:var(--bg,#0a0a0c);display:flex;align-items:center;justify-content:center;transition:filter .12s}',
+    '.nvp-send{flex:none;width:38px;height:38px;border:none;border-radius:50%;cursor:pointer;background:var(--realce, #b98cff);color:var(--accent-fg, #0a0a0c);display:flex;align-items:center;justify-content:center;transition:filter .12s}',
     '.nvp-send:hover{filter:brightness(1.08)}',
     '.nvp-send svg{width:15px;height:15px}'
   ].join('\n');
@@ -360,6 +354,8 @@
     return epIdOf(wvUrl()) === want;
   }
   function send(obj) { try { if (party && party.ws && party.ws.readyState === 1) party.ws.send(JSON.stringify(obj)); } catch (e) { /* nada */ } }
+  // La foto de tu cuenta para los demás de la sala (el relay no reenvía el join).
+  function mandaPerfil() { var f = miCuenta().foto; if (f) send({ t: 'perfil', foto: f }); }
   function pushMsg(m) { if (!party) return; party.msgs.push(m); if (party.msgs.length > 200) { party.msgs.shift(); ui.pintados = Math.max(0, (ui.pintados || 0) - 1); } render(); avisaFs(m); }
   // Copia del mensaje para la página: solo la pinta si está a pantalla completa
   // (ver __navPartyAviso en el agente). Los avisos de sala (sys) van sin nombre.
@@ -370,7 +366,7 @@
   }
   // Aviso de sala (línea divisoria, sin persona): estados, permisos…
   function logSys(text) { pushMsg({ text: text, sys: true, t: Date.now() }); }
-  // Acción de una persona (cursiva junto a su avatar): "puso play", "se unió"…
+  // Acción de una persona (en gris junto a su avatar): "puso play", "se unió"…
   function logAct(who, text) { pushMsg({ who: who || '?', text: text, act: true, t: Date.now() }); }
   function logChat(who, text) { pushMsg({ who: who, text: text, t: Date.now() }); }
   // Narración filtrada: sin duplicados seguidos y sin los pausa/play espurios
@@ -597,8 +593,9 @@
       ws.onopen = function () {
         var volvia = reintento > 0;
         reintento = 0;
-        /* La foto va UNA vez, aquí. En cada mensaje serían kilobytes por
-           latido: el resto del protocolo se queda como estaba. */
+        /* La foto va UNA vez al entrar, nunca en cada mensaje (serían
+           kilobytes por latido). El relay no reenvía el join: a los demás les
+           llega por el `perfil` que se manda al recibir `joined`. */
         var yo = miCuenta();
         var join = { t: 'join', room: code, name: name, host: asHost, sid: party.sid };
         if (volvia) join.again = true;
@@ -609,10 +606,14 @@
         if (!party || party.ws !== ws) return;
         var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
         // El avatar viaja en TODO mensaje (join/ev/beat/chat), así que se
-        // aprende de cualquiera de ellos; la foto solo al entrar (pesa).
-        var quien = m.who || m.from;
+        // aprende de cualquiera de ellos; la foto, del `perfil` que manda cada
+        // quien al entrar (pesa). Quién lo manda lo dice `from`, que pone el
+        // relay: un `who` escrito por otro cliente no vale (solo en `peers`,
+        // que lo arma el relay).
+        var quien = m.t === 'peers' ? m.who : m.from;
         if (quien && m.av) apuntaAv(quien, m.av);
         if (quien && m.foto) apuntaFoto(quien, m.foto);
+        if (m.t === 'perfil' && quien && fotos[quien]) repintaCara(quien);
         if (m.t === 'joined') {
           var volvia = party.everOk;
           party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
@@ -622,15 +623,19 @@
             logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
           }
           if (asHost) beatStart();
+          mandaPerfil();
         }
         else if (m.t === 'peers') {
           party.n = m.n;
-          if (m.joined && m.who) logAct(m.who, m.again ? 'volvió a conectarse' : 'se unió a la sala');
+          // Al que acaba de entrar le llega la foto de los que ya estaban.
+          if (m.joined && m.who) { logAct(m.who, m.again ? 'volvió a conectarse' : 'se unió a la sala'); mandaPerfil(); }
           else if (m.left && m.who) logAct(m.who, 'salió de la sala');
         }
         else if (m.t === 'ev') applyRemote(m);
         else if (m.t === 'beat') {
-          if (!party.host) {
+          // El latido solo vale del anfitrión: `host` lo pone el relay, así que
+          // otro invitado no puede mandar uno falso (pausar o mover a todos).
+          if (!party.host && m.host) {
             var hadLock = !!party.lock; party.lock = !!m.lock;
             if (party.lock !== hadLock) logSys(party.lock ? 'El anfitrión activó el control exclusivo' : 'El anfitrión desactivó el control exclusivo');
             var hadNav = !!party.navLock; party.navLock = m.nlock !== false;
@@ -648,12 +653,13 @@
         else if (m.t === 'error') party.status = 'Error: ' + m.msg;
         render(); glow();
       };
-      // Si NUNCA llegó a conectar, casi seguro es el CSP de un Naviris viejo
-      // (2.7.3-dev.3 a dev.11) vetando el WebSocket: se pide actualizar.
+      // Si NUNCA llegó a conectar no se reintenta sola: se avisa y se vuelve a
+      // entrar a mano. (El addon ya exige 2.8.0, así que no es el CSP viejo de
+      // 2.7.3-dev.3 a dev.11: es la red o el relay.)
       ws.onclose = function () {
         if (!party || party.ws !== ws) return;
         party.ok = false; beatStop();
-        if (!party.everOk) { party.status = 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); return; }
+        if (!party.everOk) { party.status = 'No se pudo conectar con la sala. Revisa tu conexión y vuelve a intentarlo.'; render(); return; }
         // Ya había conectado alguna vez: es un corte, se vuelve a entrar sola.
         reintento++;
         var espera = Math.min(30000, 1000 * Math.pow(2, reintento - 1));
@@ -662,7 +668,7 @@
         reTimer = setTimeout(function () { reTimer = null; abreSocket(); }, espera);
         render();
       };
-      ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = party.everOk ? 'Sin conexión con el servidor' : 'Sin conexión · actualiza Naviris (Acerca de → NavirisDev)'; render(); } };
+      ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = party.everOk ? 'Sin conexión con el servidor' : 'No se pudo conectar con la sala. Revisa tu conexión y vuelve a intentarlo.'; render(); } };
       render(); glow();
     }
     party.paraReconexion = function () { if (reTimer) { clearTimeout(reTimer); reTimer = null; } };
@@ -724,7 +730,7 @@
     pintarChat();
   }
   function avatar(who) {
-    var av = document.createElement('span'); av.className = 'nvp-av';
+    var av = document.createElement('span'); av.className = 'nvp-av'; av.dataset.who = who || '';
     /* La foto manda: la tuya sale de tu cuenta de Naviris y la de los demás
        de lo que mandaron al entrar. Después el avatar del elenco de MOOVIN,
        y en último lugar la inicial de siempre. */
@@ -752,6 +758,12 @@
   function pintaInicial(av, who) {
     av.style.background = nameColor(who);
     av.textContent = (who || '?').trim().charAt(0).toUpperCase() || '?';
+  }
+  // La foto llega justo después del "se unió", que ya se pintó con la inicial:
+  // se cambian las caras de esa persona que ya están en el chat.
+  function repintaCara(who) {
+    if (!ui.chat) return;
+    ui.chat.querySelectorAll('.nvp-av').forEach(function (el) { if (el.dataset.who === who) el.replaceWith(avatar(who)); });
   }
   // Chat incremental: solo añade lo nuevo (no se rehace, así no se pierde el
   // scroll ni el foco mientras escribes). Mensajes seguidos de la misma
@@ -888,6 +900,8 @@
       // repintado del chat y con el orden inverso el texto se quedaba escrito.
       var doChat = function () {
         var msg = chatIn.value.trim(); if (!msg || !party) return;
+        // Sin conexión, send() lo tiraría: el texto se queda en el campo.
+        if (!party.ok) { logSys('Sin conexión: el mensaje no se envió'); return; }
         chatIn.value = '';
         send({ t: 'chat', msg: msg });
         logChat(party.name, msg);
@@ -912,7 +926,7 @@
   function glow() {
     var b = document.getElementById(BTN_ID); if (!b) return;
     // El botón mantiene SIEMPRE el color de la plataforma; con sala activa se
-    // añade un punto verde en la esquina en vez de teñirlo todo de verde.
+    // añade un punto con el realce del tema en la esquina en vez de teñirlo todo.
     var site = activeSite() || (party && party.site) || null;
     b.classList.toggle('nvp-live', !!party);
     b.classList.toggle('nvp-netflix', site === 'netflix');
@@ -935,21 +949,12 @@
 
   // Panel acoplado: se abre y se cierra solo desde su botón o la X (nada de
   // cerrarse al hacer clic fuera: el chat convive con el video, como Teleparty).
-  // El panel comprime la página al abrirse, así que el ancho se anima
-  // (flex-basis 0 -> 302) con una curva con rebote en vez de aparecer de golpe.
-  // Al cerrar, primero se pliega y luego se oculta; si el usuario reabre a
-  // mitad de pliegue, el temporizador lo respeta.
+  // Abre y cierra de golpe: animar el ancho remaquetaba la página del video en
+  // cada fotograma.
   function togglePanel(force) {
     var open = force !== undefined ? force : panel.classList.contains('hidden');
-    if (open) {
-      panel.classList.remove('hidden');
-      panel.classList.add('nvp-plegado');
-      requestAnimationFrame(function () { requestAnimationFrame(function () { panel.classList.remove('nvp-plegado'); }); });
-      render(true);
-    } else {
-      panel.classList.add('nvp-plegado');
-      setTimeout(function () { if (panel.classList.contains('nvp-plegado')) { panel.classList.add('hidden'); panel.classList.remove('nvp-plegado'); } }, 470);
-    }
+    panel.classList.toggle('hidden', !open);
+    if (open) render(true);
   }
   panel.querySelector('#nvp-close').addEventListener('click', function () { togglePanel(false); });
 

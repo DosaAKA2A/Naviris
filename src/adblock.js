@@ -26,19 +26,24 @@ function fetchText(url) {
   return new Promise((resolve, reject) => {
     const req = net.request(url);
     let data = '';
+    // Con tope: una lista que se queda colgada dejaba `refreshing` en true y las
+    // listas ya no se volvían a actualizar hasta reiniciar Naviris.
+    const tope = setTimeout(() => { req.abort(); reject(new Error('sin respuesta ' + url)); }, 60000);
     req.on('response', (res) => {
-      if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode + ' ' + url)); return; }
+      if (res.statusCode !== 200) { clearTimeout(tope); reject(new Error('HTTP ' + res.statusCode + ' ' + url)); return; }
       res.on('data', (c) => { data += c; });
-      res.on('end', () => resolve(data));
+      res.on('end', () => { clearTimeout(tope); resolve(data); });
     });
-    req.on('error', reject);
+    req.on('error', (e) => { clearTimeout(tope); reject(e); });
     req.end();
   });
 }
 
 function buildEngine(rulesText, resourcesJson) {
   if (!Engine) return;
-  const set = new FilterSet(true);
+  // false = sin modo depuración: guardaba el texto de cada regla (unos 8 MB más
+  // en el proceso principal, medido) y no cambia qué se bloquea.
+  const set = new FilterSet(false);
   set.addFilters(rulesText);
   const e = new Engine(set);
   if (resourcesJson) { try { e.useResources(JSON.parse(resourcesJson)); } catch (err) { console.log('[Naviris] resources del adblock inválidos:', err.message); } }
