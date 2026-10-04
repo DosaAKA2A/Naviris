@@ -72,11 +72,14 @@ function onMessage(sock, str) {
     return;
   }
   if (!sock._room) return; // el resto requiere estar en una sala
-  if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat') {
+  // `perfil` lleva la foto de la cuenta, una vez al entrar (paridad con el worker).
+  if (m.t === 'ev' || m.t === 'beat' || m.t === 'chat' || m.t === 'perfil') {
     // Reenviar tal cual a los demás de la sala (nunca al emisor: evita eco).
     // `host` va siempre: el guard del candado de video del receptor descarta
     // cualquier nav que no venga marcado como del anfitrión (paridad con el
-    // worker de Cloudflare, que lo añade desde 2026-08-15).
+    // worker de Cloudflare, que lo añade desde 2026-08-15). El `who` del
+    // cliente se borra: quién habla lo dice `from`, que pone el servidor.
+    delete m.who;
     m.from = sock._name;
     m.host = !!sock._host;
     broadcast(sock._room, m, sock);
