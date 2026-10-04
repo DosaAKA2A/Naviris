@@ -3,6 +3,26 @@
 // Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
 const { ipcRenderer, contextBridge } = require('electron');
 
+// Los permisos que la página puede consultar, con el nombre que usa la web y el
+// que usa Electron (ver el repaso de piezas de Chromium más abajo).
+const PERMISOS_WEB = {
+  'notifications': 'notifications',
+  'geolocation': 'geolocation',
+  'camera': 'media',
+  'microphone': 'media',
+  'midi': 'midi',
+  'clipboard-read': 'clipboard-read',
+  'clipboard-write': 'clipboard-sanitized-write',
+  'background-sync': 'background-sync',
+  'idle-detection': 'idle-detection',
+  'screen-wake-lock': 'wake-lock'
+};
+// Todo lo que este preload necesita de main al arrancar llega en UNA llamada
+// síncrona: client hints, idiomas, estado de esos permisos y passkeys
+// (NAV-IB-18; eran trece y cada una frena la carga de la página).
+let ARRANQUE = {};
+try { ARRANQUE = ipcRenderer.sendSync('preload:arranque', Object.values(PERMISOS_WEB)) || {}; } catch (e) { /* nada */ }
+
 // --- Identidad coherente del navegador (client hints) ---
 // main ya reescribe las cabeceras Sec-CH-UA, pero eso no basta: los antifraude
 // leen TAMBIÉN navigator.userAgentData desde JavaScript, y ahí Chromium seguía
@@ -13,7 +33,7 @@ const { ipcRenderer, contextBridge } = require('electron');
 // de una web concreta. Se mantiene el objeto original para todo lo demás
 // (plataforma, móvil, arquitectura) y solo se corrigen las marcas.
 try {
-  const hints = ipcRenderer.sendSync('ua:hints');
+  const hints = ARRANQUE.hints;
   if (hints && hints.lista) {
     contextBridge.executeInMainWorld({
       func: function (h) {
@@ -177,23 +197,12 @@ if (HOSTS_LOGIN_GOOGLE.indexOf(location.hostname) !== -1) {
 //   7. storage.estimate() devolvía el hueco libre del disco entero (197 GB
 //      aquí); Chrome y Opera GX topan en 10 GB. Además de ser una diferencia,
 //      es una fuga de información del equipo.
-const PERMISOS_WEB = {
-  'notifications': 'notifications',
-  'geolocation': 'geolocation',
-  'camera': 'media',
-  'microphone': 'media',
-  'midi': 'midi',
-  'clipboard-read': 'clipboard-read',
-  'clipboard-write': 'clipboard-sanitized-write',
-  'background-sync': 'background-sync',
-  'idle-detection': 'idle-detection',
-  'screen-wake-lock': 'wake-lock'
-};
+// (PERMISOS_WEB está al principio del archivo: su estado llega con ARRANQUE.)
 try {
-  const idiomas = ipcRenderer.sendSync('ua:idiomas') || [];
+  const idiomas = ARRANQUE.idiomas || [];
   const permisos = {};
   for (const nombreWeb of Object.keys(PERMISOS_WEB)) {
-    const estado = ipcRenderer.sendSync('perm:estado', PERMISOS_WEB[nombreWeb]);
+    const estado = (ARRANQUE.permisos || {})[PERMISOS_WEB[nombreWeb]];
     permisos[nombreWeb] = estado === 'allow' ? 'granted' : estado === 'block' ? 'denied' : 'prompt';
   }
   contextBridge.executeInMainWorld({
@@ -332,7 +341,7 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
 // hay autenticador de plataforma ni relleno automático de passkeys, y los
 // sitios ofrecen contraseña o código. En TODOS los sitios, como el ajuste.
 try {
-  if (ipcRenderer.sendSync('passkeys:bloqueadas')) {
+  if (ARRANQUE.passkeys) {
     contextBridge.executeInMainWorld({
       func: function () {
         try {
@@ -520,6 +529,25 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest && e.target.closest('button, input[type="submit"], [role="button"]');
   if (b) setTimeout(() => tryCapture(document), 0);
 }, true);
+
+// --- Copia desde un campo de contraseña, de código o de número de tarjeta ---
+// Se avisa a la interfaz para que el widget Portapapeles no lo apunte en su
+// historial (onWebviewMessage, canal 'cobalt-copia-sensible').
+const AUTOCOMPLETE_SENSIBLE = ['current-password', 'new-password', 'one-time-code', 'cc-number'];
+function avisaCopiaSensible() {
+  try {
+    const el = document.activeElement;
+    if (!el || el.tagName !== 'INPUT') return;
+    const ac = String(el.getAttribute('autocomplete') || '').trim().toLowerCase().split(/\s+/).pop();
+    if (!AUTOCOMPLETE_SENSIBLE.includes(ac)) return;
+    // Tipos como number no exponen la selección: entonces va el valor entero.
+    const ini = el.selectionStart, fin = el.selectionEnd;
+    const texto = ini != null && fin != null ? el.value.slice(ini, fin) : el.value;
+    if (texto) ipcRenderer.sendToHost('cobalt-copia-sensible', texto);
+  } catch (e) { /* nada */ }
+}
+window.addEventListener('copy', avisaCopiaSensible, true);
+window.addEventListener('cut', avisaCopiaSensible, true);
 
 // --- Aviso de formulario de login (para ofrecer autorrelleno) ---
 let announced = false;

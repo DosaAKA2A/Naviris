@@ -305,9 +305,13 @@
            CSS que enseñaba un hub que ya no existe: reloj gigante, buscador y
            seis accesos. La app hace tiempo que es un bento de widgets, así que
            una maqueta a mano solo puede envejecer mal — ahora va la captura de
-           verdad, y se actualiza volviendo a capturar. -->
+           verdad, y se actualiza volviendo a capturar.
+           La de 1280 px sale de la de 2560 (al volver a capturar, se rehacen
+           las dos). sizes es el ancho medido del hueco: 914 px en escritorio
+           con la perspectiva, 600 px hasta 900 de ventana y el ancho menos
+           el margen en móvil. -->
       <div class="mock">
-        <img src="./assets/captura-hub.jpg?v=3" width="2560" height="1440" fetchpriority="high" alt="Naviris abierto en su hub: fondo propio, buscador, reloj, clima, notas, autenticador, monitor y tarjetas, con los accesos en el dock" />
+        <img src="./assets/captura-hub.jpg?v=3" srcset="./assets/captura-hub-1280.jpg?v=3 1280w, ./assets/captura-hub.jpg?v=3 2560w" sizes="(max-width: 656px) calc(100vw - 56px), (max-width: 900px) 600px, 914px" width="2560" height="1440" fetchpriority="high" alt="Naviris abierto en su hub: fondo propio, buscador, reloj, clima, notas, autenticador, monitor y tarjetas, con los accesos en el dock" />
       </div>
       </div>
     </div>

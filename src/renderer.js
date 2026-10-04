@@ -436,6 +436,7 @@ function showCtxMenu(x, y, items) {
   // asomando por abajo y sus ultimas opciones quedaban fuera de alcance.
   m.style.top = Math.max(6, Math.min(y, Math.max(6, window.innerHeight - r.height - 8))) + 'px';
   ctxMenuEl = m;
+  window.nvsRepasa?.(m);   // se abre con el botón derecho, que no dispara el repaso del clic
 }
 // Abre una URL en una pestaña de fondo, sin cambiar la pestaña actual
 function openBackground(url) { createTab(url, false); toast('Abierto en segundo plano'); }
@@ -639,16 +640,20 @@ function crearDormida(dato, abridor) {
 /* Dormir una pestaña es QUITAR su webview y quedarse con la dirección. Antes
    se la mandaba a about:blank y su proceso seguía vivo (medido: un renderer
    de ~14 MB privados por cada dormida). Al despertarla se vuelve a crear, en
-   la partición que le toque en ese momento. */
+   la partición que le toque en ese momento. Su atrás y adelante se guardan al
+   dormirla y el webview nuevo nace con ellos (NAV-VIVO-07). */
 function duermePestana(t) {
   if (t.webview) {
     try { t.sleptUrl = t.webview.getURL() || t.url; } catch { t.sleptUrl = t.url; }
+    try { t.historial = window.cobalt.historialDe(t.webview.getWebContentsId()); } catch { t.historial = null; }
     t.webview.remove(); t.webview = null;
   }
   t.asleep = true; t.audible = false; t.fallo = null;
 }
 function despiertaPestana(t) {
-  attachWebview(t, t.sleptUrl || t.url);
+  const url = t.sleptUrl || t.url;
+  if (t.historial) { window.cobalt.historialAlDespertar(url, t.historial); t.historial = null; }
+  attachWebview(t, url);
   t.asleep = false; t.sleptUrl = null; t.sinCargar = false;
 }
 /* Electron no deja cambiar la partición de un webview que ya navegó (la
@@ -848,7 +853,9 @@ function hubDeInicio() {
 // Pestaña nueva → foco en la BARRA DE DIRECCIONES (no en el buscador del hub):
 // así la búsqueda inteligente sugiere desde la primera tecla.
 function focusUrlbar() {
-  requestAnimationFrame(() => { requestAnimationFrame(() => els.urlbar.focus()); });
+  // Solo si el hub sigue delante: si en esos dos fotogramas se abrió una web (un
+  // enlace que llega al arrancar), la barra le ponía encima sus sugerencias.
+  requestAnimationFrame(() => { requestAnimationFrame(() => { if (els.hub.classList.contains('active')) els.urlbar.focus(); }); });
 }
 // Si el hub está activo y el usuario empieza a teclear, el foco va a la barra
 window.addEventListener('keydown', (e) => {
@@ -1096,7 +1103,7 @@ window.addEventListener('pointerup', () => {
   if (a.sacando && tab) {
     const url = tab.sleptUrl || tab.url;
     if (/^https?:/i.test(url)) {
-      window.cobalt.sacarPestana(url);
+      window.cobalt.sacarPestana(url, tab.contenedor ? tab.contenedor.id : null);
       closeTab(tab.id);
       return;
     }
@@ -2542,7 +2549,9 @@ document.addEventListener('keydown', (e) => {
 });
 function renderDate(el) {
   const now = new Date(); const day = now.getDate();
-  const wd = now.toLocaleDateString('es', { weekday: 'long' }); const mo = now.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  // Mayúscula solo al principio de cada línea: con text-transform salía "Octubre De 2026"
+  const may = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const wd = may(now.toLocaleDateString('es', { weekday: 'long' })); const mo = may(now.toLocaleDateString('es', { month: 'long', year: 'numeric' }));
   el.innerHTML = `<div class="d-day">${day}</div><div class="d-rest">${wd}<br>${mo}</div>`;
 }
 /* Todos los relojes del hub, no solo el primero (con ids, un segundo Reloj
@@ -3039,6 +3048,7 @@ function renderCalendar(body) {
     };
     body.querySelector('.cal-add').addEventListener('click', (e) => { e.stopPropagation(); alta(); });
     body.querySelector('.cal-texto').addEventListener('keydown', (e) => { if (e.key === 'Enter') alta(); });
+    window.nvsRepasa?.(body);   // la lista es nueva (también al añadir con Enter, sin clic)
   };
   pinta();
 }
@@ -3228,12 +3238,14 @@ function renderXTrends(body) {
     body.querySelectorAll('.xt-i').forEach((b, i) => b.addEventListener('click', (e) => {
       e.stopPropagation(); navigateActive('https://x.com/search?q=' + encodeURIComponent(items[i]));
     }));
-    // Sin scrollbar: solo las filas que CABEN completas en la talla actual
+    // Sin scrollbar: solo las filas que CABEN completas en la talla actual.
+    // Medido en pantalla: offsetTop cuenta desde el widget (con su cabecera)
+    // mientras la lista no está posicionada, y se escondían filas que cabían.
     requestAnimationFrame(() => {
       const cont = body.querySelector('.xt-lista'); if (!cont) return;
-      const tope = cont.clientHeight;
+      const tope = cont.getBoundingClientRect().bottom;
       cont.querySelectorAll('.xt-i').forEach((f) => {
-        if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none';
+        if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none';
       });
     });
   };
@@ -3412,8 +3424,8 @@ function renderMail(body) {
     function recorta() {
       const cont = body.querySelector('.ml-lista'); if (!cont) return;
       requestAnimationFrame(() => {
-        const tope = cont.clientHeight;
-        cont.querySelectorAll('.ml-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope + 2) f.style.display = 'none'; });
+        const tope = cont.getBoundingClientRect().bottom;   // en pantalla: ver renderXTrends
+        cont.querySelectorAll('.ml-i').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 2) f.style.display = 'none'; });
       });
     }
     function ata() {
@@ -3466,8 +3478,8 @@ function llenaHoyDescargas(body) {
     }).join('') || '<div class="w-vacio">Hoy no has descargado nada</div>';
     cont.querySelectorAll('.dlw-r').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.openDownloadFile(b.dataset.n); }));
     requestAnimationFrame(() => {
-      const tope = cont.clientHeight;
-      cont.querySelectorAll('.dlw-r').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none'; });
+      const tope = cont.getBoundingClientRect().bottom;   // en pantalla: ver renderXTrends
+      cont.querySelectorAll('.dlw-r').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none'; });
     });
   }).catch(() => { cont.innerHTML = '<div class="w-vacio">No se pudo leer la carpeta</div>'; });
 }
@@ -3573,7 +3585,7 @@ function liberaMemoria() {
   let n = 0;
   for (const t of tabs) {
     if (t.kind !== 'web' || t.id === activeId || t.id === divId || t.asleep || !t.webview || t.autoLoot || t.audible) continue;
-    try { t.sleptUrl = t.webview.getURL() || t.url; t.webview.src = 'about:blank'; t.asleep = true; n++; } catch { }
+    duermePestana(t); n++;
   }
   if (n) { renderTabs(); saveSession(); }
   toast(n ? `Memoria liberada: ${n} pestaña${n > 1 ? 's' : ''} dormida${n > 1 ? 's' : ''}` : 'No había pestañas de fondo que dormir');
@@ -3684,8 +3696,9 @@ function pintaClip() {
       ]);
     }));
     requestAnimationFrame(() => {
-      const tope = cont.clientHeight;
-      cont.querySelectorAll('.clip-i').forEach((f) => { if (f.offsetTop + f.offsetHeight > tope) f.style.display = 'none'; });
+      // En pantalla: con offsetTop (desde el widget) en 2x1 no cabía ni la primera
+      const tope = cont.getBoundingClientRect().bottom;
+      cont.querySelectorAll('.clip-i').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none'; });
     });
   });
 }
@@ -3714,6 +3727,7 @@ function renderNotasW(body) {
     body.querySelectorAll('.nt-x').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation(); e.preventDefault(); const l2 = notasLista(); l2.splice(+b.dataset.i, 1); store.set('cobalt.notas2', l2); pinta();
     }));
+    window.nvsRepasa?.(body);   // la lista es nueva (también al añadir con Enter, sin clic)
   };
   pinta();
 }
@@ -3928,6 +3942,7 @@ function renderAuthW(body) {
     body.querySelector('.au-lock').addEventListener('click', async (e) => {
       e.stopPropagation(); await window.cobalt.totpLock(); pinta();
     });
+    window.nvsRepasa?.(body);   // la lista llega tras una espera (Windows Hello), sin clic que la repase
     // Un segundo: es lo que necesita la cuenta atrás para no ir a saltos.
     authTimer = relojHub(authTimer, cuenta, 1000);
   };
@@ -5321,6 +5336,7 @@ function cerrarPopsHerramientas() {
   cerrarSitePop();
   els.menuPop.classList.add('hidden');
   closeFolderPop();
+  if (!els.espPop.classList.contains('hidden')) alternaEspacios();
 }
 els.sbRat.addEventListener('click', async (e) => {
   e.stopPropagation();
@@ -5559,7 +5575,8 @@ document.addEventListener('click', (e) => {
   if (!sitePop.contains(e.target) && !stp.lock.contains(e.target)) cerrarSitePop();
   if (!els.lootPanel.classList.contains('hidden') && !els.lootPanel.contains(e.target) && !els.sbLoot.contains(e.target)) toggleLootPanel(false);
   if (folderPop && !folderPop.contains(e.target) && !e.target.closest('.bm-folder')) closeFolderPop();
-});
+  if (!els.espPop.classList.contains('hidden') && !els.espPop.contains(e.target) && !els.sbEspacios.contains(e.target)) alternaEspacios();
+}, true);   // en captura: los botones que abren otro popover cortan la propagación y quedaban dos abiertos a la vez
 els.menuPop.addEventListener('click', (e) => {
   const a = e.target.closest('button')?.dataset.action; if (!a) return; els.menuPop.classList.add('hidden');
   if (a === 'newtab') createTab(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
@@ -6639,6 +6656,8 @@ window.addEventListener('keydown', (e) => {
     // Lo que está encima de todo se cierra primero: el menú contextual y el cuadro de texto o contraseña.
     if (ctxMenuEl) { closeCtxMenu(); return; }
     if (!els.promptModal.classList.contains('hidden')) { els.promptCancel.click(); return; }
+    // Y los menús y popovers del riel y de la barra, como en Chrome.
+    if ([els.menuPop, els.shieldPop, sitePop, els.ratPop, els.resPop, els.lootPanel, els.espPop].some((p) => !p.classList.contains('hidden')) || folderPop) { cerrarPopsHerramientas(); return; }
     if (cerrarBuscar()) return;
     if (cierraMenusHub()) return;
     if (cierraNovedadesPagina()) return;
@@ -6764,7 +6783,9 @@ function pestanaDeWebContents(id) {
 window.cobalt.onOpenUrl((p) => {
   if (typeof p === 'string') { createTab(p); return; }
   const madre = pestanaDeWebContents(p.origen);
-  createTab(p.url, !p.background, null, madre ? madre.id : null);
+  // Una pestaña sacada de otra ventana llega con el id de su contenedor.
+  const cont = p.contenedor ? contenedores.find((c) => c.id === p.contenedor) || null : null;
+  createTab(p.url, !p.background, cont, madre ? madre.id : null);
 });
 /* ===== Buscar la imagen con Google Lens (2026-08-12) =====
    Lens ya no acepta que le pasen la URL de la imagen (ver el comentario de
@@ -6998,7 +7019,14 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
      menus y popovers se sumaron al limitarlos al alto de la ventana, que es
      cuando empezaron a scrollear. */
   const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #suggest, #res-list, #perm-list, .sp-list, .spl-lista, .ml-lista, .xt-lista, .au-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card, .bm-folder-pop, .lib-grid, .nov-lista, #perf-list, #find-otras, .cal-lista, .nt-lista, #vtabs-slot';
-  const barrer = () => document.querySelectorAll(SEL).forEach(montar);
+  /* Con `raiz`, solo lo de dentro (y ella misma): lo usan los widgets y menús que
+     rehacen su lista sin un clic que dispare el repaso (Enter, una espera, el
+     botón derecho). Sin ella, todo el documento. */
+  const barrer = (raiz) => {
+    const r = raiz instanceof Element ? raiz : document;
+    if (r !== document && r.matches(SEL)) montar(r);
+    r.querySelectorAll(SEL).forEach(montar);
+  };
   /* El hub y sus widgets se pintan DESPUÉS de este repaso inicial, y luego cada
      vez que se recompone: sin esta puerta, listas como la de Spotify se
      quedaban con la barra del sistema. renderHub la llama al terminar. */

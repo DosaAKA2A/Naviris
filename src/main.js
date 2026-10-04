@@ -551,10 +551,6 @@ const UA_CH = {
   plataforma: process.platform === 'win32' ? '"Windows"'
     : process.platform === 'darwin' ? '"macOS"' : '"Linux"'
 };
-ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
-// El preload de cada web pregunta si las passkeys están bloqueadas: con el
-// ajuste puesto, la página no ve autenticador de plataforma (ver webview-preload).
-ipcMain.on('passkeys:bloqueadas', (e) => { e.returnValue = !!settings.blockPasskeys; });
 
 /* Accept-Language con la MISMA forma que la de Chrome: el idioma completo y
    detrás el idioma a secas con q=0.9 ("es-ES,es;q=0.9").
@@ -586,21 +582,32 @@ function idiomasAceptados() {
 function idiomasLista() {
   return idiomasAceptados().split(',').map((t) => t.split(';')[0]);
 }
-ipcMain.on('ua:idiomas', (e) => { e.returnValue = idiomasLista(); });
 
-/* Estado REAL de un permiso para el sitio que pregunta: 'allow', 'block' o
-   'prompt' si aún no se ha decidido.
-   Hace falta porque setPermissionCheckHandler de Electron solo sabe decir sí o
-   no, y al responder "no" a algo que en realidad está SIN decidir, la página
-   leía Notification.permission === 'denied'. Eso no es solo una huella rara:
-   muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
-   diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
-   notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
-ipcMain.on('perm:estado', (e, permiso) => {
+/* Lo que el preload de cada web necesita de main al arrancar, en UNA sola
+   llamada síncrona (NAV-IB-18). Antes eran trece (client hints, idiomas, diez
+   permisos y passkeys), y cada sendSync frena la carga de la página mientras
+   main responde.
+   - hints: para rehacer navigator.userAgentData (ver UA_CH).
+   - idiomas: la lista pelada (idiomasLista).
+   - passkeys: con el ajuste puesto, la página no ve autenticador de plataforma.
+   - permisos: el estado REAL de cada permiso para el sitio que pregunta:
+     'allow', 'block' o 'prompt' si aún no se ha decidido. Hace falta porque
+     setPermissionCheckHandler de Electron solo sabe decir sí o no, y al
+     responder "no" a algo que en realidad está SIN decidir, la página leía
+     Notification.permission === 'denied'. Eso no es solo una huella rara:
+     muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
+     diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
+     notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
+ipcMain.on('preload:arranque', (e, permisos) => {
   let origen = '';
   try { origen = originOf(e.senderFrame.url); } catch { /* nada */ }
-  const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
-  e.returnValue = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
+  const estados = {};
+  for (const permiso of Array.isArray(permisos) ? permisos : []) {
+    if (typeof permiso !== 'string') continue;
+    const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
+    estados[permiso] = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
+  }
+  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados };
 });
 
 /* Dominios de verificación anti-robot. NO se bloquean nunca: bloquearlos no
@@ -1162,9 +1169,9 @@ ipcMain.on('ui:listo', (e) => {
   // La ventana que acaba de montarse puede traer una pestaña sacada de otra.
   const suya = BrowserWindow.fromWebContents(e.sender);
   if (suya && urlPendiente.has(suya.id)) {
-    const url = urlPendiente.get(suya.id);
+    const { url, contenedor } = urlPendiente.get(suya.id);
     urlPendiente.delete(suya.id);
-    e.sender.send('tab:open-url', { url, background: false });
+    e.sender.send('tab:open-url', { url, background: false, contenedor });
   }
   const win = ventanaEsperandoUI;
   if (!win) return;
@@ -1213,6 +1220,15 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
        aviso de "puede que los cambios no se guarden". A cambio, ninguna página
        puede volver a bloquear el navegador. */
     webPreferences.disableDialogs = true;
+    // Pestaña que despierta con su atrás y adelante guardados (ver 'wv:historial'):
+    // el webview nace sin cargar la URL y restaura su historial al montarse.
+    const pend = historialPendiente.get(win.webContents.id);
+    const i = pend ? pend.findIndex((h) => h.url === urlNormal(params.src) && Date.now() - h.ts < 10000) : -1;
+    if (i >= 0) {
+      historialAlCrear = pend.splice(i, 1)[0];
+      params.src = '';
+      setImmediate(() => { historialAlCrear = null; });   // solo vale para el webview que se crea ahora
+    }
   });
   // sacada=1: la ventana nace de sacar una pestaña y no debe restaurar la sesión
   // (NAV-IA-09); el renderer la reconoce por la URL, igual que private=1.
@@ -1501,7 +1517,10 @@ function atajosDeWebview(contents) {
 
 /* Scrollbar propio para las webs (2026-08-13, peticion de Dosa: seguian
    saliendo barras por defecto en varias paginas). Gris translucido para que
-   valga en claro y en oscuro, y sin flechas. */
+   valga en claro y en oscuro, y sin flechas. Desde Chromium 121, una web que
+   declara scrollbar-color (YouTube) anula los ::-webkit-scrollbar y vuelve la
+   barra del sistema: por eso se fuerza a auto. scrollbar-width no se toca, para
+   no destapar las barras que las webs ocultan a propósito (NAV-VIVO-11). */
 const SCROLLBAR_CSS = `
   ::-webkit-scrollbar { width: 11px !important; height: 11px !important; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent !important; }
@@ -1513,6 +1532,7 @@ const SCROLLBAR_CSS = `
   }
   ::-webkit-scrollbar-thumb:hover { background: rgba(128,128,132,.62) !important; background-clip: content-box !important; }
   ::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; }
+  *, *::before, *::after { scrollbar-color: auto !important; }
 `;
 
 /* La marca del foco de serie (2026-08-29, peticion de Dosa: "que sea muchisimo
@@ -1533,8 +1553,50 @@ const FOCO_CSS = `
   }
 `;
 
+/* Atrás y adelante de una pestaña dormida (NAV-VIVO-07). Dormir quita el
+   webview para soltar su proceso, y el nuevo nacía sin historial. Ahora, antes
+   de dormir, la interfaz pide las entradas del webview ('wv:historial'); al
+   despertar las deja apuntadas ('wv:historial-pendiente') y will-attach-webview
+   hace que el webview nuevo las restaure en vez de cargar la URL a pelo. */
+const historialPendiente = new Map();   // id de la interfaz -> [{ url, entries, index, ts }]
+let historialAlCrear = null;            // el del webview que se está creando ahora mismo
+const urlNormal = (u) => { try { return new URL(u).href; } catch { return String(u || ''); } };
+// Son síncronos y returnValue se asigna UNA sola vez: la primera asignación ya contesta.
+function historialDe(e, id) {
+  if (!esUI(e)) return null;
+  try {
+    const wc = webContents.fromId(Number(id));
+    if (!wc || wc.getType() !== 'webview' || wc.hostWebContents?.id !== e.sender.id) return null;
+    return { entries: wc.navigationHistory.getAllEntries(), index: wc.navigationHistory.getActiveIndex() };
+  } catch { return null; }   // ya cerrado
+}
+function apuntaHistorial(e, url, h) {
+  if (!esUI(e) || typeof url !== 'string' || !h || !Array.isArray(h.entries)) return false;
+  const valida = (x) => x && typeof x.url === 'string' && typeof x.title === 'string' && (x.pageState == null || typeof x.pageState === 'string');
+  if (!h.entries.length || h.entries.length > 50 || !h.entries.every(valida)) return false;
+  if (!Number.isInteger(h.index) || h.index < 0 || h.index >= h.entries.length) return false;
+  const id = e.sender.id;
+  if (!historialPendiente.has(id)) e.sender.once('destroyed', () => historialPendiente.delete(id));
+  // Lo que no llegó a usarse en 10 s (un webview que no se montó) se descarta.
+  const lista = (historialPendiente.get(id) || []).filter((p) => Date.now() - p.ts < 10000);
+  lista.push({ url: urlNormal(url), entries: h.entries, index: h.index, ts: Date.now() });
+  historialPendiente.set(id, lista);
+  return true;
+}
+ipcMain.on('wv:historial', (e, id) => { e.returnValue = historialDe(e, id); });
+ipcMain.on('wv:historial-pendiente', (e, url, h) => { e.returnValue = apuntaHistorial(e, url, h); });
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    // Pestaña que despierta: restaura su historial (ver historialPendiente). Si no
+    // se puede, carga su URL como antes, para no dejarla en blanco.
+    if (historialAlCrear) {
+      const h = historialAlCrear; historialAlCrear = null;
+      contents.once('did-attach', () => {
+        const aPelo = () => { if (!contents.isDestroyed() && !contents.getURL()) contents.loadURL(h.url).catch(() => {}); };
+        try { contents.navigationHistory.restore({ entries: h.entries, index: h.index }).catch(aPelo); } catch { aPelo(); }
+      });
+    }
     suppressWebAuthn(contents);
     atajosDeWebview(contents);
     menuContextual(contents);
@@ -1624,9 +1686,11 @@ ipcMain.on('win:new-private', () => createWindow(true));
 /* Sacar una pestaña de la barra abre una ventana nueva con esa direccion.
    La ventana tarda en montar su interfaz, asi que la URL se guarda y se le
    manda cuando ella avisa de que ya esta lista ('ui:listo'). */
-const urlPendiente = new Map();   // id de ventana -> url que tiene que abrir
-ipcMain.on('win:sacar-pestana', (e, url) => {
+const urlPendiente = new Map();   // id de ventana -> { url, contenedor } que tiene que abrir
+ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
   if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
+  // La pestaña sale con su contenedor (su id; la ventana nueva lo busca en los ajustes).
+  if (typeof contenedor !== 'string' || !/^[a-z0-9]{1,24}$/.test(contenedor)) contenedor = null;
   // Si sale de una ventana privada, la nueva tambien lo es: no se saca una
   // pestaña privada a una ventana normal, que dejaria rastro.
   const dueno = BrowserWindow.fromWebContents(e.sender);
@@ -1634,7 +1698,7 @@ ipcMain.on('win:sacar-pestana', (e, url) => {
   try { privada = new URL(dueno.webContents.getURL()).searchParams.get('private') === '1'; } catch { /* nada */ }
   const win = createWindow(privada, false, true);
   if (!win) return;
-  urlPendiente.set(win.id, url);
+  urlPendiente.set(win.id, { url, contenedor });
   const id = win.id;
   win.once('closed', () => urlPendiente.delete(id));   // cerrada antes de montarse
 });
@@ -1715,7 +1779,7 @@ ipcMain.handle('esp:bloquea', soloUI((_e, { id, clave } = {}) => {
   const esp = espacioDe(id);
   if (!esp) return { ok: false, error: 'Ese espacio ya no existe' };
   if (esp.bloqueado) return { ok: false, error: 'Ese espacio ya está protegido' };
-  if (!clave || String(clave).length < 4) return { ok: false, error: 'El código necesita al menos 4 caracteres' };
+  if (!clave || String(clave).length < 4) return { ok: false, error: 'La contraseña necesita al menos 4 caracteres' };
   esp.sal = crypto.randomBytes(16).toString('base64');
   esp.bloqueado = true;
   esp.particion = esp.particion || ('persist:esp-' + id);
@@ -1736,7 +1800,7 @@ ipcMain.handle('esp:desbloquea', soloUI((_e, { id, clave } = {}) => {
   const derivada = derivaClave(clave, esp.sal || '');
   let datos;
   try { datos = descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
-  catch { return { ok: false, error: 'Código incorrecto' }; }
+  catch { return { ok: false, error: 'Contraseña incorrecta' }; }
   clavesEnMemoria.set(id, derivada);
   preparaContenedor(esp.particion);
   return { ok: true, datos };
@@ -1766,7 +1830,7 @@ ipcMain.handle('esp:borra', soloUI(async (_e, { id, clave } = {}) => {
   if (esp.bloqueado) {
     const derivada = derivaClave(clave, esp.sal || '');
     try { descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
-    catch { return { ok: false, error: 'Código incorrecto' }; }
+    catch { return { ok: false, error: 'Contraseña incorrecta' }; }
     try { fs.unlinkSync(archivoEsp(id)); } catch { /* ya no estaba */ }
   }
   // Solo la partición propia del espacio, nunca la normal ni la de un contenedor.
@@ -1839,6 +1903,11 @@ ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
     return { ok: true, b64: bytes.toString('base64'), tipo };
   } catch (e) { return { ok: false, error: String(e && e.message) }; }
 }));
+// Memoria de un proceso en KB: la PRIVADA, la que enseña el administrador de
+// tareas. workingSetSize cuenta también las páginas compartidas en cada proceso
+// y el total salía unas cuatro veces más alto (NAV-VIVO-08). Fuera de Windows
+// no hay privateBytes y se usa el working set.
+const memKb = (p) => (p.memory && (p.memory.privateBytes ?? p.memory.workingSetSize)) || 0;
 // Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris
 // (app.getAppMetrics agrega todos los procesos del navegador).
 ipcMain.handle('sys:stats', soloUI(async () => {
@@ -1846,7 +1915,7 @@ ipcMain.handle('sys:stats', soloUI(async () => {
     const mem = process.getSystemMemoryInfo();               // KB
     const mets = app.getAppMetrics();
     let cpu = 0, rssKb = 0;
-    for (const p of mets) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; rssKb += (p.memory && p.memory.workingSetSize) || 0; }
+    for (const p of mets) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; rssKb += memKb(p); }
     cpu = Math.round(cpu * 10) / 10; // un decimal: redondear a entero daba siempre 0
     return {
       ramTotal: mem.total, ramLibre: mem.free,
@@ -1874,7 +1943,7 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
       return {
         id: t.id,
         pid,
-        mb: m ? Math.round((m.memory && m.memory.workingSetSize || 0) / 1024) : null,
+        mb: m ? Math.round(memKb(m) / 1024) : null,
         cpu: m ? Math.round((m.cpu && m.cpu.percentCPUUsage || 0) * 10) / 10 : null
       };
     });
@@ -1885,15 +1954,29 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
     const suma = (arr, f) => Math.round(arr.reduce((s, p) => s + f(p), 0));
     return {
       filas,
-      restoMb: suma(resto, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      restoMb: suma(resto, (p) => memKb(p) / 1024),
       restoCpu: Math.round(resto.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
-      totalMb: suma(mets, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      totalMb: suma(mets, (p) => memKb(p) / 1024),
       totalCpu: Math.round(mets.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
       procesos: mets.length
     };
   } catch { return null; }
 }));
-ipcMain.handle('clip:read', soloUI(async () => { try { return clipboard.readText() || ''; } catch { return ''; } }));
+/* Lo que copia un gestor de contraseñas (Bitwarden, KeePass, 1Password) lleva
+   la marca de Windows para que ningún historial lo guarde: el widget
+   Portapapeles tampoco lo ve. */
+function copiaExcluida() {
+  if (process.platform !== 'win32') return false;
+  try {
+    if (clipboard.has('ExcludeClipboardContentFromMonitorProcessing')) return true;
+    if (clipboard.has('CanIncludeInClipboardHistory')) {
+      const b = clipboard.readBuffer('CanIncludeInClipboardHistory');
+      return b.length >= 4 && b.readUInt32LE(0) === 0;
+    }
+  } catch { /* formato ilegible: se trata como una copia normal */ }
+  return false;
+}
+ipcMain.handle('clip:read', soloUI(async () => { try { return copiaExcluida() ? '' : (clipboard.readText() || ''); } catch { return ''; } }));
 ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
 ipcMain.handle('spotify:logged', soloUI(async () => {
   try {
