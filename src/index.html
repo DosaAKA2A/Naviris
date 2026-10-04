@@ -53,7 +53,7 @@
       <div class="sb-sep"></div>
       <div class="sb-spacer"></div>
       <!-- Herramientas -->
-      <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar vídeo/audio" data-ico="mouse"></button>
+      <button class="sb-btn" id="sb-rat" title="Rat Tool — descargar video/audio" data-ico="mouse"></button>
       <button class="sb-btn" id="sb-loot" title="AutoClaim — puntos y drops de Twitch" data-ico="twitch"></button>
       <button class="sb-btn" id="sb-media" title="Recursos gráficos" data-ico="picture"></button>
       <button class="sb-btn" id="sb-res" title="Escalado de resolución" data-ico="res-scale"></button>
@@ -80,7 +80,7 @@
         <button id="nav-fwd" title="Adelante" data-ico="arrow-right"></button>
         <button id="nav-reload" title="Recargar" data-ico="arrow-path"></button>
         <div id="urlbox">
-          <span id="url-secure" title="Conexión" data-ico="lock-closed"></span>
+          <button id="url-secure" type="button" title="Conexión" aria-label="Información del sitio" data-ico="lock-closed"></button>
           <input id="urlbar" type="text" spellcheck="false" autocomplete="off"
                  placeholder="Busca en Google o escribe una dirección" />
           <div id="suggest" class="hidden"></div>
@@ -118,8 +118,8 @@
           <span class="find-ic" data-ico="magnifying-glass"></span>
           <input id="find-input" type="text" spellcheck="false" autocomplete="off" placeholder="Buscar en la página" />
           <span id="find-count"></span>
-          <button id="find-prev" title="Anterior (Mayús+Intro)" data-ico="chevron-left"></button>
-          <button id="find-next" title="Siguiente (Intro)" data-ico="chevron-right"></button>
+          <button id="find-prev" title="Anterior (Shift+Enter)" data-ico="chevron-left"></button>
+          <button id="find-next" title="Siguiente (Enter)" data-ico="chevron-right"></button>
           <button id="find-close" title="Cerrar (Esc)" data-ico="x-mark"></button>
         </div>
         <div id="find-otras" class="hidden"></div>
@@ -143,7 +143,7 @@
                 <button class="tema-op" data-tema="rosa"><span class="tema-sw sw-rosa"></span>Rosa</button>
               </div>
             </div>
-            <button id="hub-customize" class="hub-fab" title="Aspecto del hub: fondo y logos"><span data-ico="photo"></span></button>
+            <button id="hub-customize" class="hub-fab" title="Aspecto del hub: fondo y transparencia"><span data-ico="photo"></span></button>
             <button id="hub-addons" class="hub-fab" title="Addons: extensiones instalables"><span data-ico="puzzle-piece"></span><span class="lbl">Addons</span></button>
           </div>
           <div id="hub-version" title="Versión de Naviris">Naviris</div>
@@ -174,8 +174,8 @@
             <button class="wp-custom" type="button">Imagen propia…</button>
             <!-- Transparencia de las baldosas (2026-09-09): al 100 % son opacas;
                  al bajarlo se vuelven translúcidas y se enciende el desenfoque. -->
-            <div class="hp-fila"><span>Transparencia</span><b id="op-valor">0 %</b></div>
-            <input id="op-slider" type="range" min="0" max="65" step="5" value="0" title="Cuánto se transparentan los widgets del hub" />
+            <div class="hp-fila"><span id="op-tit">Transparencia</span><b id="op-valor">0 %</b></div>
+            <input id="op-slider" type="range" aria-labelledby="op-tit" min="0" max="65" step="5" value="0" title="Cuánto se transparentan los widgets del hub" />
           </div>
         </section>
 
@@ -260,12 +260,12 @@
     <hr />
     <label class="menu-toggle"><span><span class="mt-ico" data-ico="sun"></span>Modo claro<br /><small>Tema claro para la interfaz de Naviris</small></span><input type="checkbox" id="opt-light" /></label>
     <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
-    <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita el prompt de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
+    <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita la ventana de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Continuar donde lo dejaste<br /><small>Reabre las pestañas al iniciar</small></span><input type="checkbox" id="opt-restore" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme las pestañas tras 30 min sin usarlas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Atajos de teclado<br /><small>Ctrl+T, Ctrl+W, Ctrl+R… · F11 y F12 siguen activos</small></span><input type="checkbox" id="opt-atajos" /></label>
     <label class="menu-toggle"><span>Pestañas en vertical<br /><small>En una columna a la izquierda, con mucho más sitio para el título</small></span><input type="checkbox" id="opt-vtabs" /></label>
-    <label class="menu-toggle"><span>Botones laterales del ratón<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
+    <label class="menu-toggle"><span>Botones laterales del mouse<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
     <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <label class="menu-toggle"><span>Actualizaciones automáticas<br /><small>Se bajan solas y se instalan al cerrar · apagado: te avisa y decides tú</small></span><input type="checkbox" id="opt-updauto" /></label>
@@ -343,7 +343,7 @@
 
   <!-- ===== Rat Tool (descarga vídeo/audio · modo Twitch) ===== -->
   <div id="rat-pop" class="hidden">
-    <div class="rat-head"><span class="rat-brand">Rat Tool</span><span class="rat-sub" id="rat-headsub">Descargar vídeo o audio</span></div>
+    <div class="rat-head"><span class="rat-brand">Rat Tool</span><span class="rat-sub" id="rat-headsub">Descargar video o audio</span></div>
 
     <!-- Modo normal: descarga -->
     <div id="rat-normal">
@@ -352,7 +352,7 @@
       <div class="rat-plat" id="rat-plat"></div>
       <label id="rat-qrow" class="rat-qrow hidden"><span>Resolución</span><select id="rat-quality"><option value="">Máxima</option></select></label>
       <div class="rat-btns">
-        <button id="rat-video" class="rat-btn"><span data-ico="film"></span> Vídeo MP4</button>
+        <button id="rat-video" class="rat-btn"><span data-ico="film"></span> Video MP4</button>
         <button id="rat-audio" class="rat-btn"><span data-ico="musical-note"></span> Audio MP3</button>
       </div>
       <label id="rat-xtoggle" class="rat-xrow hidden"><span>Mostrar contenido sensible en X</span><span class="switch"><input type="checkbox" id="rat-xcheck" /><span class="slider"></span></span></label>
@@ -364,7 +364,7 @@
   <!-- ===== Panel recursos gráficos ===== -->
   <aside id="media-panel" class="hidden side-panel">
     <div class="mp-head"><span id="mp-title">Recursos gráficos</span><span class="mp-tools"><button id="mp-refresh" data-ico="arrow-path" title="Volver a escanear"></button><button id="mp-close" data-ico="x-mark" title="Cerrar"></button></span></div>
-    <div class="mp-filters"><button class="mp-chip active" data-filter="all">Todo</button><button class="mp-chip" data-filter="image">Imágenes</button><button class="mp-chip" data-filter="video">Vídeos</button></div>
+    <div class="mp-filters"><button class="mp-chip active" data-filter="all">Todo</button><button class="mp-chip" data-filter="image">Imágenes</button><button class="mp-chip" data-filter="video">Videos</button></div>
     <div id="mp-grid"></div>
     <div class="mp-foot"><button id="mp-all" class="primary-btn" data-ico="arrow-down-tray"> Descargar todo</button></div>
   </aside>
@@ -426,7 +426,7 @@
   <!-- ===== Panel Loot (recompensas de auto-reclamo) ===== -->
 
   <!-- ===== Modales ===== -->
-  <div id="dial-modal" class="modal hidden"><div class="modal-card"><h3>Añadir acceso al hub</h3>
+  <div id="dial-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="dial-modal-tit"><h3 id="dial-modal-tit">Añadir acceso al hub</h3>
     <!-- Biblioteca de sitios conocidos: un clic y ya está (la pinta renderLibreria) -->
     <div class="lib-tit">Sitios habituales</div>
     <div id="lib-grid" class="lib-grid"></div>
@@ -435,15 +435,15 @@
     <input id="dial-name" type="text" placeholder="Nombre (ej. YouTube)" /><input id="dial-url" type="text" placeholder="https://..." />
     <div class="modal-actions"><button id="dial-cancel">Cancelar</button><button id="dial-save" class="primary">Añadir</button></div></div></div>
 
-  <div id="prompt-modal" class="modal hidden"><div class="modal-card"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
+  <div id="prompt-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
 
 
-  <div id="perm-modal" class="modal hidden"><div class="modal-card"><h3>Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
+  <div id="perm-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="perm-modal-tit"><h3 id="perm-modal-tit">Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
 
   <!-- ===== Cuenta Naviris ===== -->
   <div id="account-modal" class="modal hidden">
-    <div class="modal-card">
-      <h3><span class="mt-ico" data-ico="user-circle"></span>Cuenta Naviris</h3>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="account-modal-tit">
+      <h3 id="account-modal-tit"><span class="mt-ico" data-ico="user-circle"></span>Cuenta Naviris</h3>
       <div id="acc-login-view">
         <p>Guarda tus preferencias, marcadores, accesos y widgets en la nube y recupéralos al entrar en cualquier PC. Las contraseñas y tarjetas nunca salen de este equipo.</p>
         <input id="acc-email" type="email" placeholder="Correo" spellcheck="false" autocomplete="off" />
@@ -473,7 +473,7 @@
     </div>
   </div>
 
-  <div id="about-modal" class="modal hidden"><div class="modal-card"><h3>Naviris <span id="about-version"></span></h3><p>Navegador ligero de <b>Iris Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
+  <div id="about-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="about-modal-tit"><h3 id="about-modal-tit">Naviris <span id="about-version"></span></h3><p>Navegador ligero de <b>IRIS Studio</b>, sobre motor Chromium.</p><p id="about-gpu" class="about-gpu"></p>
     <div class="upd-box"><div id="upd-status">Comprueba las versiones disponibles.</div>
       <div id="upd-lines" class="upd-lines hidden">
         <div class="upd-line"><div class="ul-info"><b>Naviris</b><span class="ul-sub">Estable</span></div><span class="ul-ver" id="upd-stable-ver"></span><button id="upd-stable-btn" class="ul-btn">Instalar</button></div>
@@ -487,11 +487,11 @@
        ÚNICO que te dice que cambió algo. Sale una vez, al primer arranque de
        la versión nueva. -->
   <div id="nov-modal" class="modal hidden">
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="nov-modal-tit">
       <div class="nov-head">
         <span class="nov-mark iris-slot" data-iris="34"></span>
         <div class="nov-tit">
-          <h3>Naviris se ha actualizado</h3>
+          <h3 id="nov-modal-tit">Naviris se ha actualizado</h3>
           <span class="nov-ver" id="nov-ver"></span>
         </div>
       </div>

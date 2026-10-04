@@ -96,7 +96,7 @@ async function cambiaEspacio(id) {
   if (destino && destino.bloqueado && !espDesbloqueados.has(destino.id)) {
     pideClave(destino, 'Entrar en ' + destino.nombre, async (clave) => {
       const r = await window.cobalt.espDesbloquea(destino.id, clave);
-      if (!r.ok) { toast(r.error || 'Código incorrecto'); return; }
+      if (!r.ok) { toast(r.error || 'Contraseña incorrecta'); return; }
       espDesbloqueados.add(destino.id);
       cambiaEspacio(id);
     });
@@ -215,8 +215,8 @@ function bloqueaEspacio(id) {
     }
     pintaEspacios();
     renderTabs(true);
-    toast('Espacio protegido. Te pedirá el código una vez por sesión.');
-  }, 'Se te pedirá al entrar, una vez por sesión, y también para borrarlo. Su historial y sus marcadores se guardan cifrados con este código: si lo pierdes, se pierden. Mínimo 4 caracteres.');
+    toast('Espacio protegido. Te pedirá la contraseña una vez por sesión');
+  }, 'Se te pedirá al entrar, una vez por sesión, y también para borrarlo. Su historial y sus marcadores se guardan cifrados con esta contraseña: si la pierdes, se pierden. Mínimo 4 caracteres.');
 }
 
 function pintaEspacios() {
@@ -254,6 +254,9 @@ function pintaEspacios() {
       });
     }
     el.addEventListener('click', (ev) => { if (!ev.target.closest('.ep-acc')) cambiaEspacio(id); });
+    // Con Tab: al enfocar la fila aparecen sus acciones (:focus-within) y Enter entra
+    el.tabIndex = 0; el.setAttribute('role', 'button');
+    el.addEventListener('keydown', (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === el) { ev.preventDefault(); cambiaEspacio(id); } });
     els.espPop.appendChild(el);
   };
 
@@ -315,8 +318,10 @@ let settings = { hardwareAcceleration: true, powerSaver: true };
    lo pasa a oscuro (es lo que pide el interruptor). */
 function applyTheme(light) {
   const t = temaActual();
-  if (light) aplicaTema(t === 'rosa' ? 'rosa' : 'claro');
-  else aplicaTema(esTemaClaro(t) ? TEMA_POR_DEFECTO : t);
+  // Vuelve al ÚLTIMO tema de cada lado: con cuatro temas, ir y volver llevaba
+  // siempre a Claro o a Naviris y se perdían Acid y Rosa (auditoría 2026-10).
+  if (light) aplicaTema(esTemaClaro(t) ? t : store.get('cobalt.temaClaro', 'claro'));
+  else aplicaTema(esTemaClaro(t) ? store.get('cobalt.temaOscuro', TEMA_POR_DEFECTO) : t);
 }
 /* Temas: cada uno es un juego de tokens en <html>. lightMode se mantiene
    porque los ajustes y la cuenta ya lo sincronizaban, y rosa se guarda aparte.
@@ -353,6 +358,7 @@ function aplicaTema(tema) {
   raiz.classList.toggle('rosa', tema === 'rosa');
   raiz.classList.toggle('mono', tema === 'mono');
   store.set('cobalt.tema', tema);
+  store.set(esTemaClaro(tema) ? 'cobalt.temaClaro' : 'cobalt.temaOscuro', tema);
   store.set('cobalt.lightMode', esTemaClaro(tema));
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema());
@@ -433,7 +439,53 @@ function brandOf(url) { const h = hostOf(url); for (const dom in BRAND_BY_HOST) 
 
 /* ============ Favicons + color ============ */
 const tileCache = store.get('cobalt.tiles4', {});
-const saveTiles = () => store.set('cobalt.tiles4', tileCache);
+/* TOPE DE LA CACHÉ (auditoría 2026-10). Los iconos van en base64 dentro de
+   localStorage, que comparte cuota con marcadores, hub y notas, y la caché
+   crecía sin límite: cada sitio nuevo reescribía la clave entera en el hilo de
+   la interfaz. Ahora el icono se guarda reducido a 64 px, se conservan los
+   ICONOS_TOPE sitios más recientes (los del dock nunca se tiran), lo que aun
+   así pesa demasiado vive solo en memoria y la escritura espera a que acabe la
+   ráfaga. Lo podado es caché: se vuelve a pedir cuando haga falta. */
+const ICONOS_TOPE = 150, ICONO_LADO = 64, ICONO_BYTES = 24 * 1024;
+function escribeTiles() {
+  const fijos = new Set(dials.map((d) => hostOf(d.url)));
+  const sobran = Object.keys(tileCache).length - ICONOS_TOPE;
+  if (sobran > 0) Object.keys(tileCache).filter((h) => !fijos.has(h))
+    .sort((a, b) => tileCache[a].ts - tileCache[b].ts).slice(0, sobran).forEach((h) => delete tileCache[h]);
+  const guardar = {};
+  for (const [h, e] of Object.entries(tileCache)) if (!e.icon || e.icon.length <= ICONO_BYTES) guardar[h] = e;
+  store.set('cobalt.tiles4', guardar);
+}
+let tilesPend = null;
+const saveTiles = () => { clearTimeout(tilesPend); tilesPend = setTimeout(escribeTiles, 1000); };
+// Limpieza de lo que ya estaba guardado: los iconos enormes se tiran (se piden
+// de nuevo, ya reducidos, al usarlos) y la caché se poda al tope.
+{
+  let tocada = Object.keys(tileCache).length > ICONOS_TOPE;
+  for (const h in tileCache) if ((tileCache[h]?.icon || '').length > ICONO_BYTES) { delete tileCache[h]; tocada = true; }
+  if (tocada) saveTiles();
+}
+// Raster de más de 64 px -> PNG de 64 px (dock y accesos lo pintan a 30-34 px).
+// Los SVG se quedan como vienen: son vectores y no se pixelan.
+function reduceIcono(dataUrl) {
+  if (!dataUrl || /^data:image\/svg/i.test(dataUrl)) return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const lado = Math.max(img.naturalWidth, img.naturalHeight);
+      if (lado <= ICONO_LADO) return resolve(dataUrl);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * ICONO_LADO / lado));
+      c.height = Math.max(1, Math.round(img.naturalHeight * ICONO_LADO / lado));
+      const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      let r = dataUrl; try { r = c.toDataURL('image/png'); } catch { /* se queda el original */ }
+      resolve(r.length < dataUrl.length ? r : dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 function dominantColor(dataUrl) {
   return new Promise((resolve) => {
@@ -476,7 +528,7 @@ async function getTile(url, iconUrl) {
      cacheada: la de antes salio del servicio de Google y esta es la de casa. */
   if (c && !iconUrl && Date.now() - c.ts < 14 * 864e5) return c;
   if (c && iconUrl && c.propio && Date.now() - c.ts < 14 * 864e5) return c;
-  const icon = await window.cobalt.fetchFavicon(url, iconUrl);
+  const icon = await reduceIcono(await window.cobalt.fetchFavicon(url, iconUrl));
   const color = icon ? await dominantColor(icon) : null;
   const entry = { icon, color, ts: Date.now(), propio: !!iconUrl };
   if (!icon && c) return c;   // si el de la pagina falla, se deja el que habia
@@ -533,11 +585,13 @@ function createTab(url = null, activate = true, contenedor = null, abridor = nul
 // Formato: string (histórico) u objeto { u, p } cuando la pestaña está fijada.
 function saveSession() {
   if (IS_PRIVATE) return;
-  // Se guardan también título y favicon: al reabrir, las pestañas entran
-  // dormidas y sin eso se verían todas como "Cargando…" sin icono.
+  // Se guarda también el título: al reabrir, las pestañas entran dormidas y
+  // sin él se verían todas como "Cargando…". El favicon ya no (auditoría
+  // 2026-10): era una imagen en base64 por pestaña reescrita en cada
+  // navegación; al restaurar sale de la caché de iconos (getTile).
   const urls = tabs.filter((t) => t.kind === 'web' && t.url && /^https?:/.test(t.url))
     .map((t) => {
-      const s = { u: t.sleptUrl || t.url, t: t.title || '', f: t.favicon || '' };
+      const s = { u: t.sleptUrl || t.url, t: t.title || '' };
       if (t.pinned) s.p = 1;
       if (t.espacio) s.e = t.espacio;
       if (t.contenedor) s.c = t.contenedor;
@@ -1057,6 +1111,7 @@ els.navStar.addEventListener('mouseleave', () => {
   if (els.navStar.classList.contains('removing')) { els.navStar.classList.remove('removing'); syncNavUI(); }
 });
 setInterval(() => {
+  spCuentaPausa();   // el Spotify residente se duerme en pausa haya o no widget (no depende del ahorro)
   if (!settings.powerSaver) return; const now = Date.now(); let changed = false;
   for (const tab of tabs) {
     // No dormir: la pestaña activa, las de auto-reclamo de Twitch ni las que reproducen audio
@@ -1288,7 +1343,7 @@ const LIBRERIA = [
   { name: 'Prime Video', url: 'https://www.primevideo.com' }, { name: 'Disney+', url: 'https://www.disneyplus.com' },
   { name: 'GitHub', url: 'https://github.com' }, { name: 'ChatGPT', url: 'https://chatgpt.com' },
   { name: 'Claude', url: 'https://claude.ai' }, { name: 'Wikipedia', url: 'https://es.wikipedia.org' },
-  { name: 'Amazon', url: 'https://www.amazon.es' }, { name: 'LinkedIn', url: 'https://www.linkedin.com' },
+  { name: 'Amazon', url: 'https://www.amazon.com' }, { name: 'LinkedIn', url: 'https://www.linkedin.com' },
   { name: 'Steam', url: 'https://store.steampowered.com' }, { name: 'Telegram', url: 'https://web.telegram.org' },
   { name: 'Notion', url: 'https://www.notion.so' }, { name: 'Figma', url: 'https://www.figma.com' },
   { name: 'MOOVIN', url: 'https://moovin.live' }, { name: 'IRIS', url: 'https://iris.it.com' }
@@ -1376,6 +1431,9 @@ function armaDock(grid) {
 }
 function makeDialEl(d) {
   const el = document.createElement('div'); el.className = 'dial'; el.title = d.url;
+  // Alcanzable con Tab y abrible con Enter, como un enlace (auditoría 2026-10)
+  el.tabIndex = 0; el.setAttribute('role', 'link'); el.setAttribute('aria-label', d.name);
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === el && !els.hub.classList.contains('editing')) navigateActive(d.url); });
   // En modo Editar, los tiles se reordenan arrastrando DENTRO del contenedor
   el.addEventListener('mousedown', () => { if (els.hub.classList.contains('editing')) el.draggable = true; });
   el.addEventListener('dragstart', (e) => {
@@ -1423,7 +1481,7 @@ const WIDGET_TYPES = {
   descargas: { name: 'Descargas', icon: 'download' },
   privada: { name: 'Ventana privada', icon: 'book-lock' },
   monitor: { name: 'Monitor', icon: 'res-scale' },
-  moovin: { name: 'Moovin', icon: 'tv' },
+  moovin: { name: 'MOOVIN', icon: 'tv' },
   clip: { name: 'Portapapeles', icon: 'clipboard' },
   deco: { name: 'Adorno', icon: 'star' },
   wallet: { name: 'Tarjetas', icon: 'credit-card' },
@@ -1463,7 +1521,7 @@ const TAMANOS = {
   privada: [[1, 1], [2, 1]],
   monitor: [[2, 1], [1, 1], [1, 2], [2, 2]],
   moovin: [[2, 2], [1, 1], [2, 1], [4, 2]],
-  clip: [[2, 2], [1, 1], [2, 3], [3, 2]],
+  clip: [[2, 2], [2, 1], [1, 1], [2, 3], [3, 2]],   // 2x1: la de la composición de fábrica
   deco: [[1, 1], [2, 1], [2, 2]],
   wallet: [[2, 1], [1, 1], [2, 2]],
   auth: [[2, 2], [2, 1], [2, 3], [3, 2]]
@@ -1999,6 +2057,8 @@ function renderDock() {
   dials.forEach((d) => { const el = makeDialEl(d); el.title = d.name; dock.appendChild(el); });
   const sep = document.createElement('div'); sep.className = 'dk-sep'; dock.appendChild(sep);
   const add = document.createElement('div'); add.className = 'dial add'; add.title = 'Añadir acceso';
+  add.tabIndex = 0; add.setAttribute('role', 'button');
+  add.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); add.click(); } });
   add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div>`;
   add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; renderLibreria(); els.dialModal.classList.remove('hidden'); els.dialName.focus(); });
   dock.appendChild(add);
@@ -2085,7 +2145,7 @@ function renderHub() {
       // Reloj-TARJETA del bento (2026-08-11): texto a la izquierda y chip del
       // día FUNDIDO en la esquina (scoop). Deja de ser un texto suelto centrado.
       body.className = 'w-card w-clock';
-      body.innerHTML = `<div class="time" id="w-time"></div><div class="greet" id="w-greet"></div><div class="ck-fecha" id="w-fecha"></div>`;
+      body.innerHTML = `<div class="time"></div><div class="greet"></div><div class="ck-fecha"></div>`;
     }
     else if (w.type === 'search') { body.className = 'w-searchwrap'; body.appendChild(buildSearch()); }
     else if (w.type === 'shortcuts') { body.className = 'w-card w-shortcuts'; const g = document.createElement('div'); g.className = 'sc-grid'; dials.forEach((d) => g.appendChild(makeDialEl(d))); const add = document.createElement('div'); add.className = 'dial add'; add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir</div>`; add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; els.dialModal.classList.remove('hidden'); els.dialName.focus(); }); g.appendChild(add); body.appendChild(g); armaDock(g); }
@@ -2312,7 +2372,7 @@ function armaDnd() {
 }
 function buildSearch() {
   const form = document.createElement('form'); form.id = 'hub-search';
-  form.innerHTML = `<span class="g-ico">${window.icon('magnifying-glass')}</span><input id="hub-search-input" type="text" spellcheck="false" placeholder="Buscar en Google" /><kbd title="Pulsa / para buscar">/</kbd>`;
+  form.innerHTML = `<span class="g-ico">${window.icon('magnifying-glass')}</span><input id="hub-search-input" type="text" spellcheck="false" placeholder="Buscar en Google" /><kbd title="Presiona / para buscar">/</kbd>`;
   form.addEventListener('submit', (e) => { e.preventDefault(); const inp = form.querySelector('input'); navigateActive(inp.value); inp.value = ''; });
   return form;
 }
@@ -2328,18 +2388,21 @@ function renderDate(el) {
   const wd = now.toLocaleDateString('es', { weekday: 'long' }); const mo = now.toLocaleDateString('es', { month: 'long', year: 'numeric' });
   el.innerHTML = `<div class="d-day">${day}</div><div class="d-rest">${wd}<br>${mo}</div>`;
 }
+/* Todos los relojes del hub, no solo el primero (con ids, un segundo Reloj
+   salía vacío). Solo se escribe lo que cambia: reescribir el mismo texto cada
+   10 s también obligaba a recalcular el hub. */
 function tickClock() {
-  const now = new Date(); const t = document.getElementById('w-time'); const g = document.getElementById('w-greet');
-  if (t) t.textContent = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-  if (g) { if (IS_PRIVATE) g.textContent = 'Ventana privada — nada se guarda'; else { const h = now.getHours(); g.textContent = (h < 6 ? 'Buenas noches' : h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches') + ' — listo para navegar'; } }
-  const dn = document.getElementById('w-dnum'); if (dn) dn.textContent = now.getDate();
-  const fe = document.getElementById('w-fecha');
-  if (fe) { const f = now.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }); fe.textContent = f.charAt(0).toUpperCase() + f.slice(1); }
+  const now = new Date(); const h = now.getHours();
+  const hora = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  const saludo = IS_PRIVATE ? 'Ventana privada — nada se guarda' : (h < 6 ? 'Buenas noches' : h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches') + ' — listo para navegar';
+  const f = now.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }); const fecha = f.charAt(0).toUpperCase() + f.slice(1);
+  const pon = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+  document.querySelectorAll('.w-clock').forEach((ck) => { pon(ck.querySelector('.time'), hora); pon(ck.querySelector('.greet'), saludo); pon(ck.querySelector('.ck-fecha'), fecha); });
 }
-setInterval(tickClock, 10000);
+let relojTimer = setInterval(tickClock, 10000);   // se apaga con el hub oculto (vigilaHub)
 
 /* Clima y región (open-meteo + ipapi, sin claves) */
-let geoCache = null, wxCache = null;
+let geoCache = null, wxCache = null, wxViejo = false;
 // Estado del clima → [descripción, icono]. Los iconos son el set de clima
 // elegido a mano (Dazzle Line Icons vía svgrepo, prefijo wx-). Prioridad:
 // aviso severo > precipitación > viento fuerte > frío/calor > humedad > cielo.
@@ -2363,14 +2426,15 @@ function WMO(cur) {
   return dia ? ['Soleado', 'wx-sol'] : ['Despejado', 'moon'];
 }
 const WX_QUERY = 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m,is_day';
-// ipapi.co limita peticiones sin aviso (devuelve HTML): se prueba en cadena con
-// dos alternativas gratuitas y se normaliza al mismo formato.
+// Tres fuentes gratuitas en cadena, normalizadas al mismo formato. ipapi.co va
+// la ÚLTIMA: limita sin aviso y respondía 403 (HTML) en cada arranque, con un
+// error en consola y una espera de más antes del clima (auditoría 2026-10).
 async function getGeo() {
   if (geoCache) return geoCache;
   const fuentes = [
-    ['https://ipapi.co/json/', (j) => j],
     ['https://ipwho.is/', (j) => ({ city: j.city, region: j.region, country_name: j.country, latitude: j.latitude, longitude: j.longitude, timezone: j.timezone && j.timezone.id })],
-    ['https://get.geojs.io/v1/ip/geo.json', (j) => ({ city: j.city, region: j.region, country_name: j.country, latitude: +j.latitude, longitude: +j.longitude, timezone: j.timezone })]
+    ['https://get.geojs.io/v1/ip/geo.json', (j) => ({ city: j.city, region: j.region, country_name: j.country, latitude: +j.latitude, longitude: +j.longitude, timezone: j.timezone })],
+    ['https://ipapi.co/json/', (j) => j]
   ];
   for (const [url, map] of fuentes) {
     try {
@@ -2579,14 +2643,15 @@ function spDespierta(conPlay) {
   spPlayerWv.addEventListener('dom-ready', alCargar);
   try { spPlayerWv.src = spUrlDormida || 'https://open.spotify.com'; } catch { /* nada */ }
 }
-async function actualizaSpotify() {
-  if (!widgets.some((w) => w.type === 'spotify')) { clearInterval(spTimer); spTimer = null; return; }
-  const cuerpos = document.querySelectorAll('.w-sp');
-  if (!els.hub.classList.contains('active')) return;
-  const tab = spTab(); let st = null;
-  if (tab && !spDormido) { try { st = await tab.webview.executeJavaScript(SP_LEE, false); } catch { st = null; } }
-  // Cuenta atras de la pausa: solo con el reproductor RESIDENTE (una pestana
-  // normal de Spotify es del usuario y no se toca).
+/* Cuenta atras de la pausa: solo con el reproductor RESIDENTE (una pestana
+   normal de Spotify es del usuario y no se toca). Vive aparte (auditoría
+   2026-10): dentro de actualizaSpotify solo corría con el widget puesto y el
+   hub a la vista, y el reproductor abierto desde el lateral no se dormía
+   nunca. La llaman el repaso del widget (con la lectura que ya hizo) y el de
+   30 s del ahorro de energía (que lee aquí). */
+async function spCuentaPausa(st) {
+  if (!spPlayerWv || spDormido) return;
+  if (st === undefined) { try { st = await spPlayerWv.executeJavaScript(SP_LEE, false); } catch { st = null; } }
   // OJO: SP_LEE devuelve on:true con el reproductor VACIO (Spotify deja su
   // boton en ese estado), asi que sonando exige ademas que haya cancion. De
   // paso, un reproductor abierto sin nada cargado tambien se duerme: es un
@@ -2600,11 +2665,17 @@ async function actualizaSpotify() {
      panel no es dejar de usarlo. */
   const panel = document.getElementById('sp-panel');
   const mirando = panel && !panel.classList.contains('hidden');
-  if (spPlayerWv && !spDormido) {
-    if (sonando || mirando) spPausaDesde = 0;
-    else if (!spPausaDesde) spPausaDesde = Date.now();
-    else if (SP_DORMIR_MS > 0 && Date.now() - spPausaDesde > SP_DORMIR_MS && Date.now() - spUltimoUso > SP_GRACIA_MS) spDuerme();
-  }
+  if (sonando || mirando) spPausaDesde = 0;
+  else if (!spPausaDesde) spPausaDesde = Date.now();
+  else if (SP_DORMIR_MS > 0 && Date.now() - spPausaDesde > SP_DORMIR_MS && Date.now() - spUltimoUso > SP_GRACIA_MS) spDuerme();
+}
+async function actualizaSpotify() {
+  if (!widgets.some((w) => w.type === 'spotify')) { clearInterval(spTimer); spTimer = null; return; }
+  const cuerpos = document.querySelectorAll('.w-sp');
+  if (!els.hub.classList.contains('active')) return;
+  const tab = spTab(); let st = null;
+  if (tab && !spDormido) { try { st = await tab.webview.executeJavaScript(SP_LEE, false); } catch { st = null; } }
+  spCuentaPausa(st);
   // Usar Spotify en pestaña también revela el dock (además de la cookie de
   // sesión): la señal "tiene cuenta" más fiable es que lo esté usando.
   if (tab) els.sbSpotify.classList.remove('hidden');
@@ -2614,7 +2685,7 @@ async function actualizaSpotify() {
   if (els.sbSpotify) {
     els.sbSpotify.classList.toggle('sonando', !!(st && st.on && st.t) && !spDormido);
     els.sbSpotify.classList.toggle('dormido', spDormido);
-    els.sbSpotify.title = spDormido ? 'Spotify — dormido, pulsa para volver'
+    els.sbSpotify.title = spDormido ? 'Spotify — dormido, haz clic para volver'
       : (st && st.on && st.t) ? 'Spotify — sonando: ' + st.t
       : 'Spotify — tu música mientras navegas';
   }
@@ -2695,7 +2766,7 @@ function renderSpotify(body) {
       spUltimoUso = Date.now();
     });
   }
-  clearInterval(spTimer); spTimer = setInterval(actualizaSpotify, 3000);
+  spTimer = relojHub(spTimer, actualizaSpotify, 3000);
   actualizaSpotify();
   llenaListas(body);
 }
@@ -2703,7 +2774,7 @@ async function llenaListas(body) {
   const cont = body.querySelector('.spl-lista'); if (!cont) return;
   const t = spTab();
   const rotulo = body.querySelector('.spl-rotulo');
-  if (!t) { cont.innerHTML = '<div class="w-vacio">Conecta Spotify para ver lo que suena</div>'; return; }
+  if (!t) { cont.innerHTML = '<div class="w-vacio">Conecta Spotify para ver tus listas</div>'; return; }
   let r = null;
   try { r = await t.webview.executeJavaScript(SPL_LEE, false); } catch { /* aún cargando */ }
   const items = (r && r.items) || [];
@@ -2711,7 +2782,7 @@ async function llenaListas(body) {
     : r && r.fuente === 'biblioteca' ? 'Tu biblioteca' : 'Lista abierta';
   cont.innerHTML = items.map((l) => `<button class="spl-i" data-i="${l.i}" data-h="${escapeHtml(l.h || '')}"><span class="spl-t">${escapeHtml(l.t)}</span>${l.sub ? `<span class="spl-sub">${escapeHtml(l.sub)}</span>` : ''}${window.icon('play')}</button>`).join('') ||
     (r && r.fuente === 'ilegible'
-      ? '<div class="w-vacio">Tienes una lista abierta pero no pude leer sus canciones — pulsa actualizar</div>'
+      ? '<div class="w-vacio">Tienes una lista abierta pero no pude leer sus canciones — haz clic en actualizar</div>'
       : '<div class="w-vacio">Abre un álbum o una lista en Spotify y aparecerán sus canciones</div>');
   cont.querySelectorAll('.spl-i').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -2775,11 +2846,11 @@ function renderCalendar(body) {
     }
     body.innerHTML = `
       <div class="cal-top">
-        <button class="cal-nav" data-d="-1">${window.icon('chevron-left')}</button>
+        <button class="cal-nav" data-d="-1" title="Mes anterior" aria-label="Mes anterior">${window.icon('chevron-left')}</button>
         <div class="cal-mes">${nombre}</div>
-        <button class="cal-nav" data-d="1">${window.icon('chevron-right')}</button>
+        <button class="cal-nav" data-d="1" title="Mes siguiente" aria-label="Mes siguiente">${window.icon('chevron-right')}</button>
       </div>
-      <div class="cal-sem"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+      <div class="cal-sem"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span></div>
       <div class="cal-grid">${celdas}</div>`;
     body.querySelectorAll('.cal-nav').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); vista.setMonth(vista.getMonth() + +b.dataset.d); pinta(); }));
     body.querySelectorAll('.cal-d').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); formulario(b.dataset.f); }));
@@ -2790,7 +2861,7 @@ function renderCalendar(body) {
     const lista = recordatorios().filter((r) => r.fecha === f).sort((a, b) => a.hora.localeCompare(b.hora));
     body.innerHTML = `
       <div class="cal-top">
-        <button class="cal-nav cal-volver">${window.icon('chevron-left')}</button>
+        <button class="cal-nav cal-volver" title="Volver" aria-label="Volver">${window.icon('chevron-left')}</button>
         <div class="cal-mes">${dia}</div><span></span>
       </div>
       <div class="cal-lista">${lista.map((r) => `<div class="cal-r"><span class="cal-r-h">${r.hora}</span><span class="cal-r-t">${escapeHtml(r.texto)}</span><button class="cal-r-x" data-id="${r.id}" title="Quitar">${window.icon('x-mark')}</button></div>`).join('') || '<div class="cal-nada">Sin recordatorios</div>'}</div>
@@ -2933,11 +3004,14 @@ function scrapeOculto(url, code, timeoutMs = 15000) {
     wv.src = url; document.body.appendChild(wv);
   });
 }
-const XT_LEE = `(() => {
+const XT_LEE = `(async () => {
   const out = [];
   const tarjeta = document.querySelector('.trend-card');
   if (tarjeta) tarjeta.querySelectorAll('.trend-card__list a').forEach((a) => out.push(a.textContent.trim()));
   if (!out.length) document.querySelectorAll('ol li a').forEach((a) => { if (out.length < 12) out.push(a.textContent.trim()); });
+  /* Fuera su service worker (auditoría 2026-10): trends24 lo registra en cada
+     visita y dejaba un proceso vivo indefinidamente con el hub en reposo. */
+  try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) { /* sin SW */ }
   return out.filter(Boolean).slice(0, 9);
 })()`;
 // x.com/explore con TU sesion: tendencias "Para ti" (el algoritmo del propio
@@ -2949,6 +3023,8 @@ const XT_LEE = `(() => {
 const XT_LEE_X = `(async () => {
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let i = 0; i < 14; i++) {
+    // Sin sesión X manda al login: no hay nada que esperar (antes, 24 s de webview)
+    if (['/login', '/i/flow/login', '/i/jf/onboarding'].some((p) => location.pathname.startsWith(p))) return { login: true };
     if (document.querySelectorAll('[data-testid="trend"]').length >= 3) break;
     await esperar(700);
   }
@@ -3008,12 +3084,22 @@ function renderXTrends(body) {
   const vida = xtCache.src === 'ti' ? 20 * 60 * 1000 : 2 * 60 * 1000;
   if (xtCache.items.length && Date.now() - xtCache.t < vida) { pinta(xtCache.items); return; }
   pinta([], true);
-  /* De donde salen tus tendencias, por orden (2026-08-13):
-     1. TU PESTANA de X. Es la unica que tiene tu sesion de verdad.
-     2. Un webview oculto en x.com/explore. Se queda como segundo intento
-        porque, comprobado, X lo trata como visitante y lo manda al login —
-        por eso salian las mundiales aunque tuvieras X abierto.
-     3. trends24.in: las mundiales publicas, el ultimo recurso honesto. */
+  /* UNA lectura a la vez (auditoría 2026-10): cada repintado del hub con la
+     caché vacía (tema, ventana, accesos, sincronización) lanzaba su propia
+     cadena de webviews ocultos, hasta cinco x.com a la vez. Ahora todos se
+     cuelgan de la que esté en marcha y, al acabar, se pinta la tarjeta viva. */
+  if (!xtLectura) xtLectura = leeTendencias().finally(() => { xtLectura = null; });
+  xtLectura.then(() => { if (body.isConnected) pinta(xtCache.items); });
+}
+/* De donde salen tus tendencias, por orden (2026-08-13):
+   1. TU PESTANA de X. Es la unica que tiene tu sesion de verdad.
+   2. Un webview oculto en x.com/explore. Se queda como segundo intento
+      porque, comprobado, X lo trata como visitante y lo manda al login —
+      por eso salian las mundiales aunque tuvieras X abierto. Si acaba en el
+      login, en los 20 min siguientes ni se intenta (no hay sesion que leer).
+   3. trends24.in: las mundiales publicas, el ultimo recurso honesto. */
+let xtLectura = null, xtSinSesionHasta = 0;
+function leeTendencias() {
   const deTuPestana = () => {
     const t = tabs.find((x) => x.kind === 'web' && !x.asleep && x.webview &&
       /(^|\.)(x|twitter)\.com$/.test(hostOf(x.url) || ''));
@@ -3022,12 +3108,13 @@ function renderXTrends(body) {
   };
   const mundiales = () => scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
     if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
-    pinta(xtCache.items);
   });
-  deTuPestana().then((mias) => {
-    if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; pinta(mias); return null; }
+  return deTuPestana().then((mias) => {
+    if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; return null; }
+    if (Date.now() < xtSinSesionHasta) return mundiales();
     return scrapeOculto('https://x.com/explore', XT_LEE_X, 24000).then((tuyas) => {
-      if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; pinta(tuyas); return null; }
+      if (tuyas && tuyas.length >= 3) { xtCache = { t: Date.now(), items: tuyas, src: 'ti' }; return null; }
+      if (tuyas && tuyas.login) xtSinSesionHasta = Date.now() + 20 * 60 * 1000;
       return mundiales();
     });
   });
@@ -3066,7 +3153,7 @@ function renderImagen(body, w) {
       if (!ruta) return;
       // GIF animado permitido: es contenido DEL USUARIO y la optimizacion es
       // decision suya (la regla anti-animacion-infinita es para NUESTRA UI).
-      if (/\.gif$/i.test(ruta)) toast('GIF en bucle: se ve genial, pero consume mas GPU. Decision tuya.');
+      if (/\.gif$/i.test(ruta)) toast('GIF en bucle: se ve genial, pero consume más GPU. Decisión tuya');
       w.img = 'file:///' + ruta.replace(/\\/g, '/'); w.slot = 0; saveWidgets(); pinta();
     };
     inp.click();
@@ -3251,7 +3338,7 @@ function actualizaDescargasW() {
 function renderMoovinW(body) {
   body.innerHTML = `
     <div class="mv-cartel">${window.icon('tv')}</div>
-    <div class="mv-meta"><div class="mv-tit">Moovin</div><div class="mv-sub">Tu biblioteca privada</div></div>
+    <div class="mv-meta"><div class="mv-tit">MOOVIN</div><div class="mv-sub">Tu biblioteca privada</div></div>
     <button class="mv-play" title="Entrar">${window.icon('play')}</button>`;
   const abre = (e) => { e?.stopPropagation(); navigateActive('https://moovin.live/'); };
   body.querySelector('.mv-play').addEventListener('click', abre);
@@ -3272,11 +3359,11 @@ function renderMonitorW(body) {
     <div class="mon-pie"><span class="mon-app">Naviris —</span><span class="mon-proc"></span></div>
     <div class="mon-acc">
       <button class="mon-b mon-juego" title="Duerme pestañas de fondo y silencia el ruido">${window.icon('play')}<span>Modo juego</span></button>
-      <button class="mon-b mon-limpia" title="Liberar memoria de pestañas dormidas">${window.icon('arrow-path')}<span>Liberar</span></button>
+      <button class="mon-b mon-limpia" title="Duerme las pestañas de fondo que no suenan">${window.icon('arrow-path')}<span>Liberar</span></button>
     </div>`;
   body.querySelector('.mon-juego').addEventListener('click', (e) => { e.stopPropagation(); modoJuego(); });
   body.querySelector('.mon-limpia').addEventListener('click', (e) => { e.stopPropagation(); liberaMemoria(); });
-  clearInterval(monTimer); monTimer = setInterval(actualizaMonitor, 3000); // fresco: un tick durante el re-render lo apagaba
+  monTimer = relojHub(monTimer, actualizaMonitor, 3000); // fresco: un tick durante el re-render lo apagaba
   requestAnimationFrame(actualizaMonitor); // el body aun no esta en el DOM
 }
 async function actualizaMonitor() {
@@ -3285,13 +3372,19 @@ async function actualizaMonitor() {
   if (!els.hub.classList.contains('active')) return;
   const st = await window.cobalt.sysStats().catch(() => null); if (!st) return;
   const gbApp = st.appMb >= 1024 ? (st.appMb / 1024).toFixed(1) + ' GB' : st.appMb + ' MB';
+  /* Las barras van por transform (auditoría 2026-10): animar `width` cada 3 s
+     recalculaba la maquetación del hub entero. Y solo se escribe lo que
+     cambia: reescribir el mismo dato también repintaba. La barra va a
+     punto entero: una décima es menos de un píxel y aun así animaba. */
+  const pon = (el, sel, v) => { const n = el.querySelector(sel); if (n && n.textContent !== v) n.textContent = v; };
+  const barra = (el, sel, pct) => { const n = el.querySelector(sel), v = 'scaleX(' + Math.round(Math.max(0, Math.min(100, pct))) / 100 + ')'; if (n && n.style.transform !== v) n.style.transform = v; };
   cajas.forEach((el) => {
-    el.querySelector('.mon-ram').style.width = st.ramUso + '%';
-    el.querySelector('.mon-ram-v').textContent = st.ramUso + '%';
-    el.querySelector('.mon-cpu').style.width = Math.min(100, st.appCpu) + '%';
-    el.querySelector('.mon-cpu-v').textContent = (st.appCpu < 10 ? st.appCpu.toFixed(1) : Math.round(st.appCpu)) + '%';
-    el.querySelector('.mon-app').textContent = 'Naviris ' + gbApp;
-    el.querySelector('.mon-proc').textContent = st.procesos + ' procesos';
+    barra(el, '.mon-ram', st.ramUso);
+    pon(el, '.mon-ram-v', st.ramUso + '%');
+    barra(el, '.mon-cpu', st.appCpu);
+    pon(el, '.mon-cpu-v', (st.appCpu < 10 ? st.appCpu.toFixed(1) : Math.round(st.appCpu)) + '%');
+    pon(el, '.mon-app', 'Naviris ' + gbApp);
+    pon(el, '.mon-proc', st.procesos + ' procesos');
   });
 }
 
@@ -3311,9 +3404,19 @@ function modoJuego() {
   toast(n ? `Modo juego: ${n} pestaña${n > 1 ? 's' : ''} dormida${n > 1 ? 's' : ''}` : 'Modo juego: no había pestañas de fondo');
   actualizaMonitor();
 }
+/* Liberar: lo mismo que hace el ahorro de energía a los 30 min, pero ya
+   (auditoría 2026-10; antes repetía about:blank en las que ya dormían y decía
+   "Memoria liberada" sin haber hecho nada). Duerme las pestañas de fondo que no
+   suenan, no reclaman en Twitch ni son la otra mitad de la pantalla dividida.
+   A diferencia del Modo juego, no silencia ni corta nada. */
 function liberaMemoria() {
-  for (const t of tabs) if (t.asleep && t.webview) { try { t.webview.src = 'about:blank'; } catch { } }
-  toast('Memoria liberada');
+  let n = 0;
+  for (const t of tabs) {
+    if (t.kind !== 'web' || t.id === activeId || t.id === divId || t.asleep || !t.webview || t.autoLoot || t.audible) continue;
+    try { t.sleptUrl = t.webview.getURL() || t.url; t.webview.src = 'about:blank'; t.asleep = true; n++; } catch { }
+  }
+  if (n) { renderTabs(); saveSession(); }
+  toast(n ? `Memoria liberada: ${n} pestaña${n > 1 ? 's' : ''} dormida${n > 1 ? 's' : ''}` : 'No había pestañas de fondo que dormir');
   setTimeout(actualizaMonitor, 800);
 }
 
@@ -3322,33 +3425,103 @@ function liberaMemoria() {
    se vigila el portapapeles cada 1,5 s mientras el hub esta visible. */
 let clipTimer = null, clipUltimo = '';
 const clipHist = () => store.get('cobalt.clip', []);
+/* LO QUE NO SE APUNTA (auditoría 2026-10). El historial vive en claro en
+   localStorage y apuntaba todo: la contraseña o la tarjeta copiadas desde su
+   panel, el código y el enlace otpauth:// del autenticador, y lo que copiaras
+   en la ventana privada. Ahora:
+   · lo que la app copia o se copia desde esas pantallas pasa por
+     marcaSensible() y todas las ventanas lo dan por visto;
+   · mientras una ventana privada tiene el foco, las demás no apuntan nada, y
+     al soltarlo dan por visto lo que quedó en el portapapeles;
+   · los enlaces otpauth:// y los números de tarjeta válidos no se apuntan
+     nunca, y los que ya estuvieran guardados se borran al arrancar.
+   Las ventanas se avisan por un BroadcastChannel: en memoria, nada a disco. */
+function esSecreto(t) {
+  t = String(t || '');
+  if (/^otpauth:\/\//i.test(t)) return true;
+  const d = t.replace(/[\s-]/g, '');
+  if (!/^\d{13,19}$/.test(d)) return false;
+  let s = 0;   // control de Luhn, el de los números de tarjeta
+  for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } s += n; }
+  return s % 10 === 0;
+}
+if (clipHist().some(esSecreto)) store.set('cobalt.clip', clipHist().filter((t) => !esSecreto(t)));
+const canalClip = new BroadcastChannel('naviris-portapapeles');
+const clipPrivadas = new Set();   // ventanas privadas que tienen el foco ahora
+let clipDandoPorVisto = 0;
+function marcaSensible(t) {
+  t = String(t || '').trim(); if (!t) return;
+  clipUltimo = t; canalClip.postMessage({ sensible: t });
+}
+function daPorVisto() {
+  clipDandoPorVisto++;
+  window.cobalt.clipRead().catch(() => '').then((t) => { clipUltimo = (t || '').trim(); clipDandoPorVisto--; });
+}
+if (IS_PRIVATE) {
+  const id = Math.random().toString(36).slice(2);
+  const avisa = (privada) => canalClip.postMessage({ privada, id });
+  window.addEventListener('focus', () => avisa(true));
+  window.addEventListener('blur', () => avisa(false));
+  window.addEventListener('pagehide', () => avisa(false));
+  if (document.hasFocus()) avisa(true);
+} else {
+  canalClip.onmessage = (e) => {
+    const m = e.data || {};
+    if (typeof m.sensible === 'string') { clipUltimo = m.sensible; return; }
+    if (!m.id) return;
+    if (m.privada) clipPrivadas.add(m.id); else { clipPrivadas.delete(m.id); daPorVisto(); }
+  };
+  // Con el foco aquí, ninguna privada lo tiene (por si su aviso no llegó)
+  window.addEventListener('focus', () => { if (clipPrivadas.size) { clipPrivadas.clear(); daPorVisto(); } });
+}
+// Copiar a mano desde las pantallas de contraseñas, tarjetas o autenticador
+['copy', 'cut'].forEach((tipo) => document.addEventListener(tipo, () => {
+  const a = document.activeElement;
+  const campo = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') ? a : null;
+  const nodo = campo || getSelection().anchorNode?.parentElement;
+  if (!nodo?.closest('#pw-panel, .w-auth, .au-modal, input[type=password]')) return;
+  marcaSensible(campo ? campo.value.slice(campo.selectionStart, campo.selectionEnd) : String(getSelection()));
+}, true));
 function renderClipW(body) {
   body.innerHTML = `
     <div class="w-head">${window.icon('clipboard')} Portapapeles<button class="wh-btn clip-x" title="Vaciar">${window.icon('x-mark')}</button></div>
     <div class="clip-lista"></div>`;
   body.querySelector('.clip-x').addEventListener('click', (e) => { e.stopPropagation(); store.set('cobalt.clip', []); pintaClip(); });
-  clearInterval(clipTimer); clipTimer = setInterval(vigilaClip, 1500);
-  requestAnimationFrame(vigilaClip);
+  // En la ventana privada no se vigila: solo se enseña lo que ya había
+  if (!IS_PRIVATE) clipTimer = relojHub(clipTimer, vigilaClip, 1500);
+  requestAnimationFrame(() => { pintaClip(); vigilaClip(); });
 }
 async function vigilaClip() {
   if (!widgets.some((w) => w.type === 'clip')) { clearInterval(clipTimer); clipTimer = null; return; }
-  if (!els.hub.classList.contains('active')) return;
+  if (IS_PRIVATE || !els.hub.classList.contains('active')) return;
   const t = (await window.cobalt.clipRead().catch(() => '') || '').trim();
+  if (clipPrivadas.size || clipDandoPorVisto) { clipUltimo = t; return; }   // es de la ventana privada
+  // Solo se repinta si hay algo nuevo: rehacer la lista cada 1,5 s recalculaba el hub sin parar
   if (t && t !== clipUltimo) {
     clipUltimo = t;
+    if (esSecreto(t)) return;
     const l = clipHist().filter((x) => x !== t); l.unshift(t);
     store.set('cobalt.clip', l.slice(0, 20));
+    pintaClip();
   }
-  pintaClip();
 }
 function pintaClip() {
   const l = clipHist();
   document.querySelectorAll('.w-clip .clip-lista').forEach((cont) => {
     cont.innerHTML = l.map((t, i) => `<button class="clip-i" data-i="${i}"><span>${escapeHtml(t.slice(0, 90))}</span></button>`).join('') ||
-      '<div class="w-vacio">Lo que copies aparecera aqui</div>';
+      '<div class="w-vacio">Lo que copies aparecerá aquí</div>';
     cont.querySelectorAll('.clip-i').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation(); const t = l[+b.dataset.i]; clipUltimo = t;
       window.cobalt.clipWrite(t); toast('Copiado de nuevo');
+    }));
+    // Borrar una sola entrada (lo sensible que se colara), como en el autenticador
+    cont.querySelectorAll('.clip-i').forEach((b) => b.addEventListener('contextmenu', (e) => {
+      e.preventDefault(); e.stopPropagation(); const t = l[+b.dataset.i];
+      showCtxMenu(e.clientX, e.clientY, [
+        { label: 'Copiar', icon: 'clipboard', action: () => { clipUltimo = t; window.cobalt.clipWrite(t); toast('Copiado de nuevo'); } },
+        { sep: true },
+        { label: 'Eliminar', icon: 'trash', danger: true, action: () => { store.set('cobalt.clip', clipHist().filter((x) => x !== t)); pintaClip(); } }
+      ]);
     }));
     requestAnimationFrame(() => {
       const tope = cont.clientHeight;
@@ -3437,10 +3610,14 @@ function renderWalletW(body) {
       <span class="wl-hello">${window.icon('key')} Windows Hello</span>
       <button class="wl-ver">Ver tarjetas</button>
     </div>`;
-  const abre = (e) => {
+  /* Abre el panel en Tarjetas SIN alternarlo (auditoría 2026-10): pulsar el
+     botón del lateral lo CERRABA si ya estaba abierto, y el temporizador de
+     60 ms competía con la consulta del cifrado. */
+  const abre = async (e) => {
     e?.stopPropagation();
-    els.sbPasswords.click();           // abre el panel de contraseñas…
-    setTimeout(() => switchPwTab(true), 60); // …y salta a la pestaña Tarjetas
+    const info = await window.cobalt.pwAvailable();
+    if (!info.encryption) { toast('El cifrado seguro no está disponible en este sistema'); return; }
+    switchPwTab(true); togglePwPanel(true);
   };
   body.querySelector('.wl-ver').addEventListener('click', abre);
   body.addEventListener('click', abre);
@@ -3489,7 +3666,13 @@ function cabecera2fa(acciones) {
 
 function renderAuthW(body) {
   clearInterval(authTimer);
+  /* La cuenta atrás de 1 s solo existe con los códigos a la vista y el hub
+     visible (auditoría 2026-10). Antes corría siempre, también con el hub
+     oculto, y en los estados vacío y bloqueado rehacía el widget entero cada
+     segundo (con dos consultas a main), así que hasta se perdían clics en
+     "Desbloquear". Cada estado decide ahora si la necesita. */
   const pinta = async () => {
+    clearInterval(authTimer); authTimer = null;
     const est = await window.cobalt.totpAvailable();
     if (!est.encryption) {
       body.innerHTML = cabecera2fa('') + `
@@ -3505,7 +3688,7 @@ function renderAuthW(body) {
         <div class="au-hero">
           <span class="au-emblema au-emblema-on">${window.icon('fingerprint')}</span>
           <span class="au-hero-t">Tus códigos, aquí</span>
-          <span class="au-hero-s">Los seis dígitos que te piden al entrar en Discord, GitHub o Google, sin buscar el móvil.</span>
+          <span class="au-hero-s">Los seis dígitos que te piden al entrar en Discord, GitHub o Google, sin buscar el teléfono.</span>
           <button class="au-add au-cta">${window.icon('plus')}<span>Añadir cuenta</span></button>
         </div>`;
       body.querySelector('.au-add').addEventListener('click', (e) => { e.stopPropagation(); pideAlta(pinta); });
@@ -3552,7 +3735,7 @@ function renderAuthW(body) {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
-        window.cobalt.clipWrite(n);
+        marcaSensible(n); window.cobalt.clipWrite(n);
         toast('Código copiado');
       });
       el.addEventListener('contextmenu', (e) => {
@@ -3561,13 +3744,13 @@ function renderAuthW(body) {
           {
             label: 'Copiar código', icon: 'clipboard', action: () => {
               const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
-              window.cobalt.clipWrite(n); toast('Código copiado');
+              marcaSensible(n); window.cobalt.clipWrite(n); toast('Código copiado');
             }
           },
           {
             label: 'Copiar la cuenta para otro dispositivo', icon: 'key', action: async () => {
               const v = await window.cobalt.totpReveal(el.dataset.id);
-              if (v.ok) { window.cobalt.clipWrite(v.uri); toast('Enlace de la cuenta copiado'); }
+              if (v.ok) { marcaSensible(v.uri); window.cobalt.clipWrite(v.uri); toast('Enlace de la cuenta copiado'); }
               else toast('No se pudo verificar tu identidad');
             }
           },
@@ -3585,10 +3768,10 @@ function renderAuthW(body) {
     body.querySelector('.au-lock').addEventListener('click', async (e) => {
       e.stopPropagation(); await window.cobalt.totpLock(); pinta();
     });
+    // Un segundo: es lo que necesita la cuenta atrás para no ir a saltos.
+    authTimer = relojHub(authTimer, cuenta, 1000);
   };
-  pinta();
-  // Un segundo: es lo que necesita la cuenta atrás para no ir a saltos.
-  authTimer = setInterval(async () => {
+  const cuenta = async () => {
     if (!document.body.contains(body)) { clearInterval(authTimer); return; }
     const est = await window.cobalt.totpAvailable();
     if (!est.unlocked || !est.count) { pinta(); return; }
@@ -3603,8 +3786,40 @@ function renderAuthW(body) {
       const fg = el.querySelector('.au-r-fg');
       if (fg) fg.style.strokeDashoffset = (56.5 * (1 - it.restan / it.period)).toFixed(1);
     });
-  }, 1000);
+  };
+  pinta();
 }
+
+/* ===== EL HUB DESCANSA CUANDO NO SE VE (auditoría 2026-10) =====
+   Reloj, monitor, portapapeles, autenticador y Spotify paraban su trabajo con
+   el hub oculto, pero sus temporizadores seguían despertando a la interfaz.
+   Ahora solo existen con el hub a la vista: se apagan al cambiar a una página
+   o a otra pestaña y al minimizar, y vuelven con una lectura inmediata. Se
+   vigila la clase del propio #hub (no hay que tocar cada sitio que lo enseña). */
+function hubSeVe() { return els.hub.classList.contains('active') && !document.hidden; }
+function relojHub(t, fn, ms) { clearInterval(t); return hubSeVe() ? setInterval(fn, ms) : null; }
+let hubVisto = null;
+function vigilaHub() {
+  const ve = hubSeVe();
+  if (ve === hubVisto) return;
+  hubVisto = ve;
+  relojTimer = relojHub(relojTimer, tickClock, 10000);
+  if (!ve) {
+    [monTimer, clipTimer, authTimer, spTimer].forEach(clearInterval);
+    monTimer = clipTimer = authTimer = spTimer = null;
+    return;
+  }
+  tickClock();
+  const hay = (tipo) => widgets.some((w) => w.type === tipo);
+  if (hay('monitor')) { monTimer = relojHub(monTimer, actualizaMonitor, 3000); actualizaMonitor(); }
+  if (hay('clip') && !IS_PRIVATE) { clipTimer = relojHub(clipTimer, vigilaClip, 1500); vigilaClip(); }
+  if (hay('spotify')) { spTimer = relojHub(spTimer, actualizaSpotify, 3000); actualizaSpotify(); }
+  document.querySelectorAll('.w-auth').forEach(renderAuthW);
+  if (wxViejo) refrescaClimaW();
+}
+new MutationObserver(vigilaHub).observe(els.hub, { attributes: true, attributeFilter: ['class'] });
+document.addEventListener('visibilitychange', vigilaHub);
+vigilaHub();
 
 /* Alta: se admite tanto el enlace otpauth:// del QR como el secreto pelado que
    enseñan las webs debajo del código. */
@@ -3612,8 +3827,8 @@ function pideAlta(alTerminar) {
   const cap = document.createElement('div');
   cap.className = 'au-modal';
   cap.innerHTML = `
-    <div class="au-box">
-      <div class="au-box-t">Añadir cuenta</div>
+    <div class="au-box" role="dialog" aria-modal="true" aria-labelledby="au-alta-tit">
+      <div class="au-box-t" id="au-alta-tit">Añadir cuenta</div>
       <div class="au-box-s">Pega el enlace <span class="au-mono">otpauth://</span> del código QR, o el secreto que muestra la web al activar la verificación en dos pasos.</div>
       <input class="au-in au-uri" type="text" spellcheck="false" placeholder="otpauth://totp/... o JBSWY3DPEHPK3PXP" />
       <input class="au-in au-nom" type="text" spellcheck="false" placeholder="Nombre (ej. Discord)" />
@@ -3671,7 +3886,15 @@ async function loadWeatherPill() {
   } catch { el.classList.add('hidden'); }
 }
 loadWeatherPill();
-setInterval(() => { wxCache = null; loadWeatherPill(); }, 30 * 60 * 1000); // refresco cada 30 min
+setInterval(() => { wxCache = null; loadWeatherPill(); refrescaClimaW(); }, 30 * 60 * 1000); // refresco cada 30 min
+/* El widget de Clima también se refresca (auditoría 2026-10: enseñaba el dato
+   del arranque todo el día). Con el hub oculto no se pide nada: queda marcado
+   y se pide al volver a verlo (vigilaHub). */
+function refrescaClimaW() {
+  const cajas = document.querySelectorAll('.w-wx');
+  wxViejo = cajas.length > 0 && !hubSeVe();
+  if (!wxViejo) cajas.forEach((el) => loadWeather(el, 'weather'));
+}
 
 /* ============ Cuenta Naviris (sincronización de preferencias) ============ */
 const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
@@ -3707,7 +3930,8 @@ async function applySyncData(d) {
   if (!d) return;
   if (Array.isArray(d.bookmarks)) { store.set('cobalt.bookmarks2', d.bookmarks); bookmarks = d.bookmarks; }
   if (Array.isArray(d.dials)) { store.set('cobalt.dials', d.dials); dials = d.dials; }
-  if (Array.isArray(d.widgets)) { store.set('cobalt.widgets', d.widgets); widgets = d.widgets; }
+  // Sin la tarjeta de accesos: la línea estable aún la manda y aquí viven en el dock
+  if (Array.isArray(d.widgets)) { widgets = d.widgets.filter((w) => w && w.type !== 'shortcuts'); store.set('cobalt.widgets', widgets); }
   if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
   // Solo si el blob TRAE la clave: una versión anterior no la manda, y tomar su
   // ausencia por "sin nombre" borraría el que acabas de poner en este equipo.
@@ -4248,7 +4472,7 @@ function mediaCollector() {
 }
 async function collectMedia() {
   const tab = activeTab(); els.mpGrid.innerHTML = '';
-  if (!tab || tab.kind !== 'web' || !tab.webview) { els.mpGrid.innerHTML = '<div class="mp-empty">Abre una página web para detectar sus imágenes y vídeos.</div>'; els.mpTitle.textContent = 'Recursos gráficos'; return; }
+  if (!tab || tab.kind !== 'web' || !tab.webview) { els.mpGrid.innerHTML = '<div class="mp-empty">Abre una página web para detectar sus imágenes y videos.</div>'; els.mpTitle.textContent = 'Recursos gráficos'; return; }
   els.mpGrid.innerHTML = '<div class="mp-empty">Escaneando la página…</div>';
   try { mediaItems = await tab.webview.executeJavaScript(`(${mediaCollector.toString()})()`); } catch { mediaItems = []; }
   renderMedia();
@@ -4256,7 +4480,7 @@ async function collectMedia() {
 function renderMedia() {
   const items = mediaItems.filter((m) => mediaFilter === 'all' || m.type === mediaFilter);
   els.mpTitle.textContent = `Recursos gráficos (${items.length})`; els.mpGrid.innerHTML = '';
-  if (!items.length) { els.mpGrid.innerHTML = '<div class="mp-empty">No hay recursos de este tipo en esta página.<br>Para vídeos de streaming usa Rat Tool.</div>'; return; }
+  if (!items.length) { els.mpGrid.innerHTML = '<div class="mp-empty">No hay recursos de este tipo en esta página.<br>Para videos de streaming usa Rat Tool.</div>'; return; }
   for (const m of items) {
     const card = document.createElement('div'); card.className = 'mp-item'; card.title = m.url;
     let thumb;
@@ -4290,7 +4514,7 @@ function upsertDownload(m) {
   row.classList.toggle('done', done); row.classList.toggle('error', error);
   row.querySelector('.dl-kind').innerHTML = window.icon(m.kind === 'audio' ? 'musical-note' : m.kind === 'video' ? 'film' : done ? 'check' : 'arrow-down-tray');
   row.querySelector('.dl-name').textContent = m.name;
-  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelado' : (m.error ? 'Error: ' + m.error : 'Error')) : (pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
+  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : (pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
   row.querySelector('.dl-bar > i').style.width = pct + '%';
   // La página de descargas, si está abierta, sigue el progreso en vivo
@@ -4412,7 +4636,7 @@ els.perfClose?.addEventListener('click', () => togglePerf(false));
 const DLP_TYPES = [
   { key: 'all', label: 'Todo' },
   { key: 'image', label: 'Imágenes', re: /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|tiff?)$/i, ico: 'photo' },
-  { key: 'video', label: 'Vídeo', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'film' },
+  { key: 'video', label: 'Video', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'film' },
   { key: 'audio', label: 'Música', re: /\.(mp3|wav|m4a|flac|ogg|opus|aac)$/i, ico: 'musical-note' },
   { key: 'doc', label: 'Documentos', re: /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|json|epub|rtf)$/i, ico: 'clipboard' },
   { key: 'zip', label: 'Comprimidos', re: /\.(zip|rar|7z|tar|gz|iso)$/i, ico: 'archive' },
@@ -4572,6 +4796,19 @@ els.historyClear.addEventListener('click', () => {
 })
 
 /* ============ Gestor de contraseñas ============ */
+/* Copiar una contraseña o una tarjeta (auditoría 2026-10). Va por main, que no
+   depende del foco: el writeText('') del renderer fallaba en silencio justo en
+   el caso normal (pegar en otra aplicación) y el secreto se quedaba en el
+   portapapeles. Y a los 20 s solo se borra si sigue ahí: lo que copiaras
+   después no se toca. marcaSensible: el widget Portapapeles no lo apunta. */
+function copiaSecreto(valor, aviso) {
+  marcaSensible(valor);
+  window.cobalt.clipWrite(valor).then((ok) => {
+    if (!ok) { toast('No se pudo copiar'); return; }
+    toast(aviso);
+    setTimeout(async () => { if ((await window.cobalt.clipRead().catch(() => '')) === valor) window.cobalt.clipWrite(''); }, 20000);
+  });
+}
 async function renderPasswords() {
   const list = await window.cobalt.pwList();
   els.pwList.innerHTML = '';
@@ -4592,7 +4829,7 @@ async function renderPasswords() {
     const copy = document.createElement('button'); copy.title = 'Copiar contraseña (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
     copy.addEventListener('click', async () => {
       copy.disabled = true; const r = await window.cobalt.pwReveal(e.id); copy.disabled = false;
-      if (r.ok) { try { await navigator.clipboard.writeText(r.password); toast('Contraseña copiada (se borra en 20 s)'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 20000); } catch { toast('No se pudo copiar'); } }
+      if (r.ok) copiaSecreto(r.password, 'Contraseña copiada (se borra en 20 s)');
       else toast('Verificación cancelada');
     });
     const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
@@ -4602,7 +4839,8 @@ async function renderPasswords() {
 }
 function togglePwPanel(force) {
   const open = force !== undefined ? force : els.pwPanel.classList.contains('hidden');
-  if (open) { closeRightPanels(); els.pwPanel.classList.remove('hidden'); els.sbPasswords.classList.add('open'); renderPasswords(); }
+  // Se repinta la pestaña que está a la vista (antes, siempre Contraseñas aunque se viera Tarjetas)
+  if (open) { closeRightPanels(); els.pwPanel.classList.remove('hidden'); els.sbPasswords.classList.add('open'); switchPwTab(!document.getElementById('pw-sec-cards').classList.contains('hidden')); }
   else { els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.pwForm.classList.add('hidden'); document.getElementById('card-form').classList.add('hidden'); }
 }
 els.sbPasswords.addEventListener('click', async () => {
@@ -4669,7 +4907,7 @@ async function renderCards() {
     const copy = document.createElement('button'); copy.title = 'Copiar número (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
     copy.addEventListener('click', async () => {
       copy.disabled = true; const r = await window.cobalt.cardsReveal(c.id); copy.disabled = false;
-      if (r.ok) { try { await navigator.clipboard.writeText(r.number); toast('Número copiado (se borra en 20 s)'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 20000); } catch { toast('No se pudo copiar'); } }
+      if (r.ok) copiaSecreto(r.number, 'Número copiado (se borra en 20 s)');
       else toast('Verificación cancelada');
     });
     const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
@@ -4874,7 +5112,7 @@ els.sbRat.addEventListener('click', async (e) => {
   if (!open) return;
   anclarPop(els.ratPop, els.sbRat);
   const tab = activeTab();
-  els.ratHeadsub.textContent = 'Descargar vídeo o audio';
+  els.ratHeadsub.textContent = 'Descargar video o audio';
   let url = tab?.kind === 'web' ? tab.url : '';
   // 1º: el vídeo de la PÁGINA ACTUAL (así, al pasar de TikTok a YouTube, detecta YouTube)
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
@@ -4886,7 +5124,7 @@ els.sbRat.addEventListener('click', async (e) => {
   els.ratXcheck.checked = !!settings.xRevealSensitive;
   els.ratQrow.classList.add('hidden'); loadRatQualities();
   const ok = await window.cobalt.ytAvailable();
-  els.ratNote.textContent = ok ? 'Se guarda en Descargas. En TikTok abre un vídeo concreto; se baja sin marca de agua.' : 'Faltan yt-dlp/ffmpeg en resources/bin.';
+  els.ratNote.textContent = ok ? 'Se guarda en Descargas. En TikTok abre un video concreto; se baja sin marca de agua.' : 'No se pudo preparar el descargador. Reinicia Naviris e inténtalo de nuevo.';
 });
 
 /* ============ AutoLoot (por pestaña) ============ */
@@ -4919,14 +5157,14 @@ function updateRatPlat() {
   if (p && onSite) {
     els.ratDetect.classList.remove('hidden');
     els.ratDetectLogo.innerHTML = p[1] ? window.brandIcon(p[1]) : window.icon('film');
-    els.ratDetectName.textContent = 'Vídeo en ' + p[0] + ' detectado';
+    els.ratDetectName.textContent = 'Video en ' + p[0] + ' detectado';
     els.ratDetectUrl.textContent = url;
   } else els.ratDetect.classList.add('hidden');
   // Toggle de sensibilidad solo en X
   const onX = p && p[0] === 'X' && onSite;
   els.ratXtoggle.classList.toggle('hidden', !onX);
   const looksVideo = isVideoUrl(url);
-  if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un vídeo concreto</b> o pega su enlace (en el feed no se detecta).`;
+  if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un video concreto</b> o pega su enlace (en el feed no se detecta).`;
   else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p[0]}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
 }
 let ratQualityToken = 0, ratQualityTimer = null;
@@ -4945,7 +5183,7 @@ async function loadRatQualities() {
 }
 els.ratUrl.addEventListener('input', () => { updateRatPlat(); clearTimeout(ratQualityTimer); ratQualityTimer = setTimeout(loadRatQualities, 700); });
 els.ratXcheck.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.ratXcheck.checked }); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
-async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando vídeo (${quality}p)…` : 'Descargando vídeo…')); }
+async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando video (${quality}p)…` : 'Descargando video…')); }
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 
@@ -5002,8 +5240,14 @@ window.addEventListener('resize', () => applyResponsive());
     if (actual && actual.dataset.tip != null) { actual.title = actual.dataset.tip; delete actual.dataset.tip; }
     actual = null; tip.classList.remove('on');
   };
+  /* Al pulsar, la etiqueta se va y ese botón no la vuelve a sacar hasta que el
+     puntero salga de él: tapaba la cabecera del panel recién abierto. Va en
+     pointerdown porque varios botones cortan la propagación del click. */
+  let pulsado = null;
+  els.sidebar.addEventListener('pointerdown', (e) => { pulsado = e.target.closest('.sb-btn'); oculta(); });
   els.sidebar.addEventListener('mouseover', (e) => {
-    const b = e.target.closest('.sb-btn'); if (!b || b === actual) return;
+    if (pulsado && !pulsado.contains(e.target)) pulsado = null;
+    const b = e.target.closest('.sb-btn'); if (!b || b === actual || b === pulsado) return;
     oculta();
     const txt = (b.title || '').trim(); if (!txt) return;
     actual = b; b.dataset.tip = b.title; b.title = '';   // sin title no sale el del sistema
@@ -5012,7 +5256,7 @@ window.addEventListener('resize', () => applyResponsive());
     tip.style.left = Math.round(r.right + 10) + 'px';
     tip.style.top = Math.round(Math.min(window.innerHeight - tip.offsetHeight - 8, Math.max(8, r.top + r.height / 2 - tip.offsetHeight / 2))) + 'px';
   });
-  els.sidebar.addEventListener('mouseleave', oculta);
+  els.sidebar.addEventListener('mouseleave', () => { pulsado = null; oculta(); });
   els.sidebar.addEventListener('click', oculta);
 })();
 
@@ -5120,7 +5364,7 @@ els.optVtabs.addEventListener('change', async () => {
 els.vtabsNew.addEventListener('click', () => createTab());
 els.divSalir.innerHTML = window.icon('x-mark');
 els.divSalir.addEventListener('click', salirDivision);
-els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del ratón activados' : 'Botones del ratón desactivados'); });
+els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del mouse activados' : 'Botones del mouse desactivados'); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
 document.getElementById('hub-theme').addEventListener('click', async () => {
@@ -5131,7 +5375,9 @@ document.getElementById('hub-theme').addEventListener('click', async () => {
 els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
 els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
 els.optUpdauto.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ updatesAuto: els.optUpdauto.checked }); toast(els.optUpdauto.checked ? 'Naviris se actualizará solo' : 'Te avisaré cuando haya versión nueva; la instalas tú desde el menú'); });
-async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: ${gpu['2d_canvas'] || '—'} · WebGL: ${gpu.webgl || '—'}<br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b> · HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
+// Los estados de getGPUFeatureStatus llegan en inglés de Chromium ("enabled", "disabled_software"…)
+const gpuTxt = (v) => !v ? '—' : /^enabled/.test(v) ? 'activado' : /software/.test(v) ? 'por software' : /^unavailable/.test(v) ? 'no disponible' : 'desactivado';
+async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: <b>${gpuTxt(gpu['2d_canvas'])}</b> · WebGL: <b>${gpuTxt(gpu.webgl)}</b><br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b><br>HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 
 /* ============ Contraseñas: guardar y autorrellenar en sitios ============ */
@@ -5194,6 +5440,8 @@ function ensureDropClaimer(sourceTab) {
 }
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Algo copiado desde un campo de contraseña de la página: el Portapapeles no lo apunta
+  if (e.channel === 'cobalt-copia-sensible') { if (typeof data === 'string') marcaSensible(data); return; }
   // Botones 4/5 del ratón pulsados DENTRO de la página
   if (e.channel === 'cobalt-mouse-nav') {
     const dir = (e.args && e.args[0]) || '';
@@ -5860,7 +6108,7 @@ async function muestraNovedades() {
     // sigue siendo lo importante.
     const d = document.createElement('div');
     d.className = 'nov-vacio';
-    d.textContent = 'Se instaló sola, sin instalador ni reinicios. Puedes ver el detalle de los cambios en el menú, en Acerca de Naviris.';
+    d.textContent = 'Se instaló sola, sin instalador ni reinicios.';
     lista.appendChild(d);
   }
   $('#nov-modal').classList.remove('hidden');
@@ -6318,7 +6566,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
     // El Rat Tool prefiere la URL de la página (así reconoce YouTube, TikTok…);
     // la del propio <video> solo sirve de repuesto para archivos sueltos.
     const url = /^https?:/.test(datos.pagina || '') ? datos.pagina : (datos.src || '');
-    if (!url) { toast('No he podido identificar ese vídeo'); return; }
+    if (!url) { toast('No se pudo identificar ese video'); return; }
     if (els.ratPop.classList.contains('hidden')) els.sbRat.click();
     setTimeout(() => { els.ratUrl.value = url; updateRatPlat(); els.ratQrow.classList.add('hidden'); loadRatQualities(); }, 60);
   }
@@ -6363,7 +6611,11 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
     // NINGUNA se carga al arrancar: todas entran DORMIDAS y se abre el hub.
     // Cada pestaña carga solo cuando la seleccionas. Antes se cargaban todas y
     // cualquier página con vídeo se ponía a sonar sola nada más abrir Naviris.
-    session.forEach((s) => { const t = crearDormida(s); if (s && s.p) t.pinned = true; });
+    session.forEach((s) => {
+      const t = crearDormida(s); if (s && s.p) t.pinned = true;
+      // El icono ya no viaja en la sesión: sale de la caché (sin red si está)
+      if (!t.favicon) getTile(t.url).then((x) => { if (x?.icon) { t.favicon = x.icon; renderTabs(); } }).catch(() => {});
+    });
     hubDeInicio();
     renderTabs(true);
   } else {
@@ -6460,7 +6712,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
      sistema. Todo lo que scrollee en la interfaz entra en esta lista — los
      menus y popovers se sumaron al limitarlos al alto de la ventana, que es
      cuando empezaron a scrollear. */
-  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, .spl-lista, .ml-lista, .xt-lista, .au-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card';
+  const SEL = '#hub .hub-scroll, .overlay-page, .lp-body, .hub-panel, #history-list, #dl-list, #pw-list, #card-list, #mp-grid, #loot-list, #suggest, #res-list, #perm-list, #sidebar-config, .sp-list, .spl-lista, .ml-lista, .xt-lista, .au-lista, #menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop, .ctx-menu, .temas-pop, .modal-card, .lib-grid, .nov-lista, #perf-list, #find-otras, .cal-lista, .nt-lista, #vtabs-slot';
   const barrer = () => document.querySelectorAll(SEL).forEach(montar);
   /* El hub y sus widgets se pintan DESPUÉS de este repaso inicial, y luego cada
      vez que se recompone: sin esta puerta, listas como la de Spotify se
