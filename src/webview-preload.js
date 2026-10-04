@@ -557,9 +557,17 @@ function avisaOtp() {
 if (document.readyState !== 'loading') avisaOtp();
 document.addEventListener('DOMContentLoaded', avisaOtp);
 [800, 2000, 4000].forEach((ms) => setTimeout(avisaOtp, ms));
+// En los logins de una sola página la casilla del código (o el formulario)
+// aparece mucho después de cargar: se vuelve a mirar cuando cambia el foco.
+document.addEventListener('focusin', () => { avisaOtp(); announce(); }, true);
+
+// Lo que se rellena llega con el sitio para el que se ofreció: si la página ya
+// es otra (se navegó mientras se verificaba), no se pone nada.
+const esElSitio = (host) => !!host && location.hostname.replace(/^www\./, '') === host;
 
 // Relleno del codigo: lo pide el host cuando la persona acepta.
-ipcRenderer.on('naviris-otp-fill', (_e, codigo) => {
+ipcRenderer.on('naviris-otp-fill', (_e, codigo, host) => {
+  if (!esElSitio(host)) return;
   const el = buscaOtp();
   if (!el) return;
   const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -599,7 +607,8 @@ if (document.readyState !== 'loading') announceCard();
 document.addEventListener('DOMContentLoaded', announceCard);
 [600, 1500, 3000, 6000].forEach((ms) => setTimeout(announceCard, ms));
 
-ipcRenderer.on('cobalt-fill-card', (_e, card) => {
+ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
+  if (!esElSitio(host)) return;
   const f = findCardForm();
   if (!f) return;
   const set = (el, val) => {
@@ -787,7 +796,6 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       window.addEventListener('visibilitychange', block, true);
       document.addEventListener('webkitvisibilitychange', block, true);
       window.addEventListener('webkitvisibilitychange', block, true);
-      document.dispatchEvent(new Event('visibilitychange')); // notifica el nuevo estado "visible"
     } catch (e) { /* nada */ }
   }
   // Baja la calidad desde el MENÚ del reproductor de Twitch: cambio EN VIVO (sin
@@ -847,7 +855,11 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
         // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
         try {
           let deb = null;
-          obs = new MutationObserver(function () { if (deb) return; deb = setTimeout(function () { deb = null; clickChest(); claimDrops(); }, 800); });
+          // Los cambios del chat (no para nunca) no traen ni cofres ni drops.
+          obs = new MutationObserver(function (muts) {
+            if (muts.every(function (m) { return m.target.closest && m.target.closest('.chat-scrollable-area__message-container'); })) return;
+            if (deb) return; deb = setTimeout(function () { deb = null; clickChest(); claimDrops(); }, 800);
+          });
           obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
         } catch (e) { /* nada */ }
       }
@@ -870,7 +882,8 @@ window.addEventListener('mouseup', function (e) {
 window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true);
 
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
-ipcRenderer.on('cobalt-fill', (_e, cred) => {
+ipcRenderer.on('cobalt-fill', (_e, cred, host) => {
+  if (!esElSitio(host)) return;
   const l = findLogin();
   if (!l) return;
   const set = (el, val) => {

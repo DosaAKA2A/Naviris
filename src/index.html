@@ -127,6 +127,16 @@
         <!-- Separador de la pantalla dividida -->
         <div id="div-barra" class="hidden"><button id="div-salir" title="Salir de la pantalla dividida"></button></div>
 
+        <!-- Página de error: la dirección no existe o no hay conexión (la rellena pintaFallo) -->
+        <section id="fallo-pagina" class="hidden">
+          <div class="fallo-inner">
+            <h2 id="fallo-tit"></h2>
+            <p id="fallo-motivo"></p>
+            <p id="fallo-url"></p>
+            <button id="fallo-reintentar" type="button"><span data-ico="arrow-path"></span>Reintentar</button>
+          </div>
+        </section>
+
         <!-- Hub con widgets -->
         <section id="hub">
           <div class="hub-scroll">
