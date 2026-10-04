@@ -1,5 +1,5 @@
 /* Iconos Lucide (ISC — lucide.dev), inline en currentColor: un solo idioma
-   visual de trazo 1.75 para todo el chrome de la interfaz. Se conservan a
+   visual de trazo 2 para todo el chrome de la interfaz. Se conservan a
    propósito: el clima (WX, ya de línea), la rata del Rat Tool, el ojo relleno
    del Watch Party y el logo de IRIS. Los nombres históricos (heroicons/svgrepo)
    se mantienen como alias para no tocar ningún punto de uso ni los addons. */
@@ -62,7 +62,6 @@
     'shield-check': '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" />',
     'skip-back': '<polygon points="19 20 9 12 19 4 19 20" /> <line x1="5" x2="5" y1="19" y2="5" />',
     'skip-forward': '<polygon points="5 4 15 12 5 20 5 4" /> <line x1="19" x2="19" y1="5" y2="19" />',
-    'arrow-up-right': '<path d="M7 7h10v10" /> <path d="M7 17 17 7" />',
     'pencil-square': '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />',
     'photo': '<rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />',
     'picture': '<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16" /> <path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" /> <circle cx="13" cy="7" r="1" fill="currentColor" /> <rect x="8" y="2" width="14" height="14" rx="2" />',

@@ -59,7 +59,7 @@
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #10130a; --accent-hover: #eaff77; --text-strong: #ffffff;
   /* Pestañas del titlebar */
-  --tab-fg: #a6a6a6; --tab-hover-bg: #1c1c1c; --tab-hover-fg: #e6e6e6;
+  --tab-hover-bg: #1c1c1c; --tab-hover-fg: #e6e6e6;
   --tab-asleep-fg: #7f7f7f; --fav-dot: #616161;
   --tab-active-bg: #2c2c30; --tab-active-line: #3f3f44;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
@@ -74,22 +74,23 @@
   --track-knob: #787878; --track-on: var(--realce); --track-knob-on: #10130a;
   /* Barras de progreso en lima, velos y sombras */
   --bar-from: #9fc32a; --bar-to: var(--lima); --backdrop: rgba(4,4,4,.65);
-  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(220,251,79,.10);
+  --shadow-pop: rgba(0,0,0,.6); --shadow-panel: rgba(0,0,0,.55);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #151515 0%, #0b0b0b 60%);
   --checker-a: #101010; --checker-b: #0b0b0b;
   /* Superficies del hub (reforma 2.8.1): baldosas OPACAS. Los valores de
      verdad los pone el bloque REFORMA DEL HUB más abajo; estos son el respaldo. */
   --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(16,16,18,.20); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(14,14,16,.22); --hub-input-line: #252525;
   --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(14,14,16,.24); --hub-fab-line: #2b2b2b;
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(14,14,16,.24); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #ececec;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(14,14,16,.24); --hub-pill-line: rgba(255,255,255,.09);
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #a8a8a8;
   --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(16,16,18,.22); --tile-line: rgba(255,255,255,.07);
   /* "hoy" del calendario: pastilla NEUTRA (el hub no lleva color de tema) */
   --cal-hoy-bg: #ffffff; --cal-hoy-fg: #111111;
   --tile-letter: #ffffff; --tile-mono: #e6e6e6; --dial-add-line: #2b2b2b;
-  --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(16,16,16,.93);
+  --wx-ic: #d0d0d0;
   --fav-filter: grayscale(1) brightness(1.5);
+  /* Controles nativos (desplegables, selector de hora, casillas) en el estilo del tema */
+  color-scheme: dark;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* ===== Tema Rosa =====
@@ -112,7 +113,7 @@
   --grad-realce: linear-gradient(135deg, #b9a8f0 0%, #f2a0cd 55%, #f9917c 100%);
   --grad-medida: linear-gradient(90deg, #c9bcf7 0%, #f2a0cd 55%, #e0674f 100%);
   --grad-fg: #47203c;
-  --tab-fg: #8a5674; --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
+  --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
   --tab-active-bg: #ffffff; --tab-active-line: #e2b7cc;
   --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
@@ -122,19 +123,19 @@
   --chip: rgba(216,79,150,.10); --chip-hover: rgba(216,79,150,.18); --chip-dim: rgba(216,79,150,.06);
   --track-knob: #ffffff; --track-on: #d84f96; --track-knob-on: #ffffff;
   --bar-from: #e879b2; --bar-to: #d84f96; --backdrop: rgba(90,35,66,.35);
-  --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14); --focus-ring: rgba(216,79,150,.14);
+  --shadow-pop: rgba(120,40,84,.20); --shadow-panel: rgba(120,40,84,.14);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #f4ecfa 60%);
   --checker-a: #f3dae6; --checker-b: #faeff5;
   --hub-card: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.16); --hub-card-line: rgba(150,45,95,.10);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.20); --hub-input-line: rgba(150,45,95,.14);
   --hub-fab: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-fab-line: rgba(150,45,95,.14);
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(150,45,95,.12); --hub-pill-fg: #6d3c58;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(150,45,95,.12);
   --hub-hairline: rgba(150,45,95,.24); --hub-label: #a06e88;
   --tile-default: linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.12)), rgba(255,255,255,.18); --tile-line: rgba(150,45,95,.10);
   --cal-hoy-bg: #26262e; --cal-hoy-fg: #ffffff;
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
-  --clock-shadow: rgba(255,255,255,.6); --wx-ic: #8a4a6b; --addons-plate: rgba(255,250,252,.92);
+  --wx-ic: #8a4a6b;
   --fav-filter: grayscale(1) brightness(.45);
+  color-scheme: light;
 }
 /* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
    con un halo suave, que le da el toque más femenino sin tocar el resto. */
@@ -147,9 +148,9 @@
 :root.rosa .ls-btn.stop { color: #c25a68; }
 /* Logo de Naviris en rosa: gradiente de rosas con cuerpo (los pasteles del
    oscuro se perdían sobre blanco, igual que en el modo claro). */
-:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #c93b86; }
-:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #e05a9e; }
-:root.rosa .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f07eb6; }
+:root.rosa .iris-slot .iris-logo stop.i-a { stop-color: #c93b86; }
+:root.rosa .iris-slot .iris-logo stop.i-b { stop-color: #e05a9e; }
+:root.rosa .iris-slot .iris-logo stop.i-c { stop-color: #f07eb6; }
 
 /* ===== Modo claro =====
    Mismo sistema de tokens con la elevación invertida: en oscuro las superficies
@@ -168,7 +169,7 @@
   --muted: #5d5f66; --dim: #8b8d95; --violet: #6e46c8;
   --danger: #d02f34; --ok: #1e8e4f;
   --accent-fg: #f6f7f9; --accent-hover: #1b1c20; --text-strong: #23252b;
-  --tab-fg: #54565d; --tab-hover-bg: #e2e4e9; --tab-hover-fg: #2e3038;
+  --tab-hover-bg: #e2e4e9; --tab-hover-fg: #2e3038;
   --tab-asleep-fg: #84868e; --fav-dot: #a3a6ad;
   --tab-active-bg: #ffffff; --tab-active-line: #b8bcc6;
   --winctl-fg: #4a4c53; --winctl-hover: #e0e2e7; --winctl-active: #d4d7dd;
@@ -178,20 +179,19 @@
   --chip: rgba(20,22,28,.08); --chip-hover: rgba(20,22,28,.14); --chip-dim: rgba(20,22,28,.05);
   --track-knob: #f9fafb; --track-on: var(--realce); --track-knob-on: #f6f7f9;
   --bar-from: #6a6d75; --bar-to: #3a3d45; --backdrop: rgba(35,39,46,.4);
-  --shadow-pop: rgba(24,28,36,.22); --shadow-panel: rgba(24,28,36,.16); --focus-ring: rgba(27,28,32,.08);
+  --shadow-pop: rgba(24,28,36,.22); --shadow-panel: rgba(24,28,36,.16);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #ffffff 0%, #eef0f3 60%);
   --checker-a: #e8eaee; --checker-b: #f4f5f7;
   /* Hub invertido: cristales blancos con hairline oscura y sombra en vez de
      brillo; los tiles sin color propio pasan a gris claro con letra oscura. */
   --hub-card: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.16); --hub-card-line: rgba(18,20,26,.10);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.10)), rgba(255,255,255,.20); --hub-input-line: rgba(18,20,26,.14);
   --hub-fab: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-fab-line: rgba(18,20,26,.14);
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.32), rgba(255,255,255,.12)), rgba(255,255,255,.22); --hub-pill-line: rgba(18,20,26,.12);
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
   --tile-default: linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.12)), rgba(255,255,255,.18); --tile-line: rgba(18,20,26,.10);
   --cal-hoy-bg: #26262e; --cal-hoy-fg: #ffffff;
   --tile-letter: #2e3038; --tile-mono: #383a42; --dial-add-line: #b9bcc4;
-  --clock-shadow: rgba(255,255,255,.6); --wx-ic: #4a4d55; --addons-plate: rgba(255,255,255,.9);
+  --wx-ic: #4a4d55;
   --fav-filter: grayscale(1) brightness(.42);
   /* Regla de color del usuario (2026-08-11): en claro el realce es ROJO y
      NARANJA, con el MISMO degradado del logo de Naviris en claro
@@ -200,6 +200,7 @@
   --grad-realce: linear-gradient(135deg, #d93a2b 0%, #ea6a2c 55%, #f59a35 100%);
   --grad-medida: linear-gradient(90deg, #f7a53a 0%, #ea6a2c 55%, #b52d1f 100%);
   --grad-fg: #ffffff;
+  color-scheme: light;
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
 :root.light .ctx-item.danger, :root.light .ctx-item.danger .ctx-ic { color: #c62f34; }
@@ -208,14 +209,14 @@
 :root.light .ls-btn.stop { color: #c25a68; }
 /* Logo de Naviris en claro: gradiente rojo→naranja (los pasteles se perdían
    sobre blanco). El splash queda fuera: es momento de marca y va sobre oscuro. */
-:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #d93a2b; }
-:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ea6a2c; }
-:root.light .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #f59a35; }
+:root.light .iris-slot .iris-logo stop.i-a { stop-color: #d93a2b; }
+:root.light .iris-slot .iris-logo stop.i-b { stop-color: #ea6a2c; }
+:root.light .iris-slot .iris-logo stop.i-c { stop-color: #f59a35; }
 /* Logo de Naviris en OSCURO: lima ácido -> verde (2026-08-11), a juego con el
    acento del tema. El splash queda fuera: es momento de marca. */
-:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #eaff77; }
-:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #a8dc2a; }
-:root:not(.light):not(.rosa):not(.mono) .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #2f8f4f; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot .iris-logo stop.i-a { stop-color: #eaff77; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot .iris-logo stop.i-b { stop-color: #a8dc2a; }
+:root:not(.light):not(.rosa):not(.mono) .iris-slot .iris-logo stop.i-c { stop-color: #2f8f4f; }
 /* ===== Tema NAVIRIS — el predeterminado (2026-08-21) =====
    Manda el NEGRO y el logo va en degradado blanco. La clase sigue siendo
    .mono porque la clave guardada no se renombra (ver TEMAS en renderer.js).
@@ -244,7 +245,7 @@
   --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
   --grad-medida: #ffffff;   /* la barra del monitor, BLANCA y sin degradado */
   --grad-fg: #131313;
-  --tab-fg: #a0a0a0; --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
+  --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
   --tab-asleep-fg: #7d7d7d; --fav-dot: #666666;
   --tab-active-bg: #343436; --tab-active-line: #4a4a4d;
   --winctl-fg: #c8c8c8; --winctl-hover: #2a2a2a; --winctl-active: #343434;
@@ -253,36 +254,41 @@
   --nav-fg: #bcbcbc; --nav-hover: #242424; --bm-fg: #c8c8c8;
   --track-knob: #7a7a7a; --track-on: #ffffff; --track-knob-on: #131313;
   --bar-from: #8a8a8a; --bar-to: #ffffff; --backdrop: rgba(8,8,8,.66);
-  --shadow-pop: rgba(0,0,0,.62); --shadow-panel: rgba(0,0,0,.55); --focus-ring: rgba(255,255,255,.10);
+  --shadow-pop: rgba(0,0,0,.62); --shadow-panel: rgba(0,0,0,.55);
   --page-bg: radial-gradient(120% 80% at 50% -10%, #262626 0%, #131313 60%);
   --checker-a: #1a1a1a; --checker-b: #151515;
   --hub-card: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(10,10,10,.26); --hub-card-line: rgba(255,255,255,.06);
-  --hub-input: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.03)), rgba(10,10,10,.30); --hub-input-line: #2c2c2c;
   --hub-fab: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(10,10,10,.30); --hub-fab-line: #333333;
-  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(10,10,10,.30); --hub-pill-line: rgba(255,255,255,.09); --hub-pill-fg: #f2f2f2;
+  --hub-pill: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04)), rgba(10,10,10,.30); --hub-pill-line: rgba(255,255,255,.09);
   --hub-hairline: rgba(255,255,255,.16); --hub-label: #a8a8a8;
   --tile-default: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(10,10,10,.26); --tile-line: rgba(255,255,255,.07);
   --cal-hoy-bg: #ffffff; --cal-hoy-fg: #131313;
   --tile-letter: #ffffff; --tile-mono: #ffffff; --dial-add-line: #3a3a3a;
-  --clock-shadow: rgba(0,0,0,.55); --wx-ic: #d0d0d0; --addons-plate: rgba(20,20,20,.94);
+  --wx-ic: #d0d0d0;
   --fav-filter: grayscale(1) brightness(1.6);
+  color-scheme: dark;
 }
 /* Lo cromatico que NO sale de un token y hay que apagar a mano */
 /* ===== REFORMA DEL HUB 2.8.1 (2026-09-09): superficies OPACAS =====
    Dosa dejó el cristal ("siento que no tiene futuro") y eligió la composición
    "Mosaico + dock": baldosas opacas de radio 18 con hueco de 12, y los accesos
-   en un dock abajo. Estos tokens PISAN a los de vidrio de cada tema (van
-   después en el archivo, misma especificidad). Sobre una foto clara,
+   en un dock abajo. Estos tokens PISAN a los de vidrio de cada tema: los de
+   :root a los del oscuro (van después en el archivo) y cada tema con su
+   propia línea, porque :root.mono o :root.light pesan más que :root (la de
+   mono se había quedado a medias y el tema de fábrica seguía con pastillas y
+   botones de cristal; auditoría 2026-10). Sobre una foto clara,
    #hub.bg-claro los vuelve a pisar con el juego blanco (más abajo). */
-:root { --hub-r: 18px; --hub-card: #151517; --hub-card-2: #1c1c1f; --hub-card-line: transparent;
-  --hub-input: #151517; --hub-input-line: transparent; --hub-fab: #151517; --hub-fab-line: rgba(255,255,255,.08);
-  --hub-pill: #151517; --hub-pill-line: rgba(255,255,255,.08); --hub-pill-fg: #ececec;
-  --tile-default: #1c1c1f; --tile-line: transparent; --addons-plate: #151517; --clock-shadow: transparent; }
-:root.mono { --hub-card: #151517; --hub-card-2: #1d1d20; --tile-default: #1d1d20; --hub-hairline: rgba(255,255,255,.14); }
-:root.light { --hub-card: #ffffff; --hub-card-2: #f1f2f5; --hub-card-line: rgba(18,20,26,.08); --hub-input: #ffffff; --hub-fab: #ffffff; --hub-fab-line: rgba(18,20,26,.10);
-  --hub-pill: #ffffff; --hub-pill-line: rgba(18,20,26,.10); --hub-pill-fg: #33353c; --tile-default: #ffffff; --tile-line: rgba(18,20,26,.08); --addons-plate: #ffffff; }
-:root.rosa { --hub-card: #ffffff; --hub-card-2: #fbf0f6; --hub-card-line: rgba(70,36,58,.10); --hub-input: #ffffff; --hub-fab: #ffffff; --hub-fab-line: rgba(70,36,58,.12);
-  --hub-pill: #ffffff; --hub-pill-line: rgba(70,36,58,.12); --hub-pill-fg: #46243a; --tile-default: #ffffff; --tile-line: rgba(70,36,58,.10); --addons-plate: #ffffff; }
+:root { --hub-r: 18px; --hub-card: #151517; --hub-card-line: transparent;
+  --hub-fab: #151517; --hub-fab-line: rgba(255,255,255,.08);
+  --hub-pill: #151517; --hub-pill-line: rgba(255,255,255,.08);
+  --tile-default: #1c1c1f; --tile-line: transparent; }
+:root.mono { --hub-card: #151517; --tile-default: #1d1d20; --hub-hairline: rgba(255,255,255,.14);
+  --hub-card-line: transparent; --hub-fab: #151517; --hub-fab-line: rgba(255,255,255,.08);
+  --hub-pill: #151517; --hub-pill-line: rgba(255,255,255,.08); --tile-line: transparent; }
+:root.light { --hub-card: #ffffff; --hub-card-line: rgba(18,20,26,.08); --hub-fab: #ffffff; --hub-fab-line: rgba(18,20,26,.10);
+  --hub-pill: #ffffff; --hub-pill-line: rgba(18,20,26,.10); --tile-default: #ffffff; --tile-line: rgba(18,20,26,.08); }
+:root.rosa { --hub-card: #ffffff; --hub-card-line: rgba(70,36,58,.10); --hub-fab: #ffffff; --hub-fab-line: rgba(70,36,58,.12);
+  --hub-pill: #ffffff; --hub-pill-line: rgba(70,36,58,.12); --tile-default: #ffffff; --tile-line: rgba(70,36,58,.10); }
 /* ===== DOCK de accesos (reforma 2.8.1) =====
    Los accesos dejan la rejilla y viven en un dock abajo al centro, como en un
    escritorio: tiles de 66 px sin nombre (el nombre va en el tooltip), la misma
@@ -336,6 +342,13 @@
   background: var(--realce); margin-top: -5px; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: transform var(--dur-1) var(--spring); }
 #op-slider:hover::-webkit-slider-thumb { transform: scale(1.15); }
 #hub.con-scroll .hub-scroll { inset: 0 0 var(--franja) 0; }
+/* El borde del recorte se DESVANECE (auditoría 2026-10): las tarjetas se
+   partían en seco contra la franja, a media línea y sin indicio de que hubiera
+   más debajo. Máscara estática, sin animación. Con las baldosas translúcidas
+   no se pone: la máscara dejaría su desenfoque sin el fondo que desenfocar. */
+#hub.con-scroll:not(.translucido) .hub-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
 #hub.con-scroll #widget-grid { padding-bottom: 24px; }
 /* Sitio arriba para la esquina de cuenta/clima/tema cuando el hub va en flujo */
 #hub.reflujo #widget-grid { padding-top: 92px; }
@@ -358,14 +371,12 @@
   #hub-dock .dk-sep { height: 30px; }
 }
 
-#hub.editing .hub-corner, #hub.editing #hub-version { opacity: .25; pointer-events: none; }
 :root.mono .tab.mini { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
 :root.mono .tab.mini.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
 :root.mono .tab.farming .t-fav { filter: grayscale(1) drop-shadow(0 0 4px rgba(255,255,255,.55)); }
 :root.mono .lp-title span[data-ico] svg { color: #d6d6d6; }
-:root.mono #sb-loot.on-twitch { color: #ffffff; }
-:root.mono .loot-go { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: #131313; }
-:root.mono .wp-custom.sel { border-color: #ffffff; }
+:root.mono #sb-loot.on-twitch { color: var(--realce); }
+:root.mono .loot-go:not(.off) { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: var(--accent-fg); }
 :root.mono .ctx-item.danger, :root.mono .ctx-item.danger .ctx-ic { color: #ffffff; }
 :root.mono .ctx-item.danger:hover { background: rgba(255,255,255,.12); }
 :root.mono #win-close:active { background: #d0d0d0; color: #131313; }
@@ -376,8 +387,8 @@
 :root.mono #agent-badge.connected .ab-dot { background: #ffffff; }
 :root.mono #content webview.agent-controlled.active { outline-color: #ffffff; }
 :root.mono .adp-badge.on { border-color: #3a3a3a; }
-:root.mono .adp-btn.danger:hover { border-color: #6a6a6a; color: #ffffff; }
-:root.mono .ls-btn.stop, :root.mono .au-err { color: #e0e0e0; }
+:root.mono .adp-btn.danger:hover { border-color: #6a6a6a; color: var(--danger); }
+:root.mono .ls-btn.stop { color: #e0e0e0; }
 :root.mono .mp-item.done, :root.mono .mp-item.done .mi-dl { border-color: rgba(255,255,255,.35); }
 :root.mono .mp-item.done::after { background: rgba(0,0,0,.8); border-color: rgba(255,255,255,.30); }
 :root.mono .perm-row .pr-state.allow, :root.mono .perm-row .pr-state.block { background: rgba(255,255,255,.12); }
@@ -392,12 +403,18 @@
 /* El play de Spotify va con relleno ENTERO: --grad-realce se apaga hacia el
    gris a mitad del circulo y sobre una foto de fondo el boton se perdia. */
 :root.mono .w-sp .sp-play, :root.mono .w-sp .sp-play:hover { background: var(--accent); color: var(--accent-fg); }
-:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-a { stop-color: #ffffff; }
-:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-b { stop-color: #ededed; }
-:root.mono .iris-slot:not(.splash-iris) .iris-logo stop.i-c { stop-color: #b4b4b4; }
+:root.mono .iris-slot .iris-logo stop.i-a { stop-color: #ffffff; }
+:root.mono .iris-slot .iris-logo stop.i-b { stop-color: #ededed; }
+:root.mono .iris-slot .iris-logo stop.i-c { stop-color: #b4b4b4; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
+/* Foco por teclado propio (auditoría 2026-10): sin esto salía el anillo ámbar
+   de Chromium, que toma el color de acento de Windows. Con el ratón no aparece.
+   En el hub, neutro como el resto de sus piezas. Los campos de texto llevan su
+   propio foco (outline: none y halo), y esas reglas pesan más que esta. */
+:focus-visible { outline: 2px solid var(--realce); outline-offset: 2px; }
+:where(#hub) :focus-visible { outline-color: color-mix(in srgb, var(--text) 70%, transparent); }
 .hidden { display: none !important; }
 
 /* Iconos */
@@ -524,7 +541,7 @@ body.sacando-pestana { cursor: copy; }
    pasar por encima: habia que adivinar donde estaba y afinar el raton en 18
    px. Ahora va tenue de serie, en 21 px de zona pinchable, y se enciende al
    apuntarla. */
-.tab .t-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 6px; width: 21px; height: 21px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .75; transition: background .12s, color .12s, opacity .12s; }
+.tab .t-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 6px; width: 21px; height: 21px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .75; transition: background var(--dur-1), color var(--dur-1), opacity var(--dur-1); }
 .tab:hover .t-close, .tab.active .t-close { opacity: 1; }
 .tab .t-close:hover { background: var(--btn-hover); color: var(--text-strong); opacity: 1; }
 /* Pestaña de grupo AutoLoot (colapsa todos los canales en autoloot) */
@@ -539,18 +556,17 @@ body.sacando-pestana { cursor: copy; }
 .loot-empty { color: var(--dim); font-size: 12.5px; line-height: 1.5; padding: 8px 4px; }
 
 /* Slider de opacidad para el fondo transparente */
-.wp-custom.sel { border-style: solid; border-color: #9170d6; color: var(--text); }
 
 /* Fondo del hub transparente: deja ver el escritorio (acrílico de Windows) */
 /* Botón de silencio de pestaña */
-.tab .t-mute { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .12s, color .12s; }
+.tab .t-mute { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background var(--dur-1), color var(--dur-1); }
 .tab .t-mute svg { width: 13px; height: 13px; }
 .tab .t-mute:hover { background: var(--btn-hover); color: var(--text); }
 .tab .t-mute.muted { color: var(--accent-2); }
 
 /* Menú contextual */
-.ctx-menu { position: fixed; z-index: 590; min-width: 190px; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; box-shadow: 0 12px 34px var(--shadow-panel); animation: pop-in var(--dur-1) var(--spring) both; }
-.ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+.ctx-menu { position: fixed; z-index: 590; min-width: 190px; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-1) var(--spring) both; }
+.ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 8px 10px; border-radius: var(--r-s); cursor: pointer; }
 .ctx-item:hover { background: var(--wash); }
 .ctx-item.danger { color: #e57373; }
 .ctx-item.danger:hover { background: rgba(229,115,115,.12); }
@@ -559,12 +575,12 @@ body.sacando-pestana { cursor: copy; }
 .ctx-ic svg { width: 15px; height: 15px; }
 .ctx-sep { height: 1px; background: var(--line); margin: 4px 6px; }
 /* El + tambien era pequeño y tenue de mas para lo que se usa. */
-#newtab-btn { width: 30px; height: 30px; margin: 0 4px; border: none; border-radius: 8px; background: transparent; color: var(--text); opacity: .8; cursor: pointer; transition: background .12s, opacity .12s; }
+#newtab-btn { width: 30px; height: 30px; margin: 0 4px; border: none; border-radius: 8px; background: transparent; color: var(--text); opacity: .8; cursor: pointer; transition: background var(--dur-1), opacity var(--dur-1); }
 #newtab-btn:hover { background: var(--hover); opacity: 1; }
 /* Controles de ventana al estilo de Windows 11: iconos nítidos, superficie
    completa al pasar por encima y el de cerrar en rojo. */
 .win-controls { display: flex; height: 100%; }
-.win-controls button { width: 46px; height: 100%; border: none; background: transparent; color: var(--winctl-fg); cursor: pointer; transition: background .12s ease, color .12s ease; }
+.win-controls button { width: 46px; height: 100%; border: none; background: transparent; color: var(--winctl-fg); cursor: pointer; transition: background var(--dur-1) ease, color var(--dur-1) ease; }
 .win-controls button:hover { background: var(--winctl-hover); color: var(--text-strong); }
 .win-controls button:active { background: var(--winctl-active); }
 #win-close:hover { background: var(--danger); color: #fff; }
@@ -630,7 +646,7 @@ body.sacando-pestana { cursor: copy; }
 /* Botones de la navbar: más presencia. Antes quedaban apagados (gris tenue sobre
    fondo oscuro y sin forma propia); ahora tienen color legible en reposo, una
    superficie definida al pasar por encima y un estado activo con marca. */
-#navbar > button { width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--nav-fg); cursor: pointer; transition: background .13s ease, color .13s ease, transform .09s ease; }
+#navbar > button { width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--nav-fg); cursor: pointer; transition: background var(--dur-2) ease, color var(--dur-2) ease, transform .09s ease; }
 #navbar > button svg { width: 18px; height: 18px; }
 #navbar > button:active:not(:disabled) { transform: scale(.93); }
 #navbar > button:hover:not(:disabled) { background: var(--wash); color: var(--realce); }
@@ -641,18 +657,19 @@ body.sacando-pestana { cursor: copy; }
 #nav-star.removing { color: var(--danger); }
 #nav-shield.off { color: var(--dim); }
 #nav-shield.open { background: var(--bg-3); color: var(--text); }
-#urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s; }
+#urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color var(--dur-2), box-shadow var(--dur-2); }
 /* Foco de la barra: SIN borde de color (cantaba mucho con el lima). Solo un
    halo tenue del realce y el borde a su gris de siempre. */
-#urlbox:focus-within { border-color: var(--line-3); box-shadow: 0 0 0 3px var(--wash); }
+/* El halo es del campo: el candado (un botón) también toma el foco y no debe encenderlo */
+#urlbox:has(#urlbar:focus) { border-color: var(--line-3); box-shadow: 0 0 0 3px var(--wash); }
 /* El lima vive en los HOVER: la barra se tiñe al pasar el ratón */
-#urlbox:hover:not(:focus-within) { border-color: color-mix(in srgb, var(--realce) 30%, var(--line)); }
+#urlbox:hover:not(:has(#urlbar:focus)) { border-color: color-mix(in srgb, var(--realce) 30%, var(--line)); }
 #url-secure { color: var(--text-dim); }
 #urlbar { flex: 1; border: none; outline: none; background: transparent; color: var(--text); font-size: 13px; }
 #urlbar::placeholder { color: var(--dim); }
 
-#suggest { position: absolute; top: calc(100% + 6px); left: -1px; right: -1px; z-index: 550; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; padding: 5px; box-shadow: var(--elev-pop); max-height: 340px; overflow-y: auto; animation: pop-in .28s var(--spring) both; }
-.sug { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+#suggest { position: absolute; top: calc(100% + 6px); left: -1px; right: -1px; z-index: 550; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; box-shadow: var(--elev-pop); max-height: 340px; overflow-y: auto; animation: fade-in var(--dur-1) var(--ease) both; }
+.sug { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-s); cursor: pointer; font-size: 13px; }
 .sug .sug-ic { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
 .sug .sug-ic img { width: 16px; height: 16px; border-radius: 4px; }
 .sug .sug-ic svg { width: 14px; height: 14px; }
@@ -668,16 +685,21 @@ body.sacando-pestana { cursor: copy; }
 #bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 12px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-radius: 999px; margin: 0 10px 6px 4px; }
 #bookmarks-bar::-webkit-scrollbar { display: none; }
 #bookmarks-bar.hidden, #bookmarks-bar.empty { display: none !important; }
-.bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--bm-fg); cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background .12s, color .12s; }
+.bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--bm-fg); cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background var(--dur-1), color var(--dur-1); }
 .bookmark:hover, .bm-folder:hover { background: var(--wash); color: var(--realce); }
 .bookmark img { width: 14px; height: 14px; border-radius: 3px; }
+/* Un título largo no se come la barra (auditoría 2026-10): tope y elipsis.
+   Y el borde derecho se desvanece en vez de cortar un marcador a medias: el
+   velo es pegajoso y, si todo cabe, cae sobre el hueco vacío del final. */
+#bookmarks-bar .bookmark span, #bookmarks-bar .bm-folder span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+#bookmarks-bar::after { content: ""; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: auto; background: linear-gradient(to right, transparent, var(--bg-2)); pointer-events: none; }
 .bm-folder svg { width: 14px; height: 14px; color: var(--text-dim); }
-.bm-folder-pop { position: fixed; z-index: 560; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 10px; padding: 5px; min-width: 200px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; overflow-y: auto; overscroll-behavior: contain; }
+.bm-folder-pop { position: fixed; z-index: 560; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; min-width: 200px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; overflow-y: auto; overscroll-behavior: contain; }
 .bm-folder-pop .bookmark { width: 100%; }
 .bm-folder-pop:not(:has(> :not(.nvs-bar)))::after { content: "Carpeta vacía"; color: var(--dim); font-size: 12px; padding: 8px; display: block; }
 
 /* Popups */
-#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain; }
+#menu-pop, #shield-pop, #res-pop, #rat-pop, #loot-pop, #site-pop { position: fixed; z-index: 500; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(.94); } to { opacity: 1; transform: none; } }
 /* El menu NO puede pasar de la pantalla (2026-08-13). En una ventana baja se
    salia por abajo y lo de mas abajo —incluido BUSCAR ACTUALIZACIONES— no habia
@@ -685,7 +707,7 @@ body.sacando-pestana { cursor: copy; }
    al alto disponible y hace scroll dentro. */
 #menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column;
   max-height: calc(100vh - var(--titlebar-h) - var(--navbar-h) - 34px); overflow-y: auto; overscroll-behavior: contain; }
-#menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: 7px; cursor: pointer; }
+#menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: var(--r-s); cursor: pointer; }
 #menu-pop button:hover { background: var(--wash); }
 #menu-pop hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
 /* Version nueva disponible: punto en el boton del menu y la entrada de
@@ -695,7 +717,7 @@ body.sacando-pestana { cursor: copy; }
   background: var(--realce); box-shadow: 0 0 0 2px var(--bg-2); }
 #menu-pop button.destacado { color: var(--realce); font-weight: 600; }
 #menu-pop .kbd { color: var(--dim); font-size: 11px; }
-.menu-toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13px; cursor: pointer; border-radius: 7px; }
+.menu-toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13px; cursor: pointer; border-radius: var(--r-s); }
 .menu-toggle:hover { background: var(--wash); }
 .menu-toggle small { color: var(--text-dim); }
 /* Icono en línea junto a un texto (toggle del menú, títulos de modal) */
@@ -704,8 +726,8 @@ body.sacando-pestana { cursor: copy; }
 .modal-card h3 .mt-ico svg { width: 16px; height: 16px; }
 /* Mismo lenguaje que el interruptor del AdBlock: en todo Naviris los ajustes
    se encienden y apagan igual (antes aquí había checkboxes nativos de Chromium). */
-.menu-toggle input { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--track); position: relative; flex-shrink: 0; cursor: pointer; margin: 0; transition: background .15s; }
-.menu-toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--track-knob); transition: transform .15s, background .15s; }
+.menu-toggle input { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--track); position: relative; flex-shrink: 0; cursor: pointer; margin: 0; transition: background var(--dur-2); }
+.menu-toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--track-knob); transition: transform var(--dur-2), background var(--dur-2); }
 .menu-toggle input:checked { background: var(--track-on); }
 .menu-toggle input:checked::after { transform: translateX(16px); background: var(--track-knob-on); }
 
@@ -719,18 +741,18 @@ body.sacando-pestana { cursor: copy; }
 .stp-row.danger, .stp-row.danger .stp-ic { color: var(--danger); }
 .stp-txt { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .stp-txt small { color: var(--text-dim); font-size: 11px; }
-.stp-btn { border: none; background: transparent; cursor: pointer; text-align: left; font-family: inherit; transition: background .12s; }
+.stp-btn { border: none; background: transparent; cursor: pointer; text-align: left; font-family: inherit; transition: background var(--dur-1); }
 .stp-btn:hover { background: var(--hover); }
 .stp-go { color: var(--dim); display: inline-flex; }
 .stp-go svg { width: 13px; height: 13px; }
 .stp-act { border: 1px solid var(--line-3); background: var(--btn); color: var(--text); font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-family: inherit; }
 .stp-act:hover { background: var(--btn-hover); }
-#url-secure { cursor: pointer; border-radius: 6px; padding: 2px; }
+#url-secure { cursor: pointer; border-radius: 6px; padding: 2px; border: none; background: none; }
 #url-secure:hover { background: var(--nav-hover); }
 .sp-head { display: flex; justify-content: space-between; align-items: center; }
 .sp-title { font-size: 13.5px; font-weight: 600; }
 .sp-count { font-size: 12px; color: var(--text-dim); }
-.sp-site { border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color .12s, background .12s; }
+.sp-site { border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color var(--dur-1), background var(--dur-1); }
 .sp-site:hover { border-color: var(--focus); background: var(--hover); }
 .sp-list-title { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); margin-top: 2px; }
 .sp-list { display: flex; flex-direction: column; gap: 2px; max-height: 160px; overflow-y: auto; }
@@ -753,7 +775,7 @@ body.sacando-pestana { cursor: copy; }
 .rat-brand { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
 .rat-sub { font-size: 11px; color: var(--text-dim); }
 #rat-url { height: 34px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 11px; font-size: 12.5px; outline: none; }
-#rat-url:focus { border-color: var(--focus); }
+#rat-url:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 .rat-plat { font-size: 11px; color: var(--text-dim); min-height: 14px; }
 .rat-plat b { color: var(--ok); font-weight: 600; }
 .rat-detect { display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
@@ -765,9 +787,9 @@ body.sacando-pestana { cursor: copy; }
 .rat-xrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-dim); padding: 4px 2px; cursor: pointer; }
 .rat-qrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-dim); padding: 2px 2px; }
 .rat-qrow select { height: 30px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 8px; font-size: 12.5px; outline: none; cursor: pointer; min-width: 130px; }
-.rat-qrow select:focus { border-color: var(--focus); }
+.rat-qrow select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 .rat-btns { display: flex; gap: 8px; }
-.rat-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); font-size: 12.5px; padding: 10px; border-radius: 9px; cursor: pointer; transition: background .12s, border-color .12s; }
+.rat-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); font-size: 12.5px; padding: 10px; border-radius: 9px; cursor: pointer; transition: background var(--dur-1), border-color var(--dur-1); }
 .rat-btn svg { width: 15px; height: 15px; color: var(--text-dim); }
 .rat-btn:hover { background: var(--hover); border-color: var(--line-3); }
 .rat-note { font-size: 11px; color: var(--dim); line-height: 1.5; }
@@ -779,34 +801,34 @@ body.sacando-pestana { cursor: copy; }
 /* Switch */
 .switch { position: relative; width: 38px; height: 21px; flex-shrink: 0; cursor: pointer; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.switch .slider { position: absolute; inset: 0; border-radius: 999px; background: var(--track); transition: background .15s; }
-.switch .slider::after { content: ""; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: var(--track-knob); transition: transform .15s, background .15s; }
+.switch .slider { position: absolute; inset: 0; border-radius: 999px; background: var(--track); transition: background var(--dur-2); }
+.switch .slider::after { content: ""; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: var(--track-knob); transition: transform var(--dur-2), background var(--dur-2); }
 .switch input:checked + .slider { background: var(--track-on); }
 .switch input:checked + .slider::after { transform: translateX(17px); background: var(--track-knob-on); }
 
 /* Paneles laterales derechos */
 /* Panel lateral como cápsula flotante, a juego con el sidebar */
-.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 24px); right: 16px; bottom: 16px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in .42s cubic-bezier(.3,1.22,.4,1) both; }
+.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 24px); right: 16px; bottom: 16px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in var(--dur-3) var(--spring) both; }
 @keyframes panel-in { from { transform: translateX(44px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
 .mp-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 12px; font-size: 15px; font-weight: 650; letter-spacing: .2px; }
 .mp-tools { display: flex; gap: 4px; }
-.mp-tools button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 26px; height: 26px; border-radius: 7px; transition: background .12s, color .12s; }
+.mp-tools button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 26px; height: 26px; border-radius: 7px; transition: background var(--dur-1), color var(--dur-1); }
 .mp-tools button:hover { background: var(--bg-3); color: var(--text); }
 .mp-tools [data-ico] svg { width: 14px; height: 14px; }
 .mp-filters { display: flex; gap: 6px; padding: 0 16px 12px; }
-.mp-chip { font-size: 11.5px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); cursor: pointer; transition: all .12s; }
+.mp-chip { font-size: 11.5px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); cursor: pointer; transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1); }
 .mp-chip:hover { color: var(--text); border-color: var(--focus); }
 .mp-chip.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 #mp-grid { flex: 1; overflow-y: auto; padding: 2px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
 /* (sin scrollbar propio: toda la UI usa el overlay Fluent de Chromium) */
-.mp-item { position: relative; border-radius: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); flex-shrink: 0; transition: border-color .12s; }
+.mp-item { position: relative; border-radius: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); flex-shrink: 0; transition: border-color var(--dur-1); }
 .mp-item:hover { border-color: var(--line-3); }
 .mp-item img, .mp-item video { width: 100%; max-height: 240px; min-height: 72px; object-fit: contain; display: block; background: repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%) 0 0 / 18px 18px; }
 .mp-item .mi-fallback { height: 90px; display: flex; align-items: center; justify-content: center; color: var(--dim); }
 .mp-item .mi-fallback svg { width: 26px; height: 26px; }
 .mp-item .mi-meta { font-size: 10px; padding: 5px 10px; color: var(--text-dim); display: flex; justify-content: space-between; border-top: 1px solid var(--line); background: var(--bg-2); font-variant-numeric: tabular-nums; }
-.mp-item .mi-dl { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 8px; background: rgba(8,8,10,.8); border: 1px solid rgba(255,255,255,.16); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; cursor: pointer; transition: opacity .12s, background .12s; }
-.mp-item:hover .mi-dl { opacity: 1; }
+.mp-item .mi-dl { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 8px; background: rgba(8,8,10,.8); border: 1px solid rgba(255,255,255,.16); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; cursor: pointer; transition: opacity var(--dur-1), background var(--dur-1); }
+.mp-item:hover .mi-dl, .mp-item:focus-within .mi-dl { opacity: 1; }
 .mp-item .mi-dl:hover { background: rgba(30,30,34,.95); }
 .mp-item .mi-dl svg { width: 13px; height: 13px; }
 .mp-item.done { border-color: rgba(127,211,155,.4); }
@@ -815,7 +837,7 @@ body.sacando-pestana { cursor: copy; }
 .mp-empty { color: var(--dim); font-size: 12.5px; text-align: center; padding: 44px 20px; line-height: 1.7; }
 .mp-foot { padding: 12px 16px; border-top: 1px solid var(--line); }
 /* CTA primario: píldora del acento con contenido oscuro (referencias verdes) */
-.primary-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: var(--accent-fg); border: none; border-radius: var(--r-full); padding: 11px; font-weight: 650; font-size: 13px; cursor: pointer; transition: background .12s, transform .1s; }
+.primary-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: var(--accent-fg); border: none; border-radius: var(--r-full); padding: 11px; font-weight: 650; font-size: 13px; cursor: pointer; transition: background var(--dur-1), transform .1s; }
 .primary-btn:hover { background: var(--accent-hover); }
 .primary-btn:active { transform: scale(.98); }
 .primary-btn svg { width: 15px; height: 15px; }
@@ -860,7 +882,7 @@ body.sacando-pestana { cursor: copy; }
 /* Historial */
 .hist-search { padding: 0 16px 12px; }
 .hist-search input { width: 100%; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 12px; font-size: 12.5px; outline: none; }
-.hist-search input:focus { border-color: var(--focus); }
+.hist-search input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 #history-list { flex: 1; overflow-y: auto; padding: 0 12px 8px; display: flex; flex-direction: column; gap: 2px; }
 #history-list:not(:has(> :not(.nvs-bar)))::after { content: "No hay historial."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 30px 12px; display: block; }
 .hist-day { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); padding: 12px 8px 4px; }
@@ -874,10 +896,10 @@ body.sacando-pestana { cursor: copy; }
 .hist-u { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist-time { font-size: 10.5px; color: var(--dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .hist-x { border: none; background: transparent; color: transparent; cursor: pointer; width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.hist-item:hover .hist-x { color: var(--text-dim); }
+.hist-item:hover .hist-x, .hist-item:focus-within .hist-x { color: var(--text-dim); }
 .hist-x:hover { background: var(--bg-2); color: var(--danger) !important; }
 .hist-x svg { width: 12px; height: 12px; }
-.danger-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: var(--danger); border: 1px solid rgba(229,72,77,.35); border-radius: 10px; padding: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background .12s; }
+.danger-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: var(--danger); border: 1px solid rgba(229,72,77,.35); border-radius: 10px; padding: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background var(--dur-1); }
 .danger-btn:hover { background: rgba(229,72,77,.12); }
 .danger-btn svg { width: 15px; height: 15px; }
 
@@ -886,12 +908,12 @@ body.sacando-pestana { cursor: copy; }
 .pw-hint b { color: var(--text); font-weight: 600; }
 .pw-form { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
 .pw-form input { height: 34px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 11px; font-size: 12.5px; outline: none; }
-.pw-form input:focus { border-color: var(--focus); }
+.pw-form input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 .pw-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .pw-form-actions button { border: none; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; background: var(--btn); color: var(--text); }
 .pw-form-actions button:hover { background: var(--btn-hover); }
 #pw-list { flex: 1; overflow-y: auto; padding: 0 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-#pw-list:not(:has(> :not(.nvs-bar)))::after { content: "Aún no has guardado contraseñas. Pulsa + para añadir una."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 30px 12px; line-height: 1.6; display: block; }
+#pw-list:not(:has(> :not(.nvs-bar)))::after { content: "Aún no has guardado contraseñas. Haz clic en + para añadir una."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 30px 12px; line-height: 1.6; display: block; }
 .pw-item { background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; }
 .pw-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
 .pw-ic img { width: 18px; height: 18px; border-radius: 4px; }
@@ -910,7 +932,7 @@ body.sacando-pestana { cursor: copy; }
 #pw-sec-pw, #pw-sec-cards { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #pw-sec-pw.hidden, #pw-sec-cards.hidden { display: none; }
 #card-list { flex: 1; overflow-y: auto; padding: 0 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-#card-list:not(:has(> :not(.nvs-bar)))::after { content: "Aún no has guardado tarjetas. Pulsa + para añadir una."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 30px 12px; line-height: 1.6; display: block; }
+#card-list:not(:has(> :not(.nvs-bar)))::after { content: "Aún no has guardado tarjetas. Haz clic en + para añadir una."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 30px 12px; line-height: 1.6; display: block; }
 .card-chip { font-size: 9px; font-weight: 700; letter-spacing: .3px; color: var(--text-dim); text-transform: uppercase; }
 .card-num { font-family: var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
 .card-exp-row { display: flex; gap: 8px; }
@@ -920,7 +942,7 @@ body.sacando-pestana { cursor: copy; }
 .dl-hint { font-size: 11px; color: var(--dim); padding: 0 16px 8px; }
 #dl-list { flex: 1; overflow-y: auto; padding: 0 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 #dl-list:not(:has(> :not(.nvs-bar)))::after { content: "No hay descargas todavía."; color: var(--dim); font-size: 12.5px; text-align: center; padding: 34px 12px; }
-.dl-item { background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: border-color .12s, background .12s; }
+.dl-item { background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
 .dl-item.done:hover { border-color: var(--line-3); background: var(--hover); }
 .dl-top { display: flex; align-items: center; gap: 10px; }
 .dl-kind { width: 30px; height: 30px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex-shrink: 0; }
@@ -947,8 +969,12 @@ body.sacando-pestana { cursor: copy; }
    redondeada lo revela como un trazo claro en las cuatro esquinas. El
    contenedor va del color del lienzo (costura invisible) y el suelo blanco
    de página lo pone el PROPIO webview, dentro del recorte. */
-#content { flex: 1; position: relative; background: var(--bg); min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; transition: margin .45s cubic-bezier(.3,1.25,.42,1); }
-#content webview.active { border-radius: 18px; background: #fff; }
+#content { flex: 1; position: relative; background: var(--bg); min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; }
+/* El suelo blanco se redondea a 20 px, un poco más que el recorte de #content
+   (18): así su antialiasing queda debajo de la página y no asoma como un arco
+   claro en las esquinas cuando la web es oscura (auditoría 2026-10). Sin suelo
+   no vale: una web que no declara fondo saldría con el texto sobre el lienzo. */
+#content webview.active { border-radius: 20px; background: #fff; }
 #content webview { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 #content webview.active { display: flex; }
 /* Pestañas de AutoLoot inactivas: se mantienen RENDERIZADAS fuera de pantalla
@@ -965,6 +991,9 @@ body.sacando-pestana { cursor: copy; }
 /* Verde cuando hay un agente conectado/actuando (ámbar = activo pero sin agente). */
 #agent-badge.connected { color: #22c55e; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.45); }
 #agent-badge.connected .ab-dot { background: #22c55e; }
+/* En los temas claros el ámbar y el verde no se leían (2:1); el mismo tono, más hondo */
+:root.light #agent-badge, :root.rosa #agent-badge { color: #b45309; }
+:root.light #agent-badge.connected, :root.rosa #agent-badge.connected { color: #15803d; }
 /* Punto ámbar en las pestañas que el agente está usando. */
 .tab .t-agent { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin: 0 4px; flex: 0 0 auto; }
 #content.res-mode { background: var(--bg); }
@@ -1004,13 +1033,15 @@ body.sacando-pestana { cursor: copy; }
    scroll) vuelve al anclaje superior natural. */
 #widget-grid { margin: 0 auto; padding: 24px 0 130px; display: grid; justify-content: center; height: 100%; align-content: center; }
 #hub.con-scroll #widget-grid { height: auto; align-content: start; }
-#celda-fantasma { border: 2px dashed var(--realce); border-radius: 20px; background: color-mix(in srgb, var(--realce) 10%, transparent); pointer-events: none; z-index: 5; }
+#celda-fantasma { border: 2px dashed var(--realce); border-radius: var(--hub-r); background: color-mix(in srgb, var(--realce) 10%, transparent); pointer-events: none; z-index: 5; }
 #celda-fantasma.mal { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 /* El buscador centra su pastilla dentro de su rectangulo de celdas */
 .w-searchwrap { display: flex; align-items: center; height: 100%; }
 .w-searchwrap form { width: 100%; }
-.widget { position: relative; animation: rise-in .5s cubic-bezier(.2,.7,.3,1) both; }
-@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+/* Sin entrada propia (auditoría 2026-10): renderHub rehace la rejilla al mover
+   un widget, cambiar de tema o tocar un acceso, y todo el hub volvía a "entrar"
+   medio segundo. La única entrada es la del arranque (#hub.estrenando). */
+.widget { position: relative; }
 /* Limpieza (petición 2026-08-11: "no es poner sombras en cada recuadro, es
    un diseño mucho más limpio"): la tarjeta es UNA superficie suave, sin borde
    ni sombra — separa el espacio, no el trazo. */
@@ -1037,7 +1068,6 @@ body.sacando-pestana { cursor: copy; }
 .w-clock { container: ck / size; text-align: left; position: relative; display: flex; flex-direction: column; justify-content: center; }
 @container ck (max-height: 132px) { .w-clock .time { font-size: 34px; } .ck-fecha { display: none; } }
 @container ck (max-height: 100px) { .w-clock .time { font-size: 26px; } .w-clock .greet { display: none; } }
-.ck-chip { display: none; }
 .ck-fecha { color: var(--text-dim); font-size: 12px; margin-top: 10px; }
 /* Jerarquía: el reloj es EL dato grande de la portada (referencias: número
    protagonista + etiqueta pequeña debajo) */
@@ -1076,7 +1106,7 @@ body.sacando-pestana { cursor: copy; }
 /* Widget: notas */
 .w-notes textarea { width: 100%; min-height: 90px; resize: vertical; background: transparent; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.6; }
 .w-notes textarea::placeholder { color: var(--dim); }
-.w-head { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }
+.w-head { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
 .w-head svg { width: 13px; height: 13px; }
 
 /* Widget: accesos (tiles) */
@@ -1100,12 +1130,12 @@ body.sacando-pestana { cursor: copy; }
    salga como en un dock de verdad. */
 .w-shortcuts { overflow: visible; }
 /* Tiles de los accesos: opacos, en el tono del tema (reforma 2.8.1). */
-.d-tile { width: 92px; height: 92px; border-radius: 30px; transform-origin: 50% 100%; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile, var(--tile-default)); transition: transform var(--dur-3) var(--spring), box-shadow .18s;
+.d-tile { width: 92px; height: 92px; border-radius: 30px; transform-origin: 50% 100%; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--tile-default); transition: transform var(--dur-3) var(--spring), box-shadow .18s;
   transform: translate3d(0, var(--dk-y, 0px), 0) scale(var(--dk-e, 1)); }
 .d-tile img { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); object-fit: contain; position: relative; z-index: 1; }
 /* Favicon del acceso: monocromo y con el brillo del tema (claro en tiles oscuros, oscuro en tiles claros) */
 .d-tile img.d-fav { filter: var(--fav-filter); }
-.d-tile .d-letter { font-size: 30px; font-weight: 650; color: var(--letter, var(--tile-letter)); position: relative; z-index: 1; }
+.d-tile .d-letter { font-size: 30px; font-weight: 650; color: var(--tile-letter); position: relative; z-index: 1; }
 .d-tile .d-mono { width: 40px; height: 40px; color: var(--tile-mono); position: relative; z-index: 1; }
 .d-tile .d-mono svg { width: 40px; height: 40px; }
 /* La opción "Logos a color" se ELIMINÓ (2026-08-11): los accesos van siempre
@@ -1114,17 +1144,17 @@ body.sacando-pestana { cursor: copy; }
 .dial:active .d-tile { --dk-y: -2px; --dk-e: .96; transition-duration: .08s; }
 /* line-height FIJA: el alto del nombre entra en la cuenta de altoAccesos() y
    con `normal` lo pone la tipografia (y cambia de un equipo a otro). */
-.d-name { font-size: 11.5px; line-height: 14px; color: var(--text-dim); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+.d-name { font-size: 11.5px; line-height: 14px; max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-2); }
 .dial:hover .d-name { color: var(--text); }
 /* Eliminar tile: solo en modo edición */
 .d-x { position: absolute; top: -6px; left: -6px; z-index: 4; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); background: var(--danger); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; }
 .d-x svg { width: 11px; height: 11px; }
 #hub.editing .d-x { display: flex; }
-#hub.editing .dial { animation: jiggle .3s ease-in-out infinite alternate; }
+#hub.editing .dial { animation: jiggle .3s ease-in-out 4 alternate; }
 @keyframes jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
 .dial.add .d-tile { background: transparent; border: 1.5px dashed var(--dial-add-line); color: var(--dim); }
 .dial.add .d-tile svg { width: 22px; height: 22px; }
-.dial.add:hover .d-tile { border-color: #4a4b52; color: var(--text); box-shadow: none; --dk-y: 0px; }
+.dial.add:hover .d-tile { color: var(--text); box-shadow: none; --dk-y: 0px; }
 
 /* Modo edición de widgets */
 .widget .w-tools { position: absolute; top: -10px; right: -8px; z-index: 5; display: none; gap: 4px; }
@@ -1140,7 +1170,7 @@ body.sacando-pestana { cursor: copy; }
 /* Esquina superior derecha del hub (como Opera GX): cuenta, clima y tema en
    pastillas opacas, apiladas en vertical. */
 .hub-corner { position: absolute; right: 18px; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.hub-pill { display: inline-flex; align-items: center; gap: 8px; overflow: hidden; border: 1px solid transparent; background: var(--hub-pill); color: var(--hub-pill-fg); font-size: 12px; padding: 7px 12px; border-radius: 999px; box-shadow: none; }
+.hub-pill { display: inline-flex; align-items: center; gap: 8px; overflow: hidden; border: 1px solid transparent; background: var(--hub-pill); font-size: 12px; padding: 7px 12px; border-radius: 999px; box-shadow: none; }
 button.hub-pill { cursor: pointer; transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); font-family: inherit; }
 button.hub-pill:hover { border-color: var(--focus); color: var(--text); transform: translateY(-1px); }
 button.hub-pill:active { transform: translateY(0) scale(.97); }
@@ -1153,17 +1183,20 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* Interruptor de tema del hub: la bolita se desliza de la luna al sol con una
    transición finita al hacer clic (nada de animaciones infinitas). */
 .theme-switch { position: relative; gap: 0; padding: 5px 8px; width: 66px; justify-content: space-between; overflow: hidden; }
-.theme-switch .ts-ico { position: relative; z-index: 1; display: inline-flex; width: 24px; justify-content: center; transition: color .3s; }
+.theme-switch .ts-ico { position: relative; z-index: 1; display: inline-flex; width: 24px; justify-content: center; transition: color var(--dur-3); }
 .theme-switch .ts-ico:first-child { color: var(--text); }
 .theme-switch .ts-ico:nth-child(2) { color: var(--hub-label); }
 :root.light .theme-switch .ts-ico:first-child, :root.rosa .theme-switch .ts-ico:first-child { color: var(--hub-label); }
 :root.light .theme-switch .ts-ico:nth-child(2), :root.rosa .theme-switch .ts-ico:nth-child(2) { color: var(--text); }
-.theme-switch .ts-knob { position: absolute; left: 4px; top: 3px; bottom: 3px; width: 28px; border-radius: 999px; background: var(--chip-hover); border: 1px solid var(--hub-pill-line); transition: transform .35s cubic-bezier(.34, 1.35, .45, 1); }
+.theme-switch .ts-knob { position: absolute; left: 4px; top: 3px; bottom: 3px; width: 28px; border-radius: 999px; background: var(--chip-hover); border: 1px solid var(--hub-pill-line); transition: transform var(--dur-3) var(--spring); }
 /* El rosa también es claro: la bolita se va al sol, como en el modo claro */
 :root.light .theme-switch .ts-knob, :root.rosa .theme-switch .ts-knob { transform: translateX(30px); }
 
 /* Modal de cuenta */
 .acc-error { color: var(--danger); font-size: 12px; }
+/* Los campos van dentro de esta vista, no sueltos en la tarjeta: necesitan su
+   propia columna para ocupar el ancho y separarse como en el resto de modales. */
+#acc-login-view { display: flex; flex-direction: column; gap: 12px; }
 .acc-last { color: var(--text-dim); font-size: 12px; }
 
 /* FAB + paneles del hub */
@@ -1176,11 +1209,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .hub-fab.on { background: var(--grad-realce); color: var(--grad-fg); border-color: transparent; box-shadow: var(--glow); }
 /* Selector de tema: se abre hacia arriba desde su botón del hub */
 .temas-wrap { position: relative; display: inline-flex; }
-.temas-pop { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 6; display: flex; flex-direction: column; gap: 3px; padding: 7px; min-width: 196px; border: 1px solid var(--hub-fab-line); background: var(--bg-3); border-radius: 16px; box-shadow: 0 18px 42px var(--shadow-pop); }
+.temas-pop { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 6; display: flex; flex-direction: column; gap: 3px; padding: 7px; min-width: 196px; border: 1px solid var(--line-2); background: var(--bg-3); border-radius: var(--r-m); box-shadow: var(--elev-pop); }
 .temas-pop.hidden { display: none; }
 /* Cabecera del selector: el menu era una lista pelada y no decia ni de que iba */
 .temas-pop::before { content: "Tema"; font-size: 10px; font-weight: 650; letter-spacing: 1.1px; text-transform: uppercase; color: var(--hub-label); padding: 4px 10px 6px; }
-.tema-op { position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 32px 9px 9px; border: none; border-radius: 11px; background: transparent; color: var(--text); font-size: 13px; cursor: pointer; text-align: left; transition: background var(--dur-1) var(--ease); }
+.tema-op { position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 32px 9px 9px; border: none; border-radius: var(--r-s); background: transparent; color: var(--text); font-size: 13px; cursor: pointer; text-align: left; transition: background var(--dur-1) var(--ease); }
 .tema-op:hover { background: var(--hover); }
 .tema-op.on { color: var(--text-strong); font-weight: 600; background: var(--wash); }
 /* Palomita del tema activo: dos bordes girados, sin icono ni tipografia extra */
@@ -1197,13 +1230,13 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    cuando está activo: se oculta a petición del usuario. El addon sigue haciendo
    su trabajo; solo se le quita el botón. */
 .hub-fab svg { width: 15px; height: 15px; }
-.hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 14px; box-shadow: var(--elev-pop); animation: pop-in .28s var(--spring) both; max-height: 70vh; overflow-y: auto; }
+.hub-panel { position: absolute; left: 18px; bottom: 60px; z-index: 4; width: 300px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 14px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; max-height: 70vh; overflow-y: auto; }
 /* ===== BIBLIOTECA DE SITIOS (modal Añadir acceso) =====
    Una rejilla de sitios conocidos con su logo ya en el tono del tema: los que
    tienen marca propia salen de brands.js y el resto usa su favicon con el
    mismo filtro monocromo que los accesos del hub. Un clic lo añade. */
 .lib-tit { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); margin: 4px 0 10px; }
-.lib-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 232px; overflow-y: auto; margin-bottom: 6px; }
+.lib-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: min(232px, 30vh); overflow-y: auto; margin-bottom: 6px; }
 .lib-item { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px 4px 8px; border: 1px solid transparent; border-radius: 12px; background: var(--bg-2); color: var(--text); cursor: pointer; font: inherit; transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .lib-item:hover { background: var(--hover); border-color: var(--line-2); transform: translateY(-1px); }
 .lib-item:active { transform: translateY(0) scale(.97); }
@@ -1217,16 +1250,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #dial-modal .modal-card { width: 520px; max-width: calc(100vw - 40px); }
 .hp-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--hub-label); margin-bottom: 10px; }
 #palette-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pal-item { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .12s, background .12s; }
+.pal-item { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
 .pal-item:hover { border-color: var(--line-3); background: var(--bg-3); }
 .pal-item svg { width: 18px; height: 18px; color: var(--text-dim); }
 .pal-item span { font-size: 12px; }
 #bg-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
-.bg-thumb { height: 42px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color .12s, transform .12s; }
+.bg-thumb { height: 42px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color var(--dur-1), transform var(--dur-1); }
 .bg-thumb:hover { transform: scale(1.04); }
 .bg-thumb.sel { border-color: var(--accent); }
-.wp-custom { display: block; text-align: center; font-size: 12.5px; padding: 8px; border-radius: 8px; border: 1px dashed var(--line-3); color: var(--text-dim); cursor: pointer; transition: color .12s, border-color .12s; }
-.wp-custom:hover { color: var(--text); border-color: var(--focus); }
+.wp-custom { display: block; text-align: center; font-size: 12.5px; padding: 8px; border-radius: 8px; border: 1px dashed var(--line-3); color: var(--text-dim); cursor: pointer; transition: color var(--dur-1), border-color var(--dur-1); }
 /* Fila de ajuste dentro de un panel del hub (interruptor a la derecha) */
 
 /* Página de marcadores */
@@ -1238,13 +1270,13 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .bmp-head h2 [data-ico] svg { width: 24px; height: 24px; }
 .bmp-tools { display: flex; gap: 8px; align-items: center; }
 #bm-filter { height: 34px; width: 170px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); padding: 0 12px; font-size: 12.5px; outline: none; }
-#bm-filter:focus { border-color: var(--focus); }
-.ghost-btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 13px; padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: border-color .12s, background .12s; }
+#bm-filter:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
+.ghost-btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 13px; padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
 .ghost-btn svg { width: 15px; height: 15px; color: var(--text-dim); }
 .ghost-btn:hover { border-color: var(--focus); background: var(--bg-2); }
 #bm-tree { display: flex; flex-direction: column; gap: 6px; }
-#bm-tree:empty::after { content: "Aún no tienes marcadores. Pulsa el botón de marcador de la barra para guardar una página."; color: var(--dim); font-size: 13px; }
-.bm-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color .12s, background .12s; }
+#bm-tree:empty::after { content: "Aún no tienes marcadores. Haz clic en el botón de marcador de la barra para guardar una página."; color: var(--dim); font-size: 13px; }
+.bm-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
 .bm-row:hover { border-color: var(--line-3); background: var(--bg-3); }
 .bm-row .bm-ic { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
 .bm-row .bm-ic img { width: 18px; height: 18px; border-radius: 4px; }
@@ -1253,29 +1285,29 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .bm-row .bm-label .bm-t { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bm-row .bm-label .bm-u { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bm-row .bm-count { font-size: 11.5px; color: var(--text-dim); }
-.bm-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
-.bm-row:hover .bm-actions { opacity: 1; }
+.bm-actions { display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-1); }
+.bm-row:hover .bm-actions, .bm-row:focus-within .bm-actions { opacity: 1; }
 .bm-actions button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
 .bm-actions button:hover { background: var(--bg); color: var(--text); }
 .bm-actions button.del:hover { color: var(--danger); }
 .bm-actions button svg { width: 14px; height: 14px; }
 .bm-children { margin: 4px 0 4px 34px; display: flex; flex-direction: column; gap: 4px; }
 .bm-folder-row.collapsed + .bm-children { display: none; }
-.bm-chev { transition: transform .15s; }
+.bm-chev { transition: transform var(--dur-2); }
 .bm-folder-row.collapsed .bm-chev { transform: rotate(-90deg); }
 
 /* Página de descargas: archivos de la carpeta real, por tipo y fecha */
 .dlp-filters { padding: 0 0 16px; flex-wrap: wrap; }
 .dlp-day { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); padding: 16px 4px 8px; }
-.dlp-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color .12s, background .12s; }
+.dlp-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
 .dlp-row:hover { border-color: var(--line-3); background: var(--bg-3); }
 .dlp-ic { width: 34px; height: 34px; border-radius: 9px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex-shrink: 0; }
 .dlp-ic svg { width: 16px; height: 16px; }
 .dlp-info { flex: 1; min-width: 0; }
 .dlp-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dlp-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.dlp-acts { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
-.dlp-row:hover .dlp-acts { opacity: 1; }
+.dlp-acts { display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-1); }
+.dlp-row:hover .dlp-acts, .dlp-row:focus-within .dlp-acts { opacity: 1; }
 .dlp-acts button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
 .dlp-acts button:hover { background: var(--bg); color: var(--text); }
 .dlp-acts button svg { width: 14px; height: 14px; }
@@ -1289,22 +1321,22 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .dlp-row.failed .dlp-sub { color: var(--danger); }
 
 /* Modales */
-.modal { position: fixed; inset: 0; z-index: 600; background: var(--backdrop); display: flex; align-items: center; justify-content: center; animation: fade-in .15s ease both; }
+.modal { position: fixed; inset: 0; z-index: 600; background: var(--backdrop); display: flex; align-items: center; justify-content: center; animation: fade-in var(--dur-2) var(--ease) both; }
 /* El de confirmar también se abre desde otro modal (Permisos → Borrar todos): va encima. */
 #prompt-modal { z-index: 610; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-.modal-card { width: min(400px, 92vw); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 20px; display: flex; flex-direction: column; gap: 12px; animation: pop-in var(--dur-3) var(--spring) both; }
+.modal-card { width: min(400px, 92vw); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-l); padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 32px); overflow-y: auto; animation: pop-in var(--dur-3) var(--spring) both; }
 .modal-card h3 { font-size: 16px; font-weight: 600; }
 .modal-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
-.modal-card input { height: 36px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 12px; font-size: 13px; outline: none; transition: border-color .12s; }
-.modal-card input:focus { border-color: var(--focus); }
+.modal-card input { height: 36px; border-radius: 8px; border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 12px; font-size: 13px; outline: none; transition: border-color var(--dur-1); }
+.modal-card input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; align-items: center; }
-.modal-actions button { border: none; border-radius: var(--r-full); padding: 8px 16px; font-size: 13px; cursor: pointer; background: var(--btn); color: var(--text); transition: background .12s, transform .1s; }
+.modal-actions button { border: none; border-radius: var(--r-full); padding: 8px 16px; font-size: 13px; cursor: pointer; background: var(--btn); color: var(--text); transition: background var(--dur-1), transform .1s; }
 .modal-actions button:active { transform: scale(.97); }
 .modal-actions button:hover { background: var(--btn-hover); }
 .modal-actions .primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 .modal-actions .primary:hover { background: var(--accent-hover); }
-.about-gpu { font-size: 11.5px !important; line-height: 1.7; }
+.modal-card p.about-gpu { font-size: 11.5px; line-height: 1.7; }
 .upd-box { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
 #upd-status { font-size: 12.5px; color: var(--text-dim); }
 #upd-status.hot { color: var(--ok); }
@@ -1338,34 +1370,36 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .nov-lista .nov-vacio { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
 #sidebar-config { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 
-#toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); z-index: 900; background: var(--bg-3); border: 1px solid var(--line-3); border-radius: 10px; padding: 11px 18px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .22s, transform .22s; box-shadow: 0 14px 40px var(--shadow-panel); max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); z-index: 900; background: var(--bg-3); border: 1px solid var(--line-3); border-radius: 10px; padding: 11px 18px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity var(--dur-3), transform var(--dur-3); box-shadow: 0 14px 40px var(--shadow-panel); max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } #hub.editing .dial { animation: none; } }
 
 /* ===== Addons ===== */
-.adp-sub { color: var(--muted, #8b8d94); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
+.adp-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
 /* Addons NO es una lista estrecha como Marcadores: encajonarla en los 760px de
    .bmp-inner dejaba dos tarjetas por fila, media pantalla muerta a los lados y
    scroll para ver el resto. Con el ancho suelto caben todas de una (Dosa). */
 #addons-page .bmp-inner { max-width: 1500px; padding-bottom: 40px; }
 .adp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-.adp-loading, .adp-error { color: var(--muted, #8b8d94); font-size: 13px; padding: 24px 0; }
-.adp-card { background: var(--bg-3, #17171b); border: 1px solid var(--line, #232327); border-radius: var(--r-l); padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
+.adp-loading, .adp-error { color: var(--muted); font-size: 13px; padding: 24px 0; }
+.adp-card { background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--r-l); padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--spring); }
 .adp-card:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .adp-card .adp-top { display: flex; align-items: center; gap: 10px; }
 .adp-card .adp-ico { width: 34px; height: 34px; border-radius: 50%; background: var(--chip-dim); display: flex; align-items: center; justify-content: center; flex: none; }
 .adp-card .adp-ico svg { width: 18px; height: 18px; }
 .adp-card h3 { font-size: 14px; margin: 0; }
-.adp-card .adp-ver { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted, #8b8d94); }
-.adp-card p { margin: 0; font-size: 12.5px; color: var(--muted, #8b8d94); line-height: 1.5; flex: 1; }
+.adp-card .adp-ver { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.adp-card p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; flex: 1; }
 .adp-card .adp-actions { display: flex; gap: 8px; align-items: center; }
-.adp-badge { font-size: 10.5px; font-family: var(--mono, ui-monospace, monospace); letter-spacing: .4px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line, #232327); color: var(--muted, #8b8d94); }
+.adp-badge { font-size: 10.5px; font-family: var(--mono); letter-spacing: .4px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .adp-badge.on { color: var(--ok); border-color: #2c4636; }
-.adp-btn { border: 1px solid var(--line-3); background: var(--chip-dim); color: var(--text, #ececef); font-size: 12px; padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+.adp-btn { border: 1px solid var(--line-3); background: var(--chip-dim); color: var(--text); font-size: 12px; padding: 7px 12px; border-radius: 9px; cursor: pointer; }
 .adp-btn:hover { border-color: var(--focus); }
-.adp-btn.primary { background: var(--accent, #e8e9ec); color: var(--accent-fg); border-color: var(--accent, #e8e9ec); font-weight: 600; }
+.adp-btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 .adp-btn.danger:hover { border-color: #7a3040; color: #f2a9b4; }
+/* Deshabilitado (Buscar actualizaciones mientras consulta, botones de addons ocupados) */
+.modal-actions button:disabled, .adp-btn:disabled { opacity: .5; cursor: default; pointer-events: none; }
 
 /* Botones de herramientas registrados por addons: viven en el sidebar,
    después de las herramientas nativas (Rat Tool siempre va primero) */
@@ -1376,24 +1410,18 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #addon-tools .sb-btn:first-child { margin-top: 9px; }
 #addon-tools .sb-btn:last-child { margin-bottom: 9px; }
 
-/* Botón Addons del hub: misma placa de VIDRIO que los demás FABs, con el
-   borde de gradiente en la gama del tema (antes era una placa opaca con los
-   colores pastel del tema viejo y cantaba sobre cualquier fondo). */
+/* Botón Addons del hub: la misma placa OPACA de .hub-fab que Editar, Temas y
+   Aspecto, con el texto en negrita (auditoría 2026-10). Su fondo de vidrio con
+   borde degradado era una declaración inválida —un color solo vale en la
+   última capa de background— y el botón salía sin placa en los cuatro temas. */
 #hub-addons { position: relative; overflow: hidden; border: 1px solid transparent; border-radius: var(--r-full);
-  background: var(--hub-fab) padding-box,
-              linear-gradient(120deg, rgba(255,255,255,.45), rgba(255,255,255,.12), rgba(255,255,255,.45)) border-box;
-  background-size: auto, 300% 100%;
   padding: 9px 16px; font-weight: 600; letter-spacing: .3px; }
-/* El gradiente solo se anima al pasar el ratón: una animación infinita
-   mantiene el compositor de la GPU despierto y dispara su memoria */
-#hub-addons:hover { animation: addons-flow 2.5s linear infinite; }
 #hub-addons svg { width: 16px; height: 16px; color: var(--text); }
-#hub-addons:hover { box-shadow: 0 0 0 1px rgba(255,255,255,.28), 0 8px 22px rgba(0,0,0,.28); color: var(--text-strong); }
-@keyframes addons-flow { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }
+#hub-addons:hover { color: var(--text-strong); }
 
 /* El logo "vive" al tocarlo: rotación de tono por CSS (las animaciones SMIL
    del gradiente fugaban memoria en Electron 33; ver icons.js) */
-.iris-wrap:hover .iris-logo { animation: iris-hue 5s linear infinite; }
+.iris-wrap:hover .iris-logo { animation: iris-hue 1.2s ease-out 1; }
 @keyframes iris-hue { to { filter: hue-rotate(360deg); } }
 
 /* AutoClaim v2: la pestaña que farmea se marca en verde (sin grupo acoplado) */
@@ -1418,7 +1446,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    sistema se queda los clics ANTES de que lleguen a la página — la X del
    encabezado dejaba de funcionar sin dar ni un error. Mismo motivo por el que
    `#tabstrip > *` y `#agent-badge` ya lo llevan. */
-.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 13px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 44px rgba(0,0,0,.55); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; -webkit-app-region: no-drag; }
+.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in var(--dur-3) var(--spring) both; -webkit-app-region: no-drag; }
 @keyframes lp-in { from { transform: translateX(-26px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
 .lp-head { display: flex; align-items: center; padding: 12px 14px 8px; }
 .lp-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text); }
@@ -1429,6 +1457,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .lp-tabs { display: flex; gap: 6px; margin: 0 14px 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; }
 .lp-tab { flex: 1; padding: 6px 0; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: none; color: var(--muted); }
 .lp-tab.active { background: var(--chip); color: var(--text); }
+.lp-tab:not(.active):hover { color: var(--text); }
 .lp-body { flex: 1; overflow-y: auto; padding: 6px 14px 14px; }
 .loot-go { width: 100%; margin-top: 6px; padding: 11px; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; background: linear-gradient(120deg, #7b5cc4, #9147ff); color: #fff; }
 .loot-go.off { background: var(--chip-dim); color: var(--dim, #5c5e64); cursor: default; }
@@ -1454,6 +1483,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .loot-hgroup .lhg-drop .lh-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loot-hgroup .lhg-drop .lh-when { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--muted); }
 .loot-clear-btn { margin-top: 10px; border: 1px solid var(--line-2, #2c2c33); background: none; color: var(--muted); border-radius: 8px; padding: 6px 11px; font-size: 11px; cursor: pointer; }
+.ls-btn:not(.stop):hover, .loot-clear-btn:hover { color: var(--text); }
 
 /* ===== Scroll propio de Naviris (2026-08-11) =====
    El scrollbar nativo de Chromium se comía las esquinas redondeadas de las
@@ -1484,7 +1514,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* Texto secundario del hub: sin halos, las superficies son opacas (reforma 2.8.1). */
 .d-name { color: var(--text); }
 .dial:hover .d-name { color: var(--text-strong); }
-.hub-pill, .hub-pill .wxp-city, #hub-version { color: var(--text); }
+#hub-version { color: var(--text); }
 .w-clock .greet, .w-head { color: var(--text); }
 
 /* Fichas de resolución: rejilla compacta con la medida como dato grande */
@@ -1508,17 +1538,17 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    (el lima, el rojo o el rosa) salvo que él lo pida. Superficies opacas y blancos. */
 #hub .hub-fab.on { background: var(--realce); color: var(--grad-fg); border-color: transparent; }
 #hub .tema-op.on { color: var(--text-strong); }
-#hub .bg-thumb.sel { border-color: rgba(255,255,255,.75); }
-#hub .wp-custom:hover { border-color: rgba(255,255,255,.45); }
-#hub .wp-custom:focus-visible { outline-color: rgba(255,255,255,.7); }
-#hub .dial.add .d-tile { border-color: rgba(255,255,255,.28); }
+/* Del texto del ámbito, no blancos fijos (auditoría 2026-10): en Claro y Rosa,
+   y sobre una foto clara, eran blanco sobre blanco. */
+#hub .bg-thumb.sel { border-color: var(--text); }
+#hub .wp-custom:hover { border-color: color-mix(in srgb, var(--text) 45%, transparent); }
+#hub .wp-custom:focus-visible { outline-color: color-mix(in srgb, var(--text) 70%, transparent); }
+#hub .dial.add .d-tile { border-color: color-mix(in srgb, var(--text) 28%, transparent); }
 :root.light #hub .hub-fab.on, :root.rosa #hub .hub-fab.on { background: var(--realce); color: var(--grad-fg); }
-:root.light #hub .bg-thumb.sel, :root.rosa #hub .bg-thumb.sel,
 
 /* Las piezas del hub llevan el texto fuerte */
 .hub-fab, .hub-pill { color: var(--text-strong); }
 #hub-addons { color: var(--text-strong); }
-.hub-pill .wxp-city { color: var(--muted); }
 
 /* ===== FOTO CLARA DE FONDO (2026-08-11, reforma 2.8.1) =====
    applyBackground mide el brillo medio de la foto del usuario y pone
@@ -1526,10 +1556,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    juego BLANCO con texto oscuro, solo dentro del hub. Con los degradados del
    tema no aplica. */
 #hub.bg-claro {
-  --hub-card: #ffffff; --hub-card-2: #f1f2f5; --hub-card-line: rgba(18,20,26,.10);
-  --hub-input: #ffffff; --hub-input-line: rgba(18,20,26,.14);
+  --hub-card: #ffffff; --hub-card-line: rgba(18,20,26,.10);
   --hub-fab: #ffffff; --hub-fab-line: rgba(18,20,26,.14);
-  --hub-pill: #ffffff; --hub-pill-line: rgba(18,20,26,.12); --hub-pill-fg: #33353c;
+  --hub-pill: #ffffff; --hub-pill-line: rgba(18,20,26,.12);
   --hub-hairline: rgba(18,20,26,.24); --hub-label: #6c6f77;
   --tile-default: #ffffff; --tile-line: rgba(18,20,26,.10);
   --cal-hoy-bg: #26262e; --cal-hoy-fg: #ffffff;
@@ -1543,7 +1572,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #hub.bg-claro .hub-fab, #hub.bg-claro #hub-addons, #hub.bg-claro #hub-version, #hub.bg-claro #hub-dock {
   --text: #17181c; --text-strong: #0e0f12; --text-dim: #454851; --muted: #454851; --dim: #6a6d76;
   --chip: rgba(18,20,26,.10); --chip-hover: rgba(18,20,26,.16);
-  --clock-shadow: rgba(255,255,255,.5);
   color: var(--text);
 }
 #hub.bg-claro .hub-fab.on { background: #17181c; color: #ffffff; }
@@ -1575,7 +1603,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   background: var(--text); margin-top: -4px; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform var(--dur-1) var(--spring); }
 .sp-vol-sl:hover::-webkit-slider-thumb { transform: scale(1.15); }
 .sp-vol-sl:active::-webkit-slider-thumb { transform: scale(1.25); }
-.sp-art { width: 96px; aspect-ratio: 1; align-self: flex-start; flex-shrink: 0; border-radius: 26px 0 0 0; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; color: var(--dim); background: rgba(255,255,255,.05); }
+.sp-art { width: 96px; aspect-ratio: 1; align-self: flex-start; flex-shrink: 0; border-radius: var(--hub-r) 0 0 0; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; color: var(--dim); background: rgba(255,255,255,.05); }
 .sp-art > svg { width: 26px; height: 26px; }
 .sp-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .w-sp.sp-vacio .sp-art img { display: none; }
@@ -1666,7 +1694,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wx2-chips { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
 .wx2-chip { background: var(--chip); color: var(--text); border-radius: 999px; padding: 4px 9px; font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .wx2-city { color: var(--text-dim); font-size: 11.5px; margin-top: 9px; padding-right: 52px; }
-.wx2-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: #fff; color: #111; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
+.wx2-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
 .wx2-go:hover { transform: scale(1.08); }
 .wx2-go svg { width: 16px; height: 16px; }
 
@@ -1711,7 +1739,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .u-nom { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .u-mail { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 40px; }
 .u-sync { font-size: 10.5px; color: var(--dim); margin-top: 8px; padding-right: 52px; }
-.u-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: #fff; color: #111; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
+.u-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
 .u-go:hover { transform: scale(1.08); }
 .u-go svg { width: 16px; height: 16px; }
 
@@ -1720,16 +1748,20 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    Cápsula flotante junto al sidebar, bajo el home. Cerrarla oculta el webview
    pero NO lo destruye: el audio sigue (mismo comportamiento probado de los
    webviews ocultos de las pestañas). Entra con el muelle de los paneles. */
-#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h) + 14px); width: 720px; height: min(78vh, 760px); z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in .38s cubic-bezier(.3,1.22,.4,1) both; }
+#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h) + 14px); width: 720px; height: min(78vh, 760px); z-index: 400; background: transparent; border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in var(--dur-3) var(--spring) both; }
 /* Tirador del canto derecho (mismo gesto que los paneles web laterales) */
 #sp-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 3; }
 #sp-grip:hover { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--realce) 45%, transparent)); }
 #sp-panel.hidden { display: flex !important; visibility: hidden; pointer-events: none; animation: none; }
 /* OJO: display:none destruiría el render del webview en algunos estados; con
    visibility:hidden el guest sigue exactamente igual y el audio no se corta. */
-#sp-panel .lp-head { flex-shrink: 0; }
+/* El panel recortado no lleva fondo: en Claro y Rosa su blanco asomaba como un
+   arco en las esquinas de abajo, bajo el reproductor negro. El fondo va en la
+   cabecera y en el hueco del reproductor, este con una curva algo más cerrada
+   que la del panel para que su borde quede siempre debajo de Spotify. */
+#sp-panel .lp-head { flex-shrink: 0; background: var(--bg-2); }
 #sp-p-vivo { font-size: 10.5px; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); border-radius: 999px; padding: 3px 9px; margin-left: 8px; }
-#sp-holder { flex: 1; min-height: 0; }
+#sp-holder { flex: 1; min-height: 0; background: var(--bg-2); border-radius: 0 0 28px 28px; }
 #sp-holder webview { width: 100%; height: 100%; }
 
 /* ===== Piezas comunes de los widgets del bento (2026-08-11) ===== */
@@ -1767,7 +1799,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* cabecera alineada con el texto de las filas (no con su borde) */
 .w-xt .w-head { padding: 0 2px 0 5px; }
 .w-xt .w-head svg { width: 13px; height: 13px; }
-.xt-chip { margin-left: auto; font-size: 9.5px; letter-spacing: .4px; background: var(--chip); color: var(--text-dim); padding: 3px 9px; border-radius: 999px; }
+.xt-chip { margin-left: auto; font-size: 9.5px; letter-spacing: .4px; background: var(--chip); color: var(--text-dim); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .xt-lista { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; flex: 1; min-height: 0; overflow: hidden; }
 .xt-i { display: flex; align-items: center; gap: 9px; border: none; background: var(--chip); border-radius: 11px; color: var(--text); font-family: inherit; font-size: 12px; font-weight: 550; text-align: left; padding: 8px 11px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
 .xt-i:hover { background: var(--chip-hover); transform: translateX(2px); }
@@ -1782,7 +1814,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-img .wi-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--dim); font-size: 12px; cursor: pointer; }
 .w-img .wi-vacio svg { width: 26px; height: 26px; }
 .wi-cambia { position: absolute; right: 10px; bottom: 10px; width: 32px; height: 32px; border: none; border-radius: 999px; background: rgba(10,10,12,.55); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--dur-2) var(--ease); }
-.w-img:hover .wi-cambia { opacity: 1; }
+.w-img:hover .wi-cambia, .w-img:focus-within .wi-cambia { opacity: 1; }
 .wi-cambia svg { width: 15px; height: 15px; }
 
 /* ===== Widget Correo (el verde del mock): degradado del realce + grain ===== */
@@ -1791,13 +1823,14 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    pone el color del hub y una sombra pensada para el fondo, no para esto). */
 .w-mail .w-head { color: var(--text-dim); margin-bottom: 2px; }
 .w-mail .w-head svg { width: 14px; height: 14px; }
-.w-mail .wh-btn { color: color-mix(in srgb, var(--grad-fg) 55%, transparent); }
-.w-mail .wh-btn:hover { background: color-mix(in srgb, var(--grad-fg) 12%, transparent); color: var(--grad-fg); }
+/* Desde la reforma 2.8.1 es una baldosa normal: los textos van con los tokens
+   de texto, no con --grad-fg, que en Naviris, Acid y Claro es el color de la
+   propia baldosa y los dejaba invisibles (auditoría 2026-10). */
 .ml-ocupado { opacity: .45; }
 /* El dato grande: numero de no leidos con la etiqueta pegada a su linea base */
 .ml-hero { display: flex; align-items: baseline; gap: 7px; margin: 2px 0 12px; }
 .ml-n { font-size: 34px; font-weight: 600; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
-.ml-lbl { font-size: 11.5px; color: color-mix(in srgb, var(--grad-fg) 62%, transparent); }
+.ml-lbl { font-size: 11.5px; color: var(--text-dim); }
 /* Sin scroll: lo que no cabe se oculta en JS, asi que la lista solo recorta */
 .ml-lista { display: flex; flex-direction: column; gap: 6px; overflow: hidden; flex: 1; min-height: 0; }
 /* Las filas se reparten el alto sobrante (con tope): al ocultar la que no
@@ -1811,12 +1844,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .ml-hora { flex-shrink: 0; align-self: flex-start; font-size: 10px; color: #7b7f88; font-variant-numeric: tabular-nums; }
 /* Ancha (3 celdas): cabe el adelanto del mensaje */
 .w-mail.t-3x3 .ml-resumen { display: block; }
-.ml-limpia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; justify-content: center; font-size: 12.5px; color: color-mix(in srgb, var(--grad-fg) 80%, transparent); }
+.ml-limpia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; justify-content: center; font-size: 12.5px; color: var(--text-dim); }
 .ml-limpia svg { width: 22px; height: 22px; }
-.ml-pie { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; border: none; border-radius: 999px; background: color-mix(in srgb, var(--grad-fg) 10%, transparent); color: var(--grad-fg); font-family: inherit; font-size: 11px; font-weight: 600; padding: 7px 12px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
-.ml-pie:hover { background: color-mix(in srgb, var(--grad-fg) 18%, transparent); }
+.ml-pie { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: 11px; font-weight: 600; padding: 7px 12px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.ml-pie:hover { background: var(--chip-hover); }
 .ml-pie svg { width: 12px; height: 12px; }
-.w-mail .w-vacio { color: color-mix(in srgb, var(--grad-fg) 80%, transparent); }
 
 
 /* ===== Tallas (grilla de celdas): variantes de estructura por tamano ===== */
@@ -2012,12 +2044,14 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .au-mono { font-family: var(--mono, ui-monospace, monospace); font-size: 11.5px; color: var(--text); }
 .au-in { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px;
   padding: 10px 12px; font-family: inherit; font-size: 12.5px; outline: none; transition: border-color var(--dur-1); }
-.au-in:focus { border-color: var(--focus); }
+.au-in:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--wash); }
 .au-box-b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 .au-box-b button { border: none; border-radius: 10px; font-family: inherit; font-size: 12.5px; font-weight: 650;
   padding: 9px 15px; cursor: pointer; background: var(--bg-3); color: var(--text); }
 .au-box-b .au-ok { background: var(--accent); color: var(--accent-fg); }
-.au-err { font-size: 11.5px; color: #e6a9b4; min-height: 14px; }
+.au-box-b button:hover { background: var(--btn-hover); }
+.au-box-b .au-ok:hover { background: var(--accent-hover); }
+.au-err { font-size: 11.5px; color: var(--danger); min-height: 14px; }
 
 /* ===== Asas de estirado (modo Editar, tallas libres) ===== */
 .w-redim { position: absolute; display: none; z-index: 6; }
@@ -2076,7 +2110,12 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .mon-k { font-size: 10.5px; letter-spacing: .4px; color: var(--dim); }
 .mon-v { font-size: 23px; font-weight: 300; letter-spacing: -.5px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 .mon-riel { height: 3px; border-radius: 99px; background: var(--chip); overflow: hidden; }
-.mon-riel i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--grad-medida, var(--grad-realce)); transition: width .5s var(--ease); }
+/* La barra se llena por transform, no por width, y SIN transición (auditoría
+   2026-10): animar el ancho cada 3 s recalculaba la maquetación del hub
+   entero, y animar el transform tenía a la GPU pintando medio segundo de cada
+   tres con el hub en reposo (medido: 450-625 ms de CPU de la GPU cada 30 s
+   con transición, 62 ms sin ella). */
+.mon-riel i { display: block; height: 100%; border-radius: 99px; background: var(--grad-medida, var(--grad-realce)); transform: scaleX(0); transform-origin: left; }
 .w-mon.t-1x1 .mon-stats { grid-template-columns: 1fr; gap: 6px; } .w-mon.t-1x1 .mon-v { font-size: 17px; }
 .mon-pie { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--dim); }
 .w-mon.t-2x1 .mon-pie { display: none; }
@@ -2106,11 +2145,12 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .nt-i.ok .nt-t { text-decoration: line-through; color: var(--dim); }
 .nt-x { border: none; background: transparent; color: var(--dim); width: 18px; height: 18px; border-radius: 5px; cursor: pointer; opacity: 0; display: flex; align-items: center; justify-content: center; }
 .nt-x svg { width: 10px; height: 10px; }
-.nt-i:hover .nt-x { opacity: 1; }
+.nt-i:hover .nt-x, .nt-i:focus-within .nt-x { opacity: 1; }
 .nt-x:hover { color: var(--danger); }
 .nt-add { display: flex; gap: 6px; margin-top: 8px; }
 .nt-add input { flex: 1; min-width: 0; border: none; outline: none; background: var(--chip); color: var(--text); border-radius: 9px; font-family: inherit; font-size: 11.5px; padding: 7px 10px; }
-.nt-add button { flex-shrink: 0; width: 30px; height: 30px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.nt-add button { flex-shrink: 0; width: 30px; height: 30px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform var(--dur-1) var(--spring); }
+.nt-add button:hover { transform: scale(1.08); }
 .nt-add button svg { width: 14px; height: 14px; }
 
 /* ===== Widget MOOVIN (biblioteca privada de IRIS) ===== */
@@ -2155,6 +2195,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-dlw.t-1x1 .dlw-lista, .w-dlw.t-1x1 .dlw-ir, .w-dlw.t-1x1 .w-head { display: none; }
 .w-dlw.t-1x1 .dlw-activa { flex-direction: column; }
 .w-dlw.t-1x1 .dlw-meta { display: none; }
+/* En 2x1 con celdas de 122 px el aviso vacío no cabía con su relleno y el
+   botón del pie le tapaba la última línea (auditoría 2026-10) */
+.w-dlw.t-2x1 .w-vacio { padding: 0 2px; }
 .w-wallet.t-1x1 { padding: 10px; }
 .w-wallet.t-1x1 .wl-pie, .w-wallet.t-1x1 .wl-puntos { display: none; }
 /* ===== Arreglos de la talla 1x1 (2026-08-21) =====
@@ -2240,7 +2283,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    movimiento ocurre SOLO en hover y solo con transform/opacity (regla
    anti-animacion-infinita intacta). */
 .w-deco { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-.w-deco span { position: absolute; border-radius: 34%; transition: transform .55s var(--spring), opacity .45s var(--ease); }
+.w-deco span { position: absolute; border-radius: 34%; transition: transform var(--dur-3) var(--spring), opacity var(--dur-3) var(--ease); }
 .dc-a { width: 58%; height: 58%; background: var(--grad-realce); opacity: .95; }
 .dc-b { width: 78%; height: 78%; border: 2px solid color-mix(in srgb, var(--realce) 45%, transparent); opacity: .5; }
 .dc-c { width: 96%; height: 96%; border: 1.5px solid color-mix(in srgb, var(--realce) 22%, transparent); opacity: .3; }
@@ -2265,10 +2308,8 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #find-bar button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: var(--r-full); background: transparent; color: var(--nav-fg); cursor: pointer; transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
 #find-bar button:hover:not(:disabled) { background: var(--btn-hover); color: var(--text); }
 #find-bar button:disabled { opacity: .35; cursor: default; }
-#find-bar button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 #find-bar button svg { width: 14px; height: 14px; }
 #find-close { margin-left: 2px; }
-@media (prefers-reduced-motion: reduce) { #find-bar { animation: none; } }
 
 /* ===== Panel de rendimiento (qué gasta cada pestaña) ===== */
 #perf-resumen { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
@@ -2370,7 +2411,7 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
 
 
 /* ===== Espacios (grupos de pestañas) ===== */
-#esp-pop { position: fixed; z-index: 500; width: 232px; background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--r-m); box-shadow: var(--elev-pop); padding: 5px; }
+#esp-pop { position: fixed; z-index: 500; width: 232px; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); box-shadow: var(--elev-pop); padding: 5px; }
 #esp-pop.hidden { display: none; }
 #esp-pop .ep-tit { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); padding: 6px 8px 4px; }
 .ep-fila { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: var(--r-s); cursor: pointer; font-size: 12.5px; }
@@ -2388,7 +2429,7 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
 .ep-fila .ep-candado { display: flex; flex: none; color: var(--text-dim); }
 .ep-fila .ep-candado svg { width: 13px; height: 13px; }
 .ep-fila .ep-acc { display: none; gap: 2px; flex: none; }
-.ep-fila:hover .ep-acc { display: flex; }
+.ep-fila:hover .ep-acc, .ep-fila:focus-within .ep-acc { display: flex; }
 .ep-fila .ep-b { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 22px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
 .ep-fila .ep-b:hover { color: var(--text); background: var(--bg); }
 .ep-fila .ep-b.ep-x:hover { color: var(--danger); }
