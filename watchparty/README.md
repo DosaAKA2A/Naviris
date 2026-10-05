@@ -45,10 +45,11 @@ vuelve a cargar la página por su cuenta.
 | `beat` | anfitrión, cada 2 s | `url` (canónica), `tit`, `time`, `paused`, `lock`, `nlock` |
 | `ev` | quien actúa | `kind`: `play` / `pause` / `seek` (+ `time`) o `nav` (+ `url`) |
 | `chat` | todos | `msg` |
+| `perfil` | todos, al entrar y cuando entra otro | `foto` (data URI png/jpeg/webp) |
 
-El relay reenvía `ev`, `beat` y `chat` a todos menos al emisor, añadiendo
+El relay reenvía `ev`, `beat`, `chat` y `perfil` a todos menos al emisor, añadiendo
 `from` y `host` (del attachment del join: es el único dato de quién manda en
-el que se puede confiar). Responde `joined` al que entra y avisa a los demás
+el que se puede confiar) y borrando el `who` que mande el cliente. Responde `joined` al que entra y avisa a los demás
 con `peers` (`n`, `who`, `joined` / `left`, `again`). Con `sid`, un socket
 viejo de la misma sesión se cierra en silencio al reconectar: sin eso la sala
 contaba a la misma persona dos veces y anunciaba un "salió" fantasma.

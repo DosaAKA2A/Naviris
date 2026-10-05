@@ -1,0 +1,32 @@
+{
+  "version": "2.8.1-dev.13",
+  "linea": "dev",
+  "titulo": "Más ligero, más seguro y sin fallos pequeños",
+  "entradilla": "Una revisión completa del navegador: gasta menos de la mitad en reposo, los espacios protegidos ya no se pueden abrir sin su contraseña y se corrigieron más de cien fallos de pestañas, paneles, temas y addons.",
+  "bloques": [
+    {
+      "titulo": "Gasta mucho menos en reposo",
+      "texto": "Con solo el hub abierto, Naviris usa menos de la mitad de procesador que antes, y con varios sitios abiertos, cerca de una cuarta parte. Una pestaña dormida libera ahora su proceso entero y al despertar conserva atrás y adelante. Las pestañas guardadas no cargan nada hasta que las abres, y el reloj, el Monitor, el Portapapeles, el Autenticador y Spotify se detienen cuando el hub no se ve.\n\nEl panel Rendimiento y el Monitor muestran ahora la memoria real, la misma que enseña el administrador de tareas."
+    },
+    {
+      "titulo": "Espacios protegidos y privacidad",
+      "texto": "Un espacio con contraseña ya no se puede abrir sin escribirla: ni con Ctrl+Tab, ni con Ctrl+1 a Ctrl+9, ni desde Inicio, ni desde Rendimiento, ni desde una ventana privada.\n\nEl Portapapeles del hub ya no guarda contraseñas, números de tarjeta ni códigos del autenticador, ni lo que copias en una ventana privada o desde un gestor de contraseñas. La barra para rellenar una contraseña solo actúa en el sitio para el que se ofreció y desaparece al cambiar de pestaña."
+    },
+    {
+      "titulo": "Página de error propia",
+      "texto": "Cuando una dirección no existe o no hay conexión, Naviris muestra su propia página con el motivo y un botón para reintentar. Antes la pestaña se quedaba en blanco diciendo «Cargando…»."
+    },
+    {
+      "titulo": "Pestañas, paneles y menús",
+      "texto": "Sacar una pestaña a su propia ventana ya no copia todas las demás. Los enlaces abiertos desde un contenedor o un espacio se quedan en él. «Cerrar otras», «Silenciar otras» y «Recargar todas» solo afectan al espacio que estás viendo. Las direcciones con puerto, como localhost:3000, se abren bien desde la barra.\n\nSe pide confirmación antes de borrar una contraseña, una tarjeta, todos los permisos o una carpeta de marcadores. Los menús se cierran con Escape o al hacer clic fuera, y ya no quedan dos abiertos a la vez."
+    },
+    {
+      "titulo": "Temas, teclado y textos",
+      "texto": "Los temas Claro y Rosa recuperan estados que salían en blanco sobre blanco, y el widget Correo se lee en todos los temas. El foco del teclado se ve en toda la interfaz con el color del tema. Los textos se repasaron uno por uno."
+    },
+    {
+      "titulo": "Addons",
+      "texto": "Blockify, Inspector de diseño, Minireproductor, Sound Booster, Strainer y Watch Party se actualizan solos. Ahora siguen el color del tema que tengas puesto, dejan de gastar en las pestañas que ya cerraste y corrigen varios fallos: Sound Booster ya no deja en silencio algunos videos y el Inspector de diseño se lee en el tema por defecto."
+    }
+  ]
+}

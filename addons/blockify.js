@@ -1,4 +1,4 @@
-/* Naviris addon: Blockify v1.3.0
+/* Naviris addon: Blockify v1.3.1
    Port completo de la extensión "Spotify Ad Blocker - Blockify" 1.9.5 de
    Chrome, reescrita como addon de Naviris. Qué hace en open.spotify.com:
 
@@ -64,11 +64,13 @@
    Arquitectura: herramienta del sidebar (kind "tool", corre en el renderer).
    En la página solo se inyecta un agente que detecta y salta; la página avisa
    al addon por console-message ("NAVBLOCKIFY|{...}") y el addon silencia o
-   desmutea la pestaña con setAudioMuted. Botón verde Spotify = activo, con
-   contador de anuncios saltados en el tooltip. */
+   desmutea la pestaña con setAudioMuted. Botón con el realce del tema = activo,
+   con contador de anuncios saltados en el tooltip. */
 (function () {
   var ID = 'blockify';
-  var VERDE = '#1DB954'; // verde Spotify: se ve de un vistazo que está activo
+  // El realce del tema, como Strainer y Sensibilidad X: el verde de Spotify
+  // queda solo de respaldo para un Naviris sin ese token.
+  var COLOR = 'var(--realce, #1DB954)';
   var activo = localStorage.__navBlockify !== '0'; // activo nada más instalar
   var contador = Number(localStorage.__navBlockifyCount || 0);
   var wvs = [];          // webviews de Spotify ya armados (para apagar/desmutear)
@@ -79,7 +81,7 @@
   // addon en caliente no cambiaba nada: el renderer cargaba el código nuevo pero
   // la pestaña de Spotify seguía ejecutando el agente viejo y el nuevo se salía en
   // su primera línea. Había que recargar la pestaña para que el arreglo existiera.
-  var AGENTE_VER = 3;
+  var AGENTE_VER = 4;
   var AGENT = '(function(){' +
     'if(window.__navBlockifyAgent>=' + AGENTE_VER + ')return;' +
     'var reemplazo=!!window.__navBlockifyAgent;window.__navBlockifyAgent=' + AGENTE_VER + ';' +
@@ -94,7 +96,7 @@
     'try{if(window.__navBlockifyStop)window.__navBlockifyStop()}catch(e){}' +
     'var vivos=[],obs=null;' +
     'window.__navBlockifyStop=function(){for(var i=0;i<vivos.length;i++){try{clearTimeout(vivos[i]);clearInterval(vivos[i])}catch(e){}}' +
-    'vivos=[];try{if(obs)obs.disconnect()}catch(e){}};' +
+    'vivos=[];try{clearTimeout(deb);deb=null}catch(e){}try{if(obs)obs.disconnect()}catch(e){}};' +
     'function luego(f,ms){var t=setTimeout(f,ms);vivos.push(t);return t}' +
     // 1. Controller de Spotify vía webpack. El criterio EXIGE _streamer.on: antes
     // bastaba con nextTrack+pause+resume, pero Spotify tiene varios envoltorios
@@ -185,6 +187,10 @@
     // 2. Respaldo: reconocer la interfaz de pausa publicitaria. Ya NO depende de
     // una frase en inglés ("Your music will continue after the break"), que en un
     // Spotify en español no aparecía nunca y dejaba el respaldo sin cubrir.
+    // El observer LIMITA (como mucho un sync cada 500 ms) en vez de reiniciar la
+    // espera: con el reproductor mutando sin parar, el debounce no llegaba a
+    // ejecutarse. Su temporizador no va a `vivos` (se limpia aparte) y solo se
+    // miran nodos y los atributos que lee esAnuncio().
     'var deb=null;' +
     'function esAnuncio(){try{' +
     'if(document.querySelector("[data-testid=ad-companion-card],[data-testid=ad-companion-card-tagline],a[data-context-item-type=ad],[data-testid=advertiser-name]"))return true;' +
@@ -195,8 +201,8 @@
     // el anuncio sigue sonando aunque su tarjeta ya no esté en el DOM.
     'if(muteForzado)return;manda(esAnuncio())}' +
     'function vigila(){if(!document.body){luego(vigila,1200);return}' +
-    'obs=new MutationObserver(function(){if(deb)clearTimeout(deb);deb=luego(function(){deb=null;sync()},500)});' +
-    'obs.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true});' +
+    'obs=new MutationObserver(function(){if(!deb)deb=setTimeout(function(){deb=null;sync()},500)});' +
+    'obs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["data-testid","data-context-item-type"]});' +
     'sync()}' +
     'vigila()' +
     '})();';
@@ -244,6 +250,15 @@
   // eso, actualizar el addon dejaba vivos los de la instancia anterior y acababa
   // habiendo dos manejadores con su propio contador y su propio criterio de mute.
   var oyentes = new WeakMap();
+  function soltar(wv) {
+    var re = oyentes.get(wv);
+    try { wv.removeEventListener('console-message', onMsg); } catch (e) { /* nada */ }
+    if (re) {
+      try { wv.removeEventListener('dom-ready', re); } catch (e) { /* nada */ }
+      try { wv.removeEventListener('did-navigate', re); } catch (e) { /* nada */ }
+    }
+    oyentes.delete(wv);
+  }
   function armar(wv) {
     if (wvs.indexOf(wv) !== -1) return;
     wvs.push(wv);
@@ -259,13 +274,8 @@
   }
   function desarmar() {
     for (var i = 0; i < wvs.length; i++) {
-      var wv = wvs[i], re = oyentes.get(wv);
-      try { wv.removeEventListener('console-message', onMsg); } catch (e) { /* nada */ }
-      if (re) {
-        try { wv.removeEventListener('dom-ready', re); } catch (e) { /* nada */ }
-        try { wv.removeEventListener('did-navigate', re); } catch (e) { /* nada */ }
-      }
-      oyentes.delete(wv);
+      var wv = wvs[i];
+      soltar(wv);
       try { wv.setAudioMuted(false); } catch (e) { /* nada */ }
       quitaCss(wv);
     }
@@ -287,6 +297,9 @@
   // plano (clic central, restauración de sesión) no se armaba hasta ponerla en
   // primer plano, así que Blockify no hacía nada en ella.
   function barre() {
+    // Una pestaña cerrada deja su webview fuera del DOM: se suelta, o la lista
+    // la retiene para siempre.
+    wvs = wvs.filter(function (w) { if (w.isConnected) return true; soltar(w); return false; });
     var lista = [];
     try { lista = naviris.allWebviews ? naviris.allWebviews() : []; } catch (e) { lista = []; }
     if (!lista.length) { var a = naviris.activeWebview(); if (a) lista = [a]; }
@@ -297,8 +310,8 @@
   function pinta(btn) {
     btn = btn || document.getElementById('adt-' + ID);
     if (!btn) return;
-    btn.style.color = activo ? VERDE : '';
-    btn.style.filter = activo ? 'drop-shadow(0 0 5px rgba(29,185,84,.75))' : '';
+    btn.style.color = activo ? COLOR : '';
+    btn.style.filter = activo ? 'drop-shadow(0 0 5px currentColor)' : '';
     btn.title = activo
       ? 'Blockify: ACTIVO — los anuncios de Spotify Web se saltan solos (' + contador + ' saltados). Clic para pausarlo.'
       : 'Blockify: bloquea los anuncios de audio de Spotify Web. Clic para activarlo.';

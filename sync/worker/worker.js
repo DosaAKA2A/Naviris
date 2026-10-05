@@ -12,7 +12,7 @@
  *   tok:<sha256(tok)> -> email            (expirationTtl 90 dias)
  *   sync:<email>      -> { data, updatedAt }
  *   av:<email>        -> foto de perfil (data URI, <= 64 KB)
- *   rl:<ip>:<ventana> -> intentos fallidos de login
+ *   rl:<ip>:<ventana> -> intentos fallidos de login (y altas con un correo que ya existe)
  *
  * El token se guarda HASHEADO: quien leyera el KV no podria usarlo para
  * suplantar a nadie, igual que con las contrasenas.
@@ -106,7 +106,9 @@ export default {
         if (!emailOk(em)) return json({ ok: false, error: 'Correo no válido' }, 400);
         if (String(password || '').length < 8) return json({ ok: false, error: 'La contraseña necesita al menos 8 caracteres' }, 400);
         if (await rlBloqueado(env, req)) return json({ ok: false, error: 'Demasiados intentos. Espera unos minutos.' }, 429);
-        if (await env.SYNC.get('acct:' + em)) return json({ ok: false, error: 'Ya existe una cuenta con ese correo' }, 409);
+        // El alta sí dice si el correo ya tiene cuenta: cuenta como intento
+        // fallido para que no sirva para comprobar correos sin freno.
+        if (await env.SYNC.get('acct:' + em)) { await rlFallo(env, req); return json({ ok: false, error: 'Ya existe una cuenta con ese correo' }, 409); }
         const salt = randB64(16);
         const hash = await pbkdf2(String(password), salt);
         await env.SYNC.put('acct:' + em, JSON.stringify({ salt, hash, created: Date.now() }));

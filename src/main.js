@@ -143,6 +143,19 @@ const borraCookies = (f) => { if (f) { try { fs.rmSync(f, { force: true }); } ca
    --js-runtimes deno:<ruta> desaparece el aviso y salen todos los formatos hasta
    1080p y más. Las instalaciones que ya tenían yt-dlp y ffmpeg bajan solo Deno
    (~42 MB en zip): la lista `missing` decide qué se descarga. */
+// Texto dentro de un literal '...' de PowerShell. PowerShell también cierra el
+// literal con las comillas tipográficas (‘ ’ ‚ ‛), así que se doblan todas:
+// una ruta como C:\Users\O'Brien rompía la orden.
+const literalPs = (s) => "'" + String(s).replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q) + "'";
+// Sin bloquear el proceso principal: con execSync todas las ventanas se
+// quedaban congeladas mientras se extraían los ~80 MB de ffmpeg.
+function descomprime(zip, destino) {
+  return new Promise((resolve, reject) => {
+    require('child_process').execFile('powershell.exe',
+      ['-NoProfile', '-Command', `Expand-Archive -Force -LiteralPath ${literalPs(zip)} -DestinationPath ${literalPs(destino)}`],
+      { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+  });
+}
 let binsPromise = null;
 function ensureBins() {
   const missing = ['yt-dlp.exe', 'ffmpeg.exe', 'deno.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
@@ -180,7 +193,7 @@ function ensureBins() {
         const zip = path.join(dir, 'ffmpeg.zip');
         await downloadTo(BIN_FFMPEG_URL, zip, tramo('ffmpeg.exe'));
         const tmp = path.join(dir, '_ff');
-        require('child_process').execSync(`powershell -NoProfile -Command "Expand-Archive -Force '${zip}' '${tmp}'"`, { windowsHide: true });
+        await descomprime(zip, tmp);
         const findFf = (d) => {
           for (const f of fs.readdirSync(d, { withFileTypes: true })) {
             const fp = path.join(d, f.name);
@@ -201,7 +214,7 @@ function ensureBins() {
         const zip = path.join(dir, 'deno.zip');
         await downloadTo(BIN_DENO_URL, zip, tramo('deno.exe'));
         const tmp = path.join(dir, '_deno');
-        require('child_process').execSync(`powershell -NoProfile -Command "Expand-Archive -Force '${zip}' '${tmp}'"`, { windowsHide: true });
+        await descomprime(zip, tmp);
         const found = path.join(tmp, 'deno.exe');
         if (!fs.existsSync(found)) throw new Error('deno no encontrado en el zip');
         fs.copyFileSync(found, path.join(dir, 'deno.exe'));
@@ -328,10 +341,27 @@ function loadSettings() {
   }
 }
 
+/* Escritura a prueba de cortes: se escribe al lado y se renombra encima. Con
+   writeFileSync directo, un cierre forzado o un apagón a mitad dejaba el JSON
+   cortado; al arrancar no se podía leer y se volvía a los valores de fábrica:
+   se perdían los ajustes (con la sal de los espacios protegidos) o, en el
+   siguiente guardado, la lista entera de contraseñas. */
+function escribeSeguro(ruta, texto) {
+  const tmp = ruta + '.tmp';
+  try {
+    fs.writeFileSync(tmp, texto, 'utf8');
+    fs.renameSync(tmp, ruta);
+  } catch {
+    // El renombrado falla si otro programa tiene el archivo abierto (un antivirus): se escribe como antes.
+    try { fs.rmSync(tmp, { force: true }); } catch { /* nada */ }
+    fs.writeFileSync(ruta, texto, 'utf8');
+  }
+}
+
 function saveSettings(s) {
   try {
     fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
-    fs.writeFileSync(settingsPath(), JSON.stringify(s, null, 2), 'utf8');
+    escribeSeguro(settingsPath(), JSON.stringify(s, null, 2));
   } catch (e) {
     console.error('No se pudieron guardar los ajustes:', e);
   }
@@ -412,6 +442,12 @@ function isWhitelisted(referrer) {
   } catch { return false; }
 }
 
+// La página de la pestaña que hace la petición; el referrer solo si no hay pestaña (service workers).
+function paginaDe(details) {
+  try { if (details.webContents && !details.webContents.isDestroyed()) return details.webContents.getURL() || details.referrer || ''; } catch { /* nada */ }
+  return details.referrer || '';
+}
+
 function broadcast(channel, payload) {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send(channel, payload);
 }
@@ -420,13 +456,16 @@ function broadcast(channel, payload) {
 let downloadSeq = 0;
 const downloads = new Map(); // id → { item, meta }
 
-function registerDownloadItem(item, sourceUrl) {
+function registerDownloadItem(item, sourceUrl, enHistorial = true) {
   const dir = app.getPath('downloads');
   let name = item.getFilename() || 'descarga';
   let candidate = path.join(dir, name);
   const ext = path.extname(name);
   const base = path.basename(name, ext);
-  for (let i = 1; fs.existsSync(candidate); i++) {
+  // Tampoco vale el nombre de otra descarga que siga en marcha: su archivo aún
+  // no existe y las dos acababan escribiendo en el mismo (se perdía la primera).
+  const ocupado = (p) => fs.existsSync(p) || [...downloads.values()].some((d) => d.item && (d.meta.state === 'progressing' || d.meta.state === 'interrupted') && d.meta.path.toLowerCase() === p.toLowerCase());
+  for (let i = 1; ocupado(candidate); i++) {
     candidate = path.join(dir, `${base} (${i})${ext}`);
   }
   item.setSavePath(candidate);
@@ -454,7 +493,7 @@ function registerDownloadItem(item, sourceUrl) {
   item.once('done', (_e, state) => {
     meta.state = state; // completed | cancelled | interrupted
     meta.received = item.getReceivedBytes();
-    if (state === 'completed') recordDlHistory(meta.path);
+    if (state === 'completed' && enHistorial) recordDlHistory(meta.path);
     broadcast('download:update', meta);
   });
   return meta;
@@ -472,7 +511,7 @@ function loadDlHistory() {
 function recordDlHistory(p) {
   if (!p) return;
   dlHistory = [{ path: p, time: Date.now() }, ...loadDlHistory().filter((x) => x.path !== p)].slice(0, 2000);
-  try { fs.writeFileSync(dlHistoryPath(), JSON.stringify(dlHistory), 'utf8'); } catch {}
+  try { escribeSeguro(dlHistoryPath(), JSON.stringify(dlHistory)); } catch {}
 }
 
 // Solo anuncios/telemetría puros. NO se tocan rutas del reproductor
@@ -512,10 +551,6 @@ const UA_CH = {
   plataforma: process.platform === 'win32' ? '"Windows"'
     : process.platform === 'darwin' ? '"macOS"' : '"Linux"'
 };
-ipcMain.on('ua:hints', (e) => { e.returnValue = UA_CH; });
-// El preload de cada web pregunta si las passkeys están bloqueadas: con el
-// ajuste puesto, la página no ve autenticador de plataforma (ver webview-preload).
-ipcMain.on('passkeys:bloqueadas', (e) => { e.returnValue = !!settings.blockPasskeys; });
 
 /* Accept-Language con la MISMA forma que la de Chrome: el idioma completo y
    detrás el idioma a secas con q=0.9 ("es-ES,es;q=0.9").
@@ -547,27 +582,53 @@ function idiomasAceptados() {
 function idiomasLista() {
   return idiomasAceptados().split(',').map((t) => t.split(';')[0]);
 }
-ipcMain.on('ua:idiomas', (e) => { e.returnValue = idiomasLista(); });
 
-/* Estado REAL de un permiso para el sitio que pregunta: 'allow', 'block' o
-   'prompt' si aún no se ha decidido.
-   Hace falta porque setPermissionCheckHandler de Electron solo sabe decir sí o
-   no, y al responder "no" a algo que en realidad está SIN decidir, la página
-   leía Notification.permission === 'denied'. Eso no es solo una huella rara:
-   muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
-   diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
-   notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
-ipcMain.on('perm:estado', (e, permiso) => {
+/* Lo que el preload de cada web necesita de main al arrancar, en UNA sola
+   llamada síncrona (NAV-IB-18). Antes eran trece (client hints, idiomas, diez
+   permisos y passkeys), y cada sendSync frena la carga de la página mientras
+   main responde.
+   - hints: para rehacer navigator.userAgentData (ver UA_CH).
+   - idiomas: la lista pelada (idiomasLista).
+   - passkeys: con el ajuste puesto, la página no ve autenticador de plataforma.
+   - permisos: el estado REAL de cada permiso para el sitio que pregunta:
+     'allow', 'block' o 'prompt' si aún no se ha decidido. Hace falta porque
+     setPermissionCheckHandler de Electron solo sabe decir sí o no, y al
+     responder "no" a algo que en realidad está SIN decidir, la página leía
+     Notification.permission === 'denied'. Eso no es solo una huella rara:
+     muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
+     diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
+     notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
+ipcMain.on('preload:arranque', (e, permisos) => {
   let origen = '';
   try { origen = originOf(e.senderFrame.url); } catch { /* nada */ }
-  const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
-  e.returnValue = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
+  const estados = {};
+  for (const permiso of Array.isArray(permisos) ? permisos : []) {
+    if (typeof permiso !== 'string') continue;
+    const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
+    estados[permiso] = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
+  }
+  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados };
 });
 
 /* Dominios de verificación anti-robot. NO se bloquean nunca: bloquearlos no
    quita publicidad, solo hace que el sitio pida el captcha una y otra vez.
    Ver el comentario largo dentro de onBeforeRequest. */
 const ES_VERIFICACION = /^https?:\/\/([^/]*\.)?(awswaf\.com|challenges\.cloudflare\.com|hcaptcha\.com|recaptcha\.net)(\/|$|:)/i;
+
+/* Antes de salir, cada sesión vuelca y conserva sus cookies (ver setupSession).
+   Un solo before-quit las espera TODAS: con uno por sesión, la primera en
+   acabar (la privada, casi vacía) llamaba a app.quit() y la app se cerraba sin
+   esperar a la normal. Medido: de 167 cookies de sesión volvían 3. El tope
+   evita que una cookie atascada deje la app sin cerrar. */
+const alSalir = [];
+let saliendo = false;
+app.on('before-quit', (e) => {
+  if (saliendo) return;                            // segunda pasada: dejar salir
+  e.preventDefault();                              // el guardado es asíncrono
+  saliendo = true;
+  const tareas = Promise.all(alSalir.map((f) => f().catch(() => {})));
+  Promise.race([tareas, new Promise((r) => setTimeout(r, 8000))]).finally(() => app.quit());
+});
 
 function setupSession(ses) {
   // UA de Chrome puro para navegar: el UA por defecto lleva los tokens
@@ -627,7 +688,11 @@ function setupSession(ses) {
     callback({ requestHeaders: h });
   });
   ses.webRequest.onBeforeRequest((details, callback) => {
-    if (!settings.adblockEnabled || details.resourceType === 'mainFrame' || isWhitelisted(details.referrer)) {
+    // La lista blanca (y Spotify, abajo) miran la PÁGINA de la pestaña, no el
+    // referrer: con "no-referrer", o desde un iframe de terceros, el referrer
+    // no es el sitio y se seguía bloqueando en un sitio que el usuario permitió.
+    const pagina = paginaDe(details);
+    if (!settings.adblockEnabled || details.resourceType === 'mainFrame' || isWhitelisted(pagina)) {
       return callback({});
     }
     const u = details.url;
@@ -638,7 +703,7 @@ function setupSession(ses) {
     // bloquea nada, el anuncio se quita en cliente (el addon Blockify lo salta
     // o lo silencia).
     try {
-      const refHost = new URL(details.referrer || '').hostname;
+      const refHost = new URL(pagina).hostname;
       if (hostMatches(refHost, 'spotify.com') || hostMatches(refHost, 'open.spotify.com')) return callback({});
     } catch { /* sin referrer válido */ }
     // (el vídeo de googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr,
@@ -798,7 +863,8 @@ function setupSession(ses) {
     }, WAF_VENTANA);
   }
 
-  ses.on('will-download', (_e, item) => registerDownloadItem(item));
+  // Lo bajado en la sesión privada (en memoria) no entra en el historial de descargas.
+  ses.on('will-download', (_e, item) => registerDownloadItem(item, undefined, ses.isPersistent()));
   /* SESIONES QUE NO SE PIERDEN (2026-08-13). Chromium guarda las cookies en
      memoria y las vuelca al disco cuando le parece: si el proceso muere de
      golpe (cierre forzado, cuelgue, corte de luz) se pierde lo escrito desde
@@ -825,7 +891,6 @@ function setupSession(ses) {
      Cómo: al salir, las cookies marcadas como de sesión se vuelven a escribir
      con caducidad de 30 días. Es lo mismo que hace Chrome de facto. */
   const DIAS_SESION = 30;
-  let conservando = false;
   async function conservaSesiones() {
     if (settings.restoreSession === false) return;
     const todas = await ses.cookies.get({});
@@ -848,13 +913,9 @@ function setupSession(ses) {
     try { await ses.cookies.flushStore(); } catch { /* nada */ }
     if (n) console.log(`[Naviris] ${n} cookies de sesión conservadas para el próximo arranque`);
   }
-  app.on('before-quit', (e) => {
-    vuelca();
-    if (conservando) return;                       // segunda pasada: dejar salir
-    e.preventDefault();                            // el guardado es asíncrono
-    conservando = true;
-    conservaSesiones().catch(() => {}).finally(() => app.quit());
-  });
+  // Lo espera el único before-quit (ver alSalir). La privada vive en memoria:
+  // convertir sus cookies no serviría de nada.
+  alSalir.push(async () => { vuelca(); if (ses.isPersistent()) await conservaSesiones(); });
   ses.cookies.on('changed', (() => {
     let t = null;
     return () => { clearTimeout(t); t = setTimeout(vuelca, 20000); };   // agrupado: no en cada cookie
@@ -885,8 +946,14 @@ function setupPermissions(ses) {
     // Preguntar al usuario
     const id = 'perm' + (++permSeq);
     permPending.set(id, { callback, key });
+    // Si la pestaña se cierra sin contestar, la petición no se queda colgada.
+    wc?.once('destroyed', () => { const p = permPending.get(id); if (p) { permPending.delete(id); p.callback(false); } });
     const mediaTypes = (details && details.mediaTypes) || [];
-    broadcast('perm:ask', { id, origin, permission, mediaTypes });
+    // Solo a la ventana de la pestaña que pregunta: antes salía en todas, también
+    // en las normales cuando preguntaba una web abierta en la ventana privada.
+    const host = wc && wc.hostWebContents;
+    if (host && !host.isDestroyed()) host.send('perm:ask', { id, origin, permission, mediaTypes });
+    else broadcast('perm:ask', { id, origin, permission, mediaTypes });
   });
   ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => {
     if (AUTO_ALLOW.has(permission)) return true;
@@ -894,17 +961,18 @@ function setupPermissions(ses) {
   });
 }
 
-ipcMain.on('perm:respond', (_e, { id, decision, remember }) => {
+ipcMain.on('perm:respond', soloUI((_e, r) => {
+  const { id, decision, remember } = r || {};
   const pend = permPending.get(id);
   if (!pend) return;
   permPending.delete(id);
   const allow = decision === 'allow';
   if (remember) { settings.permissions[pend.key] = allow ? 'allow' : 'block'; saveSettings(settings); }
   pend.callback(allow);
-});
-ipcMain.handle('perm:list', () => settings.permissions);
-ipcMain.handle('perm:remove', (_e, key) => { delete settings.permissions[key]; saveSettings(settings); return settings.permissions; });
-ipcMain.handle('perm:clear', () => { settings.permissions = {}; saveSettings(settings); return settings.permissions; });
+}));
+ipcMain.handle('perm:list', soloUI(() => settings.permissions));
+ipcMain.handle('perm:remove', soloUI((_e, key) => { delete settings.permissions[key]; saveSettings(settings); return settings.permissions; }));
+ipcMain.handle('perm:clear', soloUI(() => { settings.permissions = {}; saveSettings(settings); return settings.permissions; }));
 ipcMain.handle('sec:status', () => ({
   sandbox: true,                                                   // sandbox activado en cada webview
   siteIsolation: !app.commandLine.hasSwitch('disable-site-isolation-trials'), // Chromium: por defecto activo
@@ -913,6 +981,22 @@ ipcMain.handle('sec:status', () => ({
 
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
+
+// Los errores de yt-dlp llegan en inglés y con la URL dentro; el panel de
+// descargas enseña esto en su lugar (el original va a la consola del main).
+function errorDeYtDlp(texto) {
+  const t = String(texto || '');
+  if (/Unsupported URL/i.test(t)) return 'Este sitio no es compatible con el Rat Tool';
+  if (/Sign in to confirm|not a bot/i.test(t)) return 'YouTube pide iniciar sesión para este video';
+  if (/Private video|login required|requires authentication|registered users|log in/i.test(t)) return 'El video es privado o necesita iniciar sesión';
+  if (/Requested format is not available/i.test(t)) return 'Esa calidad no está disponible para este video';
+  if (/Video unavailable|not available|has been removed|does not exist/i.test(t)) return 'El video no está disponible';
+  if (/No video formats found|no video in this/i.test(t)) return 'No se encontró ningún video en esa página';
+  if (/HTTP Error 403|Forbidden/i.test(t)) return 'El sitio rechazó la descarga';
+  if (/HTTP Error 404/i.test(t)) return 'No se encontró el video';
+  if (/Unable to download webpage|timed out|getaddrinfo|Connection|network/i.test(t)) return 'No se pudo conectar con el sitio';
+  return 'No se pudo descargar';
+}
 
 async function ytDownload({ url, mode, quality }) {
   const id = 'yt' + (++downloadSeq);
@@ -926,7 +1010,7 @@ async function ytDownload({ url, mode, quality }) {
 
   if (!fs.existsSync(ytDlpPath())) {
     meta.state = 'interrupted';
-    meta.name = 'yt-dlp no encontrado';
+    meta.name = 'El motor de descargas no está instalado';
     broadcast('download:update', meta);
     return id;
   }
@@ -957,7 +1041,8 @@ async function ytDownload({ url, mode, quality }) {
   ytJobs.set(id, child);
 
   let lastPct = 0, lastError = '';
-  const setFile = (p) => { const full = p.trim().replace(/^"|"$/g, ''); meta.path = full; meta.name = path.basename(full); };
+  const escritos = new Set();   // archivos que este trabajo ha empezado a escribir (se borran si se cancela)
+  const setFile = (p) => { const full = p.trim().replace(/^"|"$/g, ''); meta.path = full; meta.name = path.basename(full); escritos.add(full); };
   const handle = (buf) => {
     const text = buf.toString();
     const dest = text.match(/(?:\[download\]|\[ExtractAudio\])\s+Destination:\s*(.+)/);
@@ -985,9 +1070,20 @@ async function ytDownload({ url, mode, quality }) {
   child.on('close', (code) => {
     borraCookies(cookies);
     ytJobs.delete(id);
+    // Cancelada por el usuario: el código de salida del proceso matado no es un
+    // error, y lo que quedó a medias en Descargas se borra (con --no-part el
+    // archivo a medias lleva ya el nombre final).
+    if (meta.state === 'cancelled') {
+      for (const f of escritos) { try { fs.rmSync(f, { force: true }); } catch { /* en uso */ } }
+      return;
+    }
     meta.state = code === 0 ? 'completed' : 'interrupted';
     meta.percent = code === 0 ? 100 : meta.percent;
-    if (code !== 0) { meta.error = lastError || 'yt-dlp terminó con código ' + code; if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + (lastError || 'no se pudo descargar').slice(0, 80); }
+    if (code !== 0) {
+      if (lastError) console.log('[Naviris] yt-dlp:', lastError);
+      meta.error = errorDeYtDlp(lastError);
+      if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + meta.error;
+    }
     if (code === 0 && meta.path) {
       // Tras ExtractAudio/Merger el nombre cambia de extensión pero meta.path no
       const fin = path.join(path.dirname(meta.path), meta.name);
@@ -1019,7 +1115,7 @@ const SPLASH_MINIMO = 1600; // ms para que el anillo y sus cinco etapas se lean 
 function crearSplash() {
   splashWin = new BrowserWindow({
     width: 300, height: 300, resizable: false, movable: true,
-    frame: false, transparent: false, backgroundColor: '#08080a',
+    frame: false, transparent: false, backgroundColor: '#0a0a0c',   // el mismo fondo que splash.html: sin cambio de tono en el primer fotograma
     center: true, alwaysOnTop: true, skipTaskbar: false,
     maximizable: false, minimizable: false, fullscreenable: false,
     title: 'Naviris',
@@ -1073,9 +1169,9 @@ ipcMain.on('ui:listo', (e) => {
   // La ventana que acaba de montarse puede traer una pestaña sacada de otra.
   const suya = BrowserWindow.fromWebContents(e.sender);
   if (suya && urlPendiente.has(suya.id)) {
-    const url = urlPendiente.get(suya.id);
+    const { url, contenedor } = urlPendiente.get(suya.id);
     urlPendiente.delete(suya.id);
-    e.sender.send('tab:open-url', { url, background: false });
+    e.sender.send('tab:open-url', { url, background: false, contenedor });
   }
   const win = ventanaEsperandoUI;
   if (!win) return;
@@ -1084,7 +1180,10 @@ ipcMain.on('ui:listo', (e) => {
 });
 
 // ---------- Ventanas ----------
-function createWindow(isPrivate = false, conSplash = false) {
+// Las únicas sesiones en las que puede vivir una web dentro de Naviris.
+const esParticionDeNaviris = (p) => p === PART_NORMAL || p === PART_PRIVATE || /^persist:(cont|esp)-[a-z0-9]{1,24}$/.test(String(p || ''));
+
+function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 560,
     frame: false, show: false, backgroundColor: '#0a0a0c',
@@ -1095,7 +1194,13 @@ function createWindow(isPrivate = false, conSplash = false) {
     }
   });
   // Sandbox + aislamiento en cada webview (contenido de sitios) + preload de contraseñas
-  win.webContents.on('will-attach-webview', (_e, webPreferences) => {
+  win.webContents.on('will-attach-webview', (e, webPreferences, params) => {
+    // Un <webview> sin partición de Naviris caería en la sesión por defecto (la de
+    // la interfaz), sin bloqueador ni control de permisos: no se monta.
+    if (!esParticionDeNaviris(params.partition)) { e.preventDefault(); return; }
+    // Las webs nunca se cargan sin la política del mismo origen, diga lo que diga el elemento.
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
     webPreferences.sandbox = true;
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
@@ -1115,8 +1220,39 @@ function createWindow(isPrivate = false, conSplash = false) {
        aviso de "puede que los cambios no se guarden". A cambio, ninguna página
        puede volver a bloquear el navegador. */
     webPreferences.disableDialogs = true;
+    // Pestaña que despierta con su atrás y adelante guardados (ver 'wv:historial'):
+    // el webview nace sin cargar la URL y restaura su historial al montarse.
+    const pend = historialPendiente.get(win.webContents.id);
+    const i = pend ? pend.findIndex((h) => h.url === urlNormal(params.src) && Date.now() - h.ts < 10000) : -1;
+    if (i >= 0) {
+      historialAlCrear = pend.splice(i, 1)[0];
+      params.src = '';
+      setImmediate(() => { historialAlCrear = null; });   // solo vale para el webview que se crea ahora
+    }
   });
-  win.loadFile(path.join(__dirname, 'index.html'), isPrivate ? { query: { private: '1' } } : undefined);
+  // sacada=1: la ventana nace de sacar una pestaña y no debe restaurar la sesión
+  // (NAV-IA-09); el renderer la reconoce por la URL, igual que private=1.
+  const query = {};
+  if (isPrivate) query.private = '1';
+  if (sacada) query.sacada = '1';
+  win.loadFile(path.join(__dirname, 'index.html'), Object.keys(query).length ? { query } : undefined);
+  // La interfaz no navega nunca: ni un <meta refresh> inyectado ni un enlace o
+  // archivo soltado sobre ella pueden cambiar index.html por otra página (que
+  // heredaría window.cobalt).
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  // Ni abre ventanas sueltas: una dirección web se abre en una pestaña de esta ventana.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) win.webContents.send('tab:open-url', { url, background: false });
+    return { action: 'deny' };
+  });
+  // Si se cae el proceso de la interfaz, la ventana se quedaba muerta. Se recarga
+  // (las pestañas vuelven con la sesión); si se cae otra vez enseguida, no se insiste.
+  let ultimaCaida = 0;
+  win.webContents.on('render-process-gone', (_e, d) => {
+    if (d.reason === 'clean-exit' || win.isDestroyed() || Date.now() - ultimaCaida < 30000) return;
+    ultimaCaida = Date.now();
+    win.webContents.reload();
+  });
   /* CON SPLASH la ventana NO se muestra al estar pintada, sino cuando su
      interfaz avisa de que está montada ('ui:listo' desde el renderer). Si se
      mostrara antes se vería el esqueleto vacío detrás del cuadrado, que es
@@ -1239,7 +1375,8 @@ function menuContextual(contents) {
     const sep = () => { if (items.length && items[items.length - 1].type !== 'separator') items.push({ type: 'separator' }); };
 
     if (p.selectionText && !p.isEditable) {
-      const corto = p.selectionText.trim().replace(/\s+/g, ' ').slice(0, 24);
+      const limpio = p.selectionText.trim().replace(/\s+/g, ' ');
+      const corto = limpio.length > 24 ? limpio.slice(0, 24).trimEnd() + '…' : limpio;
       items.push({ label: 'Copiar', accelerator: 'Ctrl+C', click: () => contents.copy() });
       items.push({ label: 'Buscar "' + corto + '" en una pestaña nueva', click: () => aRenderer('buscar', p.selectionText.trim()) });
       sep();
@@ -1274,14 +1411,14 @@ function menuContextual(contents) {
     if (p.mediaType === 'video' || p.mediaType === 'audio') {
       const esVideo = p.mediaType === 'video';
       items.push({
-        label: 'Descargar ' + (esVideo ? 'el vídeo' : 'el audio') + ' con Rat Tool',
+        label: 'Descargar ' + (esVideo ? 'el video' : 'el audio') + ' con Rat Tool',
         click: () => aRenderer('rat', { pagina: contents.getURL(), src: p.srcURL || '' })
       });
       if (esVideo) {
         items.push({ label: 'Ver en miniatura', accelerator: 'Alt+P', click: () => aRenderer('pip') });
       }
       if (p.srcURL && /^https?:/.test(p.srcURL)) {
-        items.push({ label: 'Copiar la dirección ' + (esVideo ? 'del vídeo' : 'del audio'), click: () => clipboard.writeText(p.srcURL) });
+        items.push({ label: 'Copiar la dirección ' + (esVideo ? 'del video' : 'del audio'), click: () => clipboard.writeText(p.srcURL) });
       }
       sep();
     }
@@ -1296,12 +1433,13 @@ function menuContextual(contents) {
     items.push({ label: 'Pantalla completa', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
     items.push({ label: 'Copiar la dirección de la página', click: () => clipboard.writeText(contents.getURL()) });
     sep();
-    items.push({ label: 'Guardar la página como…', accelerator: 'Ctrl+S', click: () => guardarComo(contents, false) });
+    // Sin atajo a la vista donde ningún atajo hace eso (Ctrl+S, Ctrl+U e Inspeccionar no existen).
+    items.push({ label: 'Guardar la página como…', click: () => guardarComo(contents, false) });
     items.push({ label: 'Guardar como PDF…', click: () => guardarComo(contents, true) });
     items.push({ label: 'Imprimir…', accelerator: 'Ctrl+P', click: () => contents.print() });
     sep();
-    items.push({ label: 'Código fuente de la página', accelerator: 'Ctrl+U', click: () => host?.send('tab:open-url', { url: 'view-source:' + contents.getURL(), background: false }) });
-    items.push({ label: 'Inspeccionar', accelerator: 'Ctrl+Mayús+C', click: () => contents.inspectElement(p.x, p.y) });
+    items.push({ label: 'Código fuente de la página', click: () => host?.send('tab:open-url', { url: 'view-source:' + contents.getURL(), background: false }) });
+    items.push({ label: 'Inspeccionar', click: () => contents.inspectElement(p.x, p.y) });
 
     Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(host) || undefined });
   });
@@ -1379,7 +1517,10 @@ function atajosDeWebview(contents) {
 
 /* Scrollbar propio para las webs (2026-08-13, peticion de Dosa: seguian
    saliendo barras por defecto en varias paginas). Gris translucido para que
-   valga en claro y en oscuro, y sin flechas. */
+   valga en claro y en oscuro, y sin flechas. Desde Chromium 121, una web que
+   declara scrollbar-color (YouTube) anula los ::-webkit-scrollbar y vuelve la
+   barra del sistema: por eso se fuerza a auto. scrollbar-width no se toca, para
+   no destapar las barras que las webs ocultan a propósito (NAV-VIVO-11). */
 const SCROLLBAR_CSS = `
   ::-webkit-scrollbar { width: 11px !important; height: 11px !important; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent !important; }
@@ -1391,6 +1532,7 @@ const SCROLLBAR_CSS = `
   }
   ::-webkit-scrollbar-thumb:hover { background: rgba(128,128,132,.62) !important; background-clip: content-box !important; }
   ::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; }
+  *, *::before, *::after { scrollbar-color: auto !important; }
 `;
 
 /* La marca del foco de serie (2026-08-29, peticion de Dosa: "que sea muchisimo
@@ -1411,8 +1553,50 @@ const FOCO_CSS = `
   }
 `;
 
+/* Atrás y adelante de una pestaña dormida (NAV-VIVO-07). Dormir quita el
+   webview para soltar su proceso, y el nuevo nacía sin historial. Ahora, antes
+   de dormir, la interfaz pide las entradas del webview ('wv:historial'); al
+   despertar las deja apuntadas ('wv:historial-pendiente') y will-attach-webview
+   hace que el webview nuevo las restaure en vez de cargar la URL a pelo. */
+const historialPendiente = new Map();   // id de la interfaz -> [{ url, entries, index, ts }]
+let historialAlCrear = null;            // el del webview que se está creando ahora mismo
+const urlNormal = (u) => { try { return new URL(u).href; } catch { return String(u || ''); } };
+// Son síncronos y returnValue se asigna UNA sola vez: la primera asignación ya contesta.
+function historialDe(e, id) {
+  if (!esUI(e)) return null;
+  try {
+    const wc = webContents.fromId(Number(id));
+    if (!wc || wc.getType() !== 'webview' || wc.hostWebContents?.id !== e.sender.id) return null;
+    return { entries: wc.navigationHistory.getAllEntries(), index: wc.navigationHistory.getActiveIndex() };
+  } catch { return null; }   // ya cerrado
+}
+function apuntaHistorial(e, url, h) {
+  if (!esUI(e) || typeof url !== 'string' || !h || !Array.isArray(h.entries)) return false;
+  const valida = (x) => x && typeof x.url === 'string' && typeof x.title === 'string' && (x.pageState == null || typeof x.pageState === 'string');
+  if (!h.entries.length || h.entries.length > 50 || !h.entries.every(valida)) return false;
+  if (!Number.isInteger(h.index) || h.index < 0 || h.index >= h.entries.length) return false;
+  const id = e.sender.id;
+  if (!historialPendiente.has(id)) e.sender.once('destroyed', () => historialPendiente.delete(id));
+  // Lo que no llegó a usarse en 10 s (un webview que no se montó) se descarta.
+  const lista = (historialPendiente.get(id) || []).filter((p) => Date.now() - p.ts < 10000);
+  lista.push({ url: urlNormal(url), entries: h.entries, index: h.index, ts: Date.now() });
+  historialPendiente.set(id, lista);
+  return true;
+}
+ipcMain.on('wv:historial', (e, id) => { e.returnValue = historialDe(e, id); });
+ipcMain.on('wv:historial-pendiente', (e, url, h) => { e.returnValue = apuntaHistorial(e, url, h); });
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    // Pestaña que despierta: restaura su historial (ver historialPendiente). Si no
+    // se puede, carga su URL como antes, para no dejarla en blanco.
+    if (historialAlCrear) {
+      const h = historialAlCrear; historialAlCrear = null;
+      contents.once('did-attach', () => {
+        const aPelo = () => { if (!contents.isDestroyed() && !contents.getURL()) contents.loadURL(h.url).catch(() => {}); };
+        try { contents.navigationHistory.restore({ entries: h.entries, index: h.index }).catch(aPelo); } catch { aPelo(); }
+      });
+    }
     suppressWebAuthn(contents);
     atajosDeWebview(contents);
     menuContextual(contents);
@@ -1484,11 +1668,14 @@ function esUI(e) {
     return u.protocol === 'file:' && decodeURIComponent(u.pathname).replace(/^\//, '').replace(/\//g, path.sep).toLowerCase() === uiPath.toLowerCase();
   } catch { return false; }
 }
-// Envuelve un handler para que solo responda a la interfaz
-const soloUI = (fn) => (e, ...args) => {
-  if (!esUI(e)) { console.warn('[Naviris] IPC sensible rechazado desde', (() => { try { return e.sender.getURL(); } catch { return 'origen desconocido'; } })()); return { ok: false, error: 'origen no autorizado' }; }
-  return fn(e, ...args);
-};
+// Envuelve un handler para que solo responda a la interfaz. Es una función
+// declarada (no const) porque los permisos, más arriba, ya la usan al cargar.
+function soloUI(fn) {
+  return (e, ...args) => {
+    if (!esUI(e)) { console.warn('[Naviris] IPC sensible rechazado desde', (() => { try { return e.sender.getURL(); } catch { return 'origen desconocido'; } })()); return { ok: false, error: 'origen no autorizado' }; }
+    return fn(e, ...args);
+  };
+}
 
 ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
 ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
@@ -1499,19 +1686,24 @@ ipcMain.on('win:new-private', () => createWindow(true));
 /* Sacar una pestaña de la barra abre una ventana nueva con esa direccion.
    La ventana tarda en montar su interfaz, asi que la URL se guarda y se le
    manda cuando ella avisa de que ya esta lista ('ui:listo'). */
-const urlPendiente = new Map();   // id de ventana -> url que tiene que abrir
-ipcMain.on('win:sacar-pestana', (e, url) => {
+const urlPendiente = new Map();   // id de ventana -> { url, contenedor } que tiene que abrir
+ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
   if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
+  // La pestaña sale con su contenedor (su id; la ventana nueva lo busca en los ajustes).
+  if (typeof contenedor !== 'string' || !/^[a-z0-9]{1,24}$/.test(contenedor)) contenedor = null;
   // Si sale de una ventana privada, la nueva tambien lo es: no se saca una
   // pestaña privada a una ventana normal, que dejaria rastro.
   const dueno = BrowserWindow.fromWebContents(e.sender);
   let privada = false;
   try { privada = new URL(dueno.webContents.getURL()).searchParams.get('private') === '1'; } catch { /* nada */ }
-  const win = createWindow(privada);
-  if (win) urlPendiente.set(win.id, url);
+  const win = createWindow(privada, false, true);
+  if (!win) return;
+  urlPendiente.set(win.id, { url, contenedor });
+  const id = win.id;
+  win.once('closed', () => urlPendiente.delete(id));   // cerrada antes de montarse
 });
 
-ipcMain.handle('settings:get', () => settings);
+ipcMain.handle('settings:get', soloUI(() => settings));
 // ---------- Información del sitio (popover del candado) ----------
 // Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
 const PARTICIONES_VALIDAS = new Set(['persist:cobalt', 'cobalt-private']);
@@ -1578,15 +1770,16 @@ function descifra(clave, texto) {
 }
 function escribeEsp(id, clave, obj) {
   fs.mkdirSync(DIR_ESP(), { recursive: true });
-  fs.writeFileSync(archivoEsp(id), cifra(clave, obj), 'utf8');
+  escribeSeguro(archivoEsp(id), cifra(clave, obj));
 }
-const espacioDe = (id) => (settings.espacios || []).find((e) => e.id === id);
+// El id acaba en un nombre de archivo (archivoEsp): solo el formato que genera la interfaz.
+const espacioDe = (id) => (typeof id === 'string' && /^[a-z0-9]{1,24}$/.test(id) ? (settings.espacios || []).find((e) => e.id === id) : undefined);
 
 ipcMain.handle('esp:bloquea', soloUI((_e, { id, clave } = {}) => {
   const esp = espacioDe(id);
   if (!esp) return { ok: false, error: 'Ese espacio ya no existe' };
   if (esp.bloqueado) return { ok: false, error: 'Ese espacio ya está protegido' };
-  if (!clave || String(clave).length < 4) return { ok: false, error: 'El código necesita al menos 4 caracteres' };
+  if (!clave || String(clave).length < 4) return { ok: false, error: 'La contraseña necesita al menos 4 caracteres' };
   esp.sal = crypto.randomBytes(16).toString('base64');
   esp.bloqueado = true;
   esp.particion = esp.particion || ('persist:esp-' + id);
@@ -1607,7 +1800,7 @@ ipcMain.handle('esp:desbloquea', soloUI((_e, { id, clave } = {}) => {
   const derivada = derivaClave(clave, esp.sal || '');
   let datos;
   try { datos = descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
-  catch { return { ok: false, error: 'Código incorrecto' }; }
+  catch { return { ok: false, error: 'Contraseña incorrecta' }; }
   clavesEnMemoria.set(id, derivada);
   preparaContenedor(esp.particion);
   return { ok: true, datos };
@@ -1637,10 +1830,11 @@ ipcMain.handle('esp:borra', soloUI(async (_e, { id, clave } = {}) => {
   if (esp.bloqueado) {
     const derivada = derivaClave(clave, esp.sal || '');
     try { descifra(derivada, fs.readFileSync(archivoEsp(id), 'utf8')); }
-    catch { return { ok: false, error: 'Código incorrecto' }; }
+    catch { return { ok: false, error: 'Contraseña incorrecta' }; }
     try { fs.unlinkSync(archivoEsp(id)); } catch { /* ya no estaba */ }
   }
-  if (esp.particion) { try { await session.fromPartition(esp.particion).clearStorageData(); } catch { /* nada */ } }
+  // Solo la partición propia del espacio, nunca la normal ni la de un contenedor.
+  if (/^persist:esp-/.test(esp.particion || '')) { try { await session.fromPartition(esp.particion).clearStorageData(); } catch { /* nada */ } }
   settings.espacios = (settings.espacios || []).filter((e) => e.id !== id);
   saveSettings(settings);
   clavesEnMemoria.delete(id);
@@ -1709,6 +1903,11 @@ ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
     return { ok: true, b64: bytes.toString('base64'), tipo };
   } catch (e) { return { ok: false, error: String(e && e.message) }; }
 }));
+// Memoria de un proceso en KB: la PRIVADA, la que enseña el administrador de
+// tareas. workingSetSize cuenta también las páginas compartidas en cada proceso
+// y el total salía unas cuatro veces más alto (NAV-VIVO-08). Fuera de Windows
+// no hay privateBytes y se usa el working set.
+const memKb = (p) => (p.memory && (p.memory.privateBytes ?? p.memory.workingSetSize)) || 0;
 // Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris
 // (app.getAppMetrics agrega todos los procesos del navegador).
 ipcMain.handle('sys:stats', soloUI(async () => {
@@ -1716,7 +1915,7 @@ ipcMain.handle('sys:stats', soloUI(async () => {
     const mem = process.getSystemMemoryInfo();               // KB
     const mets = app.getAppMetrics();
     let cpu = 0, rssKb = 0;
-    for (const p of mets) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; rssKb += (p.memory && p.memory.workingSetSize) || 0; }
+    for (const p of mets) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; rssKb += memKb(p); }
     cpu = Math.round(cpu * 10) / 10; // un decimal: redondear a entero daba siempre 0
     return {
       ramTotal: mem.total, ramLibre: mem.free,
@@ -1744,7 +1943,7 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
       return {
         id: t.id,
         pid,
-        mb: m ? Math.round((m.memory && m.memory.workingSetSize || 0) / 1024) : null,
+        mb: m ? Math.round(memKb(m) / 1024) : null,
         cpu: m ? Math.round((m.cpu && m.cpu.percentCPUUsage || 0) * 10) / 10 : null
       };
     });
@@ -1755,15 +1954,29 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
     const suma = (arr, f) => Math.round(arr.reduce((s, p) => s + f(p), 0));
     return {
       filas,
-      restoMb: suma(resto, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      restoMb: suma(resto, (p) => memKb(p) / 1024),
       restoCpu: Math.round(resto.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
-      totalMb: suma(mets, (p) => (p.memory && p.memory.workingSetSize || 0) / 1024),
+      totalMb: suma(mets, (p) => memKb(p) / 1024),
       totalCpu: Math.round(mets.reduce((s, p) => s + (p.cpu && p.cpu.percentCPUUsage || 0), 0) * 10) / 10,
       procesos: mets.length
     };
   } catch { return null; }
 }));
-ipcMain.handle('clip:read', soloUI(async () => { try { return clipboard.readText() || ''; } catch { return ''; } }));
+/* Lo que copia un gestor de contraseñas (Bitwarden, KeePass, 1Password) lleva
+   la marca de Windows para que ningún historial lo guarde: el widget
+   Portapapeles tampoco lo ve. */
+function copiaExcluida() {
+  if (process.platform !== 'win32') return false;
+  try {
+    if (clipboard.has('ExcludeClipboardContentFromMonitorProcessing')) return true;
+    if (clipboard.has('CanIncludeInClipboardHistory')) {
+      const b = clipboard.readBuffer('CanIncludeInClipboardHistory');
+      return b.length >= 4 && b.readUInt32LE(0) === 0;
+    }
+  } catch { /* formato ilegible: se trata como una copia normal */ }
+  return false;
+}
+ipcMain.handle('clip:read', soloUI(async () => { try { return copiaExcluida() ? '' : (clipboard.readText() || ''); } catch { return ''; } }));
 ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
 ipcMain.handle('spotify:logged', soloUI(async () => {
   try {
@@ -1873,15 +2086,17 @@ ipcMain.handle('moovin:identidad', async (e) => {
     return String((j && j.prueba) || '');
   } catch { return ''; }
 });
-ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0); });
+// Con app.quit() y no app.exit(): exit se saltaba el before-quit y el reinicio
+// de Ajustes (aceleración por hardware, modo agente) perdía las cookies de sesión.
+ipcMain.on('app:restart', () => { app.relaunch(); app.quit(); });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
-ipcMain.handle('clipboard:read', () => { try { return clipboard.readText(); } catch { return ''; } });
+ipcMain.handle('clipboard:read', soloUI(() => { try { return clipboard.readText(); } catch { return ''; } }));
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
 const pwPath = () => path.join(app.getPath('userData'), 'cobalt-passwords.json');
 function loadPasswords() { try { return JSON.parse(fs.readFileSync(pwPath(), 'utf8')); } catch { return []; } }
-function savePasswords(list) { try { fs.writeFileSync(pwPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('pw save', e); } }
+function savePasswords(list) { try { escribeSeguro(pwPath(), JSON.stringify(list)); } catch (e) { console.error('pw save', e); } }
 let pwSeq = Date.now();
 
 // Verifica identidad con Windows Hello (PIN/biometría). Devuelve true si "Verified".
@@ -1903,7 +2118,9 @@ function hwndDeNaviris() {
 }
 function verifyWindowsHello(reason) {
   return new Promise((resolve) => {
-    const msg = String(reason || 'Naviris te pide verificar tu identidad').replace(/'/g, ' ');
+    // El motivo lleva el sitio de la contraseña (puede venir de un CSV importado):
+    // va como literal escapado, nunca pegado a mano entre comillas.
+    const msg = literalPs(reason || 'Naviris te pide verificar tu identidad');
     const hwnd = hwndDeNaviris();
     const script = `
 [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null
@@ -1937,10 +2154,10 @@ $op = $null
 if (${hwnd} -ne 0) {
   try {
     $riid = [Windows.Security.Credentials.UI.UserConsentVerifier].GetMethod('RequestVerificationAsync').ReturnType.GUID
-    $op = [HelloInterop]::Pedir([IntPtr]${hwnd}, '${msg}', $riid)
+    $op = [HelloInterop]::Pedir([IntPtr]${hwnd}, ${msg}, $riid)
   } catch { $op = $null }
 }
-if ($op -eq $null) { $op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('${msg}') }
+if ($op -eq $null) { $op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync(${msg}) }
 $task = $asTask.MakeGenericMethod([Windows.Security.Credentials.UI.UserConsentVerificationResult]).Invoke($null, @($op))
 $task.Wait()
 [Console]::Out.Write('RESULT=' + $task.Result)`;
@@ -2069,7 +2286,7 @@ ipcMain.handle('pw:reveal', soloUI(async (_e, id) => {
 // autorrellenamos número/titular/caducidad y el CVC lo teclea el usuario.
 const cardsPath = () => path.join(app.getPath('userData'), 'cobalt-cards.json');
 function loadCards() { try { return JSON.parse(fs.readFileSync(cardsPath(), 'utf8')); } catch { return []; } }
-function saveCards(list) { try { fs.writeFileSync(cardsPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('cards save', e); } }
+function saveCards(list) { try { escribeSeguro(cardsPath(), JSON.stringify(list)); } catch (e) { console.error('cards save', e); } }
 let cardSeq = Date.now();
 
 function cardBrand(num) {
@@ -2136,7 +2353,7 @@ ipcMain.handle('cards:fill', soloUI((_e, id) => revealCard(id, 'Naviris: verific
    eso los códigos solo salen con la caja desbloqueada. */
 const totpPath = () => path.join(app.getPath('userData'), 'cobalt-totp.json');
 function loadTotp() { try { return JSON.parse(fs.readFileSync(totpPath(), 'utf8')); } catch { return []; } }
-function saveTotp(list) { try { fs.writeFileSync(totpPath(), JSON.stringify(list), 'utf8'); } catch (e) { console.error('totp save', e); } }
+function saveTotp(list) { try { escribeSeguro(totpPath(), JSON.stringify(list)); } catch (e) { console.error('totp save', e); } }
 
 // Base32 de RFC 4648 sin padding, que es como viajan los secretos TOTP.
 function base32ADatos(s) {
@@ -2265,21 +2482,28 @@ ipcMain.handle('totp:reveal', soloUI(async (_e, id) => {
 }));
 
 ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
-ipcMain.handle('adblock:set-enabled', (_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; });
-ipcMain.handle('adblock:whitelist', (_e, { action, domain }) => {
+ipcMain.handle('adblock:set-enabled', soloUI((_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; }));
+ipcMain.handle('adblock:whitelist', soloUI((_e, { action, domain } = {}) => {
   const d = String(domain || '').toLowerCase().replace(/^www\./, '');
   if (action === 'add' && d && !settings.adblockWhitelist.includes(d)) settings.adblockWhitelist.push(d);
   if (action === 'remove') settings.adblockWhitelist = settings.adblockWhitelist.filter((x) => x !== d);
   saveSettings(settings);
   return settings.adblockWhitelist;
-});
+}));
 
 // Descargas
-ipcMain.on('download:url', (_e, { url, isPrivate }) => {
-  if (!/^https?:/.test(url)) return;
+ipcMain.on('download:url', soloUI((_e, d) => {
+  const { url, isPrivate } = d || {};
+  if (typeof url !== 'string' || !/^https?:/.test(url)) return;
   session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(url);
-});
-ipcMain.handle('yt:download', async (_e, opts) => { await ensureBins(); return ytDownload(opts); });
+}));
+// La URL acaba en la línea de órdenes de yt-dlp: solo direcciones web, nunca
+// algo que empiece por "-" y se lea como una opción.
+ipcMain.handle('yt:download', soloUI(async (_e, opts) => {
+  if (!opts || typeof opts.url !== 'string' || !/^https?:\/\//i.test(opts.url)) return null;
+  await ensureBins();
+  return ytDownload(opts);
+}));
 // Siempre disponible: si faltan los binarios se descargan solos al abrir el
 // Rat Tool (ensureBins muestra el progreso en el panel de descargas)
 ipcMain.handle('yt:available', () => { ensureBins(); return true; });
@@ -2369,7 +2593,7 @@ ipcMain.handle('import:available', () => {
   Object.keys(IMPORT_BROWSERS).forEach((k) => { const p = importPath(IMPORT_BROWSERS[k]); avail[k] = { label: IMPORT_BROWSERS[k].label, present: !!(p && fs.existsSync(p)) }; });
   return avail;
 });
-ipcMain.handle('import:bookmarks', (_e, key) => {
+ipcMain.handle('import:bookmarks', soloUI((_e, key) => {
   try {
     const b = IMPORT_BROWSERS[key]; const p = importPath(b);
     if (!p || !fs.existsSync(p)) return { ok: false, error: 'no encontrado' };
@@ -2384,11 +2608,11 @@ ipcMain.handle('import:bookmarks', (_e, key) => {
     }
     return { ok: true, items: out, label: b.label };
   } catch (e) { return { ok: false, error: e.message }; }
-});
+}));
 
 // Lista las alturas de vídeo disponibles (1080, 720, …) para el selector de calidad
-ipcMain.handle('yt:formats', async (_e, url) => {
-  if (!/^https?:/.test(url) || !fs.existsSync(ytDlpPath())) return [];
+ipcMain.handle('yt:formats', soloUI(async (_e, url) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || !fs.existsSync(ytDlpPath())) return [];
   // Mismas cookies y user agent que la descarga: si no, Instagram y X no
   // enseñan calidades para un vídeo que luego sí bajaría.
   const cookies = await cookiesParaYtDlp(url);
@@ -2412,7 +2636,7 @@ ipcMain.handle('yt:formats', async (_e, url) => {
     } catch { resolve([]); }
   });
   });
-});
+}));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
   if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }
@@ -2428,7 +2652,8 @@ ipcMain.on('download:cancel', (_e, id) => {
     if (d) { d.meta.state = 'cancelled'; broadcast('download:update', d.meta); }
   }
 });
-ipcMain.on('download:open', (_e, id) => { const d = downloads.get(id); if (d) shell.openPath(d.meta.path); });
+// Abrir un archivo lo ejecuta si es un programa: solo a petición de la interfaz.
+ipcMain.on('download:open', soloUI((_e, id) => { const d = downloads.get(id); if (d) shell.openPath(d.meta.path); }));
 ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) shell.showItemInFolder(d.meta.path); });
 ipcMain.handle('download:path', (_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; });
 ipcMain.on('download:clear', () => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); });
@@ -2452,7 +2677,7 @@ function downloadsFilePath(name) {
   const p = path.join(dir, String(name));
   return path.dirname(p) === dir ? p : null;
 }
-ipcMain.on('downloads:open-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.openPath(p); });
+ipcMain.on('downloads:open-file', soloUI((_e, name) => { const p = downloadsFilePath(name); if (p) shell.openPath(p); }));
 ipcMain.on('downloads:reveal-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.showItemInFolder(p); });
 ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads')));
 
@@ -2553,14 +2778,16 @@ ipcMain.handle('addons:install', soloUI(async (_e, meta) => {
 }));
 
 ipcMain.handle('addons:uninstall', soloUI((_e, id) => {
+  // El id acaba en una ruta (addonFile): el mismo formato que al instalar.
+  if (!/^[a-z0-9-]{1,60}$/.test(String(id || ''))) return { ok: false };
   try { fs.rmSync(addonFile(id), { force: true }); } catch { /* nada */ }
   const rest = { ...(settings.addons || {}) }; delete rest[id];
   settings.addons = rest; saveSettings(settings); loadAddonCode();
   return { ok: true };
 }));
 
-ipcMain.handle('addons:toggle', soloUI((_e, { id, on }) => {
-  if (settings.addons && settings.addons[id]) { settings.addons[id].enabled = !!on; saveSettings(settings); loadAddonCode(); }
+ipcMain.handle('addons:toggle', soloUI((_e, { id, on } = {}) => {
+  if (/^[a-z0-9-]{1,60}$/.test(String(id || '')) && settings.addons && Object.hasOwn(settings.addons, id)) { settings.addons[id].enabled = !!on; saveSettings(settings); loadAddonCode(); }
   return settings.addons || {};
 }));
 

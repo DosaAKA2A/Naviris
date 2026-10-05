@@ -1,12 +1,12 @@
 # Naviris
 
-Naviris por **Iris Studio** — navegador ligero sobre motor Chromium (Electron). Monocromático, de bajo consumo y con herramientas integradas.
+Naviris por **IRIS Studio** — navegador ligero sobre motor Chromium (Electron). Monocromático, de bajo consumo y con herramientas integradas.
 
 ## Características
 
 - **Hub personalizable** con widgets (reloj, buscador, accesos, fecha, clima, región, notas) en una grilla editable.
 - **Accesos rápidos** con logos monocromáticos y un sidebar con paneles web (WhatsApp, Discord, Claude…).
-- **Rat Tool** — descarga vídeo (MP4) y audio (MP3) de YouTube, Instagram, X, TikTok (sin marca de agua), Twitch y más, con yt-dlp + ffmpeg integrados. YouTube exige ahora resolver retos en JavaScript para dar sus formatos, así que el Rat Tool baja también Deno, el motor de JS que yt-dlp usa por defecto (la primera vez que se abre, o solo Deno en instalaciones que ya tenían lo demás).
+- **Rat Tool** — descarga video (MP4) y audio (MP3) de YouTube, Instagram, X, TikTok (sin marca de agua), Twitch y más, con yt-dlp + ffmpeg integrados. YouTube exige ahora resolver retos en JavaScript para dar sus formatos, así que el Rat Tool baja también Deno, el motor de JS que yt-dlp usa por defecto (la primera vez que se abre, o solo Deno en instalaciones que ya tenían lo demás).
 - **Bloqueador de anuncios** funcional, incluido un saltador de anuncios de YouTube ligero que no ralentiza la reproducción.
 - **Detector de recursos gráficos** con previsualización y descarga.
 - **Contenido sensible de X** revelable de forma nativa.
@@ -41,8 +41,8 @@ npm run dist        # genera instalador NSIS + portable en dist/
    ```bash
    npm run release
    ```
-   Esto compila y sube el instalador + `latest.yml` a GitHub Releases. Las copias instaladas detectarán la nueva versión y podrán actualizarse desde el propio navegador.
+   Esto compila (`npm run dist`, con la firma VMP de Widevine) y después `build/publish-release.js` sube a la release del tag el instalador, el portable, el blockmap y el feed: `latest.yml` si la versión es estable o `dev.yml` si lleva `-dev` (NavirisDev). No se usa `electron-builder --publish`: sus dos publicadores chocan y dejan la release a medias. Las copias instaladas de cada línea detectarán la nueva versión y podrán actualizarse desde el propio navegador.
 
 ## Licencia
 
-MIT © Studio Iris
+MIT © IRIS Studio

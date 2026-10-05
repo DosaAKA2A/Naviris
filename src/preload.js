@@ -5,8 +5,13 @@ contextBridge.exposeInMainWorld('cobalt', {
   maximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close'),
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
-  // Sacar una pestaña de la barra a su propia ventana.
-  sacarPestana: (url) => ipcRenderer.send('win:sacar-pestana', url),
+  // Sacar una pestaña de la barra a su propia ventana, con su contenedor.
+  sacarPestana: (url, contenedorId) => ipcRenderer.send('win:sacar-pestana', url, contenedorId || null),
+  // Atrás y adelante de una pestaña que se duerme: se leen antes de quitar su
+  // webview y se dejan apuntados al despertarla (NAV-VIVO-07). Son síncronos
+  // para que lleguen antes de que se cree el webview nuevo.
+  historialDe: (wcId) => ipcRenderer.sendSync('wv:historial', wcId),
+  historialAlDespertar: (url, historial) => ipcRenderer.sendSync('wv:historial-pendiente', url, historial),
   onMaximized: (cb) => ipcRenderer.on('win:maximized', (_e, v) => cb(v)),
 
   /* El token de la cuenta de Naviris, para que el main pueda pedirle al

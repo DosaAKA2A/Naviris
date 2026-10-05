@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.2.0 (kind: tool)
+/* Naviris addon: Strainer v1.2.1 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
@@ -366,19 +366,23 @@
     wv.addEventListener('did-navigate', o.nav);
     try { revisa(wv, wv.getURL()); } catch (e) { /* nada */ }
   }
-  function desarmar() {
-    for (var i = 0; i < wvs.length; i++) {
-      var wv = wvs[i], o = oyentes.get(wv);
-      if (o) {
-        try { wv.removeEventListener('will-navigate', o.antes); } catch (e) { /* nada */ }
-        try { wv.removeEventListener('load-commit', o.commit); } catch (e) { /* nada */ }
-        try { wv.removeEventListener('did-navigate', o.nav); } catch (e) { /* nada */ }
-      }
-      oyentes.delete(wv);
+  function soltar(wv) {
+    var o = oyentes.get(wv);
+    if (o) {
+      try { wv.removeEventListener('will-navigate', o.antes); } catch (e) { /* nada */ }
+      try { wv.removeEventListener('load-commit', o.commit); } catch (e) { /* nada */ }
+      try { wv.removeEventListener('did-navigate', o.nav); } catch (e) { /* nada */ }
     }
+    oyentes.delete(wv);
+  }
+  function desarmar() {
+    for (var i = 0; i < wvs.length; i++) soltar(wvs[i]);
     wvs = [];
   }
   function barre() {
+    // Una pestaña cerrada (o dormida) deja su webview fuera del DOM: se suelta,
+    // o la lista la retiene para siempre y el vigía le pregunta la URL cada 1,5 s.
+    wvs = wvs.filter(function (w) { if (w.isConnected) return true; soltar(w); return false; });
     var lista = [];
     try { lista = naviris.allWebviews ? naviris.allWebviews() : []; } catch (e) { lista = []; }
     if (!lista.length) { var a = naviris.activeWebview(); if (a) lista = [a]; }
@@ -484,7 +488,7 @@
     '#str-panel .lp-body{padding:12px 16px 18px}',
     '.str-lbl{margin:14px 2px 7px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim,#5c5e64)}',
     '.str-lbl:first-child{margin-top:2px}',
-    '.str-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#232327);background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);resize:none;height:78px;outline:none}',
+    '.str-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#232327);background:var(--hover, rgba(255,255,255,.04));border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:var(--mono,ui-monospace,monospace);color:var(--text,#ececef);resize:none;height:78px;outline:none}',
     '.str-in:focus{border-color:' + COLOR + '}',
     // Un enlace largo hace aparecer scroll en el cuadro, y ahi salia la barra
     // del sistema con sus flechitas. En Naviris ningun scroll usa la del
@@ -495,8 +499,8 @@
     '.str-in::-webkit-scrollbar-thumb:hover{background:rgba(128,128,132,.62);background-clip:content-box}',
     '.str-in::-webkit-scrollbar-button{display:none;width:0;height:0}',
     '.str-row{display:flex;gap:8px;margin-top:10px}',
-    '.str-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);color:var(--text,#ececef);transition:background .12s}',
-    '.str-btn:hover{background:rgba(255,255,255,.15)}',
+    '.str-btn{flex:1;border:none;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--btn, rgba(255,255,255,.08));color:var(--text,#ececef);transition:background .12s}',
+    '.str-btn:hover{background:var(--btn-hover, rgba(255,255,255,.15))}',
     '.str-btn:disabled{opacity:.5;cursor:default}',
     // El texto sobre el realce lo decide el tema: en lima va casi negro y en
     // rosa blanco, asi que un marron fijo se volvia ilegible en uno de los dos.
@@ -515,10 +519,10 @@
     '.str-sw{display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px solid var(--line,#232327);border-radius:11px;padding:10px 12px;margin-top:4px;cursor:pointer}',
     '.str-sw .t{font-size:12.5px;color:var(--text,#ececef)}',
     '.str-sw .s{font-size:11.5px;color:var(--muted,#8b8d94);margin-top:2px;line-height:1.45}',
-    '.str-led{width:34px;height:19px;border-radius:999px;background:rgba(255,255,255,.14);position:relative;flex:none;transition:background .15s}',
-    '.str-led i{position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}',
+    '.str-led{width:34px;height:19px;border-radius:999px;background:var(--track, rgba(255,255,255,.14));position:relative;flex:none;transition:background .15s}',
+    '.str-led i{position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:var(--track-knob, #fff);transition:left .15s}',
     '.str-sw.on .str-led{background:' + COLOR + '}',
-    '.str-sw.on .str-led i{left:17.5px}',
+    '.str-sw.on .str-led i{left:17.5px;background:var(--track-knob-on, #fff)}',
     '.str-pie{font-size:11.5px;color:var(--dim,#5c5e64);margin-top:14px;line-height:1.55}'
   ].join('\n');
   document.head.appendChild(css);
@@ -588,7 +592,7 @@
       elRes.innerHTML = '';
       estado(esFinal(fin.url)
         ? 'Ese enlace ya es el final: no hay pasarela que colar.'
-        : 'No se encontró ningún enlace detrás de ese. Puede que la pasarela pida pulsar algo.', true);
+        : 'No se encontró ningún enlace detrás de ese. Puede que la pasarela pida hacer clic en algo.', true);
       return;
     }
     var saltos = '';

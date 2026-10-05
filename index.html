@@ -13,7 +13,7 @@
   <link rel="canonical" href="https://naviris.site/" />
   <meta name="theme-color" content="#08080a" />
   <meta property="og:site_name" content="Naviris" />
-  <meta property="og:locale" content="es_ES" />
+  <meta property="og:locale" content="es_LA" />
   <meta property="og:title" content="Naviris — El navegador que trabaja por ti" />
   <meta property="og:description" content="Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin instalar una sola extensión. Gratis, para Windows y Android." />
   <meta property="og:type" content="website" />
@@ -39,7 +39,7 @@
       --maxw:1180px;
     }
     *{margin:0;padding:0;box-sizing:border-box}
-    html{scroll-behavior:smooth}
+    html{scroll-behavior:smooth;scroll-padding-top:80px}
     body{background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden}
     a{color:inherit;text-decoration:none}
     .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
@@ -76,7 +76,7 @@
     .nav a.link:hover{color:var(--text)}
     .nav a.link:hover::after{transform:scaleX(1);transform-origin:0 50%}
     .nav .spacer{flex:1}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:none;cursor:pointer;font-family:inherit;border-radius:11px;font-weight:600;transition:transform .15s,background .15s,border-color .15s,color .15s}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:none;cursor:pointer;font-family:inherit;border-radius:11px;font-weight:600;transition:background .15s,border-color .15s,color .15s}
     .btn-sm{background:var(--accent);color:#0a0a0a;font-size:13px;padding:9px 16px}
     .btn-sm:hover{background:#fff}
 
@@ -108,31 +108,12 @@
       transform:rotateX(16deg);will-change:transform;backface-visibility:hidden;
       box-shadow:0 46px 84px rgba(0,0,0,.62),0 2px 0 rgba(255,255,255,.04)}
     .mock img{display:block;width:100%;height:100%;object-fit:cover}
-    .m-bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;background:#0a0a0c}
-    .m-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:8px;background:#1b1b1f;font-size:10.5px;color:var(--text)}
-    .m-tab .tdot{width:7px;height:7px;border-radius:50%;background:#45464c}
-    .m-tab svg{width:12px;height:12px}
-    .m-tab.farm{color:var(--green);border:1px solid rgba(230,231,235,.35);background:rgba(230,231,235,.07)}
-    .m-nav{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;background:#0e0e12;color:var(--dim)}
-    .m-url{flex:1;height:22px;border-radius:999px;background:#08080a;border:1px solid #1c1c20;display:flex;align-items:center;padding:0 12px;font-size:9.5px;color:var(--dim);white-space:nowrap;overflow:hidden}
-    .m-body{position:absolute;inset:72px 0 0 34px;background:radial-gradient(120% 80% at 50% -10%,#141417 0%,#0a0a0d 60%);display:flex;flex-direction:column;align-items:center;padding-top:5%}
-    .m-clock{font-size:40px;font-weight:250;letter-spacing:1px}
-    .m-greet{font-size:10px;color:var(--muted);margin:5px 0 16px}
-    .m-search{width:56%;height:30px;border-radius:999px;background:rgba(14,14,17,.85);border:1px solid #26262b;display:flex;align-items:center;padding:0 14px;gap:8px;font-size:9.5px;color:var(--dim);margin-bottom:22px}
-    .m-tiles{display:grid;grid-template-columns:repeat(6,44px);gap:12px}
-    .m-tile{width:44px;height:44px;border-radius:13px;background:linear-gradient(140deg,#1e1e23,#141418);border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#e4e6ea;transition:transform .2s ease,border-color .2s ease}
-    .m-tile:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18)}
-    .m-tile svg{width:20px;height:20px}
-    .m-side{position:absolute;left:0;top:72px;bottom:0;width:34px;background:#08080a;border-right:1px solid #151517;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:10px;z-index:2}
-    .m-side i{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#55565c}
-    .m-side i.on{color:var(--violet)}
-    .m-side i svg{width:15px;height:15px}
 
     /* ===== Secciones ===== */
     /* overflow-x:clip contiene los estados iniciales de los reveals laterales (GSAP) sin crear scroll */
     section{position:relative;z-index:1;padding:64px 0;overflow-x:clip}
     .sec-head{margin-bottom:36px;max-width:640px}
-    h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-0.025em;text-wrap:balance}
+    h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-0.025em;line-height:1.12;text-wrap:balance}
     .sec-head .label{margin-bottom:13px;display:block}
     .sec-head p{margin-top:12px;color:var(--muted);font-size:15.5px}
 
@@ -142,7 +123,7 @@
     .spot.rev .spot-txt{order:2}
     .spot .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--violet);margin-bottom:16px}
     .spot .tag .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block}
-    .spot h3{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;margin-bottom:12px;text-wrap:balance}
+    .spot h2{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;margin-bottom:12px;text-wrap:balance}
     .spot p{color:var(--muted);font-size:15.5px;line-height:1.6;max-width:40ch}
     /* Los visuales se inclinan hacia el cursor (GSAP) */
     .visual{border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,#111114,#0a0a0c);padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5);will-change:transform;transition:border-color .25s}
@@ -226,7 +207,7 @@
     .devline b{color:var(--text)}
     .devline a,.note a{color:var(--muted);border-bottom:1px solid var(--line)}
     .devline a:hover,.note a:hover{color:var(--text);border-color:var(--text)}
-    .note{margin-top:24px;font-size:12px;color:var(--dim);max-width:52ch;margin-inline:auto;line-height:1.6}
+    .dl-panel .note{margin:24px auto 0;font-size:12px;color:var(--dim);max-width:52ch;line-height:1.6}
 
     /* ===== Footer en columnas ===== */
     footer{position:relative;z-index:1;border-top:1px solid rgba(35,35,39,.6);padding:44px 0 40px}
@@ -256,12 +237,9 @@
       .grid{grid-template-columns:1fr}
       /* El interior del mockup no cabe en 16/10.6 a este ancho: más alto y compacto */
       .mock{aspect-ratio:16/9}
-      .m-clock{font-size:32px}
-      .m-tiles{grid-template-columns:repeat(4,44px)}
-      .m-tile:nth-child(n+5){display:none}
       .foot{grid-template-columns:1fr}
     }
-    @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}html{scroll-behavior:auto}}
   </style>
 </head>
 <body>
@@ -292,7 +270,7 @@
   <header>
     <div class="wrap nav">
       <a class="brand" href="https://iris.it.com/">
-        <svg class="logo" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
+        <svg aria-hidden="true" class="logo" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
         Naviris
       </a>
       <a class="link" href="#pantallas">Capturas</a>
@@ -310,11 +288,11 @@
     <div class="wrap hero">
       <div>
         <div class="eyebrow"><span class="dot"></span><span class="label">IRIS Studio · Navegador</span></div>
-        <h1>El navegador que trabaja por ti.</h1>
+        <h1>El navegador que trabaja por ti</h1>
         <p class="lead">Descargas, drops de Twitch, watch parties, espacios protegidos, autenticador y adblock — sin instalar una sola extensión. Y un hub de widgets que montas tú.</p>
         <div class="cta-row">
           <a id="dl-hero" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Descargar para Windows
           </a>
           <a class="btn btn-ghost" href="#features">Ver qué incluye</a>
@@ -327,9 +305,13 @@
            CSS que enseñaba un hub que ya no existe: reloj gigante, buscador y
            seis accesos. La app hace tiempo que es un bento de widgets, así que
            una maqueta a mano solo puede envejecer mal — ahora va la captura de
-           verdad, y se actualiza volviendo a capturar. -->
+           verdad, y se actualiza volviendo a capturar.
+           La de 1280 px sale de la de 2560 (al volver a capturar, se rehacen
+           las dos). sizes es el ancho medido del hueco: 914 px en escritorio
+           con la perspectiva, 600 px hasta 900 de ventana y el ancho menos
+           el margen en móvil. -->
       <div class="mock">
-        <img src="./assets/captura-hub.jpg?v=3" width="2560" height="1440" alt="Naviris abierto en su hub: fondo propio, buscador, reloj, clima, notas, autenticador, monitor y tarjetas, con los accesos en el dock" />
+        <img src="./assets/captura-hub.jpg?v=3" srcset="./assets/captura-hub-1280.jpg?v=3 1280w, ./assets/captura-hub.jpg?v=3 2560w" sizes="(max-width: 656px) calc(100vw - 56px), (max-width: 900px) 600px, 914px" width="2560" height="1440" fetchpriority="high" alt="Naviris abierto en su hub: fondo propio, buscador, reloj, clima, notas, autenticador, monitor y tarjetas, con los accesos en el dock" />
       </div>
       </div>
     </div>
@@ -340,10 +322,10 @@
         <div class="spot">
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Integrado</div>
-            <h3>Deja Twitch de fondo. AutoClaim reclama por ti.</h3>
+            <h2>Deja Twitch de fondo. AutoClaim reclama por ti</h2>
             <p>Un clic y el canal queda farmeando: silencio, resolución mínima y cada punto y drop reclamado en segundo plano.</p>
           </div>
-          <div class="visual">
+          <div class="visual" aria-hidden="true">
             <div class="v-tabs">
               <div class="v-t farm"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg>Canal en farmeo</div>
               <div class="v-t"><span class="d"></span>Tú, a lo tuyo</div>
@@ -365,10 +347,10 @@
         <div class="spot rev">
           <div class="spot-txt">
             <div class="tag">Descargas</div>
-            <h3>Cualquier video, en tu carpeta. Sin sitios raros.</h3>
+            <h2>Cualquier video, en tu carpeta. Sin sitios raros</h2>
             <p>Rat Tool detecta el video de la página y lo baja en MP4 o MP3, con la resolución que elijas. YouTube, TikTok sin marca de agua, X, Instagram y Twitch.</p>
           </div>
-          <div class="visual">
+          <div class="visual" aria-hidden="true">
             <div class="v-pop">
               <div class="h"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg>Rat Tool</div>
               <div class="s">Descargar video o audio</div>
@@ -390,18 +372,18 @@
         <div class="spot">
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Addon oficial</div>
-            <h3>Serie nueva, sala nueva. Vean juntos.</h3>
+            <h2>Serie nueva, sala nueva. Vean juntos</h2>
             <p>Comparte un código y la reproducción se sincroniza sola en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN, incluidos los cambios de capítulo. El chat acompaña al video y cada quien entra con su cuenta.</p>
           </div>
-          <div class="visual">
+          <div class="visual" aria-hidden="true">
             <div class="v-room">
               <div class="t"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg>Watch Party</div>
               <div class="v-code">KQ4-7ZM</div>
             </div>
             <div class="v-chat">
-              <div class="v-sys">Vera se ha unido a la sala</div>
+              <div class="v-sys">Vera se unió a la sala</div>
               <div class="v-msg"><b>Iris:</b> dale play cuando quieras</div>
-              <div class="v-sys">Vera ha dado play</div>
+              <div class="v-sys">Vera puso play</div>
               <div class="v-msg"><b>Vera:</b> qué buen arranque de temporada</div>
             </div>
             <div class="v-svcs">
@@ -418,10 +400,10 @@
         <div class="spot rev">
           <div class="spot-txt">
             <div class="tag"><span class="dot"></span>Espacios</div>
-            <h3>Separa el trabajo de lo tuyo. Y cierra con llave lo que quieras.</h3>
+            <h2>Separa el trabajo de lo tuyo. Y cierra con llave lo que quieras</h2>
             <p>Cada espacio es un grupo de pestañas con su propio historial y sus marcadores. Si lo proteges con un código, además tiene sesión aparte: lo de dentro no se mezcla con lo de fuera, ni al cerrar Naviris ni al reiniciar el equipo.</p>
           </div>
-          <div class="visual">
+          <div class="visual" aria-hidden="true">
             <div class="v-spaces">
               <div class="v-sp"><span class="d"></span>Personal</div>
               <div class="v-sp on"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg>Trabajo</div>
@@ -444,7 +426,7 @@
       <div class="wrap">
         <div class="sec-head">
           <span class="label">Por dentro</span>
-          <h2>Así se ve.</h2>
+          <h2>Así se ve</h2>
         </div>
         <div class="tiras">
           <figure class="tira">
@@ -465,111 +447,111 @@
       <div class="wrap">
         <div class="sec-head">
           <span class="label">Qué incluye</span>
-          <h2>Todo lo que otros instalan aparte.</h2>
+          <h2>Todo lo que otros instalan aparte</h2>
         </div>
         <div class="grid">
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 512 512" fill="currentColor"><use href="#icoMouse"/></svg></div>
             <h3>Rat Tool</h3>
             <p>Video y audio de YouTube, TikTok, X e Instagram. Sin marca de agua.</p>
           </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><use href="#icoTwitch"/></svg></div>
             <h3>AutoClaim</h3>
             <p>Puntos y drops de Twitch, reclamados solos en segundo plano.</p>
           </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><use href="#icoEye"/></svg></div>
             <h3>Watch Party</h3>
             <p>Salas sincronizadas en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN.</p>
           </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><circle cx="11" cy="11" r="2.6"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><circle cx="11" cy="11" r="2.6"/></svg></div>
             <h3>Google Lens</h3>
             <p>Clic derecho en cualquier imagen y búscala. Como en Chrome, sin Chrome.</p>
           </div>
           <div class="card hl">
-            <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
             <h3>Espacios protegidos</h3>
             <p>Grupos de pestañas con historial y marcadores propios. Los que cierres con un código tienen también su sesión aparte.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.6A4.2 4.2 0 0 1 21 18.6"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.6A4.2 4.2 0 0 1 21 18.6"/></svg></div>
             <h3>Contenedores</h3>
             <p>Dos cuentas del mismo sitio abiertas a la vez, cada una en su pestaña y sin cerrar sesión en la otra.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></div>
             <h3>Autenticador</h3>
             <p>Tus códigos de verificación en dos pasos, generados en el navegador y rellenados donde hacen falta.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.2 18.4a6.5 6.5 0 0 1 11.6 0"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.2 18.4a6.5 6.5 0 0 1 11.6 0"/></svg></div>
             <h3>Cuenta Naviris</h3>
             <p>Marcadores, widgets y ajustes sincronizados entre tus equipos. Nunca contraseñas, historial ni sesiones.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
             <h3>Tu bandeja en el hub</h3>
             <p>Los correos sin leer de Gmail, con remitente y asunto, en una tarjeta.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4.5v10.2a3 3 0 1 1-2-2.83V7.6l-6 1.3v7.9a3 3 0 1 1-2-2.83V6.3z"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4.5v10.2a3 3 0 1 1-2-2.83V7.6l-6 1.3v7.9a3 3 0 1 1-2-2.83V6.3z"/></svg></div>
             <h3>Spotify al lado</h3>
             <p>Panel propio que sigue sonando, con lo que viene después y su volumen.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 486.733 486.733" fill="currentColor"><use href="#icoLock"/></svg></div>
             <h3>Series con DRM</h3>
             <p>Widevine de fábrica: tus series a 1080p sin configurar nada.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><use href="#icoShield"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><use href="#icoShield"/></svg></div>
             <h3>Bloqueador de anuncios</h3>
             <p>Filtros que se actualizan solos y excepciones por dominio.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><use href="#icoKey"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><use href="#icoKey"/></svg></div>
             <h3>Contraseñas y tarjetas</h3>
             <p>Cifradas en tu equipo, con tu cuenta de Windows. Verlas exige Windows Hello.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 16.875H16.875M16.875 16.875H20.25M16.875 16.875V13.5M16.875 16.875V20.25M6 10.5H8.25C9.49264 10.5 10.5 9.49264 10.5 8.25V6C10.5 4.75736 9.49264 3.75 8.25 3.75H6C4.75736 3.75 3.75 4.75736 3.75 6V8.25C3.75 9.49264 4.75736 10.5 6 10.5ZM6 20.25H8.25C9.49264 20.25 10.5 19.2426 10.5 18V15.75C10.5 14.5074 9.49264 13.5 8.25 13.5H6C4.75736 13.5 3.75 14.5074 3.75 15.75V18C3.75 19.2426 4.75736 20.25 6 20.25ZM15.75 10.5H18C19.2426 10.5 20.25 9.49264 20.25 8.25V6C20.25 4.75736 19.2426 3.75 18 3.75H15.75C14.5074 3.75 13.5 4.75736 13.5 6V8.25C13.5 9.49264 14.5074 10.5 15.75 10.5Z"/></svg></div>
             <h3>Addons</h3>
             <p>Watch Party, Sound Booster, Blockify, Strainer y más. Se instalan desde el catálogo, solo si los quieres.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 329.899 329.899" fill="currentColor"><use href="#icoBookmark"/></svg></div>
             <h3>Tus marcadores</h3>
             <p>Impórtalos de Chrome, Edge, Opera GX y Firefox con un clic.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3.75" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.75" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3.75" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="6.75" height="6.75" rx="2" stroke="currentColor" stroke-width="1.6"/></svg></div>
             <h3>Hub que se adapta</h3>
             <p>Una veintena de widgets, fondos y temas. Cambia el tamaño de la ventana y tu maqueta sigue intacta.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/></svg></div>
             <h3>Pantalla dividida</h3>
             <p>Dos pestañas lado a lado en la misma ventana. Y si prefieres verlas en columna, la barra de pestañas se pone en vertical.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="11" cy="11" r="3.2"/><path d="m13.4 13.4 3.1 3.1"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="11" cy="11" r="3.2"/><path d="m13.4 13.4 3.1 3.1"/></svg></div>
             <h3>Buscar en la página</h3>
-            <p>Ctrl+F busca dentro de la web que estás viendo, y también en las pestañas que tienes abiertas de fondo.</p>
+            <p>Ctrl+F busca dentro de la página que estás viendo, y también en las pestañas que tienes abiertas de fondo.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
             <h3>Ligero</h3>
             <p>Duerme las pestañas que no usas y te muestra qué gasta cada una. Las que abres de fondo ni siquiera cargan.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M9 12.75 11.25 15 15 9.75M12 2.714A11.25 11.25 0 0 1 3.6 6 11.96 11.96 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622A11.96 11.96 0 0 0 20.4 6 11.25 11.25 0 0 1 12 2.714Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Privacidad</h3>
             <p>Ventana privada real, HTTPS por defecto y permisos por sitio.</p>
           </div>
           <div class="card">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99M19.969 14.135a8.25 8.25 0 0 1-13.803 3.7l-3.181-3.182m0 4.99v-4.99" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="ic"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99M19.969 14.135a8.25 8.25 0 0 1-13.803 3.7l-3.181-3.182m0 4.99v-4.99" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Actualizaciones a tu ritmo</h3>
             <p>Se instalan solas al cerrar, sin asistentes. Si prefieres decidir tú, apágalas y Naviris solo te avisa.</p>
           </div>
@@ -583,11 +565,11 @@
         <div class="droid">
           <div>
             <span class="label">Android</span>
-            <h2 style="margin-top:10px">Llévalo en el bolsillo.</h2>
+            <h2 style="margin-top:10px">Llévalo en el bolsillo</h2>
             <p>Rat Tool, marcadores, bloqueador de anuncios, descargas y un gestor de contraseñas que se abre con tu huella, también en tu teléfono. No es el mismo programa: es una app nativa con lo esencial.</p>
           </div>
-          <a id="dl-apk" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18a1 1 0 0 0 1 1h1v3.5a1.5 1.5 0 0 0 3 0V19h2v3.5a1.5 1.5 0 0 0 3 0V19h1a1 1 0 0 0 1-1V8H6v10ZM3.5 8A1.5 1.5 0 0 0 2 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 3.5 8Zm17 0A1.5 1.5 0 0 0 19 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 20.5 8ZM17.4 4.2l1.06-1.06a.4.4 0 1 0-.57-.57l-1.2 1.2A6.47 6.47 0 0 0 12 3a6.47 6.47 0 0 0-4.69 1.77l-1.2-1.2a.4.4 0 1 0-.57.57L6.6 4.2A6.5 6.5 0 0 0 5.5 8h13a6.5 6.5 0 0 0-1.1-3.8ZM9.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/></svg>
+          <a id="dl-apk" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18a1 1 0 0 0 1 1h1v3.5a1.5 1.5 0 0 0 3 0V19h2v3.5a1.5 1.5 0 0 0 3 0V19h1a1 1 0 0 0 1-1V8H6v10ZM3.5 8A1.5 1.5 0 0 0 2 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 3.5 8Zm17 0A1.5 1.5 0 0 0 19 9.5v6a1.5 1.5 0 0 0 3 0v-6A1.5 1.5 0 0 0 20.5 8ZM17.4 4.2l1.06-1.06a.4.4 0 1 0-.57-.57l-1.2 1.2A6.47 6.47 0 0 0 12 3a6.47 6.47 0 0 0-4.69 1.77l-1.2-1.2a.4.4 0 1 0-.57.57L6.6 4.2A6.5 6.5 0 0 0 5.5 8h13a6.5 6.5 0 0 0-1.1-3.8ZM9.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/></svg>
             Descargar APK
           </a>
         </div>
@@ -598,21 +580,21 @@
     <section id="descargar" style="padding-top:0">
       <div class="wrap">
         <div class="dl-panel">
-          <svg class="logo-big" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
-          <h2>Te mereces un navegador que trabaje por ti.</h2>
-          <p>Gratis, de código abierto y se actualiza solo. Abre y ya está: tu hub, tus espacios, tus herramientas y ni una extensión que instalar.</p>
+          <svg aria-hidden="true" class="logo-big" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
+          <h2>Te mereces un navegador que trabaje por ti</h2>
+          <p>Gratis, de código abierto y se actualiza solo. Ábrelo y listo: tu hub, tus espacios, tus herramientas y ni una extensión que instalar.</p>
           <div class="dl-actions">
             <a id="dl-main" class="btn btn-dl" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span id="dl-main-label">Descargar para Windows</span>
             </a>
-            <a id="dl-android" class="btn btn-ghost" href="https://github.com/DosaAKA2A/Naviris/releases">
+            <a id="dl-android" class="btn btn-ghost" href="https://github.com/DosaAKA2A/Naviris/releases/latest">
               <span id="dl-android-label">APK Android</span>
             </a>
             <a id="dl-portable" class="btn btn-ghost" href="https://github.com/DosaAKA2A/Naviris/releases/latest">Portable</a>
           </div>
           <div class="reqs">
-            <span><b>Versión:</b> <span id="ver-main">—</span></span>
+            <span id="req-ver" hidden><b>Versión:</b> <span id="ver-main"></span></span>
             <span><b>Tamaño:</b> <span id="size-main">~86 MB</span></span>
             <span><b>SO:</b> Windows 10 / 11 (64 bits)</span>
             <span><b>Licencia:</b> MIT</span>
@@ -632,7 +614,7 @@
       <div class="foot">
         <div>
           <a class="studio" href="https://iris.it.com/">
-            <svg class="logo" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
+            <svg aria-hidden="true" class="logo" viewBox="0 0 876.27 874.83"><use href="#cobaltPath" fill="url(#cobaltGrad)"/></svg>
             Naviris
           </a>
           <p class="blurb">El navegador de IRIS Studio con las herramientas dentro.</p>
@@ -678,7 +660,6 @@
     // enlazan aparte, y bajarlas es decisión de quien las quiera probar.
     (async function(){
       const REPO='DosaAKA2A/Naviris';
-      const fallback='https://github.com/'+REPO+'/releases/latest';
       const pon=(id,href)=>{const e=document.getElementById(id); if(e&&href) e.href=href;};
       const txt=(id,v)=>{const e=document.getElementById(id); if(e&&v) e.textContent=v;};
       const gh=u=>fetch(u,{headers:{'Accept':'application/vnd.github+json'}});
@@ -703,11 +684,14 @@
           }
           if(portable) pon('dl-portable',portable.browser_download_url);
           if(apk){ pon('dl-android',apk.browser_download_url); pon('dl-apk',apk.browser_download_url); }
-          txt('ver-main',rel.tag_name||'');
+          if(rel.tag_name){ txt('ver-main',rel.tag_name); const v=document.getElementById('req-ver'); if(v) v.hidden=false; }
           txt('ver-hero',rel.tag_name||'Última versión');
         }
-        /* La línea de desarrollo va aparte y con su aviso: nunca se ofrece como
-           descarga principal. Basta con mirar las últimas releases. */
+      }catch(e){ /* sin API: se quedan los enlaces del HTML (releases/latest) */ }
+      /* La línea de desarrollo va aparte y con su aviso: nunca se ofrece como
+         descarga principal. Basta con mirar las últimas releases. Va en su
+         propio try: si falla, no toca lo que ya resolvió la estable. */
+      try{
         const rr=await gh('https://api.github.com/repos/'+REPO+'/releases?per_page=10');
         if(rr.ok){
           for(const rel of await rr.json()){
@@ -720,10 +704,7 @@
             break;
           }
         }
-      }catch(e){
-        pon('dl-main',fallback); pon('dl-hero',fallback); pon('dl-portable',fallback);
-        pon('dl-android','https://github.com/'+REPO+'/releases');
-      }
+      }catch(e){ /* la línea dev se queda oculta */ }
     })();
   </script>
 
@@ -743,15 +724,9 @@
         // Barra de progreso de lectura
         gsap.to('#bar', { scaleX: 1, ease: 'none', scrollTrigger: { scrub: .3, start: 0, end: 'max' } });
 
-        // Entrada orquestada del hero
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-        tl.from('header .nav > *', { y: -14, autoAlpha: 0, duration: .45, stagger: .05 })
-          .from('.eyebrow', { y: 18, autoAlpha: 0, duration: .5 }, '-=.2')
-          .from('h1', { y: 36, autoAlpha: 0, duration: .7 }, '-=.28')
-          .from('.hero .lead', { y: 24, autoAlpha: 0, duration: .55 }, '-=.42')
-          .from('.cta-row .btn', { y: 18, autoAlpha: 0, duration: .5, stagger: .09 }, '-=.32')
-          .from('.dl-meta', { autoAlpha: 0, duration: .5 }, '-=.28')
-          .from('.stage', { y: 70, autoAlpha: 0, duration: .9 }, '-=.35');
+        // El hero no tiene entrada animada: GSAP llega después del primer pintado y
+        // ocultarlo para volver a mostrarlo hacía parpadear la página y retrasaba
+        // la captura del hero (el LCP).
 
         // El panel recostado se endereza suavemente al hacer scroll
         gsap.to('.mock', { rotationX: 0, ease: 'none',

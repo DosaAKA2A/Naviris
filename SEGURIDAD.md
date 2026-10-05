@@ -1,6 +1,7 @@
 # Seguridad de Naviris
 
-Última revisión: **29 de julio de 2026**, sobre la versión 2.7.3-dev.3.
+Última revisión: **4 de octubre de 2026**, sobre la versión 2.8.1-dev.12. La revisión
+completa de la que habla este documento es la del 29 de julio de 2026, sobre la 2.7.3-dev.3.
 
 Este documento cuenta, sin adornos, cómo protege Naviris tus datos, qué se
 revisó, qué se encontró y qué queda pendiente. Está escrito para que cualquier
@@ -16,12 +17,14 @@ persona que use el navegador pueda juzgar por sí misma si le convence.
 | Tarjetas de crédito | `cobalt-cards.json` en tu perfil | Igual que las contraseñas. En claro solo quedan marca, últimos 4 dígitos y caducidad | **No, nunca** |
 | CVC de la tarjeta | En ningún sitio | No se guarda jamás; lo tecleas tú en cada pago | — |
 | Historial y sesión | `localStorage` de la interfaz | Local | **No** |
-| Preferencias, marcadores, accesos, widgets | Local, y en la nube **solo si creas una cuenta** | En tránsito por HTTPS; en el servidor, ligadas a tu cuenta | Solo con cuenta, y solo eso |
+| Preferencias, marcadores, accesos, widgets, notas del hub | Local, y en la nube **solo si creas una cuenta** | En tránsito por HTTPS; en el servidor, ligadas a tu cuenta | Solo con cuenta, y solo eso |
+| Foto de perfil | En el servidor, **solo si creas una cuenta** | Solo se sirve a quien tiene tu sesión: no hay URL pública. Si entras a una sala de Watch Party, la reciben los que están en ella (el relay la reenvía y no la guarda) | Solo con cuenta |
 | Contraseña de tu cuenta Naviris | Servidor | PBKDF2-SHA256, 100 000 iteraciones, sal propia por cuenta. **Nunca se guarda la contraseña** | Se envía al entrar, por HTTPS |
 | Token de sesión de la cuenta | Servidor y tu equipo | En el servidor se guarda **hasheado** (SHA-256): quien leyera la base de datos no podría suplantarte | — |
+| Identificador para MOOVIN | Servidor, **solo si creas una cuenta** | Un código al azar que no contiene tu correo. MOOVIN solo recibe una prueba firmada que caduca a los dos minutos | Solo cuando abres MOOVIN en Naviris con tu cuenta iniciada |
 
 **La regla de oro: contraseñas y tarjetas no se sincronizan.** Aunque uses la
-cuenta de Naviris en cinco ordenadores, esos datos se quedan en cada equipo.
+cuenta de Naviris en cinco computadoras, esos datos se quedan en cada equipo.
 Es una decisión deliberada: no queremos poder descifrarlos ni aunque quisiéramos.
 
 ---
@@ -30,9 +33,9 @@ Es una decisión deliberada: no queremos poder descifrarlos ni aunque quisiéram
 
 Naviris usa Electron con la configuración estricta:
 
-- **`sandbox: true`** en cada pestaña: el código de las webs corre en un proceso
+- **`sandbox: true`** en cada pestaña: el código de los sitios corre en un proceso
   con privilegios recortados por el sistema operativo.
-- **`contextIsolation: true`** y **`nodeIntegration: false`**: una web no puede
+- **`contextIsolation: true`** y **`nodeIntegration: false`**: un sitio no puede
   tocar Node.js ni las funciones internas del navegador.
 - **`nodeIntegrationInSubFrames: false`**: los iframes de terceros (anuncios,
   widgets incrustados) no reciben ni siquiera el preload de Naviris, así que un
@@ -63,7 +66,7 @@ atacante.com.br -> "com.br"    <- ¡el mismo!
 **Impacto real:** alguien que registrara `loquesea.co.uk` (o `.com.br`,
 `.co.jp`, `.com.mx`, `.com.ar`…) y pusiera un formulario de acceso recibía de
 Naviris la oferta de autorrellenar la contraseña guardada de **otro sitio bajo
-ese mismo sufijo**. Hacía falta que la persona pulsara «Rellenar» y pasara
+ese mismo sufijo**. Hacía falta que la persona presionara «Rellenar» y pasara
 Windows Hello, pero la barra decía el nombre de su cuenta real, así que el
 engaño era creíble. Afectaba a millones de dominios legítimos.
 
@@ -84,12 +87,14 @@ título de página malicioso mal escapado— habría podido cargar un script rem
 y llevarse datos.
 
 **Corregido:** CSP estricta (`default-src 'none'`, sin `eval`, sin scripts
-remotos) y `connect-src` limitado a los cuatro servicios que la interfaz usa de
-verdad: el servidor de cuentas, el del tiempo y las dos fuentes de geolocalización.
+remotos) y `connect-src` limitado a los servicios que la interfaz usa de verdad.
+Hoy son ocho orígenes: naviris.site (catálogo de addons), el servidor de cuentas,
+el relay de Watch Party (por `https` y `wss`), el del tiempo y las tres fuentes
+de geolocalización.
 Comprobado en vivo: los servicios permitidos funcionan y un dominio cualquiera
 queda bloqueado.
 
-*Nota:* se revisó el escapado de todos los datos que vienen de las webs
+*Nota:* se revisó el escapado de todos los datos que vienen de los sitios
 (títulos, URLs, favicons, nombres de archivo) y estaban correctamente tratados
 con `escapeHtml` o `textContent`. La CSP es una segunda barrera, no un parche.
 
@@ -104,7 +109,7 @@ mucho podría recargar un addon que tú ya tenías puesto.
 ### 3. El IPC sensible no comprobaba quién llamaba — **corregido**
 
 Los canales de contraseñas, tarjetas, ajustes y addons atendían a cualquier
-proceso. Con el aislamiento actual una web no puede llegar ahí, pero era una
+proceso. Con el aislamiento actual un sitio no puede llegar ahí, pero era una
 única capa de defensa.
 
 **Corregido:** 17 canales sensibles solo responden ahora si quien llama es la
@@ -122,6 +127,11 @@ rechaza y se registra.
 aciertos no cuentan); un único mensaje «Correo o contraseña incorrectos» con el
 mismo coste de cómputo en ambos casos; y los tokens se guardan hasheados con
 SHA-256. Todo verificado con una base de datos limpia.
+
+*Límite conocido:* al crear una cuenta, el servidor sí dice si ese correo ya
+está registrado (sin verificar el correo no hay forma de evitarlo del todo). Por
+eso cada alta con un correo que ya existe cuenta como intento fallido, dentro
+del mismo tope de 10 cada 15 minutos.
 
 ### 5. Revisado y correcto, sin cambios necesarios
 
@@ -153,7 +163,7 @@ abre el catálogo a terceros, hará falta un sistema de permisos antes.
 ### El Modo agente abre una puerta, a propósito
 
 Con el Modo agente activo, Naviris escucha en `127.0.0.1:9223` y **cualquier
-programa de tu ordenador** puede controlar el navegador con tus sesiones
+programa de tu computadora** puede controlar el navegador con tus sesiones
 abiertas. Está apagado por defecto, avisa con un distintivo permanente en la
 barra y se desactiva solo al actualizar. Aun así: **enciéndelo solo mientras lo
 uses**.
@@ -161,7 +171,7 @@ uses**.
 ### Windows Hello es la última línea, no la primera
 
 Ver o autorrellenar una contraseña o una tarjeta pide siempre Windows Hello.
-Eso protege frente a alguien que se siente en tu ordenador desbloqueado, pero
+Eso protege frente a alguien que se siente en tu computadora desbloqueada, pero
 no frente a un programa que ya esté ejecutándose con tu usuario: el cifrado es
 DPAPI, atado a tu cuenta de Windows, así que un virus con tus privilegios podría
 descifrarlo. Esto es exactamente igual en Chrome, Edge, Brave y Opera. La
