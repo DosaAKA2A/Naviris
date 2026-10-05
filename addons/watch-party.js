@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.8.1
+/* Naviris addon: Watch Party v2.8.2
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia

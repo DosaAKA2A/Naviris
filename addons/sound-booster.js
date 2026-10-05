@@ -1,4 +1,4 @@
-/* Naviris addon: Sound Booster v1.0.0
+/* Naviris addon: Sound Booster v1.0.1
    Amplifica el volumen de la pestaña activa por encima del 100% (hasta 500%)
    con la Web Audio API (GainNode). Control con deslizador y niveles rápidos.
    UI minimalista monocroma, sin emojis. */

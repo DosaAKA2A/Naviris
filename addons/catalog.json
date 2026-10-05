@@ -3,7 +3,7 @@
     {
       "id": "minireproductor",
       "name": "Minireproductor",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "kind": "tool",
       "icon": "pip",
       "description": "Saca el video de la pestaña activa a una ventanita flotante que queda por encima de cualquier aplicación, para seguir viendo mientras haces otra cosa. Con el video flotando, el botón del sidebar abre un panel con deslizador de volumen que manda sobre la ventanita aunque cambies de pestaña, y el botón de devolver el video a la página. Elige solo el video que se ve más grande y funciona en cualquier sitio con video, incluidas Netflix y Disney+, salvo que la propia página lo bloquee. También responde al atajo Alt+P y a la opción del menú del video. Requiere Naviris 2.5 o superior.",
@@ -12,7 +12,7 @@
     {
       "id": "sound-booster",
       "name": "Sound Booster",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "kind": "tool",
       "icon": "speaker-wave",
       "description": "Sube el volumen de la pestaña activa hasta el 500% cuando el audio original se queda corto: deslizador preciso, niveles rápidos de un toque y vuelta al 100% al instante. Ideal para videos y directos que suenan demasiado bajo. Requiere Naviris 2.5 o superior.",
@@ -21,7 +21,7 @@
     {
       "id": "watch-party",
       "name": "Watch Party",
-      "version": "2.8.1",
+      "version": "2.8.2",
       "kind": "tool",
       "icon": "eye-fill",
       "description": "Crea una sala, comparte el código y vean lo mismo a la vez en Crunchyroll, Netflix, Disney+, YouTube y MOOVIN (moovin.live), el reproductor de IRIS Studio. Para unirte basta el código, desde cualquier pestaña: se abre solo el video del anfitrión y desde ahí todo va sincronizado, incluidos los cambios de capítulo. El chat acompaña al video en un panel lateral y narra cada acción, y el anfitrión decide quién controla y quién puede cambiar el video. Nadie transmite nada: cada persona reproduce con su propia cuenta. Requiere Naviris 2.8.0 o superior.",
@@ -30,7 +30,7 @@
     {
       "id": "design-lens",
       "name": "Inspector de diseño",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "kind": "tool",
       "icon": "magnifying-glass",
       "description": "Radiografía de diseño de cualquier página, pensada para diseñadores: tipografías y tamaños en uso, paleta de colores y fondos en hex, escala de espaciado (márgenes, rellenos y sangrías), interlineados y radios de borde. Incluye un selector de elemento: haz clic sobre cualquier cosa de la página y ve su ficha completa. Todos los valores se copian al portapapeles con un clic.",
@@ -48,7 +48,7 @@
     {
       "id": "blockify",
       "name": "Blockify",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "kind": "tool",
       "icon": "musical-note",
       "description": "Spotify Web sin anuncios de audio: Naviris detecta cada pista de anuncio y la salta al instante; si alguno alcanza a sonar, silencia la pestaña mientras dure y la desmutea al volver la música. También oculta las tarjetas de anuncio y los banners de Premium del reproductor. El botón del sidebar lo activa o lo pausa (encendido = color del tema) y el tooltip lleva la cuenta de anuncios saltados. Port completo de la extensión Blockify de Chrome, sin su telemetría. Requiere Naviris 2.5 o superior.",
@@ -57,7 +57,7 @@
     {
       "id": "strainer",
       "name": "Strainer",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "kind": "tool",
       "icon": "layers",
       "description": "Un colador de enlaces: le pegas el del acortador en el panel del sidebar y te devuelve el enlace final, resolviendo la pasarela por detrás para que sus anuncios no lleguen a verse. Con el interruptor puesto también lo hace solo: si caes en una pasarela conocida, la pestaña salta sola al destino. Alt+S lo fuerza en la página que estés viendo. La lista de sitios se actualiza sola desde naviris.site. Requiere Naviris 2.7.6-dev.4 o superior.",

@@ -1,4 +1,4 @@
-/* Naviris addon: Blockify v1.3.0
+/* Naviris addon: Blockify v1.3.1
    Port completo de la extensión "Spotify Ad Blocker - Blockify" 1.9.5 de
    Chrome, reescrita como addon de Naviris. Qué hace en open.spotify.com:
 

@@ -1,4 +1,4 @@
-/* Naviris addon: Strainer v1.2.0 (kind: tool)
+/* Naviris addon: Strainer v1.2.1 (kind: tool)
 
    Un colador de enlaces. Las pasarelas de los acortadores (cuenta atras,
    "continuar" y anuncios entre el enlace de descarga y el archivo) llevan el
