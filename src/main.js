@@ -530,6 +530,19 @@ const VERSION_MAYOR = VERSION_COMPLETA.split('.')[0];
 // Chrome recorta la versión del UA a MAJOR.0.0.0 desde la "UA reduction"; dejar
 // la versión completa aquí es en sí mismo una señal de cliente no estándar.
 const UA_LIMPIO = UA_BRUTO.replace(/Chrome\/[\d.]+/, 'Chrome/' + VERSION_MAYOR + '.0.0.0');
+/* El mismo UA para TODOS los marcos, no solo para el principal (2026-10-05).
+   ses.setUserAgent (en setupSession) solo llega al marco principal de cada
+   pestaña. Los iframes de OTRO sitio, que Chromium pone en su propio proceso,
+   y los workers que lanzan, seguían con el UA por defecto de Electron
+   ("Naviris/x Chrome/148.0.7778.271 Electron/42.5.2"). Medido en el reto de
+   Cloudflare: la página decía Chrome/148.0.0.0 y su iframe de
+   challenges.cloudflare.com decía Electron, o sea dos navegadores distintos
+   en la misma verificación. Con el UA por defecto igualado aquí, antes de que
+   exista ninguna ventana, cada marco y cada worker cuentan lo mismo.
+   Resultado, con perfil nuevo y rondas intercaladas: antes el reto de página
+   completa se quedaba en "Un momento…" pidiendo la casilla (zona-leros.com y
+   scrapingcourse.com, 4 de 4); con esta línea pasa solo en 1,5-1,8 s (3 de 3). */
+app.userAgentFallback = UA_LIMPIO;
 const MARCA_RELLENO = 'Not/A)Brand';   // el mismo que ya usa Chromium aquí
 const UA_CH = {
   versionCompleta: VERSION_COMPLETA,

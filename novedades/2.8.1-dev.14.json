@@ -1,0 +1,16 @@
+{
+  "version": "2.8.1-dev.14",
+  "linea": "dev",
+  "titulo": "La verificación de Cloudflare ya pasa sola",
+  "entradilla": "Las páginas protegidas por Cloudflare, las que se quedaban en «Un momento…» para siempre, ahora entran solas como en cualquier navegador.",
+  "bloques": [
+    {
+      "titulo": "Qué pasaba",
+      "texto": "Naviris se presentaba con un nombre en la página y con otro en los marcos de otros sitios que esa página incrusta, como el de la verificación de Cloudflare. Cloudflare veía dos navegadores distintos en una misma verificación y no la daba por buena. Lo mismo ocurría en cualquier marco de otro sitio: pasarelas de pago, reproductores incrustados."
+    },
+    {
+      "titulo": "Qué cambia",
+      "texto": "Todos los marcos y procesos de una pestaña se presentan ahora igual. Medido con un perfil nuevo: antes la verificación se quedaba parada pidiendo la casilla; ahora entra sola en menos de dos segundos. Si alguna vez te pide marcar la casilla, ya funciona."
+    }
+  ]
+}
