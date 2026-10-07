@@ -286,13 +286,26 @@ function suppressWebAuthn() { /* ver arriba: el bloqueo vive en webview-preload 
 // preload en document_start (webview-preload.js), que es lo robusto y a tiempo. Aquí,
 // en dom-ready, solo queda un RESPALDO DE UI ligero: cerrar el aviso anti-adblock y
 // pulsar 'saltar' si algún anuncio se colara. Sin hooks (los hacía el preload) ni seek.
+// El aviso anti-bloqueador (ytd-enforcement-message-view-model) llega de DOS formas
+// y solo una se cierra:
+// - En un DIÁLOGO (tp-yt-paper-dialog) encima del video, que lo pausa. Es un aviso
+//   previo: quitar el diálogo y darle al play deja todo como estaba. Esa sí.
+// - DENTRO del reproductor, a las cuentas que YouTube ya marcó por usar bloqueador:
+//   el player responde ERROR + errorScreen y el aviso se pinta en #error-screen
+//   (yt-playability-error-supported-renderers), en el hueco del video. Debajo no
+//   hay video que recuperar. Antes se borraba igual (enf.remove(), 6 ms después de
+//   aparecer) y quedaba una caja NEGRA sin controles, sin mensaje y sin sonido
+//   (Dosa, 2026-10-07). Además YouTube comprueba si ese componente falta o está
+//   oculto, así que borrarlo empeoraba la marca de la cuenta. Esta variante NO se
+//   toca: la trata el preload (un reintento y, si vuelve, se deja a la vista y la
+//   interfaz ofrece la lista blanca).
 const YT_ADSKIP = `(function(){
   if(window.__cobaltYTtidy)return; window.__cobaltYTtidy=1;
   function tidy(){
     try{
       ['.ytp-ad-skip-button','.ytp-ad-skip-button-modern','.ytp-skip-ad-button','.ytp-ad-overlay-close-button'].forEach(function(s){ var b=document.querySelector(s); if(b) b.click(); });
-      var enf=document.querySelector('ytd-enforcement-message-view-model');
-      if(enf){ var dlg=enf.closest('tp-yt-paper-dialog'); if(dlg) dlg.remove(); else enf.remove(); document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(function(b){ b.remove(); }); document.documentElement.style.overflow=''; var v=document.querySelector('video'); if(v&&v.paused){ try{v.play();}catch(e){} } }
+      var enf=document.querySelector('tp-yt-paper-dialog ytd-enforcement-message-view-model');
+      if(enf){ enf.closest('tp-yt-paper-dialog').remove(); document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(function(b){ b.remove(); }); document.documentElement.style.overflow=''; var v=document.querySelector('video'); if(v&&v.paused){ try{v.play();}catch(e){} } }
     }catch(e){}
   }
   setInterval(tidy,700);
@@ -305,6 +318,9 @@ const YT_ADSKIP = `(function(){
 // ahí dentro, así que tampoco podía saltarlo a mano. Se quedan fuera a propósito: si
 // un anuncio se cuela, es preferible verlo y poder saltarlo. Lo que sigue oculto son
 // los anuncios de la interfaz (feed, sidebar, banners), que no bloquean nada.
+// Tampoco va aquí NUNCA el aviso anti-bloqueador ni nada que lo contenga (#player,
+// #error-screen…): YouTube mira si ese componente está en display:none, igual que
+// si falta (ver YT_ADSKIP). Repasado el 2026-10-07: ninguna de estas reglas lo toca.
 const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
 // Revela contenido sensible en X/Twitter
 const X_REVEAL = `(function(){
@@ -1634,15 +1650,20 @@ app.on('web-contents-created', (_event, contents) => {
       contents.insertCSS(FOCO_CSS).catch(() => {});
       let host = '';
       try { host = new URL(contents.getURL()).hostname; } catch { return; }
+      // El interruptor del bloqueador Y la lista blanca, como en la red y en el preload.
+      const bloquea = settings.adblockEnabled && !isWhitelisted(contents.getURL());
       // Ocultado cosmético + scriptlets de las listas de Brave (como uBlock/Brave)
-      if (settings.adblockEnabled && !isWhitelisted(contents.getURL())) {
+      if (bloquea) {
         const cos = braveAdblock.cosmeticsFor(contents.getURL());
         if (cos) {
           if (cos.css) contents.insertCSS(cos.css).catch(() => {});
           if (cos.script) contents.executeJavaScript(cos.script, true).catch(() => {});
         }
       }
-      if (settings.adblockEnabled && /(^|\.)(youtube\.com|youtube-nocookie\.com)$/.test(host)) {
+      // Antes esto miraba solo el interruptor: con youtube.com en la lista blanca se
+      // seguían inyectando el respaldo y el CSS, y el respaldo seguía borrando el
+      // aviso anti-bloqueador justo a quien había decidido permitir los anuncios.
+      if (bloquea && /(^|\.)(youtube\.com|youtube-nocookie\.com)$/.test(host)) {
         contents.executeJavaScript(YT_ADSKIP, true).catch(() => {});
         contents.insertCSS(YT_ADCSS).catch(() => {});
       }
