@@ -410,24 +410,37 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
       contextBridge.executeInMainWorld({
         func: function () {
           if (window.__navYT) return; window.__navYT = 1;
-          var AD = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adParams'];
+          // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
+          // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
+          //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
+          //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
+          //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
+          //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
+          //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
+          //   señal más con la que YouTube puede reconocer el bloqueador (la
+          //   lección de Amazon: no inventar señales sin medirlas).
+          // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
+          //   carga inicial, sí se anulan los tres, como hace uBlock con
+          //   `set ytInitialPlayerResponse.playerAds undefined`.
+          var AD_PLAYER = ['adPlacements', 'adSlots'];
+          var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
           // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
           // (o.playerResponse, y solo si era objeto), así que las respuestas donde
           // el player response viene anidado —o como CADENA JSON, que es como lo
           // sirven las rutas de Shorts— no se tocaban.
-          function prune(o, prof) {
+          function prune(o, prof, campos) {
             try {
               if (!o || typeof o !== 'object' || prof > 4) return o;
-              for (var i = 0; i < AD.length; i++) if (AD[i] in o) delete o[AD[i]];
-              if (typeof o.playerResponse === 'string' && o.playerResponse.indexOf('adPlacements') !== -1) {
-                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1)); } catch (e) { /* nada */ }
+              for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
+              if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
+                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
               }
               var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
               for (var k = 0; k < claves.length; k++) {
                 var v = o[claves[k]];
                 if (v && typeof v === 'object') {
-                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1); }
-                  else prune(v, prof + 1);
+                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
+                  else prune(v, prof + 1, campos);
                 }
               }
             } catch (e) { /* nada */ }
@@ -436,17 +449,21 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
           // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
           function sospechosa(s) {
             return typeof s === 'string' && s.length > 3000 &&
-              (s.indexOf('adPlacements') !== -1 || s.indexOf('playerAds') !== -1 || s.indexOf('adSlots') !== -1);
+              (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
           }
+          // Se engancha la Response y no fetch, así que da igual cómo se pidió:
+          // con una URL o con fetch(new Request(...)), que es como YouTube pide
+          // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
+          // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
           try {
             var _j = Response.prototype.json;
-            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0); }); };
+            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0, AD_PLAYER); }); };
           } catch (e) { /* nada */ }
           try {
             var _p = JSON.parse;
             JSON.parse = function (s) {
               var r = _p.apply(this, arguments);
-              try { if (sospechosa(s)) return prune(r, 0); } catch (e) { /* nada */ }
+              try { if (sospechosa(s)) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
               return r;
             };
           } catch (e) { /* nada */ }
@@ -459,11 +476,11 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
           // antes que nosotros) y se deja el setter para la que venga.
           try {
             var _v;
-            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0); } catch (e) { /* nada */ }
+            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
             Object.defineProperty(window, 'ytInitialPlayerResponse', {
               configurable: true,
               get: function () { return _v; },
-              set: function (n) { _v = prune(n, 0); }
+              set: function (n) { _v = prune(n, 0, AD_INICIAL); }
             });
           } catch (e) { /* nada */ }
           // Vídeos con anuncio cosido en el servidor (SSAP, `daiConfig`): al
@@ -491,7 +508,101 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
             window.addEventListener('yt-navigate-finish', vigila);
             if (document.readyState === 'complete') vigila(); else window.addEventListener('load', vigila);
           } catch (e) { /* nada */ }
+          // El muro anti-bloqueador DENTRO del reproductor. A las cuentas que
+          // YouTube marca por usar bloqueador les contesta el player, en una parte
+          // de las peticiones, con playabilityStatus ERROR +
+          // errorScreen.enforcementMessageViewModel: "Los bloqueadores de anuncios
+          // no están permitidos en YouTube" se pinta en el hueco del video
+          // (ytd-watch-flexy[player-unavailable], #error-screen) y debajo no hay
+          // video. Como sale solo en una parte de las peticiones, se vuelve a pedir
+          // el video UNA vez por video y pestaña, recargando la página. Recargar y
+          // no navegar por dentro de YouTube (yt-navigate al mismo watch?v=): eso
+          // no vuelve a pedir nada. Medido el 2026-10-07 con el búfer de resource
+          // timing vacío: 0 peticiones a /youtubei/v1/player y a /next; YouTube
+          // repone los datos que ya tenía, que con un muro de verdad son el muro.
+          // Si el muro vuelve, se deja a la vista —borrarlo o taparlo deja una caja
+          // negra, y YouTube lo detecta— y se avisa a la interfaz, que ofrece la
+          // lista blanca.
+          // Solo ese muro: UNPLAYABLE, un video privado o un player atascado no
+          // son esto y no se tocan (lo atascado es cosa del scriptlet
+          // serverContract de las listas).
+          try {
+            var CLAVE_MURO = '__navMuro';   // videos ya reintentados en esta pestaña: sobrevive a la recarga
+            var esperaMuro = null, avisadoMuro = '', flexyMuro = null, saliendoMuro = false;
+            var vidMuro = function () { return (new URLSearchParams(location.search)).get('v') || ''; };
+            var reintentados = function () { try { return JSON.parse(sessionStorage.getItem(CLAVE_MURO) || '[]') || []; } catch (e) { return []; } };
+            var hayMuro = function () {
+              if (location.pathname.indexOf('/watch') !== 0) return false;
+              var f = document.querySelector('ytd-watch-flexy');
+              if (!f || !f.hasAttribute('player-unavailable')) return false;
+              var ps = null;
+              try { var pd = (f.polymerController && f.polymerController.playerData) || f.playerData; ps = pd && pd.playabilityStatus; } catch (e) { /* nada */ }
+              if (ps) return ps.status === 'ERROR' && !!(ps.errorScreen && ps.errorScreen.enforcementMessageViewModel);
+              // Sin los datos a mano vale el componente, que YouTube pinta justo a partir de ellos.
+              var es = f.querySelector('#error-screen');
+              return !!(es && !es.hidden && es.querySelector('ytd-enforcement-message-view-model'));
+            };
+            var avisaMuro = function (vid) {
+              // Una página oculta (la ventana minimizada) no avisa: lo hará al
+              // mostrarse (visibilitychange). Las pestañas de fondo las filtra la
+              // interfaz, porque ahí visibilityState sigue diciendo "visible".
+              if (avisadoMuro === vid || document.visibilityState !== 'visible') return;
+              avisadoMuro = vid;
+              document.dispatchEvent(new CustomEvent('naviris-yt-muro'));
+            };
+            var revisaMuro = function () {
+              try {
+                // La página que se va no hace nada. Al descargarse dispara un
+                // visibilitychange en el que visibilityState aún dice "visible"
+                // (medido el 2026-10-07: justo tras el pagehide de la recarga del
+                // reintento), y avisaba del muro con el video ya sonando en la
+                // página nueva.
+                if (saliendoMuro || !hayMuro()) return;
+                var vid = vidMuro(); if (!vid) return;
+                if (reintentados().indexOf(vid) !== -1) { avisaMuro(vid); return; }
+                if (esperaMuro && esperaMuro.vid === vid) return;
+                if (esperaMuro) clearTimeout(esperaMuro.t);
+                // 2 s antes de recargar: el scriptlet de las listas puede estar
+                // volviendo a pedir el video por su cuenta. Si en ese rato se va
+                // player-unavailable (el observador de abajo), no se hace nada.
+                esperaMuro = { vid: vid, t: setTimeout(function () {
+                  esperaMuro = null;
+                  if (vidMuro() !== vid || !hayMuro()) return;
+                  var lista = reintentados();
+                  if (lista.indexOf(vid) !== -1) { avisaMuro(vid); return; }
+                  lista.push(vid);
+                  try { sessionStorage.setItem(CLAVE_MURO, JSON.stringify(lista.slice(-50))); } catch (e) { /* nada */ }
+                  // Sin poder apuntarlo, recargar sería un bucle: se deja el muro y se avisa.
+                  if (reintentados().indexOf(vid) === -1) { avisaMuro(vid); return; }
+                  saliendoMuro = true;
+                  location.reload();
+                }, 2000) };
+              } catch (e) { /* nada */ }
+            };
+            // YouTube pone el atributo al recibir la respuesta. Se vigila solo ese
+            // atributo de ese elemento, sin observar el árbol de la página.
+            var obsMuro = new MutationObserver(function () {
+              if (esperaMuro && flexyMuro && !flexyMuro.hasAttribute('player-unavailable')) { clearTimeout(esperaMuro.t); esperaMuro = null; }
+              revisaMuro();
+            });
+            var enganchaMuro = function () {
+              var f = document.querySelector('ytd-watch-flexy');
+              if (f && f !== flexyMuro) { flexyMuro = f; obsMuro.disconnect(); obsMuro.observe(f, { attributes: true, attributeFilter: ['player-unavailable'] }); }
+              revisaMuro(); setTimeout(revisaMuro, 1500); setTimeout(revisaMuro, 4000);
+            };
+            window.addEventListener('yt-navigate-finish', enganchaMuro);
+            if (document.readyState === 'complete') enganchaMuro(); else window.addEventListener('load', enganchaMuro);
+            document.addEventListener('visibilitychange', revisaMuro);
+            window.addEventListener('pagehide', function () { saliendoMuro = true; });
+            window.addEventListener('pageshow', function () { saliendoMuro = false; });   // vuelta desde la bfcache
+          } catch (e) { /* nada */ }
         }
+      });
+      // El aviso del muro sale del mundo de la página, que es donde se ven los
+      // datos del player, y llega aquí por un evento del DOM (lo comparten los dos
+      // mundos). ipcRenderer solo existe de este lado.
+      document.addEventListener('naviris-yt-muro', function () {
+        try { ipcRenderer.sendToHost('cobalt-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
       });
     }
   } catch (e) { /* nada */ }
