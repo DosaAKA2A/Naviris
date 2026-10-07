@@ -15,6 +15,7 @@
     "icon": "electron build/render-icon.js",
     "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
+    "adblock-recursos": "node build/adblock-recursos.js",
     "dist": "electron-builder --win",
     "release": "npm run dist && node build/publish-release.js",
     "publish": "node build/publish-release.js",
@@ -37,6 +38,7 @@
     },
     "files": [
       "src/**/*",
+      "resources/adblock/**/*",
       "build/icon.png",
       "build/icon.ico",
       "!node_modules/adblock-rs/{target,src,benches,fuzz}/**",
