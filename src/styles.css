@@ -1374,6 +1374,14 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); z-index: 900; background: var(--bg-3); border: 1px solid var(--line-3); border-radius: 10px; padding: 11px 18px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity var(--dur-3), transform var(--dur-3); box-shadow: 0 14px 40px var(--shadow-panel); max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+/* Aviso con botón (toast con `accion`): el texto se recorta y el botón es la
+   pastilla primaria de la barra de contraseñas. Solo atiende al ratón mientras
+   se ve: oculto (opacity 0) seguiría tapando los clics de esa franja. */
+#toast.con-accion { display: flex; align-items: center; gap: 14px; padding: 7px 7px 7px 18px; }
+#toast.con-accion > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#toast.show.con-accion { pointer-events: auto; }
+#toast button { flex: 0 0 auto; border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: var(--accent); color: var(--accent-fg); }
+#toast button:hover { background: var(--accent-hover); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } #hub.editing .dial { animation: none; } }
 

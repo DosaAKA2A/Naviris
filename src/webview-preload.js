@@ -508,7 +508,101 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
             window.addEventListener('yt-navigate-finish', vigila);
             if (document.readyState === 'complete') vigila(); else window.addEventListener('load', vigila);
           } catch (e) { /* nada */ }
+          // El muro anti-bloqueador DENTRO del reproductor. A las cuentas que
+          // YouTube marca por usar bloqueador les contesta el player, en una parte
+          // de las peticiones, con playabilityStatus ERROR +
+          // errorScreen.enforcementMessageViewModel: "Los bloqueadores de anuncios
+          // no están permitidos en YouTube" se pinta en el hueco del video
+          // (ytd-watch-flexy[player-unavailable], #error-screen) y debajo no hay
+          // video. Como sale solo en una parte de las peticiones, se vuelve a pedir
+          // el video UNA vez por video y pestaña, recargando la página. Recargar y
+          // no navegar por dentro de YouTube (yt-navigate al mismo watch?v=): eso
+          // no vuelve a pedir nada. Medido el 2026-10-07 con el búfer de resource
+          // timing vacío: 0 peticiones a /youtubei/v1/player y a /next; YouTube
+          // repone los datos que ya tenía, que con un muro de verdad son el muro.
+          // Si el muro vuelve, se deja a la vista —borrarlo o taparlo deja una caja
+          // negra, y YouTube lo detecta— y se avisa a la interfaz, que ofrece la
+          // lista blanca.
+          // Solo ese muro: UNPLAYABLE, un video privado o un player atascado no
+          // son esto y no se tocan (lo atascado es cosa del scriptlet
+          // serverContract de las listas).
+          try {
+            var CLAVE_MURO = '__navMuro';   // videos ya reintentados en esta pestaña: sobrevive a la recarga
+            var esperaMuro = null, avisadoMuro = '', flexyMuro = null, saliendoMuro = false;
+            var vidMuro = function () { return (new URLSearchParams(location.search)).get('v') || ''; };
+            var reintentados = function () { try { return JSON.parse(sessionStorage.getItem(CLAVE_MURO) || '[]') || []; } catch (e) { return []; } };
+            var hayMuro = function () {
+              if (location.pathname.indexOf('/watch') !== 0) return false;
+              var f = document.querySelector('ytd-watch-flexy');
+              if (!f || !f.hasAttribute('player-unavailable')) return false;
+              var ps = null;
+              try { var pd = (f.polymerController && f.polymerController.playerData) || f.playerData; ps = pd && pd.playabilityStatus; } catch (e) { /* nada */ }
+              if (ps) return ps.status === 'ERROR' && !!(ps.errorScreen && ps.errorScreen.enforcementMessageViewModel);
+              // Sin los datos a mano vale el componente, que YouTube pinta justo a partir de ellos.
+              var es = f.querySelector('#error-screen');
+              return !!(es && !es.hidden && es.querySelector('ytd-enforcement-message-view-model'));
+            };
+            var avisaMuro = function (vid) {
+              // Una página oculta (la ventana minimizada) no avisa: lo hará al
+              // mostrarse (visibilitychange). Las pestañas de fondo las filtra la
+              // interfaz, porque ahí visibilityState sigue diciendo "visible".
+              if (avisadoMuro === vid || document.visibilityState !== 'visible') return;
+              avisadoMuro = vid;
+              document.dispatchEvent(new CustomEvent('naviris-yt-muro'));
+            };
+            var revisaMuro = function () {
+              try {
+                // La página que se va no hace nada. Al descargarse dispara un
+                // visibilitychange en el que visibilityState aún dice "visible"
+                // (medido el 2026-10-07: justo tras el pagehide de la recarga del
+                // reintento), y avisaba del muro con el video ya sonando en la
+                // página nueva.
+                if (saliendoMuro || !hayMuro()) return;
+                var vid = vidMuro(); if (!vid) return;
+                if (reintentados().indexOf(vid) !== -1) { avisaMuro(vid); return; }
+                if (esperaMuro && esperaMuro.vid === vid) return;
+                if (esperaMuro) clearTimeout(esperaMuro.t);
+                // 2 s antes de recargar: el scriptlet de las listas puede estar
+                // volviendo a pedir el video por su cuenta. Si en ese rato se va
+                // player-unavailable (el observador de abajo), no se hace nada.
+                esperaMuro = { vid: vid, t: setTimeout(function () {
+                  esperaMuro = null;
+                  if (vidMuro() !== vid || !hayMuro()) return;
+                  var lista = reintentados();
+                  if (lista.indexOf(vid) !== -1) { avisaMuro(vid); return; }
+                  lista.push(vid);
+                  try { sessionStorage.setItem(CLAVE_MURO, JSON.stringify(lista.slice(-50))); } catch (e) { /* nada */ }
+                  // Sin poder apuntarlo, recargar sería un bucle: se deja el muro y se avisa.
+                  if (reintentados().indexOf(vid) === -1) { avisaMuro(vid); return; }
+                  saliendoMuro = true;
+                  location.reload();
+                }, 2000) };
+              } catch (e) { /* nada */ }
+            };
+            // YouTube pone el atributo al recibir la respuesta. Se vigila solo ese
+            // atributo de ese elemento, sin observar el árbol de la página.
+            var obsMuro = new MutationObserver(function () {
+              if (esperaMuro && flexyMuro && !flexyMuro.hasAttribute('player-unavailable')) { clearTimeout(esperaMuro.t); esperaMuro = null; }
+              revisaMuro();
+            });
+            var enganchaMuro = function () {
+              var f = document.querySelector('ytd-watch-flexy');
+              if (f && f !== flexyMuro) { flexyMuro = f; obsMuro.disconnect(); obsMuro.observe(f, { attributes: true, attributeFilter: ['player-unavailable'] }); }
+              revisaMuro(); setTimeout(revisaMuro, 1500); setTimeout(revisaMuro, 4000);
+            };
+            window.addEventListener('yt-navigate-finish', enganchaMuro);
+            if (document.readyState === 'complete') enganchaMuro(); else window.addEventListener('load', enganchaMuro);
+            document.addEventListener('visibilitychange', revisaMuro);
+            window.addEventListener('pagehide', function () { saliendoMuro = true; });
+            window.addEventListener('pageshow', function () { saliendoMuro = false; });   // vuelta desde la bfcache
+          } catch (e) { /* nada */ }
         }
+      });
+      // El aviso del muro sale del mundo de la página, que es donde se ven los
+      // datos del player, y llega aquí por un evento del DOM (lo comparten los dos
+      // mundos). ipcRenderer solo existe de este lado.
+      document.addEventListener('naviris-yt-muro', function () {
+        try { ipcRenderer.sendToHost('cobalt-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
       });
     }
   } catch (e) { /* nada */ }

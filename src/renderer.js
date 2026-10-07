@@ -411,7 +411,23 @@ const isVideoUrl = (u) => /youtu\.be\/|\/(watch|shorts|video|status|reel|reels|c
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
-function toast(msg) { els.toast.textContent = msg; els.toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => els.toast.classList.remove('show'), 3200); }
+/* `accion` ({ label, alPulsar }) le pone un botón al aviso (el muro de YouTube).
+   Con botón se queda 10 s y no se va mientras el ratón está encima: en los 3,2 s
+   de un aviso normal no da tiempo a leerlo y llegar al botón. */
+function toast(msg, accion = null) {
+  const t = els.toast, quita = () => t.classList.remove('show');
+  t.classList.toggle('con-accion', !!accion);
+  t.onmouseenter = t.onmouseleave = null;
+  if (accion) {
+    const txt = document.createElement('span'); txt.textContent = msg;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = accion.label;
+    b.addEventListener('click', () => { clearTimeout(toastTimer); quita(); accion.alPulsar(); });
+    t.replaceChildren(txt, b);
+    t.onmouseenter = () => clearTimeout(toastTimer);
+    t.onmouseleave = () => { clearTimeout(toastTimer); toastTimer = setTimeout(quita, 2500); };
+  } else t.textContent = msg;
+  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(quita, accion ? 10000 : 3200);
+}
 
 /* ============ Menú contextual reutilizable ============ */
 let ctxMenuEl = null;
@@ -843,6 +859,11 @@ function activateTab(id) {
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
   pintaFallo();
+  // El muro de YouTube que salió con la pestaña de fondo, si sigue en ese video.
+  if (tab.muroPendiente) {
+    const vid = tab.muroPendiente; tab.muroPendiente = null;
+    try { if (new URL(tab.url).searchParams.get('v') === vid) avisaMuroYT(tab, vid); } catch { /* nada */ }
+  }
 }
 // Arranque con la sesión restaurada: las pestañas quedan dormidas en la barra
 // hasta que se eligen, y delante se abre una "Nueva pestaña" con el hub, activa
@@ -5699,6 +5720,21 @@ async function onWebviewMessage(wv, e) {
     if (dir === 'back') irAtras(); else if (dir === 'forward') irAdelante();
     return;
   }
+  /* YouTube dejó a la vista su muro anti-bloqueador dentro del reproductor
+     después del reintento del preload (webview-preload, bloque de YouTube): se
+     ofrece la lista blanca. Si la pestaña no se está viendo, el aviso espera a
+     que se abra (activateTab). El preload no lo puede saber: un webview de
+     fondo sigue diciendo visibilityState "visible" (medido el 2026-10-07, con
+     el hub delante), y el aviso salía sobre otra pestaña. */
+  if (e.channel === 'cobalt-yt-muro') {
+    const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
+    let vid = '';
+    try { const u = new URL(data.url); if (/(^|\.)youtube\.com$/.test(u.hostname)) vid = u.searchParams.get('v') || ''; } catch { /* nada */ }
+    if (!vid) return;
+    if (tab.id !== activeId && tab.id !== divId) { tab.muroPendiente = vid; return; }
+    avisaMuroYT(tab, vid);
+    return;
+  }
   // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
   if (e.channel === 'cobalt-agent') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
@@ -5781,6 +5817,23 @@ async function onWebviewMessage(wv, e) {
     const card = cards[0];
     showPwBar(`Rellenar la tarjeta <b>${escapeHtml(card.brand)} •••• ${escapeHtml(card.last4)}</b> en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows. El CVC lo escribes tú.`, 'Rellenar', () => doFillCard(wv, card, host), host);
   }
+}
+// El aviso del muro de YouTube (ver 'cobalt-yt-muro'): como mucho uno por pestaña
+// y video. El botón mete youtube.com en la lista blanca, igual que el escudo, y
+// recarga la pestaña.
+function avisaMuroYT(tab, vid) {
+  tab.muroAvisado = tab.muroAvisado || new Set();
+  if (tab.muroAvisado.has(vid)) return;
+  tab.muroAvisado.add(vid);
+  toast('YouTube bloqueó el video por el bloqueador de anuncios.', {
+    label: 'Permitir anuncios en YouTube',
+    alPulsar: async () => {
+      await window.cobalt.adblockWhitelist('add', 'youtube.com');
+      if (!els.shieldPop.classList.contains('hidden')) refreshAdblockUI();
+      toast('Anuncios permitidos en YouTube');
+      try { tab.webview?.reload(); } catch { /* nada */ }
+    }
+  });
 }
 // Lo que se rellena va solo al sitio que se ofreció: se mira antes de pedir
 // Windows Hello y otra vez después, que mientras tanto se puede haber navegado.
