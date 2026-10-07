@@ -410,24 +410,37 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
       contextBridge.executeInMainWorld({
         func: function () {
           if (window.__navYT) return; window.__navYT = 1;
-          var AD = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adParams'];
+          // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
+          // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
+          //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
+          //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
+          //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
+          //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
+          //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
+          //   señal más con la que YouTube puede reconocer el bloqueador (la
+          //   lección de Amazon: no inventar señales sin medirlas).
+          // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
+          //   carga inicial, sí se anulan los tres, como hace uBlock con
+          //   `set ytInitialPlayerResponse.playerAds undefined`.
+          var AD_PLAYER = ['adPlacements', 'adSlots'];
+          var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
           // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
           // (o.playerResponse, y solo si era objeto), así que las respuestas donde
           // el player response viene anidado —o como CADENA JSON, que es como lo
           // sirven las rutas de Shorts— no se tocaban.
-          function prune(o, prof) {
+          function prune(o, prof, campos) {
             try {
               if (!o || typeof o !== 'object' || prof > 4) return o;
-              for (var i = 0; i < AD.length; i++) if (AD[i] in o) delete o[AD[i]];
-              if (typeof o.playerResponse === 'string' && o.playerResponse.indexOf('adPlacements') !== -1) {
-                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1)); } catch (e) { /* nada */ }
+              for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
+              if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
+                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
               }
               var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
               for (var k = 0; k < claves.length; k++) {
                 var v = o[claves[k]];
                 if (v && typeof v === 'object') {
-                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1); }
-                  else prune(v, prof + 1);
+                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
+                  else prune(v, prof + 1, campos);
                 }
               }
             } catch (e) { /* nada */ }
@@ -436,17 +449,21 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
           // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
           function sospechosa(s) {
             return typeof s === 'string' && s.length > 3000 &&
-              (s.indexOf('adPlacements') !== -1 || s.indexOf('playerAds') !== -1 || s.indexOf('adSlots') !== -1);
+              (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
           }
+          // Se engancha la Response y no fetch, así que da igual cómo se pidió:
+          // con una URL o con fetch(new Request(...)), que es como YouTube pide
+          // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
+          // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
           try {
             var _j = Response.prototype.json;
-            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0); }); };
+            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0, AD_PLAYER); }); };
           } catch (e) { /* nada */ }
           try {
             var _p = JSON.parse;
             JSON.parse = function (s) {
               var r = _p.apply(this, arguments);
-              try { if (sospechosa(s)) return prune(r, 0); } catch (e) { /* nada */ }
+              try { if (sospechosa(s)) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
               return r;
             };
           } catch (e) { /* nada */ }
@@ -459,11 +476,11 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
           // antes que nosotros) y se deja el setter para la que venga.
           try {
             var _v;
-            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0); } catch (e) { /* nada */ }
+            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
             Object.defineProperty(window, 'ytInitialPlayerResponse', {
               configurable: true,
               get: function () { return _v; },
-              set: function (n) { _v = prune(n, 0); }
+              set: function (n) { _v = prune(n, 0, AD_INICIAL); }
             });
           } catch (e) { /* nada */ }
           // Vídeos con anuncio cosido en el servidor (SSAP, `daiConfig`): al
