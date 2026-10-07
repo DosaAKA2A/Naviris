@@ -1,7 +1,7 @@
 // Preload que corre dentro de cada webview (sitio). Detecta formularios de login
 // para capturar contraseñas al iniciar sesión y para autorrellenarlas después.
 // Se comunica con la interfaz de Naviris (host) mediante ipcRenderer.sendToHost.
-const { ipcRenderer, contextBridge } = require('electron');
+const { ipcRenderer, contextBridge, webFrame } = require('electron');
 
 // Los permisos que la página puede consultar, con el nombre que usa la web y el
 // que usa Electron (ver el repaso de piezas de Chromium más abajo).
@@ -22,6 +22,27 @@ const PERMISOS_WEB = {
 // (NAV-IB-18; eran trece y cada una frena la carga de la página).
 let ARRANQUE = {};
 try { ARRANQUE = ipcRenderer.sendSync('preload:arranque', Object.values(PERMISOS_WEB)) || {}; } catch (e) { /* nada */ }
+
+// --- Scriptlets del bloqueador (`##+js(...)` de las listas), lo primero ---
+// Van antes que nada porque json-prune, set o trusted-replace-xhr-response
+// tienen que estar puestos antes del primer script de la página (uBlock los
+// pone en document_start) y porque así capturan las funciones nativas sin que
+// nadie las haya tocado todavía. main ya los manda envueltos y solo si el
+// adblock está encendido y el sitio no está en la lista blanca.
+// UNA sola vez por documento: este preload corre una vez por cada documento
+// nuevo, y las navegaciones internas de YouTube (SPA) no crean documento, así
+// que no se repiten. Inyectarlos dos veces encadena sus parches (varios tocan
+// JSON.stringify) y dispara la CPU.
+// Por webFrame.executeJavaScript y no por contextBridge.executeInMainWorld: el
+// segundo solo acepta una función, y convertir el texto en función exigiría
+// eval aquí, que la CSP de muchas webs prohíbe (y en YouTube, además, Trusted
+// Types). executeJavaScript lo compila Electron directamente en el mundo
+// principal, sin pasar por la CSP de la página, y lo ejecuta en el acto:
+// medido en YouTube y en marca.com, cuando corre aún no existe ni el <html> ni
+// ningún script de la página.
+if (ARRANQUE.scriptlets) {
+  try { webFrame.executeJavaScript(ARRANQUE.scriptlets).catch(() => {}); } catch (e) { /* nada */ }
+}
 
 // --- Identidad coherente del navegador (client hints) ---
 // main ya reescribe las cabeceras Sec-CH-UA, pero eso no basta: los antifraude

@@ -17,7 +17,17 @@ const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
 // registerSchemesAsPrivileged tiene que ir ANTES de que la app esté lista.
 const ADDON_SCHEME = 'naviris-addon';
 protocol.registerSchemesAsPrivileged([
-  { scheme: ADDON_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
+  { scheme: ADDON_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  /* Sustitutos del bloqueador (`$redirect=`), ver adblock.js. Los pide la
+     PÁGINA (un <script>, un fetch, un vídeo), así que el esquema necesita lo
+     que tendría la URL original: secure (si no, la web https lo bloquea por
+     contenido mixto), fetch y CORS, streaming para los sustitutos de vídeo y
+     audio, y bypassCSP. Este último es el que importa: medido en Electron 42,
+     una web con `script-src` por host rechaza el sustituto si el esquema no se
+     salta la CSP, y el script falla igual que si se hubiera cancelado. Es lo
+     mismo que consiguen los recursos de una extensión como uBlock. Lo único
+     que sirve este esquema son esos recursos fijos, sin nada de la persona. */
+  { scheme: braveAdblock.ESQUEMA_SUSTITUTOS, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true } }
 ]);
 
 // Migración de perfil: el rebrand Cobalt→Naviris cambia la carpeta de userData,
@@ -610,17 +620,27 @@ function idiomasLista() {
      Notification.permission === 'denied'. Eso no es solo una huella rara:
      muchas webs ni siquiera piden el permiso si lo ven denegado, así que el
      diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
-     notificaciones aunque quisiera. El preload usa esto para contar la verdad. */
+     notificaciones aunque quisiera. El preload usa esto para contar la verdad.
+   - scriptlets: los `##+js(...)` de las listas para ESTE documento, ya listos
+     para ejecutarse en el mundo principal (braveAdblock.scriptletsFor). Van
+     aquí y no en dom-ready porque json-prune, set o trusted-replace-xhr-response
+     tienen que estar puestos ANTES de que corra el primer script de la página,
+     como los pone uBlock (document_start): en dom-ready YouTube ya había leído
+     su respuesta del reproductor con los anuncios dentro. Respeta el
+     interruptor del adblock y la lista blanca, igual que el resto del bloqueo.
+     La URL es la del marco que pregunta según main, no la que diga la página. */
 ipcMain.on('preload:arranque', (e, permisos) => {
   let origen = '';
-  try { origen = originOf(e.senderFrame.url); } catch { /* nada */ }
+  let url = '';
+  try { url = e.senderFrame.url || ''; origen = originOf(url); } catch { /* nada */ }
   const estados = {};
   for (const permiso of Array.isArray(permisos) ? permisos : []) {
     if (typeof permiso !== 'string') continue;
     const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
     estados[permiso] = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
   }
-  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados };
+  const scriptlets = settings.adblockEnabled && /^https?:/i.test(url) && !isWhitelisted(url) ? braveAdblock.scriptletsFor(url) : '';
+  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados, scriptlets };
 });
 
 /* Dominios de verificación anti-robot. NO se bloquean nunca: bloquearlos no
@@ -700,6 +720,21 @@ function setupSession(ses) {
     ponHints();   // por si la petición no llevaba ni UIR ni User-Agent
     callback({ requestHeaders: h });
   });
+  // Los sustitutos de `$redirect=` (ver onBeforeRequest y adblock.js). Con el
+  // origen de vuelta en CORS y credenciales permitidas: tras la redirección el
+  // origen pasa a 'null' y hay peticiones que viajan con credenciales; con un
+  // '*' a secas el fetch/XHR fallaría y la web vería el hueco. El contenido son
+  // recursos fijos (noop.js, un gif de 1x1...), nada que proteger.
+  try {
+    ses.protocol.handle(braveAdblock.ESQUEMA_SUSTITUTOS, (req) => {
+      const s = braveAdblock.sustituto(req.url);
+      if (!s) return new Response('', { status: 404 });
+      const origen = req.headers.get('origin');
+      const cabeceras = { 'content-type': s.mime, 'access-control-allow-origin': origen || '*' };
+      if (origen) cabeceras['access-control-allow-credentials'] = 'true';
+      return new Response(s.cuerpo, { headers: cabeceras });
+    });
+  } catch (e) { console.log('[Naviris] Sin esquema de sustitutos en esta sesión:', e.message); }
   ses.webRequest.onBeforeRequest((details, callback) => {
     // La lista blanca (y Spotify, abajo) miran la PÁGINA de la pestaña, no el
     // referrer: con "no-referrer", o desde un iframe de terceros, el referrer
@@ -727,7 +762,17 @@ function setupSession(ses) {
       return callback({});
     }
     // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
-    if (YT_AD_PATHS.some((p) => u.includes(p))) { blockedCount++; return callback({ cancel: true }); }
+    if (YT_AD_PATHS.some((p) => u.includes(p))) {
+      blockedCount++;
+      /* Se siguen cortando todas, pero antes se pregunta al motor por si las
+         listas tienen un SUSTITUTO para esa URL. '/pagead/' casa también con
+         googlesyndication.com/pagead/js/adsbygoogle.js, y para ese script hay
+         decenas de reglas `$redirect=noopjs` en las webs que comprueban si
+         cargó: cortarlo a pelo es justo lo que les delata el bloqueador. */
+      const v = braveAdblock.check(details);
+      if (v && v.sustituto) return callback({ redirectURL: v.sustituto });
+      return callback({ cancel: true });
+    }
     /* VERIFICACIONES DE "no soy un robot". Nunca se bloquean, aunque las listas
        lo pidan y aunque sus rutas se llamen /telemetry o /report.
 
@@ -745,9 +790,23 @@ function setupSession(ses) {
     if (ES_VERIFICACION.test(u)) return callback({});
     // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
     // decide el fallback clásico por dominios.
-    const brave = braveAdblock.shouldBlock(details);
+    const brave = braveAdblock.check(details);
     if (brave !== null) {
-      if (brave) { blockedCount++; return callback({ cancel: true }); }
+      if (brave.bloquear) {
+        blockedCount++;
+        /* Con `$redirect=` la regla no quiere un hueco sino un SUSTITUTO: se
+           redirige a él en vez de cancelar. Es lo que hacen Brave y uBlock, y
+           lo que evita que la web note el bloqueo: YouTube pide
+           doubleclick.net/instream/ad_status.js y mira si quedó puesto
+           `google_ad_status`; cancelado, la carga falla y lo toma por
+           bloqueador (a un usuario le paró la reproducción con su cuenta).
+           La redirección va al esquema propio de los sustitutos y no a un
+           data: URL, que Electron no sigue (ver adblock.js). */
+        if (brave.sustituto) return callback({ redirectURL: brave.sustituto });
+        return callback({ cancel: true });
+      }
+      // `$removeparam`: la misma petición sin los parámetros de rastreo.
+      if (brave.reescrita && brave.reescrita !== u) return callback({ redirectURL: brave.reescrita });
       return callback({});
     }
     try {
@@ -1634,13 +1693,15 @@ app.on('web-contents-created', (_event, contents) => {
       contents.insertCSS(FOCO_CSS).catch(() => {});
       let host = '';
       try { host = new URL(contents.getURL()).hostname; } catch { return; }
-      // Ocultado cosmético + scriptlets de las listas de Brave (como uBlock/Brave)
+      // Ocultado cosmético de las listas de Brave. Los scriptlets de esas listas
+      // NO van aquí: los pone el preload al empezar el documento (ver
+      // 'preload:arranque'). Aquí llegaban tarde, y dejarlos TAMBIÉN aquí los
+      // pondría dos veces en cada documento: varios parchean JSON.stringify y,
+      // encadenados, multiplican las llamadas (es lo que dejó a Ghostery con la
+      // CPU al 80-90 % en YouTube). Una sola inyección por documento.
       if (settings.adblockEnabled && !isWhitelisted(contents.getURL())) {
         const cos = braveAdblock.cosmeticsFor(contents.getURL());
-        if (cos) {
-          if (cos.css) contents.insertCSS(cos.css).catch(() => {});
-          if (cos.script) contents.executeJavaScript(cos.script, true).catch(() => {});
-        }
+        if (cos && cos.css) contents.insertCSS(cos.css).catch(() => {});
       }
       if (settings.adblockEnabled && /(^|\.)(youtube\.com|youtube-nocookie\.com)$/.test(host)) {
         contents.executeJavaScript(YT_ADSKIP, true).catch(() => {});
