@@ -1,0 +1,28 @@
+{
+  "version": "2.8.1",
+  "linea": "estable",
+  "titulo": "Naviris 2.8.1",
+  "entradilla": "Todo lo que se ha trabajado desde septiembre llega a la estable: vuelves a entrar en Google y YouTube sin trabas, el hub cambia de cara y el navegador gasta mucho menos.",
+  "bloques": [
+    {
+      "titulo": "Google y YouTube, otra vez sin trabas",
+      "texto": "Google volvía a rechazar el inicio de sesión con un «Es posible que el navegador no sea seguro», y eso dejaba fuera también de YouTube. Ya se puede entrar con normalidad.\n\nY se acabaron los vídeos que se paraban nada más empezar, los que se quedaban quietos a 0:00 con la cuenta iniciada y la caja negra donde debía estar el reproductor. Si YouTube saca su aviso contra los bloqueadores de anuncios, Naviris vuelve a pedir el vídeo una vez y, si el aviso sigue, te lo deja ver y te ofrece un botón para permitir los anuncios en YouTube."
+    },
+    {
+      "titulo": "El hub, rehecho",
+      "texto": "Fuera el cristal: el hub pasa a ser un mosaico de baldosas opacas, con los accesos en un dock y la pestaña activa bien marcada. Si echas de menos la transparencia, vuelve cuando tú la pidas y con la intensidad que quieras.\n\nAl añadir un acceso tienes a mano una biblioteca de sitios habituales, la tarjeta de cada sitio lleva el color de su marca y el hub ya se puede editar también en pantallas de 1080p."
+    },
+    {
+      "titulo": "Más ligero y más seguro",
+      "texto": "Una revisión completa del navegador: en reposo gasta menos de la mitad que antes, los espacios protegidos ya no se pueden abrir sin su contraseña y hay una página de error propia cuando una web no carga. Por el camino se corrigieron más de cien fallos pequeños de pestañas, paneles, temas y addons."
+    },
+    {
+      "titulo": "Webs que ahora entran",
+      "texto": "Las páginas protegidas por Cloudflare, las que se quedaban en «Un momento…» para siempre, pasan solas como en cualquier navegador. Outlook vuelve a dejar entrar, y el Rat Tool descarga otra vez de YouTube, Instagram y X."
+    },
+    {
+      "titulo": "Y unos cuantos detalles",
+      "texto": "Ctrl más la rueda del ratón hace zoom, F5 recarga siempre aunque la web intente impedirlo, los enlaces visitados ya no se tiñen de morado y los iconos de la barra lateral quedan centrados."
+    }
+  ]
+}
