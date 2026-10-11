@@ -309,8 +309,12 @@ function suppressWebAuthn() { /* ver arriba: el bloqueo vive en webview-preload 
 //   oculto, así que borrarlo empeoraba la marca de la cuenta. Esta variante NO se
 //   toca: la trata el preload (un reintento y, si vuelve, se deja a la vista y la
 //   interfaz ofrece la lista blanca).
+// Sin marca global para no repetirse (antes window.__cobaltYTtidy, legible por
+// YouTube): dom-ready llega una sola vez por documento. El observador va con
+// freno: sin él corrían cinco querySelector en cada mutación de YouTube, que
+// son miles por minuto con el vídeo puesto.
 const YT_ADSKIP = `(function(){
-  if(window.__cobaltYTtidy)return; window.__cobaltYTtidy=1;
+  var pendiente=0;
   function tidy(){
     try{
       ['.ytp-ad-skip-button','.ytp-ad-skip-button-modern','.ytp-skip-ad-button','.ytp-ad-overlay-close-button'].forEach(function(s){ var b=document.querySelector(s); if(b) b.click(); });
@@ -319,7 +323,7 @@ const YT_ADSKIP = `(function(){
     }catch(e){}
   }
   setInterval(tidy,700);
-  try{ new MutationObserver(tidy).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  try{ new MutationObserver(function(){ if(pendiente)return; pendiente=setTimeout(function(){ pendiente=0; tidy(); },250); }).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
 })();`;
 // OJO con lo que se oculta: aquí estaban .ytp-ad-module y .video-ads, que son el
 // módulo de anuncios DENTRO del reproductor. Ocultarlos no impide que el anuncio se
@@ -770,22 +774,46 @@ function setupSession(ses) {
       const refHost = new URL(pagina).hostname;
       if (hostMatches(refHost, 'spotify.com') || hostMatches(refHost, 'open.spotify.com')) return callback({});
     } catch { /* sin referrer válido */ }
+    /* EL INICIO DE SESIÓN DE GOOGLE no se toca por red (2026-10-11). Usuarios
+       sin poder entrar en YouTube. Medido con perfil nuevo en la página de
+       accounts.google.com: Naviris cortaba accounts.google.com/generate_204
+       (la regla genérica `/generate_204?$image` de EasyPrivacy) y Brave, con
+       las mismas listas, no. Ahí no hay publicidad que quitar: lo que viaja es
+       la propia comprobación del inicio de sesión, igual que en las
+       verificaciones de ES_VERIFICACION, y Google ya rechaza a los navegadores
+       que no le parecen normales ("este navegador no es seguro"). Cualquier
+       diferencia con Brave en esa página es una papeleta más. */
+    try {
+      const hostPagina = new URL(pagina).hostname;
+      if (hostPagina === 'accounts.google.com' || hostPagina === 'accounts.youtube.com') return callback({});
+    } catch { /* sin página válida */ }
     // (el vídeo de googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr,
     // /youtubei/). Bloquearlos rompe la reproducción —sobre todo Shorts— y provoca
     // cargas lentas por reintentos. Los anuncios de YouTube se quitan con el pruning del
     // player (webview-preload.js), no bloqueando red. Verificado: era lo que rompía Shorts.
-    if (/\.googlevideo\.com\//i.test(u) || /(^|\.)youtube(-nocookie)?\.com\/(generate_204|api\/stats\/(qoe|watchtime|atr|playback)|youtubei\/)/i.test(u)) {
+    // `[/.]` y no `(^|\.)`: se mira la URL entera, y en https://youtube.com/…
+    // (sin www) lo que va delante del dominio es una barra.
+    if (/\.googlevideo\.com\//i.test(u) || /[/.]youtube(-nocookie)?\.com\/(generate_204|api\/stats\/(qoe|watchtime|atr|playback)|youtubei\/)/i.test(u)) {
       return callback({});
     }
     // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
     if (YT_AD_PATHS.some((p) => u.includes(p))) {
-      blockedCount++;
-      /* Se siguen cortando todas, pero antes se pregunta al motor por si las
-         listas tienen un SUSTITUTO para esa URL. '/pagead/' casa también con
+      /* Decide el motor, como con el resto de la web: corta lo que las listas
+         bloquean (con su SUSTITUTO si lo traen) y deja pasar lo que exceptúan
+         con `@@`. '/pagead/' casa también con
          googlesyndication.com/pagead/js/adsbygoogle.js, y para ese script hay
          decenas de reglas `$redirect=noopjs` en las webs que comprueban si
-         cargó: cortarlo a pelo es justo lo que les delata el bloqueador. */
-      const v = braveAdblock.check(details);
+         cargó: cortarlo a pelo es justo lo que les delata el bloqueador.
+         Antes se cortaban TODAS aunque las listas tuvieran una excepción, en
+         cualquier web: una diferencia más con Brave y uBlock que el muro
+         anti-bloqueador de YouTube puede usar. Solo si el motor aún no está
+         listo se cortan a ciegas, como antes. */
+      const v = braveAdblock.check(details, pagina);
+      if (v && !v.bloquear) {
+        if (v.reescrita && v.reescrita !== u) return callback({ redirectURL: v.reescrita });
+        return callback({});
+      }
+      blockedCount++;
       if (v && v.sustituto) return callback({ redirectURL: v.sustituto });
       return callback({ cancel: true });
     }
@@ -806,7 +834,7 @@ function setupSession(ses) {
     if (ES_VERIFICACION.test(u)) return callback({});
     // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
     // decide el fallback clásico por dominios.
-    const brave = braveAdblock.check(details);
+    const brave = braveAdblock.check(details, pagina);
     if (brave !== null) {
       if (brave.bloquear) {
         blockedCount++;
@@ -989,12 +1017,19 @@ function setupSession(ses) {
       const host = (c.domain || '').replace(/^\./, '');
       if (!host) continue;
       const url = (c.secure ? 'https://' : 'http://') + host + (c.path || '/');
+      /* Las cookies de UN solo host (hostOnly) se reescriben SIN domain. Con
+         domain, Chromium crea otra cookie distinta, de dominio, que convive con
+         la original: Google y YouTube recibían dos cookies con el mismo nombre
+         (una de ellas, copia vieja de 30 días que sobrevivía a cerrar sesión), y
+         las `__Host-`, que prohíben domain, fallaban en silencio y se perdían. */
+      const nueva = {
+        url, name: c.name, value: c.value, path: c.path,
+        secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite,
+        expirationDate: caduca
+      };
+      if (!c.hostOnly) nueva.domain = c.domain;
       try {
-        await ses.cookies.set({
-          url, name: c.name, value: c.value, domain: c.domain, path: c.path,
-          secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite,
-          expirationDate: caduca
-        });
+        await ses.cookies.set(nueva);
         n++;
       } catch { /* alguna cookie rara se resistirá; no vale la pena romper el cierre */ }
     }

@@ -428,9 +428,16 @@ if (enMoovin) {
 if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
   try {
     if (ipcRenderer.sendSync('yt-adblock-on', location.href)) {
+      // Nombre del evento con el que el mundo de la página avisa del muro: uno
+      // nuevo por documento, porque la página también puede escuchar `document`
+      // y un nombre fijo ("naviris-yt-muro") era una firma del navegador.
+      const EVENTO_MURO = 'e' + Math.random().toString(36).slice(2, 10);
       contextBridge.executeInMainWorld({
-        func: function () {
-          if (window.__navYT) return; window.__navYT = 1;
+        args: [EVENTO_MURO],
+        func: function (EVENTO_MURO) {
+          // Sin marca global (`window.__navYT`) para no inyectarse dos veces: el
+          // preload corre una sola vez por documento, así que no hacía falta, y
+          // una variable con ese nombre la puede leer cualquier script de YouTube.
           // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
           // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
           //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
@@ -476,17 +483,26 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
           // con una URL o con fetch(new Request(...)), que es como YouTube pide
           // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
           // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
+          // Con Proxy y no con una función nuestra, como hace uBlock: así
+          // JSON.parse.toString() sigue diciendo "[native code]" y conserva su
+          // nombre y su length (2). Una función normal se distinguía a simple
+          // vista, y cada diferencia con uBlock es algo con lo que YouTube puede
+          // reconocer el bloqueador.
           try {
-            var _j = Response.prototype.json;
-            Response.prototype.json = function () { return _j.apply(this, arguments).then(function (d) { return prune(d, 0, AD_PLAYER); }); };
+            Response.prototype.json = new Proxy(Response.prototype.json, {
+              apply: function (fn, yo, args) {
+                return Reflect.apply(fn, yo, args).then(function (d) { return prune(d, 0, AD_PLAYER); });
+              }
+            });
           } catch (e) { /* nada */ }
           try {
-            var _p = JSON.parse;
-            JSON.parse = function (s) {
-              var r = _p.apply(this, arguments);
-              try { if (sospechosa(s)) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
-              return r;
-            };
+            JSON.parse = new Proxy(JSON.parse, {
+              apply: function (fn, yo, args) {
+                var r = Reflect.apply(fn, yo, args);
+                try { if (sospechosa(args[0])) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
+                return r;
+              }
+            });
           } catch (e) { /* nada */ }
           // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
           // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
@@ -569,7 +585,7 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
               // interfaz, porque ahí visibilityState sigue diciendo "visible".
               if (avisadoMuro === vid || document.visibilityState !== 'visible') return;
               avisadoMuro = vid;
-              document.dispatchEvent(new CustomEvent('naviris-yt-muro'));
+              document.dispatchEvent(new CustomEvent(EVENTO_MURO));
             };
             var revisaMuro = function () {
               try {
@@ -622,7 +638,7 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
       // El aviso del muro sale del mundo de la página, que es donde se ven los
       // datos del player, y llega aquí por un evento del DOM (lo comparten los dos
       // mundos). ipcRenderer solo existe de este lado.
-      document.addEventListener('naviris-yt-muro', function () {
+      document.addEventListener(EVENTO_MURO, function () {
         try { ipcRenderer.sendToHost('cobalt-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
       });
     }

@@ -279,10 +279,16 @@ function sustituto(url) {
      vale si la petición NO se bloquea.
    Pedir el resultado completo cuesta unos 2 µs más por petición que pedir
    solo el sí/no (medido: 8,1 frente a 6,2 µs). */
-function check(details) {
+/* `pagina`: la página de la pestaña (paginaDe en main). Hace falta cuando la
+   petición no trae referrer (`no-referrer`, service workers): antes el origen
+   pasaba a ser la PROPIA URL pedida, todo parecía de primera parte y las
+   reglas `$third-party` y `$domain=` (también las excepciones) se evaluaban
+   contra el host equivocado. Con referrer se sigue usando el referrer, que es
+   el documento que pide (el del iframe, si viene de uno), como hace uBlock. */
+function check(details, pagina) {
   if (!engine) return null;
   try {
-    const source = details.referrer || details.url;
+    const source = details.referrer || pagina || details.url;
     const r = engine.check(details.url, source, TYPE_MAP[details.resourceType] || 'other', details.method || 'GET', true);
     const bloquear = !!r.should_block;
     return {
