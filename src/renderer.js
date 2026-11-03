@@ -6840,6 +6840,13 @@ window.cobalt.onOpenUrl((p) => {
   const cont = p.contenedor ? contenedores.find((c) => c.id === p.contenedor) || null : null;
   createTab(p.url, !p.background, cont, madre ? madre.id : null);
 });
+// Una pestaña que recargaba la misma página sin parar y main ha frenado
+// (ver frenoDeRecargas en main.js).
+window.cobalt.onBucle((p) => {
+  if (!pestanaDeWebContents(p.wc)) return;
+  let host = p.url; try { host = new URL(p.url).hostname.replace(/^www\./, ''); } catch { /* nada */ }
+  toast(host + ' se recargaba sin parar y lo he detenido', { label: 'Reintentar', alPulsar: () => window.cobalt.reintentaBucle(p.wc) });
+});
 /* ===== Buscar la imagen con Google Lens (2026-08-12) =====
    Lens ya no acepta que le pasen la URL de la imagen (ver el comentario de
    lens:imagen en main.js), hay que SUBIRLA, y la subida solo trae resultados

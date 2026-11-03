@@ -1709,8 +1709,49 @@ function apuntaHistorial(e, url, h) {
 ipcMain.on('wv:historial', (e, id) => { e.returnValue = historialDe(e, id); });
 ipcMain.on('wv:historial-pendiente', (e, url, h) => { e.returnValue = apuntaHistorial(e, url, h); });
 
+/* ===== FRENO CONTRA LOS BUCLES DE RECARGAS (2026-10-22) =====
+   A Dosa, y a usuarios, YouTube se les quedaba en blanco "cargando". Medido por
+   CDP: la portada se pedía, llegaba bien (servida por su service worker) y,
+   antes de terminar de cargar, se volvía a pedir, dos veces por segundo durante
+   minutos. Brave sufre lo mismo con Shields y sin causa conocida
+   (brave-browser #49663 y #57995). Sea cual sea el origen, una pestaña que carga
+   la misma página una y otra vez no le sirve a nadie: si pasa más de FRENO_MAX
+   veces en FRENO_VENTANA, se detiene, se cortan las repeticiones durante
+   FRENO_PAUSA y la interfaz avisa con un botón para reintentar.
+   Cuenta origen + ruta sin la query: el bucle de tema de YouTube alterna `/` y
+   `/?themeRefresh=1`. Las navegaciones dentro del documento (las de una SPA) no
+   cuentan, y una carga normal de YouTube con sus dos recargas propias (tema y
+   consentimiento) se queda en tres, por debajo del tope. */
+const FRENO_VENTANA = 10000;
+const FRENO_MAX = 4;
+const FRENO_PAUSA = 30000;
+const frenos = new Map(); // id del webContents -> quita el freno y recarga
+function frenoDeRecargas(contents) {
+  let clave = '', marcas = [], frenadoHasta = 0;
+  const para = () => setImmediate(() => { if (!contents.isDestroyed()) contents.stop(); });
+  contents.on('did-start-navigation', (_e, url, enDocumento, principal) => {
+    if (!principal || enDocumento || !/^https?:/.test(url)) return;
+    let k; try { const u = new URL(url); k = u.origin + u.pathname; } catch { return; }
+    const ahora = Date.now();
+    if (k === clave && ahora < frenadoHasta) { para(); return; }
+    if (k !== clave) { clave = k; marcas = []; frenadoHasta = 0; }
+    marcas = marcas.filter((t) => ahora - t < FRENO_VENTANA);
+    marcas.push(ahora);
+    if (marcas.length <= FRENO_MAX) return;
+    marcas = []; frenadoHasta = ahora + FRENO_PAUSA;
+    para();
+    console.log('[Naviris] Bucle de recargas detenido en', k);
+    contents.hostWebContents?.send('tab:bucle', { wc: contents.id, url: k });
+  });
+  const id = contents.id;
+  frenos.set(id, () => { marcas = []; frenadoHasta = 0; if (!contents.isDestroyed()) contents.reload(); });
+  contents.once('destroyed', () => frenos.delete(id));
+}
+ipcMain.on('tab:reintenta-bucle', (e, id) => { if (esUI(e)) frenos.get(id)?.(); });
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    frenoDeRecargas(contents);
     // Pestaña que despierta: restaura su historial (ver historialPendiente). Si no
     // se puede, carga su URL como antes, para no dejarla en blanco.
     if (historialAlCrear) {

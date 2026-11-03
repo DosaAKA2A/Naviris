@@ -138,6 +138,19 @@ async function bajarListas() {
   return { grupos, okLists };
 }
 
+/* Reglas de las listas de Brave que Naviris NO aplica. Se quitan del texto al
+   montar el motor, así da igual que la lista se vuelva a bajar.
+   · El clic automático en el aviso de cookies de YouTube (Cookie Notices):
+     tras ese clic YouTube recarga la página SIEMPRE, y si el consentimiento no
+     se llega a guardar el aviso vuelve a salir y el clic se repite sin fin.
+     Medido el 21/10/2026: candidato al bucle de recargas que dejaba YouTube en
+     blanco (ver frenoDeRecargas en main.js). Sin él, el aviso sale una vez y se
+     acepta a mano. */
+const REGLAS_FUERA = [
+  /^www\.youtube\.com##\+js\(trusted-click-element,[^\n]*consent-bump[^\n]*$/gm
+];
+const quitaReglas = (texto) => REGLAS_FUERA.reduce((t, re) => t.replace(re, ''), texto);
+
 function buildEngine(grupos, recursos) {
   if (!Engine) return;
   const t0 = Date.now();
@@ -145,7 +158,7 @@ function buildEngine(grupos, recursos) {
   // en el proceso principal, medido) y no cambia qué se bloquea.
   const set = new FilterSet(false);
   // Siempre con objeto de opciones: el binding lanza si recibe `undefined`.
-  for (const [mascara, texto] of grupos) set.addFilters(texto, { permissions: mascara });
+  for (const [mascara, texto] of grupos) set.addFilters(quitaReglas(texto), { permissions: mascara });
   const e = new Engine(set);
   const t1 = Date.now();
   // Los recursos completos (unos 1 MB de JSON, 216 en octubre de 2026) cuestan

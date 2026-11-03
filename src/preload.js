@@ -66,6 +66,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   onUpdateStatus: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s)),
 
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
+  onBucle: (cb) => ipcRenderer.on('tab:bucle', (_e, p) => cb(p)),
+  reintentaBucle: (id) => ipcRenderer.send('tab:reintenta-bucle', id),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
