@@ -1,4 +1,4 @@
-package com.estudiodeiris.cobalt
+package com.estudiodeiris.naviris
 
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList

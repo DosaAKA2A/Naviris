@@ -21,8 +21,8 @@ function twitch(dom) {
   let ahora = 1e6;
   const p = cargaPreload('https://www.twitch.tv/canal', { dom, ahora: () => ahora });
   p.avanza = (ms) => { ahora += ms; };
-  p.reclamos = () => p.enviados.filter((m) => m.canal === 'cobalt-twitch' && m.datos.type === 'claim').map((m) => JSON.parse(JSON.stringify(m.datos)));
-  p.enciende = () => p.manejadores['cobalt-autoloot']({}, { on: true, lowRes: false });
+  p.reclamos = () => p.enviados.filter((m) => m.canal === 'naviris-twitch' && m.datos.type === 'claim').map((m) => JSON.parse(JSON.stringify(m.datos)));
+  p.enciende = () => p.manejadores['naviris-autoloot']({}, { on: true, lowRes: false });
   return p;
 }
 
@@ -81,7 +81,7 @@ test('AutoClaim: apagado no reclama nada', () => {
   const cofre = boton('');
   const p = twitch({ '.community-points-summary': resumen(cofre) });
   p.enciende();
-  p.manejadores['cobalt-autoloot']({}, { on: false });
+  p.manejadores['naviris-autoloot']({}, { on: false });
   p.avanza(10000); p.corre('interval');
   assert.strictEqual(cofre.clics, 1);
 });

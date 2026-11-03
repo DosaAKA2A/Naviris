@@ -1,7 +1,9 @@
 /* Naviris — renderer principal */
 const $ = (s) => document.querySelector(s);
 const IS_PRIVATE = new URLSearchParams(location.search).get('private') === '1';
-const PARTITION = IS_PRIVATE ? 'cobalt-private' : 'persist:cobalt';
+// La sesión de las webs. Main solo la pasa si este arranque sigue en la vieja
+// porque no se pudo pasar al nombre nuevo (ver migraNombre en migraciones.js).
+const PARTITION = IS_PRIVATE ? 'naviris-private' : (new URLSearchParams(location.search).get('particion') || 'persist:naviris');
 // Ventana abierta al sacar una pestaña de la barra: trae solo esa pestaña.
 const SACADA = new URLSearchParams(location.search).get('sacada') === '1';
 
@@ -14,6 +16,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); return true; } catch { return false; } }
 };
+// Las claves con el nombre viejo pasan a naviris.* antes de leer ninguna (ver migra-claves.js).
+try { window.naviMigraClaves.migraClaves(localStorage); } catch (e) { console.warn('[Naviris] Claves de la interfaz pendientes:', e && e.message); }
 
 const els = {};
 [
@@ -69,7 +73,7 @@ let espDesbloqueados = new Set();
 const tabsVisibles = () => tabs.filter(enEspacio);
 
 function guardaEspacios() {
-  window.cobalt.setSettings({ espacios, espacioActivo }).then((s2) => { settings = s2; });
+  window.navirisApp.setSettings({ espacios, espacioActivo }).then((s2) => { settings = s2; });
 }
 
 function creaEspacio(nombre) {
@@ -96,7 +100,7 @@ async function cambiaEspacio(id) {
   const destino = id ? espacioPorId(id) : null;
   if (destino && destino.bloqueado && !espDesbloqueados.has(destino.id)) {
     pideClave(destino, 'Entrar en ' + destino.nombre, async (clave) => {
-      const r = await window.cobalt.espDesbloquea(destino.id, clave);
+      const r = await window.navirisApp.espDesbloquea(destino.id, clave);
       if (!r.ok) { toast(r.error || 'Contraseña incorrecta'); return; }
       espDesbloqueados.add(destino.id);
       cambiaEspacio(id);
@@ -107,14 +111,14 @@ async function cambiaEspacio(id) {
   const salgoDe = espacioProtegidoActivo();
   if (salgoDe) {
     clearTimeout(guardaEspTimer);   // el guardado agrupado que quedara pendiente ya va en este
-    await window.cobalt.espGuarda(salgoDe.id, { historial: history, marcadores: bookmarks }).catch(() => {});
-    history = store.get('cobalt.history', []);
-    bookmarks = store.get('cobalt.bookmarks2', []);
+    await window.navirisApp.espGuarda(salgoDe.id, { historial: history, marcadores: bookmarks }).catch(() => {});
+    history = store.get('naviris.history', []);
+    bookmarks = store.get('naviris.bookmarks2', []);
   }
   duermeEspacio(espacioActivo);
   espacioActivo = id;
   if (destino && destino.bloqueado) {
-    const r = await window.cobalt.espDatos(destino.id).catch(() => null);
+    const r = await window.navirisApp.espDatos(destino.id).catch(() => null);
     if (r && r.ok) {
       history = Array.isArray(r.datos.historial) ? r.datos.historial : [];
       bookmarks = Array.isArray(r.datos.marcadores) ? r.datos.marcadores : [];
@@ -135,7 +139,7 @@ async function cambiaEspacio(id) {
 
 async function borraEspacio(id, clave) {
   const esp = espacioPorId(id);
-  const r = await window.cobalt.espBorra(id, clave || '');
+  const r = await window.navirisApp.espBorra(id, clave || '');
   if (!r.ok) { toast(r.error || 'No se pudo borrar el espacio'); return; }
   /* Borrado desde DENTRO: se sale al General antes de cerrar nada (si no,
      closeTab abría la sustituta en el espacio borrado). Si estaba protegido,
@@ -144,8 +148,8 @@ async function borraEspacio(id, clave) {
   if (espacioActivo === id) {
     if (esp && esp.bloqueado) {
       clearTimeout(guardaEspTimer);
-      history = store.get('cobalt.history', []);
-      bookmarks = store.get('cobalt.bookmarks2', []);
+      history = store.get('naviris.history', []);
+      bookmarks = store.get('naviris.bookmarks2', []);
       renderBookmarksBar();
       if (typeof renderHistory === 'function' && !els.historyPanel.classList.contains('hidden')) renderHistory();
     }
@@ -207,7 +211,7 @@ function renombraEspacio(id) {
 function bloqueaEspacio(id) {
   const esp = espacioPorId(id); if (!esp || esp.bloqueado) return;
   pideClave(esp, 'Bloquear ' + esp.nombre, async (clave) => {
-    const r = await window.cobalt.espBloquea(id, clave);
+    const r = await window.navirisApp.espBloquea(id, clave);
     if (!r.ok) { toast(r.error || 'No se pudo bloquear'); return; }
     // La copia buena es la de main (trae la sal). Si se guardara la de aqui,
     // la sal se perderia y el espacio no se podria abrir nunca mas.
@@ -218,7 +222,7 @@ function bloqueaEspacio(id) {
        historial y los marcadores GENERALES: hay que soltarlos ya, o el primer
        guardado los metaria dentro del espacio protegido. */
     if ((espacioActivo || null) === id) {
-      const rd = await window.cobalt.espDatos(id).catch(() => null);
+      const rd = await window.navirisApp.espDatos(id).catch(() => null);
       history = (rd && rd.ok && Array.isArray(rd.datos.historial)) ? rd.datos.historial : [];
       bookmarks = (rd && rd.ok && Array.isArray(rd.datos.marcadores)) ? rd.datos.marcadores : [];
       renderBookmarksBar();
@@ -308,12 +312,12 @@ function nuevoContenedor(nombre) {
   const id = Math.random().toString(36).slice(2, 8);
   const c = { id, nombre: nombre || 'Contenedor ' + (contenedores.length + 1), particion: 'persist:cont-' + id, color: CONT_COLORES[contenedores.length % CONT_COLORES.length] };
   contenedores.push(c);
-  window.cobalt.setSettings({ contenedores }).then((s2) => { settings = s2; });
+  window.navirisApp.setSettings({ contenedores }).then((s2) => { settings = s2; });
   return c;
 }
 
 async function abreEnContenedor(url, cont) {
-  await window.cobalt.contPrepara(cont.particion);
+  await window.navirisApp.contPrepara(cont.particion);
   const tab = createTab(url || null, true, cont);
   return tab;
 }
@@ -334,8 +338,8 @@ function applyTheme(light) {
   const t = temaActual();
   // Vuelve al ÚLTIMO tema de cada lado: con cuatro temas, ir y volver llevaba
   // siempre a Claro o a Naviris y se perdían Acid y Rosa (auditoría 2026-10).
-  if (light) aplicaTema(esTemaClaro(t) ? t : store.get('cobalt.temaClaro', 'claro'));
-  else aplicaTema(esTemaClaro(t) ? store.get('cobalt.temaOscuro', TEMA_POR_DEFECTO) : t);
+  if (light) aplicaTema(esTemaClaro(t) ? t : store.get('naviris.temaClaro', 'claro'));
+  else aplicaTema(esTemaClaro(t) ? store.get('naviris.temaOscuro', TEMA_POR_DEFECTO) : t);
 }
 /* Temas: cada uno es un juego de tokens en <html>. lightMode se mantiene
    porque los ajustes y la cuenta ya lo sincronizaban, y rosa se guarda aparte.
@@ -343,15 +347,15 @@ function applyTheme(light) {
    OJO CON LOS NOMBRES (2026-08-21): la clave guardada y el nombre que se ve
    YA NO COINCIDEN. El tema que se llamaba "Naviris" (lima sobre carbon) pasa
    a llamarse ACID, y el blanco y negro pasa a ser "Naviris" y el
-   PREDETERMINADO. Las claves NO se renombran a proposito: 'cobalt.tema' y
-   'cobalt.hubBg.<tema>' ya estan escritas en el disco de todo el mundo, y la
+   PREDETERMINADO. Las claves NO se renombran a proposito: 'naviris.tema' y
+   'naviris.hubBg.<tema>' ya estan escritas en el disco de todo el mundo, y la
    sincronizacion de la cuenta manda 'hubBgs' con estos nombres — renombrarlas
    obligaria a migrar cuatro claves y romperia el intercambio con la linea
    estable, que sigue mandando los de antes. Asi que la traduccion vive AQUI,
    en un solo sitio, y de aqui la leen el menu y el aviso. */
 const TEMAS = ['mono', 'oscuro', 'claro', 'rosa'];   // en el orden del menu
 const NOMBRES = { mono: 'Naviris', oscuro: 'Acid', claro: 'Claro', rosa: 'Rosa' };
-// El tema de fabrica. Quien ya tiene uno elegido conserva el suyo: 'cobalt.tema'
+// El tema de fabrica. Quien ya tiene uno elegido conserva el suyo: 'naviris.tema'
 // se escribe en cada arranque, asi que esto solo lo estrenan los perfiles nuevos.
 const TEMA_POR_DEFECTO = 'mono';
 /* Que temas son CLAROS. Antes esto se escribia como 'tema !== oscuro' en
@@ -361,9 +365,9 @@ const TEMA_POR_DEFECTO = 'mono';
 const TEMAS_CLAROS = ['claro', 'rosa'];
 const esTemaClaro = (t) => TEMAS_CLAROS.includes(t);
 function temaActual() {
-  const t = store.get('cobalt.tema', null);
+  const t = store.get('naviris.tema', null);
   if (TEMAS.includes(t)) return t;
-  return store.get('cobalt.lightMode', false) ? 'claro' : TEMA_POR_DEFECTO;
+  return store.get('naviris.lightMode', false) ? 'claro' : TEMA_POR_DEFECTO;
 }
 function aplicaTema(tema) {
   if (!TEMAS.includes(tema)) tema = TEMA_POR_DEFECTO;
@@ -371,9 +375,9 @@ function aplicaTema(tema) {
   raiz.classList.toggle('light', tema === 'claro');
   raiz.classList.toggle('rosa', tema === 'rosa');
   raiz.classList.toggle('mono', tema === 'mono');
-  store.set('cobalt.tema', tema);
-  store.set(esTemaClaro(tema) ? 'cobalt.temaClaro' : 'cobalt.temaOscuro', tema);
-  store.set('cobalt.lightMode', esTemaClaro(tema));
+  store.set('naviris.tema', tema);
+  store.set(esTemaClaro(tema) ? 'naviris.temaClaro' : 'naviris.temaOscuro', tema);
+  store.set('naviris.lightMode', esTemaClaro(tema));
   // El fondo del hub tiene versión clara y oscura: se retraduce al cambiar de tema
   applyBackground(store.get(bgThemeKey(tema), null) || defaultBgTema());
   /* Y se REPINTA el hub: las fotos de los contenedores son las del tema activo
@@ -473,7 +477,7 @@ const BRAND_BY_HOST = { 'youtube.com': 'youtube', 'youtu.be': 'youtube', 'twitch
 function brandOf(url) { const h = hostOf(url); for (const dom in BRAND_BY_HOST) if (h === dom || h.endsWith('.' + dom)) return BRAND_BY_HOST[dom]; return null; }
 
 /* ============ Favicons + color ============ */
-const tileCache = store.get('cobalt.tiles4', {});
+const tileCache = store.get('naviris.tiles4', {});
 /* TOPE DE LA CACHÉ (auditoría 2026-10). Los iconos van en base64 dentro de
    localStorage, que comparte cuota con marcadores, hub y notas, y la caché
    crecía sin límite: cada sitio nuevo reescribía la clave entera en el hilo de
@@ -489,7 +493,7 @@ function escribeTiles() {
     .sort((a, b) => tileCache[a].ts - tileCache[b].ts).slice(0, sobran).forEach((h) => delete tileCache[h]);
   const guardar = {};
   for (const [h, e] of Object.entries(tileCache)) if (!e.icon || e.icon.length <= ICONO_BYTES) guardar[h] = e;
-  store.set('cobalt.tiles4', guardar);
+  store.set('naviris.tiles4', guardar);
 }
 let tilesPend = null;
 const saveTiles = () => { clearTimeout(tilesPend); tilesPend = setTimeout(escribeTiles, 1000); };
@@ -563,7 +567,7 @@ async function getTile(url, iconUrl) {
      cacheada: la de antes salio del servicio de Google y esta es la de casa. */
   if (c && !iconUrl && Date.now() - c.ts < 14 * 864e5) return c;
   if (c && iconUrl && c.propio && Date.now() - c.ts < 14 * 864e5) return c;
-  const icon = await reduceIcono(await window.cobalt.fetchFavicon(url, iconUrl));
+  const icon = await reduceIcono(await window.navirisApp.fetchFavicon(url, iconUrl));
   const color = icon ? await dominantColor(icon) : null;
   const entry = { icon, color, ts: Date.now(), propio: !!iconUrl };
   if (!icon && c) return c;   // si el de la pagina falla, se deja el que habia
@@ -571,7 +575,7 @@ async function getTile(url, iconUrl) {
 }
 
 /* ============ Historial ============ */
-let history = IS_PRIVATE ? [] : store.get('cobalt.history', []);
+let history = IS_PRIVATE ? [] : store.get('naviris.history', []);
 function recordHistory(url, title) {
   if (IS_PRIVATE || !/^https?:/.test(url)) return;
   const i = history.findIndex((h) => h.url === url);
@@ -639,7 +643,7 @@ function saveSession() {
       if (t.contenedor) s.c = t.contenedor;
       return s;
     });
-  store.set('cobalt.session', urls);
+  store.set('naviris.session', urls);
 }
 /* Pestaña restaurada SIN cargar: se queda dormida hasta que se abre, y sin
    webview, que es lo que gasta. Despertarla lo crea (despiertaPestana). */
@@ -663,14 +667,14 @@ function crearDormida(dato, abridor) {
 function duermePestana(t) {
   if (t.webview) {
     try { t.sleptUrl = t.webview.getURL() || t.url; } catch { t.sleptUrl = t.url; }
-    try { t.historial = window.cobalt.historialDe(t.webview.getWebContentsId()); } catch { t.historial = null; }
+    try { t.historial = window.navirisApp.historialDe(t.webview.getWebContentsId()); } catch { t.historial = null; }
     t.webview.remove(); t.webview = null;
   }
   t.asleep = true; t.audible = false; t.fallo = null;
 }
 function despiertaPestana(t) {
   const url = t.sleptUrl || t.url;
-  if (t.historial) { window.cobalt.historialAlDespertar(url, t.historial); t.historial = null; }
+  if (t.historial) { window.navirisApp.historialAlDespertar(url, t.historial); t.historial = null; }
   attachWebview(t, url);
   t.asleep = false; t.sleptUrl = null; t.sinCargar = false;
 }
@@ -783,7 +787,7 @@ function attachWebview(tab, url) {
       } else {
         // Navegación dentro de Twitch (SPA: buscar → entrar a un canal):
         // reengancha el recolector en la página nueva
-        try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch { /* nada */ }
+        try { tab.webview?.send('naviris-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch { /* nada */ }
       }
     }
     // El botón AutoLoot de la topbar se recalcula en CADA navegación (antes solo
@@ -847,7 +851,7 @@ function attachWebview(tab, url) {
   wv.addEventListener('media-started-playing', () => { tab.audible = true; if (tab.muted) { try { wv.setAudioMuted(true); } catch {} } renderTabs(); });
   wv.addEventListener('media-paused', () => { tab.audible = false; renderTabs(); });
   // Reanuda el AutoLoot tras recargar/navegar dentro de Twitch
-  wv.addEventListener('dom-ready', () => { if (tab.autoLoot) { try { wv.send('cobalt-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch {} } });
+  wv.addEventListener('dom-ready', () => { if (tab.autoLoot) { try { wv.send('naviris-autoloot', { on: true, lowRes: !!tab.lowRes }); } catch {} } });
   wv.addEventListener('ipc-message', (e) => onWebviewMessage(wv, e));
   els.content.appendChild(wv);
 }
@@ -1149,7 +1153,7 @@ window.addEventListener('pointerup', () => {
   if (a.sacando && tab) {
     const url = tab.sleptUrl || tab.url;
     if (/^https?:/i.test(url)) {
-      window.cobalt.sacarPestana(url, tab.contenedor ? tab.contenedor.id : null);
+      window.navirisApp.sacarPestana(url, tab.contenedor ? tab.contenedor.id : null);
       closeTab(tab.id);
       return;
     }
@@ -1375,8 +1379,8 @@ els.urlbar.addEventListener('keydown', (e) => {
 });
 
 /* ============ Marcadores con carpetas ============ */
-let bookmarks = store.get('cobalt.bookmarks2', migrateOld());
-function migrateOld() { const old = store.get('cobalt.bookmarks', null); return Array.isArray(old) ? old.map((b) => ({ type: 'link', title: b.title, url: b.url })) : []; }
+let bookmarks = store.get('naviris.bookmarks2', migrateOld());
+function migrateOld() { const old = store.get('naviris.bookmarks', null); return Array.isArray(old) ? old.map((b) => ({ type: 'link', title: b.title, url: b.url })) : []; }
 /* ===== Dónde se guardan historial y marcadores =====
    Con un espacio protegido activo, los dos van a SU archivo cifrado; si no, al
    almacén de siempre. Todo lo demás de la interfaz sigue leyendo las mismas
@@ -1389,12 +1393,12 @@ function espacioProtegidoActivo() {
 function guardaHistorial() {
   const e = espacioProtegidoActivo();
   if (e) { guardaDatosEspacio(e.id); return; }
-  store.set('cobalt.history', history);
+  store.set('naviris.history', history);
 }
 function guardaMarcadores() {
   const e = espacioProtegidoActivo();
   if (e) { guardaDatosEspacio(e.id); return; }
-  store.set('cobalt.bookmarks2', bookmarks);
+  store.set('naviris.bookmarks2', bookmarks);
 }
 let guardaEspTimer = null;
 function guardaDatosEspacio(id) {
@@ -1404,7 +1408,7 @@ function guardaDatosEspacio(id) {
   const datos = { historial: history, marcadores: bookmarks };
   clearTimeout(guardaEspTimer);
   guardaEspTimer = setTimeout(() => {
-    window.cobalt.espGuarda(id, datos).catch(() => {});
+    window.navirisApp.espGuarda(id, datos).catch(() => {});
   }, 400);
 }
 const saveBm = () => guardaMarcadores();
@@ -1495,13 +1499,13 @@ function moveToFolder(b) {
 els.bmNewfolder.addEventListener('click', () => promptModal('Nueva carpeta', 'Nombre de la carpeta', (name) => { if (!name.trim()) return; bookmarks.unshift({ type: 'folder', name: name.trim(), children: [] }); saveBm(); renderBookmarkTree(); renderBookmarksBar(); }));
 els.bmImport.addEventListener('click', async (e) => {
   e.stopPropagation();
-  const avail = await window.cobalt.importAvailable();
+  const avail = await window.navirisApp.importAvailable();
   const items = Object.entries(avail).filter(([, v]) => v.present).map(([key, v]) => ({ label: 'Desde ' + v.label, icon: 'arrow-down-tray', action: () => doImportBookmarks(key, v.label) }));
   if (!items.length) { toast('No se encontró Chrome/Brave/Edge con marcadores'); return; }
   const r = els.bmImport.getBoundingClientRect(); showCtxMenu(r.left, r.bottom + 4, items);
 });
 async function doImportBookmarks(key, label) {
-  const r = await window.cobalt.importBookmarks(key);
+  const r = await window.navirisApp.importBookmarks(key);
   if (!r.ok || !r.items || !r.items.length) { toast('No se pudo importar de ' + label); return; }
   const existing = new Set();
   bookmarks.forEach((it) => { if (it.type === 'link') existing.add(it.url); else if (it.type === 'folder') it.children.forEach((c) => existing.add(c.url)); });
@@ -1537,7 +1541,7 @@ const DEFAULT_DIALS = [
   { name: 'Gmail', url: 'https://mail.google.com' },
   { name: 'Pinterest', url: 'https://www.pinterest.com' }, { name: 'IRIS', url: 'https://iris.it.com' }
 ];
-let dials = store.get('cobalt.dials', DEFAULT_DIALS);
+let dials = store.get('naviris.dials', DEFAULT_DIALS);
 /* ===== BIBLIOTECA DE SITIOS (2026-09-09) =====
    Los habituales a un clic, con el logo ya en el tono del tema: si tenemos la
    marca en brands.js se usa esa, y si no el favicon del sitio con el mismo
@@ -1575,14 +1579,14 @@ function renderLibreria() {
     b.append(ic, n);
     b.addEventListener('click', () => {
       dials.push({ name: sitio.name, url: sitio.url });
-      store.set('cobalt.dials', dials);
+      store.set('naviris.dials', dials);
       els.dialModal.classList.add('hidden');
       renderHub(); toast(sitio.name + ' añadido al hub');
     });
     g.appendChild(b);
   }
 }
-function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('cobalt.dials', dials); renderHub(); }
+function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('naviris.dials', dials); renderHub(); }
 
 // Logos de los dials: SIEMPRE monocromos. La opción "Logos a color" se
 // eliminó del producto (decisión del usuario 2026-08-11: rompía la estética
@@ -1660,7 +1664,7 @@ function makeDialEl(d) {
     const desde = dials.indexOf(dialDrag), hasta = dials.indexOf(d);
     if (desde < 0 || hasta < 0) return;
     dials.splice(desde, 1); dials.splice(hasta, 0, dialDrag);
-    dialDrag = null; store.set('cobalt.dials', dials); renderHub();
+    dialDrag = null; store.set('naviris.dials', dials); renderHub();
   });
   el.addEventListener('dragend', () => { el.draggable = false; dialDrag = null; els.hub.classList.remove('arrastrando'); document.querySelectorAll('.dial-dest').forEach((x) => x.classList.remove('dial-dest')); });
   const tile = document.createElement('div'); tile.className = 'd-tile';
@@ -2099,26 +2103,26 @@ const DEFAULT_WIDGETS = () => JSON.parse(JSON.stringify([
    todo apelotonado en la fila 1 y el resto de la pantalla vacio. Ademas la
    composicion de fabrica no llegaba nunca, porque solo se usa cuando NO hay
    nada guardado. Ahora una maqueta sin `geo` se reconoce como vieja, se guarda
-   tal cual en cobalt.widgets.pre-grilla (por si hiciera falta volver) y se
+   tal cual en naviris.widgets.pre-grilla (por si hiciera falta volver) y se
    adopta la composicion de fabrica. */
 let deFabrica = false; // sin nada compuesto por el usuario: manda el monitor
 function migraMaquetaVieja(lista) {
   if (!Array.isArray(lista) || !lista.length) { deFabrica = true; return DEFAULT_WIDGETS(); }
   if (lista.some((w) => w && w.geo && (w.geo.m || w.geo.std || w.geo.uw))) return lista;
-  store.set('cobalt.widgets.pre-grilla', lista);
+  store.set('naviris.widgets.pre-grilla', lista);
   const nueva = DEFAULT_WIDGETS();
   deFabrica = true;
-  store.set('cobalt.widgets', nueva);
+  store.set('naviris.widgets', nueva);
   return nueva;
 }
-let widgets = migraMaquetaVieja(store.get('cobalt.widgets', null));
+let widgets = migraMaquetaVieja(store.get('naviris.widgets', null));
 /* REFORMA 2.8.1 (2026-09-09): la composición de fábrica cambia para todos UNA
-   vez. La maqueta anterior se guarda en cobalt.widgets.pre-v3 por si hay que
+   vez. La maqueta anterior se guarda en naviris.widgets.pre-v3 por si hay que
    volver, y el widget de accesos desaparece (ahora es el dock). */
-if (!store.get('cobalt.hub.v3', false)) {
-  if (!deFabrica) store.set('cobalt.widgets.pre-v3', widgets);
+if (!store.get('naviris.hub.v3', false)) {
+  if (!deFabrica) store.set('naviris.widgets.pre-v3', widgets);
   widgets = DEFAULT_WIDGETS(); deFabrica = true;
-  store.set('cobalt.widgets', widgets); store.del('cobalt.maqueta'); store.set('cobalt.hub.v3', true);
+  store.set('naviris.widgets', widgets); store.del('naviris.maqueta'); store.set('naviris.hub.v3', true);
 }
 widgets = widgets.filter((w) => w && w.type !== 'shortcuts');
 // migracion: la geometria plana (col/row) se convierte en geo.std
@@ -2157,7 +2161,7 @@ function composicionDeLaPantalla() {
   return (r >= ULTRA_DESDE && cabenColumnas(17)) ? 'uw' : 'std';
 }
 (function migraAMaquetaUnica() {
-  const guardada = store.get('cobalt.maqueta', null);
+  const guardada = store.get('naviris.maqueta', null);
   if (guardada && guardada.cols) { COLS_MAESTRA = guardada.cols; FILAS_MAESTRA = guardada.filas || 7; }
   if (widgets.some((w) => w.geo && w.geo.m)) return;
   const cuenta = (k) => widgets.filter((w) => w.geo && w.geo[k]).length;
@@ -2172,8 +2176,8 @@ function composicionDeLaPantalla() {
       w: Math.max(1, g.w || w.w || 2), h: Math.max(1, g.h || w.h || 1)
     };
   });
-  store.set('cobalt.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
-  store.set('cobalt.widgets', widgets);
+  store.set('naviris.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
+  store.set('naviris.widgets', widgets);
 })();
 /* REPARAR LAS QUE YA NACIERON TORCIDAS (2026-08-18) —————————————————————
    Las instalaciones hechas antes de este arreglo tienen 17 columnas guardadas
@@ -2230,7 +2234,7 @@ function huellaDeFabrica(lista) {
   const cols = toca === 'uw' ? 17 : 13;
   if (COLS_MAESTRA === cols) return;            // ya está en el ancho que toca
   if (huellaDeFabrica(widgets) === null) return; // compuesta a mano: intocable
-  store.set('cobalt.widgets.pre-reparacion', widgets);
+  store.set('naviris.widgets.pre-reparacion', widgets);
   const fab = DEFAULT_WIDGETS();
   const porId = new Map(widgets.map((w) => [w.id, w]));
   widgets = fab.map((f) => {
@@ -2249,10 +2253,10 @@ function huellaDeFabrica(lista) {
   const suelta = porId.get(IMG_RETIRADA);
   if (suelta && suelta.img && !suelta.slot) widgets.push(suelta);
   COLS_MAESTRA = cols; FILAS_MAESTRA = 7;
-  store.set('cobalt.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
-  store.set('cobalt.widgets', widgets);
+  store.set('naviris.maqueta', { cols: COLS_MAESTRA, filas: FILAS_MAESTRA });
+  store.set('naviris.widgets', widgets);
 })();
-const saveWidgets = () => store.set('cobalt.widgets', widgets);
+const saveWidgets = () => store.set('naviris.widgets', widgets);
 let widgetSeq = 100;
 
 let ultimoCols = 0, dragId = null;
@@ -2705,7 +2709,7 @@ const SP_SEL = {
    energía y el audio sigue al navegar por otros sitios. El botón del sidebar
    (bajo el home) abre un panel cápsula; CERRAR el panel solo lo oculta.
    El botón aparece si hay sesión de Spotify (cookie sp_dc, IPC spotify:logged)
-   o si el dock ya se usó alguna vez (cobalt.spotifyDock). */
+   o si el dock ya se usó alguna vez (naviris.spotifyDock). */
 let spPlayerWv = null;
 /* PANEL DE SPOTIFY (rehecho 2026-08-12).
    Antes el panel medía 392px fijos y forzaba USER AGENT DE MÓVIL, porque a esa
@@ -2719,7 +2723,7 @@ let spPlayerWv = null;
 const SP_VIEWPORT = 900;   // ancho de página mínimo para que Spotify dé la UI de escritorio
 const SP_ANCHO_DEF = 720, SP_ANCHO_MIN = 380, SP_ANCHO_MAX = 1280;
 function spAncho() {
-  const v = +store.get('cobalt.spPanelW', SP_ANCHO_DEF) || SP_ANCHO_DEF;
+  const v = +store.get('naviris.spPanelW', SP_ANCHO_DEF) || SP_ANCHO_DEF;
   return Math.max(SP_ANCHO_MIN, Math.min(SP_ANCHO_MAX, v));
 }
 function aplicaSpAncho(px) {
@@ -2759,7 +2763,7 @@ function ensureSpotifyPlayer() {
   wv.src = 'https://open.spotify.com';
   document.getElementById('sp-holder').appendChild(wv);
   spPlayerWv = wv;
-  store.set('cobalt.spotifyDock', true);
+  store.set('naviris.spotifyDock', true);
   els.sbSpotify.classList.remove('hidden');
   return wv;
 }
@@ -2776,7 +2780,7 @@ function armaSpGrip() {
     const suelta = () => {
       document.removeEventListener('mousemove', mueve); document.removeEventListener('mouseup', suelta);
       document.body.style.cursor = '';
-      store.set('cobalt.spPanelW', aplicaSpAncho(panel.getBoundingClientRect().width));
+      store.set('naviris.spPanelW', aplicaSpAncho(panel.getBoundingClientRect().width));
     };
     document.addEventListener('mousemove', mueve); document.addEventListener('mouseup', suelta);
   });
@@ -2808,8 +2812,8 @@ els.sbSpotify.addEventListener('click', () => toggleSpotifyPanel());
 armaSpGrip();
 document.getElementById('sp-p-x').addEventListener('click', () => toggleSpotifyPanel(false));
 (async () => {
-  if (store.get('cobalt.spotifyDock', false)) { els.sbSpotify.classList.remove('hidden'); return; }
-  try { if (await window.cobalt.spotifyLogged()) els.sbSpotify.classList.remove('hidden'); } catch { /* sin IPC: se queda oculto */ }
+  if (store.get('naviris.spotifyDock', false)) { els.sbSpotify.classList.remove('hidden'); return; }
+  try { if (await window.navirisApp.spotifyLogged()) els.sbSpotify.classList.remove('hidden'); } catch { /* sin IPC: se queda oculto */ }
 })();
 function spCmd(cmd) {
   spUltimoUso = Date.now();
@@ -3020,7 +3024,7 @@ function renderUserCard(body) {
   body.classList.toggle('u-on', logged);
   if (logged) {
     const nombre = nombreCuenta();
-    const st = store.get('cobalt.syncStamp', 0);
+    const st = store.get('naviris.syncStamp', 0);
     body.innerHTML = `
       <div class="u-ava">${escapeHtml(nombre.charAt(0).toUpperCase())}</div>
       <div class="u-nom">${escapeHtml(nombre)}</div>
@@ -3043,8 +3047,8 @@ function renderUserCard(body) {
 function refrescaUserCards() { document.querySelectorAll('.w-user').forEach((b) => renderUserCard(b)); pintaFoto(); }
 
 /* ============ Widget Calendario con recordatorios (2026-08-11) ============ */
-const recordatorios = () => store.get('cobalt.reminders', []);
-const guardaRecordatorios = (l) => store.set('cobalt.reminders', l);
+const recordatorios = () => store.get('naviris.reminders', []);
+const guardaRecordatorios = (l) => store.set('naviris.reminders', l);
 function renderCalendar(body) {
   const vista = new Date(); vista.setDate(1);
   const pinta = () => {
@@ -3335,7 +3339,7 @@ function leeTendencias() {
 
 /* ============ Widget Imagen (los huecos "violeta" del bento) ============
    Un marco para la imagen que el usuario quiera: se elige de disco y llena la
-   tarjeta (cover). La ruta se guarda EN el widget (cobalt.widgets). */
+   tarjeta (cover). La ruta se guarda EN el widget (naviris.widgets). */
 /* Imagenes POR TEMA (2026-08-12): cada tema trae su juego empaquetado en
    src/temas/<tema>/<slot>.jpg. El widget guarda un `slot` (1..3) y solo usa
    ruta propia si el usuario elige una imagen suya (w.img manda siempre).
@@ -3362,7 +3366,7 @@ function renderImagen(body, w) {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
     inp.onchange = () => {
       const f = inp.files && inp.files[0]; if (!f) return;
-      const ruta = window.cobalt.filePath(f);
+      const ruta = window.navirisApp.filePath(f);
       if (!ruta) return;
       // GIF animado permitido: es contenido DEL USUARIO y la optimizacion es
       // decision suya (la regla anti-animacion-infinita es para NUESTRA UI).
@@ -3415,7 +3419,7 @@ function mlHora(ts) {
 async function cargaGmail(force) {
   if (!force && mailCache.entradas && Date.now() - mailCache.t < 5 * 60 * 1000) return mailCache;
   try {
-    const r = await window.cobalt.gmailFeed();
+    const r = await window.navirisApp.gmailFeed();
     if (!r.ok) { mailCache = { t: Date.now(), entradas: null, total: '0', err: (r.status === 401 || r.status === 403) ? 'sin-sesion' : 'error' }; return mailCache; }
     const doc = new DOMParser().parseFromString(r.xml, 'text/xml');
     const entradas = [...doc.querySelectorAll('entry')].slice(0, 8).map((e) => ({
@@ -3505,7 +3509,7 @@ function renderDescargasW(body) {
    scrollbar; clic abre el archivo. */
 function llenaHoyDescargas(body) {
   const cont = body.querySelector('.dlw-lista'); if (!cont) return;
-  window.cobalt.listDownloadFiles().then((files) => {
+  window.navirisApp.listDownloadFiles().then((files) => {
     const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0);
     const hoy = (files || []).filter((f) => f.mtime >= hoy0.getTime());
     const cnt = body.querySelector('.dlw-cnt'); if (cnt) cnt.textContent = hoy.length ? String(hoy.length) : '';
@@ -3513,7 +3517,7 @@ function llenaHoyDescargas(body) {
       const ext = (f.name.split('.').pop() || 'doc').slice(0, 4);
       return `<button class="dlw-r" data-n="${escapeHtml(f.name)}"><span class="dlw-r-k">${escapeHtml(ext)}</span><span class="dlw-r-n">${escapeHtml(f.name)}</span></button>`;
     }).join('') || '<div class="w-vacio">Hoy no has descargado nada</div>';
-    cont.querySelectorAll('.dlw-r').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.openDownloadFile(b.dataset.n); }));
+    cont.querySelectorAll('.dlw-r').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); window.navirisApp.openDownloadFile(b.dataset.n); }));
     recortaFilas(cont, '.dlw-r');
   }).catch(() => { cont.innerHTML = '<div class="w-vacio">No se pudo leer la carpeta</div>'; });
 }
@@ -3576,7 +3580,7 @@ async function actualizaMonitor() {
   if (!widgets.some((w) => w.type === 'monitor')) { clearInterval(monTimer); monTimer = null; return; }
   const cajas = document.querySelectorAll('.w-mon');
   if (!els.hub.classList.contains('active')) return;
-  const st = await window.cobalt.sysStats().catch(() => null); if (!st) return;
+  const st = await window.navirisApp.sysStats().catch(() => null); if (!st) return;
   const gbApp = st.appMb >= 1024 ? (st.appMb / 1024).toFixed(1) + ' GB' : st.appMb + ' MB';
   /* Las barras van por transform (auditoría 2026-10): animar `width` cada 3 s
      recalculaba la maquetación del hub entero. Y solo se escribe lo que
@@ -3630,7 +3634,7 @@ function liberaMemoria() {
    Historial de lo copiado (solo texto, local, max 20). Clic vuelve a copiar;
    se vigila el portapapeles cada 1,5 s mientras el hub esta visible. */
 let clipTimer = null, clipUltimo = '';
-const clipHist = () => store.get('cobalt.clip', []);
+const clipHist = () => store.get('naviris.clip', []);
 /* LO QUE NO SE APUNTA (auditoría 2026-10). El historial vive en claro en
    localStorage y apuntaba todo: la contraseña o la tarjeta copiadas desde su
    panel, el código y el enlace otpauth:// del autenticador, y lo que copiaras
@@ -3651,7 +3655,7 @@ function esSecreto(t) {
   for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } s += n; }
   return s % 10 === 0;
 }
-if (clipHist().some(esSecreto)) store.set('cobalt.clip', clipHist().filter((t) => !esSecreto(t)));
+if (clipHist().some(esSecreto)) store.set('naviris.clip', clipHist().filter((t) => !esSecreto(t)));
 const canalClip = new BroadcastChannel('naviris-portapapeles');
 const clipPrivadas = new Set();   // ventanas privadas que tienen el foco ahora
 let clipDandoPorVisto = 0;
@@ -3661,7 +3665,7 @@ function marcaSensible(t) {
 }
 function daPorVisto() {
   clipDandoPorVisto++;
-  window.cobalt.clipRead().catch(() => '').then((t) => { clipUltimo = (t || '').trim(); clipDandoPorVisto--; });
+  window.navirisApp.clipRead().catch(() => '').then((t) => { clipUltimo = (t || '').trim(); clipDandoPorVisto--; });
 }
 if (IS_PRIVATE) {
   const id = Math.random().toString(36).slice(2);
@@ -3692,7 +3696,7 @@ function renderClipW(body) {
   body.innerHTML = `
     <div class="w-head">${window.icon('clipboard')} Portapapeles<button class="wh-btn clip-x" title="Vaciar">${window.icon('x-mark')}</button></div>
     <div class="clip-lista"></div>`;
-  body.querySelector('.clip-x').addEventListener('click', (e) => { e.stopPropagation(); store.set('cobalt.clip', []); pintaClip(); });
+  body.querySelector('.clip-x').addEventListener('click', (e) => { e.stopPropagation(); store.set('naviris.clip', []); pintaClip(); });
   // En la ventana privada no se vigila: solo se enseña lo que ya había
   if (!IS_PRIVATE) clipTimer = relojHub(clipTimer, vigilaClip, 1500);
   requestAnimationFrame(() => { pintaClip(); vigilaClip(); });
@@ -3700,14 +3704,14 @@ function renderClipW(body) {
 async function vigilaClip() {
   if (!widgets.some((w) => w.type === 'clip')) { clearInterval(clipTimer); clipTimer = null; return; }
   if (IS_PRIVATE || !els.hub.classList.contains('active')) return;
-  const t = (await window.cobalt.clipRead().catch(() => '') || '').trim();
+  const t = (await window.navirisApp.clipRead().catch(() => '') || '').trim();
   if (clipPrivadas.size || clipDandoPorVisto) { clipUltimo = t; return; }   // es de la ventana privada
   // Solo se repinta si hay algo nuevo: rehacer la lista cada 1,5 s recalculaba el hub sin parar
   if (t && t !== clipUltimo) {
     clipUltimo = t;
     if (esSecreto(t)) return;
     const l = clipHist().filter((x) => x !== t); l.unshift(t);
-    store.set('cobalt.clip', l.slice(0, 20));
+    store.set('naviris.clip', l.slice(0, 20));
     pintaClip();   // solo si cambió: repintar cada 1,5 s se comía los clics en la lista
   }
 }
@@ -3718,15 +3722,15 @@ function pintaClip() {
       '<div class="w-vacio">Lo que copies aparecerá aquí</div>';
     cont.querySelectorAll('.clip-i').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation(); const t = l[+b.dataset.i]; clipUltimo = t;
-      window.cobalt.clipWrite(t); toast('Copiado de nuevo');
+      window.navirisApp.clipWrite(t); toast('Copiado de nuevo');
     }));
     // Borrar una sola entrada (lo sensible que se colara), como en el autenticador
     cont.querySelectorAll('.clip-i').forEach((b) => b.addEventListener('contextmenu', (e) => {
       e.preventDefault(); e.stopPropagation(); const t = l[+b.dataset.i];
       showCtxMenu(e.clientX, e.clientY, [
-        { label: 'Copiar', icon: 'clipboard', action: () => { clipUltimo = t; window.cobalt.clipWrite(t); toast('Copiado de nuevo'); } },
+        { label: 'Copiar', icon: 'clipboard', action: () => { clipUltimo = t; window.navirisApp.clipWrite(t); toast('Copiado de nuevo'); } },
         { sep: true },
-        { label: 'Eliminar', icon: 'trash', danger: true, action: () => { store.set('cobalt.clip', clipHist().filter((x) => x !== t)); pintaClip(); } }
+        { label: 'Eliminar', icon: 'trash', danger: true, action: () => { store.set('naviris.clip', clipHist().filter((x) => x !== t)); pintaClip(); } }
       ]);
     }));
     recortaFilas(cont, '.clip-i');
@@ -3735,7 +3739,7 @@ function pintaClip() {
 
 /* ============ Widget NOTAS mejorado (2026-08-12) ============
    Lista de tareas con tachado + texto libre debajo; todo local. */
-const notasLista = () => store.get('cobalt.notas2', []);
+const notasLista = () => store.get('naviris.notas2', []);
 function renderNotasW(body) {
   const pinta = () => {
     const l = notasLista();
@@ -3746,16 +3750,16 @@ function renderNotasW(body) {
       <div class="nt-add"><input type="text" placeholder="Nueva tarea…" maxlength="120" /><button title="Añadir">${window.icon('plus')}</button></div>`;
     const alta = () => {
       const inp = body.querySelector('.nt-add input'); const t = inp.value.trim(); if (!t) return;
-      const l2 = notasLista(); l2.push({ t, ok: false }); store.set('cobalt.notas2', l2); pinta();
+      const l2 = notasLista(); l2.push({ t, ok: false }); store.set('naviris.notas2', l2); pinta();
       body.querySelector('.nt-add input').focus();
     };
     body.querySelector('.nt-add button').addEventListener('click', (e) => { e.stopPropagation(); alta(); });
     body.querySelector('.nt-add input').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') alta(); });
     body.querySelectorAll('.nt-i input').forEach((ch) => ch.addEventListener('change', (e) => {
-      e.stopPropagation(); const l2 = notasLista(); l2[+ch.dataset.i].ok = ch.checked; store.set('cobalt.notas2', l2); pinta();
+      e.stopPropagation(); const l2 = notasLista(); l2[+ch.dataset.i].ok = ch.checked; store.set('naviris.notas2', l2); pinta();
     }));
     body.querySelectorAll('.nt-x').forEach((b) => b.addEventListener('click', (e) => {
-      e.stopPropagation(); e.preventDefault(); const l2 = notasLista(); l2.splice(+b.dataset.i, 1); store.set('cobalt.notas2', l2); pinta();
+      e.stopPropagation(); e.preventDefault(); const l2 = notasLista(); l2.splice(+b.dataset.i, 1); store.set('naviris.notas2', l2); pinta();
     }));
     window.nvsRepasa?.(body);   // la lista es nueva (también al añadir con Enter, sin clic)
   };
@@ -3767,7 +3771,7 @@ function renderNotasW(body) {
    grande. Clic = ventana privada nueva. */
 function renderPrivadaW(body) {
   body.innerHTML = `<div class="pv-ico">${window.icon('book-lock')}</div><span class="pv-t">Privada</span>`;
-  body.addEventListener('click', () => window.cobalt.newPrivateWindow());
+  body.addEventListener('click', () => window.navirisApp.newPrivateWindow());
 }
 
 /* ============ Widget TARJETAS / WALLET (2026-08-11) ============
@@ -3819,7 +3823,7 @@ function renderWalletW(body) {
      60 ms competía con la consulta del cifrado. */
   const abre = async (e) => {
     e?.stopPropagation();
-    const info = await window.cobalt.pwAvailable();
+    const info = await window.navirisApp.pwAvailable();
     if (!info.encryption) { toast('El cifrado seguro no está disponible en este sistema'); return; }
     switchPwTab(true); togglePwPanel(true);
   };
@@ -3827,7 +3831,7 @@ function renderWalletW(body) {
   body.addEventListener('click', abre);
   // La primera tarjeta guardada manda el color y el logo. Sin tarjetas, la
   // neutra del tema; si el cifrado no está disponible, tampoco pasa nada.
-  window.cobalt.cardsList().then((l) => { if (body.isConnected) pintaTarjetaW(body, l && l[0]); }).catch(() => {});
+  window.navirisApp.cardsList().then((l) => { if (body.isConnected) pintaTarjetaW(body, l && l[0]); }).catch(() => {});
 }
 
 /* ============ Widget de códigos 2FA (TOTP) ============
@@ -3877,7 +3881,7 @@ function renderAuthW(body) {
      "Desbloquear". Cada estado decide ahora si la necesita. */
   const pinta = async () => {
     clearInterval(authTimer); authTimer = null;
-    const est = await window.cobalt.totpAvailable();
+    const est = await window.navirisApp.totpAvailable();
     if (!est.encryption) {
       body.innerHTML = cabecera2fa('') + `
         <div class="au-hero">
@@ -3908,12 +3912,12 @@ function renderAuthW(body) {
         </div>`;
       body.querySelector('.au-unlock').addEventListener('click', async (e) => {
         e.stopPropagation();
-        const r = await window.cobalt.totpUnlock();
+        const r = await window.navirisApp.totpUnlock();
         if (r.ok) pinta(); else toast('No se pudo verificar tu identidad');
       });
       return;
     }
-    const r = await window.cobalt.totpCodes();
+    const r = await window.navirisApp.totpCodes();
     if (!r.ok) { pinta(); return; }
     body.innerHTML = cabecera2fa(`
           <button class="au-add" title="Añadir cuenta">${window.icon('plus')}</button>
@@ -3939,7 +3943,7 @@ function renderAuthW(body) {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
-        marcaSensible(n); window.cobalt.clipWrite(n);
+        marcaSensible(n); window.navirisApp.clipWrite(n);
         toast('Código copiado');
       });
       el.addEventListener('contextmenu', (e) => {
@@ -3948,20 +3952,20 @@ function renderAuthW(body) {
           {
             label: 'Copiar código', icon: 'clipboard', action: () => {
               const n = el.querySelector('.au-num').textContent.replace(/\s/g, '');
-              marcaSensible(n); window.cobalt.clipWrite(n); toast('Código copiado');
+              marcaSensible(n); window.navirisApp.clipWrite(n); toast('Código copiado');
             }
           },
           {
             label: 'Copiar la cuenta para otro dispositivo', icon: 'key', action: async () => {
-              const v = await window.cobalt.totpReveal(el.dataset.id);
-              if (v.ok) { marcaSensible(v.uri); window.cobalt.clipWrite(v.uri); toast('Enlace de la cuenta copiado'); }
+              const v = await window.navirisApp.totpReveal(el.dataset.id);
+              if (v.ok) { marcaSensible(v.uri); window.navirisApp.clipWrite(v.uri); toast('Enlace de la cuenta copiado'); }
               else toast('No se pudo verificar tu identidad');
             }
           },
           { sep: true },
           {
             label: 'Eliminar', icon: 'trash', danger: true, action: async () => {
-              const v = await window.cobalt.totpDelete(el.dataset.id);
+              const v = await window.navirisApp.totpDelete(el.dataset.id);
               if (v.ok) { toast('Código eliminado'); pinta(); } else toast('No se pudo verificar tu identidad');
             }
           }
@@ -3970,7 +3974,7 @@ function renderAuthW(body) {
     });
     body.querySelector('.au-add').addEventListener('click', (e) => { e.stopPropagation(); pideAlta(pinta); });
     body.querySelector('.au-lock').addEventListener('click', async (e) => {
-      e.stopPropagation(); await window.cobalt.totpLock(); pinta();
+      e.stopPropagation(); await window.navirisApp.totpLock(); pinta();
     });
     window.nvsRepasa?.(body);   // la lista llega tras una espera (Windows Hello), sin clic que la repase
     // Un segundo: es lo que necesita la cuenta atrás para no ir a saltos.
@@ -3978,9 +3982,9 @@ function renderAuthW(body) {
   };
   const cuenta = async () => {
     if (!document.body.contains(body)) { clearInterval(authTimer); return; }
-    const est = await window.cobalt.totpAvailable();
+    const est = await window.navirisApp.totpAvailable();
     if (!est.unlocked || !est.count) { pinta(); return; }
-    const r = await window.cobalt.totpCodes();
+    const r = await window.navirisApp.totpCodes();
     if (!r.ok) { pinta(); return; }
     r.items.forEach((it) => {
       const el = body.querySelector(`.au-it[data-id="${it.id}"]`);
@@ -4053,7 +4057,7 @@ function pideAlta(alTerminar) {
     err.textContent = '';
     const v = uri.value.trim();
     if (!v) { err.textContent = 'Pega el enlace o el secreto'; return; }
-    const r = await window.cobalt.totpAdd({ entrada: v, issuer: nom.value.trim() });
+    const r = await window.navirisApp.totpAdd({ entrada: v, issuer: nom.value.trim() });
     if (!r.ok) { err.textContent = r.error || 'No se pudo guardar'; return; }
     cierra(); toast('Cuenta añadida'); alTerminar && alTerminar();
   };
@@ -4103,12 +4107,12 @@ function refrescaClimaW() {
 
 /* ============ Cuenta Naviris (sincronización de preferencias) ============ */
 const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
-let account = store.get('cobalt.account', null); // { email, token }
+let account = store.get('naviris.account', null); // { email, token }
 /* El main necesita el token para pedirle al worker la prueba de identidad
    que MOOVIN cambia por una sesion. Se le pasa al arrancar, al entrar y al
    salir; el se lo queda solo en memoria. */
 const avisaTokenCuenta = () => {
-  try { cobalt.cuentaToken(account && account.token ? account.token : ''); }
+  try { window.navirisApp.cuentaToken(account && account.token ? account.token : ''); }
   catch (e) { /* version del preload sin esto */ }
 };
 avisaTokenCuenta();
@@ -4120,11 +4124,11 @@ function buildSyncData() {
   for (const k of SYNC_SETTINGS) if (settings[k] !== undefined) s[k] = settings[k];
   return {
     v: 1, settings: s,
-    bookmarks: store.get('cobalt.bookmarks2', []),
-    dials: store.get('cobalt.dials', null),
-    widgets: store.get('cobalt.widgets', null),
-    notes: store.get('cobalt.notes', ''),
-    nombre: store.get('cobalt.account.nombre', ''),
+    bookmarks: store.get('naviris.bookmarks2', []),
+    dials: store.get('naviris.dials', null),
+    widgets: store.get('naviris.widgets', null),
+    notes: store.get('naviris.notes', ''),
+    nombre: store.get('naviris.account.nombre', ''),
     // Un fondo por tema (dev.49). `hubBg` se mantiene para las versiones que
     // aun sincronizan el fondo unico: viaja el del tema activo.
     hubBg: store.get(bgThemeKey(), null),
@@ -4133,19 +4137,19 @@ function buildSyncData() {
 }
 async function applySyncData(d) {
   if (!d) return;
-  if (Array.isArray(d.bookmarks)) { store.set('cobalt.bookmarks2', d.bookmarks); bookmarks = d.bookmarks; }
-  if (Array.isArray(d.dials)) { store.set('cobalt.dials', d.dials); dials = d.dials; }
+  if (Array.isArray(d.bookmarks)) { store.set('naviris.bookmarks2', d.bookmarks); bookmarks = d.bookmarks; }
+  if (Array.isArray(d.dials)) { store.set('naviris.dials', d.dials); dials = d.dials; }
   // Sin la tarjeta de accesos: la línea estable aún la manda y aquí viven en el dock
-  if (Array.isArray(d.widgets)) { widgets = d.widgets.filter((w) => w && w.type !== 'shortcuts'); store.set('cobalt.widgets', widgets); }
-  if (typeof d.notes === 'string') store.set('cobalt.notes', d.notes);
+  if (Array.isArray(d.widgets)) { widgets = d.widgets.filter((w) => w && w.type !== 'shortcuts'); store.set('naviris.widgets', widgets); }
+  if (typeof d.notes === 'string') store.set('naviris.notes', d.notes);
   // Solo si el blob TRAE la clave: una versión anterior no la manda, y tomar su
   // ausencia por "sin nombre" borraría el que acabas de poner en este equipo.
-  if (typeof d.nombre === 'string') store.set('cobalt.account.nombre', d.nombre.trim().slice(0, 24));
+  if (typeof d.nombre === 'string') store.set('naviris.account.nombre', d.nombre.trim().slice(0, 24));
   if (d.hubBgs && typeof d.hubBgs === 'object') for (const t of TEMAS) if (d.hubBgs[t]) store.set(bgThemeKey(t), d.hubBgs[t]);
   if (d.hubBg && !(d.hubBgs && d.hubBgs[temaActual()])) applyBackground(d.hubBg);
   else if (d.hubBgs) applyBackground(store.get(bgThemeKey(), defaultBgTema()));
   if (d.settings) {
-    settings = await window.cobalt.setSettings(d.settings);
+    settings = await window.navirisApp.setSettings(d.settings);
     applyTheme(settings.lightMode); els.optLight.checked = !!settings.lightMode;
     els.optSmartsearch.checked = settings.smartSearch !== false;
     els.optPasskeys.checked = settings.blockPasskeys !== false; els.optRestore.checked = settings.restoreSession !== false;
@@ -4153,7 +4157,7 @@ async function applySyncData(d) {
     els.optAtajos.checked = settings.atajos !== false;
     els.optVtabs.checked = !!settings.tabsVerticales;
     els.optMousenav.checked = settings.mouseNav !== false;
-    const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
+    const ab = await window.navirisApp.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   }
   renderBookmarksBar(); renderHub();
 }
@@ -4174,16 +4178,16 @@ const accEls = {
    la foto: son 20 bytes, no compite por el espacio del blob y viaja entre
    equipos sin tocar el worker. Vacío = se vuelve al nombre del correo. */
 function nombreCuenta() {
-  const n = String(store.get('cobalt.account.nombre', '') || '').trim();
+  const n = String(store.get('naviris.account.nombre', '') || '').trim();
   if (n) return n;
   return (account && account.email) ? account.email.split('@')[0] : '';
 }
 function guardaNombre() {
   if (!accEls.nombre) return;
-  const antes = String(store.get('cobalt.account.nombre', '') || '');
+  const antes = String(store.get('naviris.account.nombre', '') || '');
   const v = accEls.nombre.value.trim().slice(0, 24);
   if (v === antes) return;
-  store.set('cobalt.account.nombre', v);
+  store.set('naviris.account.nombre', v);
   accEls.nombre.value = v;
   accEls.nombre.placeholder = nombreCuenta();
   renderAccountPill();  // pastilla y widget del hub
@@ -4207,12 +4211,12 @@ function showAccountModal() {
   if (logged) {
     accEls.who.textContent = account.email;
     if (accEls.nombre) {
-      accEls.nombre.value = String(store.get('cobalt.account.nombre', '') || '');
+      accEls.nombre.value = String(store.get('naviris.account.nombre', '') || '');
       // El placeholder enseña con qué te va a llamar si lo dejas vacío
       accEls.nombre.placeholder = account.email.split('@')[0];
     }
     cargaFoto();
-    const st = store.get('cobalt.syncStamp', 0);
+    const st = store.get('naviris.syncStamp', 0);
     accEls.last.textContent = st ? 'Última sincronización: ' + new Date(st).toLocaleString('es') : 'Aún sin sincronizar en este equipo.';
   } else { accError(''); accEls.pass.value = ''; }
   accEls.modal.classList.remove('hidden');
@@ -4237,7 +4241,7 @@ $('#acc-close2').addEventListener('click', () => accEls.modal.classList.add('hid
    Se guarda además una copia local para que aparezca al instante al abrir,
    sin esperar a la red. */
 const FOTO_LADO = 128;
-function fotoLocal() { return store.get('cobalt.account.foto', null); }
+function fotoLocal() { return store.get('naviris.account.foto', null); }
 function pintaFoto(img) {
   const url = img || fotoLocal();
   if (accEls.foto) {
@@ -4255,7 +4259,7 @@ async function cargaFoto() {
   pintaFoto();                                   // primero lo local, sin esperar
   if (!(account && account.token)) return;
   const r = await accRequest('/avatar');
-  if (r && r.ok) { store.set('cobalt.account.foto', r.img || null); pintaFoto(r.img); }
+  if (r && r.ok) { store.set('naviris.account.foto', r.img || null); pintaFoto(r.img); }
 }
 /* Reducción en el cliente: se recorta al cuadrado central y se escala a 128,
    así una foto apaisada no sale deformada. */
@@ -4278,11 +4282,11 @@ async function eligeFoto() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const f = inp.files && inp.files[0]; if (!f) return;
-    const ruta = window.cobalt.filePath(f); if (!ruta) return;
+    const ruta = window.navirisApp.filePath(f); if (!ruta) return;
     try {
       const img = await reduceImagen(ruta);
       const r = await accRequest('/avatar', { method: 'PUT', body: JSON.stringify({ img }) });
-      if (r && r.ok) { store.set('cobalt.account.foto', img); pintaFoto(img); toast('Foto de perfil actualizada'); }
+      if (r && r.ok) { store.set('naviris.account.foto', img); pintaFoto(img); toast('Foto de perfil actualizada'); }
       else toast('No se pudo guardar la foto: ' + ((r && r.error) || 'error del servidor'));
     } catch { toast('No se pudo leer esa imagen'); }
   };
@@ -4290,7 +4294,7 @@ async function eligeFoto() {
 }
 async function quitaFoto() {
   const r = await accRequest('/avatar', { method: 'DELETE' });
-  if (r && r.ok) { store.set('cobalt.account.foto', null); pintaFoto(null); toast('Foto quitada'); }
+  if (r && r.ok) { store.set('naviris.account.foto', null); pintaFoto(null); toast('Foto quitada'); }
 }
 async function accRequest(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -4307,13 +4311,13 @@ async function accAuth(path) {
   const r = await accRequest(path, { method: 'POST', body: JSON.stringify({ email, password }) });
   if (!r.ok) { accError(r.error || 'No se pudo iniciar sesión'); return; }
   account = { email: r.email, token: r.token };
-  store.set('cobalt.account', account);
+  store.set('naviris.account', account);
   avisaTokenCuenta();
   renderAccountPill();
   // Al entrar: si la cuenta ya tiene datos se cargan aquí (eso es "moverse de PC");
   // si está vacía (recién creada), se sube lo de este equipo.
   const s = await accRequest('/sync');
-  if (s.ok && s.data) { await applySyncData(s.data); store.set('cobalt.syncStamp', s.updatedAt); toast('Preferencias de tu cuenta cargadas'); }
+  if (s.ok && s.data) { await applySyncData(s.data); store.set('naviris.syncStamp', s.updatedAt); toast('Preferencias de tu cuenta cargadas'); }
   else if (s.ok) { await accPush(); toast('Cuenta lista: tus preferencias ya están en la nube'); }
   showAccountModal();
 }
@@ -4323,9 +4327,9 @@ accEls.pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') accAuth(
 $('#acc-logout').addEventListener('click', async () => {
   await accRequest('/logout', { method: 'POST' });
   // Foto y nombre son de la CUENTA, no del equipo: al salir se van con ella
-  store.set('cobalt.account.foto', null);
-  store.set('cobalt.account.nombre', '');
-  account = null; store.set('cobalt.account', null); store.set('cobalt.syncStamp', 0);
+  store.set('naviris.account.foto', null);
+  store.set('naviris.account.nombre', '');
+  account = null; store.set('naviris.account', null); store.set('naviris.syncStamp', 0);
   avisaTokenCuenta();
   renderAccountPill(); showAccountModal();
 });
@@ -4334,8 +4338,8 @@ async function accPush() {
   if (!account || !account.token) return;
   const data = buildSyncData();
   const r = await accRequest('/sync', { method: 'PUT', body: JSON.stringify({ data }) });
-  if (r.ok) { lastPushJson = JSON.stringify(data); store.set('cobalt.syncStamp', r.updatedAt); }
-  else if (/Sesión caducada/.test(r.error || '')) { account = null; store.set('cobalt.account', null); avisaTokenCuenta(); renderAccountPill(); }
+  if (r.ok) { lastPushJson = JSON.stringify(data); store.set('naviris.syncStamp', r.updatedAt); }
+  else if (/Sesión caducada/.test(r.error || '')) { account = null; store.set('naviris.account', null); avisaTokenCuenta(); renderAccountPill(); }
   return r;
 }
 $('#acc-sync').addEventListener('click', async () => {
@@ -4347,7 +4351,7 @@ $('#acc-sync').addEventListener('click', async () => {
 async function accBootSync() {
   if (!account || !account.token) return;
   const s = await accRequest('/sync');
-  if (s.ok && s.data && s.updatedAt > store.get('cobalt.syncStamp', 0)) { await applySyncData(s.data); store.set('cobalt.syncStamp', s.updatedAt); }
+  if (s.ok && s.data && s.updatedAt > store.get('naviris.syncStamp', 0)) { await applySyncData(s.data); store.set('naviris.syncStamp', s.updatedAt); }
   lastPushJson = JSON.stringify(buildSyncData());
 }
 // Empuje automático: cada minuto, solo si algo cambió de verdad
@@ -4398,7 +4402,7 @@ function cierraMenusHub(excepto) {
     // lightMode sigue viviendo en los ajustes: lo leen el interruptor de la
     // sidebar, el tema del sistema y la sincronización de la cuenta. Lo
     // encienden los temas CLAROS (claro y rosa); oscuro y mono lo apagan.
-    settings = await window.cobalt.setSettings({ lightMode: esTemaClaro(b.dataset.tema) });
+    settings = await window.navirisApp.setSettings({ lightMode: esTemaClaro(b.dataset.tema) });
     if (els.optLight) els.optLight.checked = esTemaClaro(b.dataset.tema);
     toast('Tema ' + (NOMBRES[b.dataset.tema] || b.dataset.tema));
   }));
@@ -4530,14 +4534,14 @@ function defaultBgTema() { return BACKGROUNDS[0]; }
 // equivoco: se descarta y el tema vuelve a su degradado.
 const esFotoDeTema = (v) => typeof v === 'string' && /url\("?temas\//.test(v);
 // Clave de store por tema: cada tema recuerda su propio fondo.
-function bgThemeKey(tema) { return 'cobalt.hubBg.' + (tema || temaActual()); }
-/* Hasta dev.48 el fondo era UNO para toda la app (cobalt.hubBg). Esa clave se
+function bgThemeKey(tema) { return 'naviris.hubBg.' + (tema || temaActual()); }
+/* Hasta dev.48 el fondo era UNO para toda la app (naviris.hubBg). Esa clave se
    retira sin heredarla: cada tema arranca con SU predeterminado (el primero de
    su paleta, el mas oscuro en el tema oscuro) y desde ahi se elige. Tiene que
    correr ANTES del primer applyTheme(), que ya escribe la clave del tema. */
 function migraFondoPorTema() {
   for (const t of TEMAS) if (esFotoDeTema(store.get(bgThemeKey(t), null))) store.del(bgThemeKey(t));
-  store.del('cobalt.hubBg');
+  store.del('naviris.hubBg');
 }
 
 // Traduce el fondo canónico (oscuro) al del tema activo. Las imágenes propias
@@ -4635,10 +4639,10 @@ function aplicaOpacidad(pct) {
 }
 if (els.opSlider) {
   els.opSlider.addEventListener('input', () => {
-    store.set('cobalt.hubTransparencia', aplicaOpacidad(els.opSlider.value));
+    store.set('naviris.hubTransparencia', aplicaOpacidad(els.opSlider.value));
   });
 }
-aplicaOpacidad(store.get('cobalt.hubTransparencia', 0));
+aplicaOpacidad(store.get('naviris.hubTransparencia', 0));
 
 function renderBgPresets() {
   els.bgPresets.innerHTML = '';
@@ -4668,7 +4672,7 @@ function renderBgPresets() {
    colgado — lo reportó Dosa el 2026-08-11). Resolución completa: el archivo
    se copia a userData y el hub apunta a él. */
 async function elegirFondoPropio() {
-  const r = await window.cobalt.pickWallpaper();
+  const r = await window.navirisApp.pickWallpaper();
   if (r?.canceled) return;
   if (r?.ok) { applyBackground(`url("${r.url}") center/cover no-repeat`); toast('Fondo actualizado'); return; }
   toast(r?.message || 'No se pudo usar esa imagen');
@@ -4676,7 +4680,7 @@ async function elegirFondoPropio() {
 document.querySelector('.wp-custom')?.addEventListener('click', (e) => { e.preventDefault(); elegirFondoPropio(); });
 
 $('#dial-cancel').addEventListener('click', () => els.dialModal.classList.add('hidden'));
-$('#dial-save').addEventListener('click', () => { const name = els.dialName.value.trim(); const url = toUrl(els.dialUrl.value); if (!name || !url) return; dials.push({ name, url }); store.set('cobalt.dials', dials); renderHub(); els.dialModal.classList.add('hidden'); });
+$('#dial-save').addEventListener('click', () => { const name = els.dialName.value.trim(); const url = toUrl(els.dialUrl.value); if (!name || !url) return; dials.push({ name, url }); store.set('naviris.dials', dials); renderHub(); els.dialModal.classList.add('hidden'); });
 
 /* ============ Recursos gráficos ============ */
 let mediaItems = [], mediaFilter = 'all';
@@ -4716,7 +4720,7 @@ function renderMedia() {
     const medida = document.createElement('span'); medida.textContent = m.w && m.h ? m.w + '×' + m.h : '';
     meta.append(tipo, medida);
     const dl = document.createElement('button'); dl.className = 'mi-dl'; dl.title = 'Descargar'; dl.innerHTML = window.icon('arrow-down-tray');
-    dl.addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.download(m.url, IS_PRIVATE); dl.innerHTML = window.icon('check'); card.classList.add('done'); toast('Descarga iniciada'); toggleDownloads(true); });
+    dl.addEventListener('click', (e) => { e.stopPropagation(); window.navirisApp.download(m.url, IS_PRIVATE); dl.innerHTML = window.icon('check'); card.classList.add('done'); toast('Descarga iniciada'); toggleDownloads(true); });
     card.append(thumb, meta, dl); card.addEventListener('click', () => createTab(m.url)); els.mpGrid.appendChild(card);
   }
 }
@@ -4725,7 +4729,7 @@ els.sbMedia.addEventListener('click', () => toggleMediaPanel());
 $('#mp-close').addEventListener('click', () => toggleMediaPanel(false));
 $('#mp-refresh').addEventListener('click', collectMedia);
 document.querySelectorAll('.mp-chip').forEach((chip) => chip.addEventListener('click', () => { document.querySelectorAll('.mp-chip').forEach((c) => c.classList.remove('active')); chip.classList.add('active'); mediaFilter = chip.dataset.filter; renderMedia(); }));
-els.mpAll.addEventListener('click', () => { const items = mediaItems.filter((m) => mediaFilter === 'all' || m.type === mediaFilter); if (!items.length) { toast('No hay recursos que descargar'); return; } items.forEach((m, i) => setTimeout(() => window.cobalt.download(m.url, IS_PRIVATE), i * 150)); toast(`Descargando ${items.length} recursos…`); toggleDownloads(true); });
+els.mpAll.addEventListener('click', () => { const items = mediaItems.filter((m) => mediaFilter === 'all' || m.type === mediaFilter); if (!items.length) { toast('No hay recursos que descargar'); return; } items.forEach((m, i) => setTimeout(() => window.navirisApp.download(m.url, IS_PRIVATE), i * 150)); toast(`Descargando ${items.length} recursos…`); toggleDownloads(true); });
 
 /* ============ Descargas ============ */
 const dlMeta = new Map(); const dlRows = new Map();
@@ -4746,9 +4750,9 @@ function upsertDownload(m) {
   // La página de descargas, si está abierta, sigue el progreso en vivo
   if (els.dlPage.classList.contains('active')) renderDlActive();
   const act = row.querySelector('.dl-act:not(.dl-act2)');
-  if (done) { act.innerHTML = window.icon('folder'); act.title = 'Mostrar en carpeta'; act.onclick = (e) => { e.stopPropagation(); window.cobalt.revealDownload(m.id); }; }
+  if (done) { act.innerHTML = window.icon('folder'); act.title = 'Mostrar en carpeta'; act.onclick = (e) => { e.stopPropagation(); window.navirisApp.revealDownload(m.id); }; }
   else if (error) { act.innerHTML = window.icon('x-mark'); act.title = 'Cerrar'; act.onclick = (e) => { e.stopPropagation(); row.remove(); dlRows.delete(m.id); }; }
-  else { act.innerHTML = window.icon('x-mark'); act.title = 'Cancelar'; act.onclick = (e) => { e.stopPropagation(); window.cobalt.cancelDownload(m.id); }; }
+  else { act.innerHTML = window.icon('x-mark'); act.title = 'Cancelar'; act.onclick = (e) => { e.stopPropagation(); window.navirisApp.cancelDownload(m.id); }; }
   accionDescarga(row.querySelector('.dl-act2'), m);
 }
 /* Pausar y reanudar la que está en curso; reintentar la que falló o se
@@ -4763,18 +4767,18 @@ function accionDescarga(b, m) {
   b.title = enCurso ? (m.paused ? 'Reanudar' : 'Pausar') : 'Reintentar';
   b.onclick = (e) => {
     e.stopPropagation();
-    if (enCurso) { if (m.paused) window.cobalt.resumeDownload(m.id); else window.cobalt.pauseDownload(m.id); return; }
-    window.cobalt.retryDownload(m.id);
+    if (enCurso) { if (m.paused) window.navirisApp.resumeDownload(m.id); else window.navirisApp.pauseDownload(m.id); return; }
+    window.navirisApp.retryDownload(m.id);
     dlRows.get(m.id)?.remove(); dlRows.delete(m.id); dlMeta.delete(m.id);
     if (els.dlPage.classList.contains('active')) renderDlActive();
   };
 }
 async function openDownloadInBrowser(id) {
   const m = dlMeta.get(id); if (!m || m.state !== 'completed') return;
-  const p = await window.cobalt.downloadPath(id); if (!p) return;
-  if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.cobalt.openDownload(id);
+  const p = await window.navirisApp.downloadPath(id); if (!p) return;
+  if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.navirisApp.openDownload(id);
 }
-window.cobalt.onDownloadNew((m) => { dlVivo.set(m.id, m); upsertDownload(m); actualizaDescargasW(); });
+window.navirisApp.onDownloadNew((m) => { dlVivo.set(m.id, m); upsertDownload(m); actualizaDescargasW(); });
 /* Cada descarga suena UNA vez: al terminar o al fallar. Cancelarla no suena
    (lo acaba de hacer el usuario). 'failed' es el del motor de descargas. */
 const dlSonadas = new Set();
@@ -4783,11 +4787,11 @@ function sonidoDescarga(m) {
   if (!fin || dlSonadas.has(m.id)) return;
   dlSonadas.add(m.id); suena(fin);
 }
-window.cobalt.onDownloadUpdate((m) => { sonidoDescarga(m); dlVivo.set(m.id, m); actualizaDescargasW(); if (m.state === 'completed') document.querySelectorAll('.w-dlw').forEach((el) => llenaHoyDescargas(el)); upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
+window.navirisApp.onDownloadUpdate((m) => { sonidoDescarga(m); dlVivo.set(m.id, m); actualizaDescargasW(); if (m.state === 'completed') document.querySelectorAll('.w-dlw').forEach((el) => llenaHoyDescargas(el)); upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.navirisApp.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
 function toggleDownloads(force) { const open = force !== undefined ? force : els.dlPanel.classList.contains('hidden'); if (open) { closeRightPanels(); els.dlPanel.classList.remove('hidden'); els.sbDownloads.classList.add('open'); } else { els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); } }
 els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
-$('#dl-clear').addEventListener('click', () => { window.cobalt.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
+$('#dl-clear').addEventListener('click', () => { window.navirisApp.clearDownloads(); for (const [id, row] of dlRows) if (row.classList.contains('done') || row.classList.contains('error')) { row.remove(); dlRows.delete(id); dlMeta.delete(id); } });
 function closeRightPanels() { els.mediaPanel.classList.add('hidden'); els.sbMedia.classList.remove('open'); els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.historyPanel.classList.add('hidden'); els.sbHistory.classList.remove('open'); els.lootPanel.classList.add('hidden'); els.sbLoot.classList.remove('open'); cierraPerf(); }
 
 /* ============ Panel de rendimiento ============
@@ -4828,7 +4832,7 @@ async function pintaPerf(reordena) {
     try { wcId = t.asleep ? null : t.webview?.getWebContentsId?.() ?? null; } catch { /* aún no montada */ }
     return { id: t.id, wcId };
   });
-  const d = await window.cobalt.perfTabs(lista).catch(() => null);
+  const d = await window.navirisApp.perfTabs(lista).catch(() => null);
   if (!d) return;
 
   const porId = new Map(d.filas.map((f) => [f.id, f]));
@@ -4967,7 +4971,7 @@ function renderDlActive() {
         + `</div><div class="dlp-acts"><button class="dlp-pausa"></button><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
       row.querySelector('.dlp-cancel').addEventListener('click', (e) => {
         e.stopPropagation();
-        if (failed) { dlMeta.delete(m.id); renderDlActive(); } else window.cobalt.cancelDownload(m.id);
+        if (failed) { dlMeta.delete(m.id); renderDlActive(); } else window.navirisApp.cancelDownload(m.id);
       });
       dlpFilas.set(m.id, { row, failed });
       els.dlpActive.appendChild(row);
@@ -5012,8 +5016,8 @@ function renderDownloadsPage() {
     const when = new Date(f.mtime).toLocaleString('es', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(f.name))}</div><div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub">${fmtBytes(f.size)} · ${when}</div></div><div class="dlp-acts"><button class="dlp-reveal" title="Mostrar en carpeta">${window.icon('folder')}</button></div>`;
     row.querySelector('.dlp-name').textContent = f.name;
-    row.querySelector('.dlp-reveal').addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.revealDownloadFile(f.name); });
-    row.addEventListener('click', () => { if (VIEWABLE.test(f.name)) createTab('file:///' + f.path.replace(/\\/g, '/')); else window.cobalt.openDownloadFile(f.name); });
+    row.querySelector('.dlp-reveal').addEventListener('click', (e) => { e.stopPropagation(); window.navirisApp.revealDownloadFile(f.name); });
+    row.addEventListener('click', () => { if (VIEWABLE.test(f.name)) createTab('file:///' + f.path.replace(/\\/g, '/')); else window.navirisApp.openDownloadFile(f.name); });
     els.dlpList.appendChild(row);
   }
 }
@@ -5022,20 +5026,20 @@ async function showDownloadsPage() {
   tabs.forEach((t) => t.webview?.classList.remove('active'));
   els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage(); cierraNovedadesPagina(true);
   els.dlPage.classList.remove('hidden'); els.dlPage.classList.add('active'); els.sbDownloads.classList.add('open');
-  dlpFiles = await window.cobalt.listDownloadFiles();
+  dlpFiles = await window.navirisApp.listDownloadFiles();
   renderDownloadsPage();
 }
 function hideDownloadsPage() { els.dlPage.classList.remove('active'); els.dlPage.classList.add('hidden'); els.sbDownloads.classList.remove('open'); }
 function toggleDownloadsPage() { if (els.dlPage.classList.contains('active')) { hideDownloadsPage(); activateTab(activeId); } else showDownloadsPage(); }
-els.dlpFolder.addEventListener('click', () => window.cobalt.openDownloadsFolder());
+els.dlpFolder.addEventListener('click', () => window.navirisApp.openDownloadsFolder());
 
 /* ============ Loot: registro de recompensas del auto-reclamo ============ */
-let loot = store.get('cobalt.loot', []);
+let loot = store.get('naviris.loot', []);
 function recordLoot(kind, channel, info) {
   info = info || {};
   loot.unshift({ t: Date.now(), kind: kind === 'drop' ? 'drop' : 'points', channel: channel || '', name: info.name || '', balance: (typeof info.balance === 'number' ? info.balance : null) });
   if (loot.length > 500) loot = loot.slice(0, 500);
-  store.set('cobalt.loot', loot);
+  store.set('naviris.loot', loot);
   updateLootUI();
 }
 
@@ -5094,14 +5098,14 @@ els.historyClear.addEventListener('click', () => {
    después no se toca. marcaSensible: el widget Portapapeles no lo apunta. */
 function copiaSecreto(valor, aviso) {
   marcaSensible(valor);
-  window.cobalt.clipWrite(valor).then((ok) => {
+  window.navirisApp.clipWrite(valor).then((ok) => {
     if (!ok) { toast('No se pudo copiar'); return; }
     toast(aviso);
-    setTimeout(async () => { if ((await window.cobalt.clipRead().catch(() => '')) === valor) window.cobalt.clipWrite(''); }, 20000);
+    setTimeout(async () => { if ((await window.navirisApp.clipRead().catch(() => '')) === valor) window.navirisApp.clipWrite(''); }, 20000);
   });
 }
 async function renderPasswords() {
-  const list = await window.cobalt.pwList();
+  const list = await window.navirisApp.pwList();
   els.pwList.innerHTML = '';
   for (const e of list) {
     const item = document.createElement('div'); item.className = 'pw-item';
@@ -5113,19 +5117,19 @@ async function renderPasswords() {
     const acts = document.createElement('div'); acts.className = 'pw-acts';
     const eye = document.createElement('button'); eye.title = 'Ver contraseña (Windows Hello)'; eye.innerHTML = window.icon('eye');
     eye.addEventListener('click', async () => {
-      eye.disabled = true; const r = await window.cobalt.pwReveal(e.id); eye.disabled = false;
+      eye.disabled = true; const r = await window.navirisApp.pwReveal(e.id); eye.disabled = false;
       if (r.ok) { sub.textContent = r.password; setTimeout(() => { sub.textContent = e.username || '••••••••'; }, 15000); }
       else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo verificar');
     });
     const copy = document.createElement('button'); copy.title = 'Copiar contraseña (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
     copy.addEventListener('click', async () => {
-      copy.disabled = true; const r = await window.cobalt.pwReveal(e.id); copy.disabled = false;
+      copy.disabled = true; const r = await window.navirisApp.pwReveal(e.id); copy.disabled = false;
       if (r.ok) copiaSecreto(r.password, 'Contraseña copiada (se borra en 20 s)');
       else toast('Verificación cancelada');
     });
     const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
     // La papelera está pegada a "Copiar": se confirma, que no hay deshacer.
-    del.addEventListener('click', () => promptConfirm('¿Borrar la contraseña de ' + (e.username ? e.username + ' en ' : '') + e.site + '?', 'No se puede deshacer.', async () => { await window.cobalt.pwDelete(e.id); renderPasswords(); }));
+    del.addEventListener('click', () => promptConfirm('¿Borrar la contraseña de ' + (e.username ? e.username + ' en ' : '') + e.site + '?', 'No se puede deshacer.', async () => { await window.navirisApp.pwDelete(e.id); renderPasswords(); }));
     acts.append(eye, copy, del); item.append(ic, info, acts); els.pwList.appendChild(item);
   }
 }
@@ -5136,7 +5140,7 @@ function togglePwPanel(force) {
   else { els.pwPanel.classList.add('hidden'); els.sbPasswords.classList.remove('open'); els.pwForm.classList.add('hidden'); document.getElementById('card-form').classList.add('hidden'); }
 }
 els.sbPasswords.addEventListener('click', async () => {
-  const info = await window.cobalt.pwAvailable();
+  const info = await window.navirisApp.pwAvailable();
   if (!info.encryption) { toast('El cifrado seguro no está disponible en este sistema'); return; }
   togglePwPanel();
 });
@@ -5149,7 +5153,7 @@ els.pwAddbtn.addEventListener('click', () => {
 });
 els.pwImport.addEventListener('click', async () => {
   toast('Elige el CSV exportado desde tu navegador (Configuración → Contraseñas → Exportar)');
-  const r = await window.cobalt.pwImportCsv();
+  const r = await window.navirisApp.pwImportCsv();
   if (r.ok) { renderPasswords(); toast(`Importadas: ${r.added} nuevas, ${r.updated} actualizadas`); }
   else if (!r.canceled) toast('No se pudo importar: ' + (r.error || 'archivo no válido'));
 });
@@ -5158,7 +5162,7 @@ els.pwForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const site = hostOf(els.pwSite.value.includes('://') ? els.pwSite.value : 'https://' + els.pwSite.value) || els.pwSite.value.trim();
   if (!site || !els.pwPass.value) { toast('Falta el sitio o la contraseña'); return; }
-  const r = await window.cobalt.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value);
+  const r = await window.navirisApp.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value);
   if (r.ok) { els.pwForm.classList.add('hidden'); renderPasswords(); toast('Contraseña guardada y cifrada'); }
   else toast('No se pudo guardar');
 });
@@ -5179,7 +5183,7 @@ function switchPwTab(cards) {
 cardEls.tabPw.addEventListener('click', () => switchPwTab(false));
 cardEls.tabCards.addEventListener('click', () => switchPwTab(true));
 async function renderCards() {
-  const list = await window.cobalt.cardsList();
+  const list = await window.navirisApp.cardsList();
   cardEls.list.innerHTML = '';
   for (const c of list) {
     const item = document.createElement('div'); item.className = 'pw-item';
@@ -5192,25 +5196,25 @@ async function renderCards() {
     const acts = document.createElement('div'); acts.className = 'pw-acts';
     const eye = document.createElement('button'); eye.title = 'Ver número completo (Windows Hello)'; eye.innerHTML = window.icon('eye');
     eye.addEventListener('click', async () => {
-      eye.disabled = true; const r = await window.cobalt.cardsReveal(c.id); eye.disabled = false;
+      eye.disabled = true; const r = await window.navirisApp.cardsReveal(c.id); eye.disabled = false;
       if (r.ok) { num.textContent = r.number.replace(/(\d{4})(?=\d)/g, '$1 '); setTimeout(() => { num.textContent = '•••• ' + c.last4; }, 15000); }
       else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo verificar');
     });
     const copy = document.createElement('button'); copy.title = 'Copiar número (Windows Hello)'; copy.innerHTML = window.icon('clipboard');
     copy.addEventListener('click', async () => {
-      copy.disabled = true; const r = await window.cobalt.cardsReveal(c.id); copy.disabled = false;
+      copy.disabled = true; const r = await window.navirisApp.cardsReveal(c.id); copy.disabled = false;
       if (r.ok) copiaSecreto(r.number, 'Número copiado (se borra en 20 s)');
       else toast('Verificación cancelada');
     });
     const del = document.createElement('button'); del.className = 'del'; del.title = 'Eliminar'; del.innerHTML = window.icon('trash');
-    del.addEventListener('click', () => promptConfirm('¿Borrar la tarjeta ' + c.brand + ' •••• ' + c.last4 + '?', 'No se puede deshacer.', async () => { await window.cobalt.cardsDelete(c.id); renderCards(); }));
+    del.addEventListener('click', () => promptConfirm('¿Borrar la tarjeta ' + c.brand + ' •••• ' + c.last4 + '?', 'No se puede deshacer.', async () => { await window.navirisApp.cardsDelete(c.id); renderCards(); }));
     acts.append(eye, copy, del); item.append(ic, info, acts); cardEls.list.appendChild(item);
   }
 }
 cardEls.cancel.addEventListener('click', () => cardEls.form.classList.add('hidden'));
 cardEls.form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const r = await window.cobalt.cardsAdd({ number: cardEls.number.value, holder: cardEls.holder.value.trim(), expMonth: cardEls.month.value, expYear: cardEls.year.value });
+  const r = await window.navirisApp.cardsAdd({ number: cardEls.number.value, holder: cardEls.holder.value.trim(), expMonth: cardEls.month.value, expYear: cardEls.year.value });
   if (r.ok) { cardEls.form.classList.add('hidden'); cardEls.number.value = cardEls.holder.value = cardEls.month.value = cardEls.year.value = ''; renderCards(); toast(r.updated ? 'Tarjeta actualizada' : 'Tarjeta guardada y cifrada'); }
   else toast(r.error || 'No se pudo guardar');
 });
@@ -5365,7 +5369,7 @@ function renderLootPanel() {
       }
       body.appendChild(card);
     }
-    if (loot.length) { const c = document.createElement('button'); c.className = 'loot-clear-btn'; c.textContent = 'Vaciar historial'; c.addEventListener('click', () => { loot = []; store.set('cobalt.loot', loot); renderLootPanel(); }); body.appendChild(c); }
+    if (loot.length) { const c = document.createElement('button'); c.className = 'loot-clear-btn'; c.textContent = 'Vaciar historial'; c.addEventListener('click', () => { loot = []; store.set('naviris.loot', loot); renderLootPanel(); }); body.appendChild(c); }
   }
 }
 function lootLabel(t, extra) {
@@ -5422,12 +5426,12 @@ els.sbRat.addEventListener('click', async (e) => {
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
   // 2º: solo si la página actual NO es un vídeo, usa el enlace copiado (útil en Instagram: copiar enlace → detectar)
   if (!window.ratTool.esVideo(url)) {
-    try { const clip = (await window.cobalt.readClipboard() || '').trim(); if (/^https?:\/\/\S+$/i.test(clip)) url = clip; } catch {}
+    try { const clip = (await window.navirisApp.readClipboard() || '').trim(); if (/^https?:\/\/\S+$/i.test(clip)) url = clip; } catch {}
   }
   els.ratUrl.value = url; updateRatPlat();
   els.ratXcheck.checked = !!settings.xRevealSensitive;
   els.ratQrow.classList.add('hidden'); loadRatQualities();
-  const ok = await window.cobalt.ytAvailable();
+  const ok = await window.navirisApp.ytAvailable();
   els.ratNote.textContent = ok ? 'Se guarda en Descargas. En TikTok abre un video concreto; se baja sin marca de agua.' : 'No se pudo preparar el descargador. Reinicia Naviris e inténtalo de nuevo.';
 });
 
@@ -5437,7 +5441,7 @@ function setAutoLoot(tab, on) {
   tab.autoLoot = !!on;
   if (on) { if (!tab.lootStart) tab.lootStart = Date.now(); } // marca de inicio para el temporizador
   else { tab.lowRes = false; tab.twitchClaims = 0; delete tab.lootStart; }
-  try { tab.webview?.send('cobalt-autoloot', { on: !!on, lowRes: !!tab.lowRes }); } catch { /* nada */ }
+  try { tab.webview?.send('naviris-autoloot', { on: !!on, lowRes: !!tab.lowRes }); } catch { /* nada */ }
   renderTabs(); updateLootUI();
 }
 function activateAutoLoot(tab) {
@@ -5450,7 +5454,7 @@ function activateAutoLoot(tab) {
   if (!tab.muted) { tab.muted = true; try { tab.webview?.setAudioMuted(true); } catch { /* nada */ } }
   // La calidad ahora baja desde el menú del reproductor (en caliente), así que
   // ya no hace falta recargar la pestaña ni reiniciar el stream.
-  try { tab.webview?.send('cobalt-autoloot', { on: true, lowRes: true }); } catch { /* nada */ }
+  try { tab.webview?.send('naviris-autoloot', { on: true, lowRes: true }); } catch { /* nada */ }
   renderTabs(); updateLootUI();
   toast('AutoClaim activo: canal silenciado y en resolución mínima');
 }
@@ -5482,15 +5486,15 @@ async function loadRatQualities() {
   els.ratQrow.classList.remove('hidden');
   els.ratQuality.innerHTML = '<option value="">Cargando resoluciones…</option>';
   let heights = [];
-  try { heights = await window.cobalt.ytFormats(url); } catch {}
+  try { heights = await window.navirisApp.ytFormats(url); } catch {}
   if (token !== ratQualityToken) return; // llegó otra petición más nueva
   if (!heights.length) { els.ratQuality.innerHTML = '<option value="">Máxima calidad</option>'; return; }
   els.ratQuality.innerHTML = '<option value="">Máxima calidad</option>';
   heights.forEach((h) => { const o = document.createElement('option'); o.value = String(h); o.textContent = h + 'p'; els.ratQuality.appendChild(o); });
 }
 els.ratUrl.addEventListener('input', () => { updateRatPlat(); clearTimeout(ratQualityTimer); ratQualityTimer = setTimeout(loadRatQualities, 700); });
-els.ratXcheck.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ xRevealSensitive: els.ratXcheck.checked }); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
-async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.cobalt.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando video (${quality}p)…` : 'Descargando video…')); }
+els.ratXcheck.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ xRevealSensitive: els.ratXcheck.checked }); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload(); toast(els.ratXcheck.checked ? 'Contenido sensible visible en X' : 'Sensibilidad de X restaurada'); });
+async function ratGrab(mode) { const url = els.ratUrl.value.trim(); if (!/^https?:/.test(url)) { toast('Pega un enlace válido'); return; } const quality = mode === 'video' ? els.ratQuality.value : ''; els.ratPop.classList.add('hidden'); els.sbRat.classList.remove('open'); toggleDownloads(true); await window.navirisApp.ytDownload(url, mode, quality); toast(mode === 'audio' ? 'Extrayendo MP3…' : (quality ? `Descargando video (${quality}p)…` : 'Descargando video…')); }
 els.ratVideo.addEventListener('click', () => ratGrab('video'));
 els.ratAudio.addEventListener('click', () => ratGrab('audio'));
 
@@ -5580,16 +5584,16 @@ els.sbSettings.addEventListener('click', (e) => {
 /* ============ Bloqueador ============ */
 let adblockPoll = null;
 async function refreshAdblockUI() {
-  const info = await window.cobalt.adblockGet(); els.adblockToggle.checked = info.enabled; els.navShield.classList.toggle('off', !info.enabled);
+  const info = await window.navirisApp.adblockGet(); els.adblockToggle.checked = info.enabled; els.navShield.classList.toggle('off', !info.enabled);
   els.adblockCount.textContent = info.enabled ? `${info.blocked} peticiones bloqueadas` : 'Desactivado';
   const tab = activeTab(); const host = tab?.kind === 'web' ? hostOf(tab.url) : '';
   if (host) { const permitido = info.whitelist.find((d) => host === d || host.endsWith('.' + d)); const allowed = !!permitido; els.adblockSite.classList.remove('hidden'); els.adblockSite.textContent = allowed ? `Volver a bloquear en ${permitido}` : `Permitir anuncios en ${host}`; els.adblockSite.dataset.host = permitido || host; els.adblockSite.dataset.allowed = allowed ? '1' : ''; } else els.adblockSite.classList.add('hidden');
   els.adblockList.innerHTML = '';
-  for (const d of info.whitelist) { const row = document.createElement('div'); row.className = 'sp-item'; const s = document.createElement('span'); s.textContent = d; const rm = document.createElement('button'); rm.innerHTML = window.icon('trash'); rm.addEventListener('click', async () => { await window.cobalt.adblockWhitelist('remove', d); refreshAdblockUI(); }); row.append(s, rm); els.adblockList.appendChild(row); }
+  for (const d of info.whitelist) { const row = document.createElement('div'); row.className = 'sp-item'; const s = document.createElement('span'); s.textContent = d; const rm = document.createElement('button'); rm.innerHTML = window.icon('trash'); rm.addEventListener('click', async () => { await window.navirisApp.adblockWhitelist('remove', d); refreshAdblockUI(); }); row.append(s, rm); els.adblockList.appendChild(row); }
 }
 els.navShield.addEventListener('click', async (e) => { e.stopPropagation(); const open = els.shieldPop.classList.contains('hidden'); els.shieldPop.classList.toggle('hidden'); els.navShield.classList.toggle('open', open); clearInterval(adblockPoll); if (open) { await refreshAdblockUI(); adblockPoll = setInterval(refreshAdblockUI, 3000); } });
-els.adblockToggle.addEventListener('change', async () => { await window.cobalt.adblockSetEnabled(els.adblockToggle.checked); refreshAdblockUI(); toast(els.adblockToggle.checked ? 'Bloqueador activado' : 'Bloqueador desactivado'); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)youtube\.com$/.test(hostOf(tab.url))) tab.webview.reload(); });
-els.adblockSite.addEventListener('click', async () => { const host = els.adblockSite.dataset.host; if (!host) return; await window.cobalt.adblockWhitelist(els.adblockSite.dataset.allowed ? 'remove' : 'add', host); refreshAdblockUI(); activeTab()?.webview?.reload(); });
+els.adblockToggle.addEventListener('change', async () => { await window.navirisApp.adblockSetEnabled(els.adblockToggle.checked); refreshAdblockUI(); toast(els.adblockToggle.checked ? 'Bloqueador activado' : 'Bloqueador desactivado'); const tab = activeTab(); if (tab?.kind === 'web' && /(^|\.)youtube\.com$/.test(hostOf(tab.url))) tab.webview.reload(); });
+els.adblockSite.addEventListener('click', async () => { const host = els.adblockSite.dataset.host; if (!host) return; await window.navirisApp.adblockWhitelist(els.adblockSite.dataset.allowed ? 'remove' : 'add', host); refreshAdblockUI(); activeTab()?.webview?.reload(); });
 
 /* ============ Información del sitio (candado) ============ */
 const sitePop = document.getElementById('site-pop');
@@ -5615,14 +5619,14 @@ async function abrirSitePop() {
   else { stp.secureTitle.textContent = 'Página local'; stp.secureSub.textContent = ''; }
   stp.cookieN.textContent = 'Contando…';
   sitePop.classList.remove('hidden');
-  const d = await window.cobalt.siteData(tab.url, PARTITION);
+  const d = await window.navirisApp.siteData(tab.url, PARTITION);
   stp.cookieN.textContent = d.ok ? (d.cookies === 1 ? '1 cookie de este sitio' : d.cookies + ' cookies de este sitio') : 'No disponible';
 }
 stp.lock.addEventListener('click', (e) => { e.stopPropagation(); sitePop.classList.contains('hidden') ? abrirSitePop() : cerrarSitePop(); });
 stp.close.addEventListener('click', cerrarSitePop);
 stp.clear.addEventListener('click', async () => {
   const tab = activeTab(); if (!tab || tab.kind !== 'web') return;
-  const r = await window.cobalt.siteClear(tab.url, PARTITION);
+  const r = await window.navirisApp.siteClear(tab.url, PARTITION);
   if (r.ok) { toast('Cookies y datos del sitio borrados'); stp.cookieN.textContent = '0 cookies de este sitio'; try { tab.webview?.reload(); } catch { /* nada */ } }
   else toast('No se pudieron borrar los datos');
 });
@@ -5654,23 +5658,23 @@ document.addEventListener('click', (e) => {
 }, true);   // en captura: los botones que abren otro popover cortan la propagación y quedaban dos abiertos a la vez
 els.menuPop.addEventListener('click', (e) => {
   const a = e.target.closest('button')?.dataset.action; if (!a) return; els.menuPop.classList.add('hidden');
-  if (a === 'newtab') createTab(); if (a === 'newwindow') window.cobalt.newWindow(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
+  if (a === 'newtab') createTab(); if (a === 'newwindow') window.navirisApp.newWindow(); if (a === 'private') window.navirisApp.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
   if (a === 'borrar-datos') abreBorrarDatos();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   // Con la estable ya descargada, la entrada del menú instala directamente: el
   // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
-  if (a === 'update') { if (updAutoLista) window.cobalt.updateInstall(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
+  if (a === 'update') { if (updAutoLista) window.navirisApp.updateInstall(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
   if (a === 'permissions') showPermManager();
   // Volver a ver la página de la versión instalada cuando quieras: sale sola al
   // actualizar, pero cerrarla no puede significar perderla.
   if (a === 'novedades') (async () => {
-    const v = await window.cobalt.version();
+    const v = await window.navirisApp.version();
     const pag = await paginaNovedades(v);
     if (pag) abreNovedadesPagina(pag);
     else toast('Esta versión no trae página de novedades');
   })();
 });
-els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
+els.optSmartsearch.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ smartSearch: els.optSmartsearch.checked }); });
 // Motor de búsqueda (src/buscadores.js): la lista sale de ahí, no del HTML.
 function pintaBuscador() {
   const sel = els.optBuscador, b = window.naviBuscadores;
@@ -5681,41 +5685,41 @@ function pintaBuscador() {
   els.urlbar.placeholder = 'Busca en ' + b.buscador(settings.buscador).nombre + ' o escribe una dirección';
 }
 els.optBuscador.addEventListener('change', async () => {
-  settings = await window.cobalt.setSettings({ buscador: els.optBuscador.value });
+  settings = await window.navirisApp.setSettings({ buscador: els.optBuscador.value });
   pintaBuscador();
   toast('Buscador: ' + window.naviBuscadores.buscador(settings.buscador).nombre);
 });
 els.optPreguntarDescargas.addEventListener('change', async () => {
-  settings = await window.cobalt.setSettings({ preguntarDescargas: els.optPreguntarDescargas.checked });
+  settings = await window.navirisApp.setSettings({ preguntarDescargas: els.optPreguntarDescargas.checked });
   toast(els.optPreguntarDescargas.checked ? 'Cada descarga preguntará dónde guardarse' : 'Las descargas van directas a Descargas');
 });
-els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
-els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
-els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
-els.optAtajos.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ atajos: els.optAtajos.checked }); toast(els.optAtajos.checked ? 'Atajos de teclado activados' : 'Atajos de teclado desactivados'); });
+els.optPasskeys.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
+els.optRestore.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('naviris.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
+els.optPowersaver.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ powerSaver: els.optPowersaver.checked }); });
+els.optAtajos.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ atajos: els.optAtajos.checked }); toast(els.optAtajos.checked ? 'Atajos de teclado activados' : 'Atajos de teclado desactivados'); });
 els.optVtabs.addEventListener('change', async () => {
-  settings = await window.cobalt.setSettings({ tabsVerticales: els.optVtabs.checked });
+  settings = await window.navirisApp.setSettings({ tabsVerticales: els.optVtabs.checked });
   aplicaVerticales(els.optVtabs.checked);
   toast(els.optVtabs.checked ? 'Pestañas en vertical' : 'Pestañas arriba');
 });
 els.vtabsNew.addEventListener('click', () => createTab());
 els.divSalir.innerHTML = window.icon('x-mark');
 els.divSalir.addEventListener('click', salirDivision);
-els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del mouse activados' : 'Botones del mouse desactivados'); });
-els.optSonidos.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ sonidos: els.optSonidos.checked }); });
-els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
+els.optMousenav.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del mouse activados' : 'Botones del mouse desactivados'); });
+els.optSonidos.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ sonidos: els.optSonidos.checked }); });
+els.optLight.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
 document.getElementById('hub-theme').addEventListener('click', async () => {
-  settings = await window.cobalt.setSettings({ lightMode: !settings.lightMode });
+  settings = await window.navirisApp.setSettings({ lightMode: !settings.lightMode });
   els.optLight.checked = !!settings.lightMode;
   applyTheme(settings.lightMode);
 });
-els.optGpu.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.cobalt.restart(); });
-els.optAgent.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ agentMode: els.optAgent.checked }); window.cobalt.restart(); });
-els.optUpdauto.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ updatesAuto: els.optUpdauto.checked }); toast(els.optUpdauto.checked ? 'Naviris se actualizará solo' : 'Te avisaré cuando haya versión nueva; la instalas tú desde el menú'); });
+els.optGpu.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ hardwareAcceleration: els.optGpu.checked }); window.navirisApp.restart(); });
+els.optAgent.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ agentMode: els.optAgent.checked }); window.navirisApp.restart(); });
+els.optUpdauto.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ updatesAuto: els.optUpdauto.checked }); toast(els.optUpdauto.checked ? 'Naviris se actualizará solo' : 'Te avisaré cuando haya versión nueva; la instalas tú desde el menú'); });
 // Los estados de getGPUFeatureStatus llegan en inglés de Chromium ("enabled", "disabled_software"…)
 const gpuTxt = (v) => !v ? '—' : /^enabled/.test(v) ? 'activado' : /software/.test(v) ? 'por software' : /^unavailable/.test(v) ? 'no disponible' : 'desactivado';
-async function showAbout() { $('#about-version').textContent = 'v' + (await window.cobalt.version()); const gpu = await window.cobalt.gpuStatus(); const sec = await window.cobalt.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: <b>${gpuTxt(gpu['2d_canvas'])}</b> · WebGL: <b>${gpuTxt(gpu.webgl)}</b><br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b><br>HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
+async function showAbout() { $('#about-version').textContent = 'v' + (await window.navirisApp.version()); const gpu = await window.navirisApp.gpuStatus(); const sec = await window.navirisApp.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: <b>${gpuTxt(gpu['2d_canvas'])}</b> · WebGL: <b>${gpuTxt(gpu.webgl)}</b><br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b><br>HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 
 /* ============ Contraseñas: guardar y autorrellenar en sitios ============ */
@@ -5780,9 +5784,9 @@ function ensureDropClaimer(sourceTab) {
     try { wv.remove(); } catch { /* nada */ }
     dropClaimer = null;
   };
-  wv.addEventListener('dom-ready', () => { try { wv.send('cobalt-claim-inventory'); } catch { /* nada */ } });
+  wv.addEventListener('dom-ready', () => { try { wv.send('naviris-claim-inventory'); } catch { /* nada */ } });
   wv.addEventListener('ipc-message', (ev) => {
-    if (ev.channel !== 'cobalt-twitch') return;
+    if (ev.channel !== 'naviris-twitch') return;
     const d = (ev.args && ev.args[0]) || {};
     if (d.type === 'claim' && d.kind === 'drop') apuntaReclamo(sourceTab, d);
     else if (d.type === 'claim-done') cleanup();
@@ -5793,9 +5797,9 @@ function ensureDropClaimer(sourceTab) {
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
   // Algo copiado desde un campo de contraseña de la página: el Portapapeles no lo apunta
-  if (e.channel === 'cobalt-copia-sensible') { if (typeof data === 'string') marcaSensible(data); return; }
+  if (e.channel === 'naviris-copia-sensible') { if (typeof data === 'string') marcaSensible(data); return; }
   // Botones 4/5 del ratón pulsados DENTRO de la página
-  if (e.channel === 'cobalt-mouse-nav') {
+  if (e.channel === 'naviris-mouse-nav') {
     if (settings.mouseNav === false) return;   // el interruptor vale también con el ratón sobre la web
     const dir = (e.args && e.args[0]) || '';
     if (dir === 'back') irAtras(); else if (dir === 'forward') irAdelante();
@@ -5807,7 +5811,7 @@ async function onWebviewMessage(wv, e) {
      que se abra (activateTab). El preload no lo puede saber: un webview de
      fondo sigue diciendo visibilityState "visible" (medido el 2026-10-07, con
      el hub delante), y el aviso salía sobre otra pestaña. */
-  if (e.channel === 'cobalt-yt-muro') {
+  if (e.channel === 'naviris-yt-muro') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
     let vid = '';
     try { const u = new URL(data.url); if (/(^|\.)youtube\.com$/.test(u.hostname)) vid = u.searchParams.get('v') || ''; } catch { /* nada */ }
@@ -5817,7 +5821,7 @@ async function onWebviewMessage(wv, e) {
     return;
   }
   // Un agente (CDP) marcó/desmarcó esta pestaña: pinta el distintivo. Vale para cualquier pestaña.
-  if (e.channel === 'cobalt-agent') {
+  if (e.channel === 'naviris-agent') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
     tab.agentControlled = !!data.on;
     try { wv.classList.toggle('agent-controlled', !!data.on); } catch { /* nada */ }
@@ -5825,7 +5829,7 @@ async function onWebviewMessage(wv, e) {
     return;
   }
   // Twitch: se atiende aunque la pestaña esté en segundo plano (ahí es donde se deja el stream)
-  if (e.channel === 'cobalt-twitch') {
+  if (e.channel === 'naviris-twitch') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
     // Hay drops ganados sin reclamar: abre el webview oculto que los reclama sin cortar el farmeo.
     if (data.type === 'drops-pending') ensureDropClaimer(tab);
@@ -5833,7 +5837,7 @@ async function onWebviewMessage(wv, e) {
     return;
   }
   if (activeTab()?.webview !== wv) return; // el resto (contraseñas) solo en la pestaña activa
-  if (e.channel === 'cobalt-capture') {
+  if (e.channel === 'naviris-capture') {
     if (IS_PRIVATE) return; // en ventana privada no se guardan contraseñas
     const { url, username, password } = data;
     if (!password) return;
@@ -5841,25 +5845,25 @@ async function onWebviewMessage(wv, e) {
     const key = host + '|' + (username || '');
     if (pwPrompted.get(key) === password) return;
     pwPrompted.set(key, password);
-    const existing = (await window.cobalt.pwForHost(host)).find((c) => (c.username || '') === (username || ''));
+    const existing = (await window.navirisApp.pwForHost(host)).find((c) => (c.username || '') === (username || ''));
     const who = username ? `<b>${escapeHtml(username)}</b> en <b>${escapeHtml(host)}</b>` : `<b>${escapeHtml(host)}</b>`;
     if (existing) showPwBar(`¿Actualizar la contraseña de ${who}?`, 'Actualizar', () => doSavePw(host, username, password));
     else showPwBar(`¿Guardar la contraseña de ${who} en Naviris?`, 'Guardar', () => doSavePw(host, username, password));
-  } else if (e.channel === 'cobalt-loginform') {
+  } else if (e.channel === 'naviris-loginform') {
     const host = hostOf(data.url); if (!host) return;
-    const creds = await window.cobalt.pwForHost(host);
+    const creds = await window.navirisApp.pwForHost(host);
     if (!creds.length) return;
     const cred = creds[0];
     const who = cred.username ? `<b>${escapeHtml(cred.username)}</b>` : 'la cuenta guardada';
     showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred, host), host);
-  } else if (e.channel === 'cobalt-otpform') {
+  } else if (e.channel === 'naviris-otpform') {
     /* Casilla de código de un solo uso: si hay una cuenta del autenticador que
        case con este sitio, se ofrece el codigo. Se empareja por el emisor
        (GitHub ↔ github.com) y por la etiqueta; si no casa ninguna NO se
        ofrece nada, porque meter el codigo de otra cuenta seria peor que no
        ofrecer. */
     const host = hostOf(data.url); if (!host) return;
-    const lista = await window.cobalt.totpList().catch(() => []);
+    const lista = await window.navirisApp.totpList().catch(() => []);
     if (!lista.length) return;
     /* Se compara con cada trozo del dominio menos el final (accounts.GOOGLE.com,
        login.MICROSOFTonline.com), no solo con el primero. Un emisor corto solo
@@ -5875,7 +5879,7 @@ async function onWebviewMessage(wv, e) {
     const nombre = escapeHtml(cuenta.issuer || host);
     const pon = async () => {
       if (!sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-      const r = await window.cobalt.totpCodes();
+      const r = await window.navirisApp.totpCodes();
       if (!r.ok) { toast('Desbloquea el autenticador para usar el código'); return; }
       const it = r.items.find((x) => x.id === cuenta.id);
       if (!it || !/^[0-9]{4,8}$/.test(it.code)) { toast('No se pudo generar el código'); return; }
@@ -5883,17 +5887,17 @@ async function onWebviewMessage(wv, e) {
       try { wv.send('naviris-otp-fill', it.code, host); toast('Código puesto — caduca en ' + it.restan + ' s'); } catch { toast('No se pudo rellenar'); }
     };
     showPwBar('Rellenar el código de <b>' + nombre + '</b> desde tu autenticador.', 'Rellenar código', pon, host);
-  } else if (e.channel === 'cobalt-cardform') {
+  } else if (e.channel === 'naviris-cardform') {
     // Formulario de pago detectado: ofrecer la tarjeta guardada (CVC no; lo teclea el usuario)
     if (IS_PRIVATE) return;
     const host = hostOf(data.url); if (!host) return;
-    const cards = await window.cobalt.cardsList();
+    const cards = await window.navirisApp.cardsList();
     if (!cards.length) return;
     const card = cards[0];
     showPwBar(`Rellenar la tarjeta <b>${escapeHtml(card.brand)} •••• ${escapeHtml(card.last4)}</b> en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows. El CVC lo escribes tú.`, 'Rellenar', () => doFillCard(wv, card, host), host);
   }
 }
-// El aviso del muro de YouTube (ver 'cobalt-yt-muro'): como mucho uno por pestaña
+// El aviso del muro de YouTube (ver 'naviris-yt-muro'): como mucho uno por pestaña
 // y video. El botón mete youtube.com en la lista blanca, igual que el escudo, y
 // recarga la pestaña.
 function avisaMuroYT(tab, vid) {
@@ -5903,7 +5907,7 @@ function avisaMuroYT(tab, vid) {
   toast('YouTube bloqueó el video por el bloqueador de anuncios.', {
     label: 'Permitir anuncios en YouTube',
     alPulsar: async () => {
-      await window.cobalt.adblockWhitelist('add', 'youtube.com');
+      await window.navirisApp.adblockWhitelist('add', 'youtube.com');
       if (!els.shieldPop.classList.contains('hidden')) refreshAdblockUI();
       toast('Anuncios permitidos en YouTube');
       try { tab.webview?.reload(); } catch { /* nada */ }
@@ -5914,20 +5918,20 @@ function avisaMuroYT(tab, vid) {
 // Windows Hello y otra vez después, que mientras tanto se puede haber navegado.
 async function doFillCard(wv, card, host) {
   if (!sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-  const r = await window.cobalt.cardsFill(card.id);
+  const r = await window.navirisApp.cardsFill(card.id);
   if (r.ok && !sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-  if (r.ok) { try { wv.send('cobalt-fill-card', r, host); toast('Tarjeta rellenada (falta el CVC)'); } catch { toast('No se pudo rellenar'); } }
+  if (r.ok) { try { wv.send('naviris-fill-card', r, host); toast('Tarjeta rellenada (falta el CVC)'); } catch { toast('No se pudo rellenar'); } }
   else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
 }
 async function doSavePw(host, username, password) {
-  const r = await window.cobalt.pwAdd(host, username || '', password);
+  const r = await window.navirisApp.pwAdd(host, username || '', password);
   toast(r && r.ok ? (r.updated ? 'Contraseña actualizada' : 'Contraseña guardada en Naviris') : 'No se pudo guardar');
 }
 async function doFillPw(wv, cred, host) {
   if (!sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-  const r = await window.cobalt.pwReveal(cred.id);
+  const r = await window.navirisApp.pwReveal(cred.id);
   if (r.ok && !sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-  if (r.ok) { try { wv.send('cobalt-fill', { username: cred.username, password: r.password }, host); toast('Contraseña rellenada'); } catch { toast('No se pudo rellenar'); } }
+  if (r.ok) { try { wv.send('naviris-fill', { username: cred.username, password: r.password }, host); toast('Contraseña rellenada'); } catch { toast('No se pudo rellenar'); } }
   else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
 }
 
@@ -5950,10 +5954,10 @@ function showNextPerm() {
 }
 function answerPerm(decision) {
   const req = permQueue.shift(); if (!req) return;
-  window.cobalt.permRespond(req.id, decision, els.permRemember.checked);
+  window.navirisApp.permRespond(req.id, decision, els.permRemember.checked);
   showNextPerm();
 }
-window.cobalt.onPermAsk((req) => { permQueue.push(req); if (permQueue.length === 1) showNextPerm(); });
+window.navirisApp.onPermAsk((req) => { permQueue.push(req); if (permQueue.length === 1) showNextPerm(); });
 els.permAllow.addEventListener('click', () => answerPerm('allow'));
 els.permBlock.addEventListener('click', () => answerPerm('block'));
 
@@ -5963,7 +5967,7 @@ els.permBlock.addEventListener('click', () => answerPerm('block'));
 const emergEls = { bar: document.getElementById('emerg-bar'), text: document.getElementById('emerg-text') };
 let emergAviso = null;   // { tab, origen, n }
 function ocultaEmergentes() { emergEls.bar.classList.add('hidden'); emergAviso = null; }
-window.cobalt.onEmergenteBloqueada((p) => {
+window.navirisApp.onEmergenteBloqueada((p) => {
   const tab = pestanaDeWebContents(p.wc);
   if (!tab || tab.id !== activeId) return;
   if (emergAviso && emergAviso.tab === tab.id && emergAviso.origen === p.origen) emergAviso.n++;
@@ -5973,13 +5977,13 @@ window.cobalt.onEmergenteBloqueada((p) => {
   emergEls.bar.classList.remove('hidden');
 });
 document.getElementById('emerg-allow').addEventListener('click', () => {
-  if (emergAviso) { window.cobalt.permitirEmergentes(emergAviso.origen); toast('Ventanas emergentes permitidas en este sitio'); }
+  if (emergAviso) { window.navirisApp.permitirEmergentes(emergAviso.origen); toast('Ventanas emergentes permitidas en este sitio'); }
   ocultaEmergentes();
 });
 document.getElementById('emerg-close').addEventListener('click', ocultaEmergentes);
 
 async function showPermManager() {
-  const perms = await window.cobalt.permList();
+  const perms = await window.navirisApp.permList();
   els.permList.innerHTML = '';
   const keys = Object.keys(perms);
   for (const key of keys) {
@@ -5990,16 +5994,16 @@ async function showPermManager() {
     info.innerHTML = `<div class="pr-site">${escapeHtml(host)}</div><div class="pr-perm">${escapeHtml(PERM_SHORT[type] || type)}</div>`;
     const state = document.createElement('span'); state.className = 'pr-state ' + (perms[key] === 'allow' ? 'allow' : 'block'); state.textContent = perms[key] === 'allow' ? 'Permitido' : 'Bloqueado';
     const x = document.createElement('button'); x.className = 'pr-x'; x.title = 'Revocar'; x.innerHTML = window.icon('trash');
-    x.addEventListener('click', async () => { await window.cobalt.permRemove(key); showPermManager(); });
+    x.addEventListener('click', async () => { await window.navirisApp.permRemove(key); showPermManager(); });
     row.append(info, state, x); els.permList.appendChild(row);
   }
   els.permModal.classList.remove('hidden');
 }
 els.permModalClose.addEventListener('click', () => els.permModal.classList.add('hidden'));
 els.permClearAll.addEventListener('click', async () => {
-  const n = Object.keys(await window.cobalt.permList()).length;
+  const n = Object.keys(await window.navirisApp.permList()).length;
   if (!n) { toast('No hay permisos guardados'); return; }
-  promptConfirm('¿Borrar todos los permisos?', (n === 1 ? 'Se borra el permiso guardado.' : 'Se borran los ' + n + ' permisos guardados.') + ' Cada sitio te lo volverá a pedir.', async () => { await window.cobalt.permClear(); showPermManager(); toast('Permisos borrados'); });
+  promptConfirm('¿Borrar todos los permisos?', (n === 1 ? 'Se borra el permiso guardado.' : 'Se borran los ' + n + ' permisos guardados.') + ' Cada sitio te lo volverá a pedir.', async () => { await window.navirisApp.permClear(); showPermManager(); toast('Permisos borrados'); });
 });
 
 /* ===== Addons (catálogo remoto: naviris.site/addons) ===== */
@@ -6022,7 +6026,7 @@ adEls.refresh.addEventListener('click', renderAddons);
 
 async function renderAddons() {
   adEls.list.innerHTML = '<div class="adp-loading">Cargando catálogo…</div>';
-  const [cat, installed] = await Promise.all([window.cobalt.addonsCatalog(), window.cobalt.addonsList()]);
+  const [cat, installed] = await Promise.all([window.navirisApp.addonsCatalog(), window.navirisApp.addonsList()]);
   const remote = cat.ok ? cat.addons : [];
   const byId = new Map(remote.map((a) => [a.id, a]));
   for (const id of Object.keys(installed)) if (!byId.has(id)) byId.set(id, installed[id]);
@@ -6057,7 +6061,7 @@ async function renderAddons() {
     if (!inst) {
       btn('Instalar', 'primary', async (ev) => {
         ev.target.textContent = 'Instalando…'; ev.target.disabled = true;
-        const r = await window.cobalt.addonsInstall(meta);
+        const r = await window.navirisApp.addonsInstall(meta);
         toast(r.ok ? 'Addon instalado: ' + meta.name + (meta.kind === 'tool' ? '' : ' (activo al recargar los sitios)') : 'Error: ' + r.message);
         if (r.ok) loadToolAddons();
         renderAddons();
@@ -6066,7 +6070,7 @@ async function renderAddons() {
       if (inCatalog && meta.version && inst.version !== meta.version) {
         btn('Actualizar a v' + meta.version, 'primary', async (ev) => {
           ev.target.textContent = 'Actualizando…'; ev.target.disabled = true;
-          const r = await window.cobalt.addonsInstall(meta);
+          const r = await window.navirisApp.addonsInstall(meta);
           if (!r.ok) { toast('Error: ' + r.message); renderAddons(); return; }
           // Descargar el código nuevo NO basta: la herramienta vieja sigue
           // corriendo en memoria (su botón, sus temporizadores). Se retira y se
@@ -6085,12 +6089,12 @@ async function renderAddons() {
         });
       }
       btn(inst.enabled ? 'Pausar' : 'Activar', '', async () => {
-        await window.cobalt.addonsToggle(meta.id, !inst.enabled);
+        await window.navirisApp.addonsToggle(meta.id, !inst.enabled);
         if (inst.kind === 'tool') loadToolAddons();
         renderAddons();
       });
       btn('Quitar', 'danger', async () => {
-        await window.cobalt.addonsUninstall(meta.id);
+        await window.navirisApp.addonsUninstall(meta.id);
         naviris.unregisterTool(meta.id); loadedTools.delete(meta.id);
         toast('Addon eliminado'); renderAddons();
       });
@@ -6122,7 +6126,7 @@ const naviris = {
   // armar una pestaña de Spotify aunque el usuario esté mirando otra cosa); con
   // solo activeWebview esas pestañas no se tocaban hasta ponerlas en primer plano.
   allWebviews: () => tabs.filter((t) => t.kind === 'web' && !t.asleep && t.webview).map((t) => t.webview),
-  savePng: (dataUrl, name) => window.cobalt.savePng(dataUrl, name),
+  savePng: (dataUrl, name) => window.navirisApp.savePng(dataUrl, name),
   // onUnload: se invoca al retirar la herramienta (desinstalar o actualizar en
   // caliente) para que el addon suelte sus listeners. Sin esto, actualizar dejaba
   // vivos los listeners de la instancia vieja colgando de cada <webview> y acababa
@@ -6205,7 +6209,7 @@ const naviris = {
   xSensitive: {
     get: () => !!settings.xRevealSensitive,
     set: async (v) => {
-      settings = await window.cobalt.setSettings({ xRevealSensitive: !!v });
+      settings = await window.navirisApp.setSettings({ xRevealSensitive: !!v });
       els.ratXcheck.checked = !!v;
       const tab = activeTab();
       if (tab?.kind === 'web' && /(^|\.)(x\.com|twitter\.com)$/.test(hostOf(tab.url))) tab.webview.reload();
@@ -6232,7 +6236,7 @@ function ejecutarAddon(id) {
   });
 }
 async function loadToolAddons() {
-  const installed = await window.cobalt.addonsList();
+  const installed = await window.navirisApp.addonsList();
   // Migración: addons retirados del producto. AutoLoot pasó al core; Twitch Kit
   // y Valve Rat Tool se descatalogaron (2026-07-29). Si alguien los tiene
   // instalados, se desinstalan solos para que no quede código muerto sin
@@ -6242,7 +6246,7 @@ async function loadToolAddons() {
   // 'long-screenshot' (Captura larga) se descatalogó el 2026-09-09: sale del
   // catálogo y se desinstala a quien lo tuviera puesto.
   for (const retirado of ['autoloot', 'twitch-kit', 'steam-inventory-helper', 'salta-pasarelas', 'long-screenshot']) {
-    if (installed[retirado]) { try { await window.cobalt.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
+    if (installed[retirado]) { try { await window.navirisApp.addonsUninstall(retirado); naviris.unregisterTool(retirado); delete installed[retirado]; } catch { /* nada */ } }
   }
   // Migración 2.7.3: la sensibilidad de X salió de Ajustes y ahora es el addon
   // "Sensibilidad X". Quien la tenía activa recibe el addon solo, para no
@@ -6250,9 +6254,9 @@ async function loadToolAddons() {
   // próximo arranque; el ajuste no se toca).
   if (settings.xRevealSensitive && !installed['x-sensitive']) {
     try {
-      const cat = await window.cobalt.addonsCatalog();
+      const cat = await window.navirisApp.addonsCatalog();
       const meta = cat.ok && cat.addons.find((a) => a.id === 'x-sensitive');
-      if (meta) { const r = await window.cobalt.addonsInstall(meta); if (r.ok) installed[meta.id] = { ...meta, enabled: true }; }
+      if (meta) { const r = await window.navirisApp.addonsInstall(meta); if (r.ok) installed[meta.id] = { ...meta, enabled: true }; }
     } catch { /* nada */ }
   }
   for (const [id, meta] of Object.entries(installed)) {
@@ -6280,7 +6284,7 @@ function setUpd(text, cls) { updStatus.textContent = text; updStatus.className =
 function updLineEls(line) { return { ver: $('#upd-' + line + '-ver'), btn: $('#upd-' + line + '-btn') }; }
 async function showChannels() {
   setUpd('Consultando versiones…'); updBtn.disabled = true;
-  const r = await window.cobalt.updateChannels();
+  const r = await window.navirisApp.updateChannels();
   updBtn.disabled = false;
   if (!r.ok) { setUpd('Error: ' + r.message, 'err'); return; }
   for (const line of ['stable', 'dev']) {
@@ -6296,11 +6300,11 @@ async function showChannels() {
   else if (updAutoLista) setUpd('Naviris v' + updAutoLista + ' lista: se instala sola al cerrar el navegador.', 'hot');
 }
 async function chooseLine(line) {
-  if (updReadyLine === line) { window.cobalt.updateInstall(); return; }
+  if (updReadyLine === line) { window.navirisApp.updateInstall(); return; }
   if (updBusy || updReadyLine) return;
   updBusy = true; updChosen = line;
   updLineEls('stable').btn.disabled = true; updLineEls('dev').btn.disabled = true;
-  const r = await window.cobalt.updateChoose(line);
+  const r = await window.navirisApp.updateChoose(line);
   if (r.state === 'dev') { setUpd('Las actualizaciones solo funcionan en la versión instalada.'); updBusy = false; updChosen = null; showChannels(); }
   else if (r.state === 'error') { setUpd('Error: ' + r.message, 'err'); updBusy = false; updChosen = null; showChannels(); }
 }
@@ -6338,7 +6342,7 @@ function marcaListaParaInstalar(version) {
     if (pop.firstElementChild !== entrada) pop.insertBefore(entrada, pop.firstElementChild);
   }
 }
-window.cobalt.onUpdateStatus((s) => {
+window.navirisApp.onUpdateStatus((s) => {
   if (s.state === 'available') {
     // Solo se descarga si el usuario eligió línea; el aviso silencioso de arranque solo notifica
     if (!updChosen) {
@@ -6353,7 +6357,7 @@ window.cobalt.onUpdateStatus((s) => {
       return;
     }
     setUpd('Descargando ' + UPD_LABEL[updChosen] + ' v' + s.version + '…'); updBar.classList.remove('hidden');
-    window.cobalt.updateDownload();
+    window.navirisApp.updateDownload();
   } else if (s.state === 'latest') {
     if (updChosen) { setUpd('Ya estás en la última versión de ' + UPD_LABEL[updChosen] + '.'); updBusy = false; updChosen = null; showChannels(); }
   } else if (s.state === 'downloading') {
@@ -6500,7 +6504,7 @@ $('#novp-x').addEventListener('click', () => cierraNovedadesPagina());
 
 async function muestraNovedades() {
   let nov = null;
-  try { nov = await window.cobalt.updateNovedades(); } catch { return; }
+  try { nov = await window.navirisApp.updateNovedades(); } catch { return; }
   if (!nov) return;
   // Con página escrita para esta versión, se abre la página entera
   const pag = await paginaNovedades(nov.version);
@@ -6529,20 +6533,20 @@ async function muestraNovedades() {
 $('#nov-ok').addEventListener('click', () => $('#nov-modal').classList.add('hidden'));
 
 /* Ventana */
-$('#win-min').addEventListener('click', () => window.cobalt.minimize());
-$('#win-max').addEventListener('click', () => window.cobalt.maximize());
-$('#win-close').addEventListener('click', () => window.cobalt.close());
+$('#win-min').addEventListener('click', () => window.navirisApp.minimize());
+$('#win-max').addEventListener('click', () => window.navirisApp.maximize());
+$('#win-close').addEventListener('click', () => window.navirisApp.close());
 // El botón conserva SIEMPRE el icono de maximizar elegido por el usuario
 // (antes al maximizar se cambiaba por otro y parecía que "desaparecía");
 // solo cambia el tooltip según el estado.
-window.cobalt.onMaximized((max) => { $('#win-max').title = max ? 'Restaurar' : 'Maximizar'; });
+window.navirisApp.onMaximized((max) => { $('#win-max').title = max ? 'Restaurar' : 'Maximizar'; });
 
 /* ============ Atajos de teclado y ratón ============ */
 // Juego estándar de navegador (Chrome/Firefox/Edge). Los webviews reciben las
 // teclas por su cuenta, así que estos van en la ventana y actúan sobre la
 // pestaña activa.
 function activeWv() { const t = activeTab(); return t?.kind === 'web' ? t.webview : null; }
-function avisaNavUsuario(wv) { try { window.cobalt.navUsuario(wv.getWebContentsId()); } catch { /* aún sin montar */ } }
+function avisaNavUsuario(wv) { try { window.navirisApp.navUsuario(wv.getWebContentsId()); } catch { /* aún sin montar */ } }
 // Recarga que pide la persona (F5, Ctrl+R, el botón, los menús): main la deja
 // pasar aunque el freno de bucles esté puesto (ver freno-recargas.js).
 function recargaWv(wv, forzado) {
@@ -6861,8 +6865,8 @@ function ejecutaAtajo(cmd) {
   else if (cmd === 'forward') irAdelante();
   else if (cmd === 'home') els.sbHome.click();
   else if (cmd === 'new-tab') createTab();
-  else if (cmd === 'new-window') window.cobalt.newWindow();
-  else if (cmd === 'new-private') window.cobalt.newPrivateWindow();
+  else if (cmd === 'new-window') window.navirisApp.newWindow();
+  else if (cmd === 'new-private') window.navirisApp.newPrivateWindow();
   // Ctrl+W y Ctrl+F4 no cierran las fijadas (decisión de Dosa): se cierran desde su menú.
   else if (cmd === 'close-tab') { const t = activeTab(); if (window.naviAtajos.cierraConAtajo(t)) closeTab(t.id); }
   else if (cmd === 'reopen-tab') reabrirCerrada();
@@ -6881,10 +6885,10 @@ function ejecutaAtajo(cmd) {
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();
   else if (cmd === 'print') { try { activeWv()?.print(); } catch { /* nada */ } }
-  else if (cmd === 'save-page') { const wv = activeWv(); if (wv) { try { window.cobalt.guardaPagina(wv.getWebContentsId()); } catch { /* aún sin montar */ } } }
+  else if (cmd === 'save-page') { const wv = activeWv(); if (wv) { try { window.navirisApp.guardaPagina(wv.getWebContentsId()); } catch { /* aún sin montar */ } } }
   else if (cmd === 'view-source') { const t = activeTab(); if (t?.kind === 'web' && /^https?:/i.test(t.url)) createTab('view-source:' + t.url, true, t.contenedor, t.id); }
   else if (cmd === 'clear-data') abreBorrarDatos();
-  else if (cmd === 'fullscreen') window.cobalt.toggleFullscreen();
+  else if (cmd === 'fullscreen') window.navirisApp.toggleFullscreen();
   else if (cmd === 'zoom-in') zoom(1);
   else if (cmd === 'zoom-out') zoom(-1);
   else if (cmd === 'zoom-reset') zoom(0);
@@ -6900,7 +6904,7 @@ function ejecutaAtajo(cmd) {
     if (n) activateTab(n.id);
   }
 }
-window.cobalt.onShortcut(ejecutaAtajo);
+window.navirisApp.onShortcut(ejecutaAtajo);
 // Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
 // el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
 window.addEventListener('mouseup', (e) => {
@@ -6912,7 +6916,7 @@ window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 
 // Clic derecho en la ZONA VACÍA de la barra de pestañas (región de arrastre de
 // la ventana): a la página no le llega — el main lo intercepta con
 // 'system-context-menu' y manda las coordenadas. Menú de barra, como Chrome.
-window.cobalt.onTabstripMenu(({ x, y }) => {
+window.navirisApp.onTabstripMenu(({ x, y }) => {
   showCtxMenu(x, y, [
     { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
     { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada },
@@ -6930,7 +6934,7 @@ function pestanaDeWebContents(id) {
   }
   return null;
 }
-window.cobalt.onOpenUrl((p) => {
+window.navirisApp.onOpenUrl((p) => {
   if (typeof p === 'string') { createTab(p); return; }
   const madre = pestanaDeWebContents(p.origen);
   // Una pestaña sacada de otra ventana llega con el id de su contenedor.
@@ -6939,14 +6943,14 @@ window.cobalt.onOpenUrl((p) => {
 });
 // Una pestaña que recargaba la misma página sin parar y main ha frenado
 // (ver frenoDeRecargas en main.js).
-window.cobalt.onBucle((p) => {
+window.navirisApp.onBucle((p) => {
   if (!pestanaDeWebContents(p.wc)) return;
   let host = p.url; try { host = new URL(p.url).hostname.replace(/^www\./, ''); } catch { /* nada */ }
-  toast(host + ' se recargaba sin parar y lo he detenido', { label: 'Reintentar', alPulsar: () => window.cobalt.reintentaBucle(p.wc) });
+  toast(host + ' se recargaba sin parar y lo he detenido', { label: 'Reintentar', alPulsar: () => window.navirisApp.reintentaBucle(p.wc) });
 });
 // Una página que no contesta (bucle de JavaScript): se avisa con la salida.
 // Esperar es no hacer nada; si vuelve a responder, el aviso ya no vale.
-window.cobalt.onColgada(({ wc, colgada }) => {
+window.navirisApp.onColgada(({ wc, colgada }) => {
   const tab = pestanaDeWebContents(wc);
   if (!tab || !colgada) return;
   toast((hostOf(tab.url) || 'La página') + ' no responde', { label: 'Cerrar pestaña', alPulsar: () => { if (tabs.includes(tab)) closeTab(tab.id); } });
@@ -6993,18 +6997,18 @@ function quitaDialogo(id) {
 }
 function respondeDialogo(ok) {
   const d = dialogoDe(activeTab()); if (!d) return;
-  window.cobalt.respondeDialogo({ id: d.id, ok, valor: d.tipo === 'prompt' ? els.tdValor.value : null, silenciar: els.tdSilenciar.checked });
+  window.navirisApp.respondeDialogo({ id: d.id, ok, valor: d.tipo === 'prompt' ? els.tdValor.value : null, silenciar: els.tdSilenciar.checked });
   quitaDialogo(d.id);
   try { activeWv()?.focus(); } catch { /* nada */ }
 }
-window.cobalt.onDialogo((d) => {
+window.navirisApp.onDialogo((d) => {
   const tab = pestanaDeWebContents(d.wc);
-  if (!tab) { window.cobalt.respondeDialogo({ id: d.id, ok: false }); return; }
+  if (!tab) { window.navirisApp.respondeDialogo({ id: d.id, ok: false }); return; }
   if (d.tipo !== 'externo') tab.avisos = (tab.avisos || 0) + 1;
   (tab.dialogos || (tab.dialogos = [])).push(d);
   if (tab.id === activeId) pintaDialogo();
 });
-window.cobalt.onDialogoFin(quitaDialogo);
+window.navirisApp.onDialogoFin(quitaDialogo);
 els.tdAceptar.addEventListener('click', () => respondeDialogo(true));
 els.tdCancelar.addEventListener('click', () => respondeDialogo(false));
 els.tabDialogo.addEventListener('keydown', (e) => {
@@ -7024,9 +7028,9 @@ document.addEventListener('contextmenu', (e) => {
   if (document.activeElement !== el) el.focus();
   const valor = texto ? el.value : el.textContent;
   const seleccion = texto ? el.selectionStart !== el.selectionEnd : !!String(getSelection() || '');
-  window.cobalt.menuCampo({ urlbar: el === els.urlbar, seleccion, vacio: !valor });
+  window.navirisApp.menuCampo({ urlbar: el === els.urlbar, seleccion, vacio: !valor });
 });
-window.cobalt.onPegarEIr((texto) => { els.urlbar.value = texto; navigateActive(texto); hideSuggest(); els.urlbar.blur(); });
+window.navirisApp.onPegarEIr((texto) => { els.urlbar.value = texto; navigateActive(texto); hideSuggest(); els.urlbar.blur(); });
 
 /* ===== BORRAR DATOS DE NAVEGACIÓN (Ctrl+Mayús+Supr) =====
    El historial se borra por periodo; cookies y caché siempre enteras, porque
@@ -7049,7 +7053,7 @@ els.datosBorrar.addEventListener('click', async () => {
       guardaHistorial();
       if (!els.historyPanel.classList.contains('hidden')) renderHistory();
     }
-    if (cookies || cache) await window.cobalt.borraDatos({ cookies, cache });
+    if (cookies || cache) await window.navirisApp.borraDatos({ cookies, cache });
     els.datosModal.classList.add('hidden');
     toast('Datos de navegación borrados');
   } finally { els.datosBorrar.disabled = false; }
@@ -7064,7 +7068,7 @@ els.datosBorrar.addEventListener('click', async () => {
    esa misma pestaña a los resultados, igual que en Chrome u Opera GX. */
 function buscarConLens({ src, pagina }) {
   toast('Buscando la imagen con Google Lens…');
-  window.cobalt.lensImagen({ src, pagina }).then((r) => {
+  window.navirisApp.lensImagen({ src, pagina }).then((r) => {
     if (!r || !r.ok) { toast('Google Lens: ' + ((r && r.error) || 'no se pudo leer la imagen')); return; }
     const tab = createTab('https://lens.google.com/', true);
     const wv = tab.webview; if (!wv) return;
@@ -7093,10 +7097,10 @@ function buscarConLens({ src, pagina }) {
 }
 /* Lo que el menú contextual de la página no puede hacer desde el proceso
    principal: cosas de la interfaz (pestañas, marcadores, hub, Rat Tool). */
-window.cobalt.onContextAction(({ tipo, datos }) => {
+window.navirisApp.onContextAction(({ tipo, datos }) => {
   if (tipo === 'buscar') { const u = toUrl(datos); if (u) createTab(u); return; }
   if (tipo === 'lens') { buscarConLens(datos); return; }
-  if (tipo === 'pantalla-completa') { window.cobalt.toggleFullscreen(); return; }
+  if (tipo === 'pantalla-completa') { window.navirisApp.toggleFullscreen(); return; }
   if (tipo === 'pip') { miniReproductor(); return; }
   if (tipo === 'marcador') {
     if (findBookmark(datos.url)) { toast('Ya estaba en marcadores'); return; }
@@ -7127,7 +7131,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
 /* Arranque */
 (async function init() {
   migraFondoPorTema(); // antes de applyTheme(): el es quien aplica el fondo del tema
-  settings = await window.cobalt.getSettings();
+  settings = await window.navirisApp.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode; els.optUpdauto.checked = settings.updatesAuto !== false;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
   els.optPreguntarDescargas.checked = !!settings.preguntarDescargas; pintaBuscador();
@@ -7139,7 +7143,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   espacioActivo = IS_PRIVATE ? null : (settings.espacioActivo || null);
   /* Se ESPERA antes de restaurar la sesión: las pestañas que se crean al
      arrancar nacen en el espacio activo, y tiene que estar decidido ya. */
-  await window.cobalt.espDesbloqueados().then(async (lista) => {
+  await window.navirisApp.espDesbloqueados().then(async (lista) => {
     espDesbloqueados = new Set(lista || []);
     // Si al arrancar el espacio activo está bloqueado y no se ha abierto en esta
     // sesión, no se entra: se cae al General. Si no, bastaría reiniciar para ver
@@ -7150,28 +7154,28 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
        marcadores. Con los generales en memoria, el primer guardado los metería
        en su archivo cifrado. */
     else if (esp && esp.bloqueado) {
-      const rd = await window.cobalt.espDatos(esp.id).catch(() => null);
+      const rd = await window.navirisApp.espDatos(esp.id).catch(() => null);
       if (rd && rd.ok) { history = Array.isArray(rd.datos.historial) ? rd.datos.historial : []; bookmarks = Array.isArray(rd.datos.marcadores) ? rd.datos.marcadores : []; }
     }
   }).catch(() => {});
   // Migración 2.7.3-dev.16: el tema rosa pasó a ser claro. Quien lo eligió en
   // la versión oscura guarda lightMode=false y, sin esto, el arranque lo
   // degradaría a oscuro (y los webviews seguirían renderizando en oscuro).
-  if (temaActual() === 'rosa' && !settings.lightMode) settings = await window.cobalt.setSettings({ lightMode: true });
+  if (temaActual() === 'rosa' && !settings.lightMode) settings = await window.navirisApp.setSettings({ lightMode: true });
   els.optLight.checked = !!settings.lightMode; applyTheme(settings.lightMode);
   // Modo agente activo: aviso permanente en la topbar (el puerto CDP está abierto).
   refreshAgentBadge();
   els.optSmartsearch.checked = settings.smartSearch !== false; els.optPasskeys.checked = settings.blockPasskeys !== false;
-  const ab = await window.cobalt.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
+  const ab = await window.navirisApp.adblockGet(); els.navShield.classList.toggle('off', !ab.enabled);
   if (IS_PRIVATE) { els.privateBadge.classList.remove('hidden'); els.privateBadge.innerHTML = window.icon('eye-slash') + '<span>Privado</span>'; }
   // (el fondo ya lo puso applyTheme: cada tema recuerda el suyo)
-  window.cobalt.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
+  window.navirisApp.version().then((v) => { const el = document.getElementById('hub-version'); if (el) el.textContent = 'Naviris v' + v; });
   els.optRestore.checked = settings.restoreSession !== false;
   renderBookmarksBar(); renderHub();
   if (!IS_PRIVATE) accBootSync(); // cuenta Naviris: baja preferencias si el servidor tiene algo más nuevo
   // Restaura la sesión anterior si el ajuste está activo (por defecto sí, como Brave)
   // La ventana sacada no restaura nada: era copiar todas las pestañas en ella.
-  const session = (IS_PRIVATE || SACADA) ? [] : store.get('cobalt.session', []);
+  const session = (IS_PRIVATE || SACADA) ? [] : store.get('naviris.session', []);
   if (settings.restoreSession !== false && Array.isArray(session) && session.length) {
     // NINGUNA se carga al arrancar: todas entran DORMIDAS y se abre el hub.
     // Cada pestaña carga solo cuando la seleccionas. Antes se cargaban todas y
@@ -7190,7 +7194,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
      (src/splash.html) y ESTA ventana sigue oculta hasta este aviso: así nadie
      ve el esqueleto vacío montándose. El main la enseña y cierra el cuadrado.
      Ver crearSplash()/cerrarSplash() en main.js. */
-  window.cobalt.uiLista();
+  window.navirisApp.uiLista();
   // El hub entra escalonado mientras el cuadrado se va: el relevo se solapa,
   // que es lo que hace que parezca una sola secuencia. La clase se quita al
   // terminar, así no queda nada animándose.

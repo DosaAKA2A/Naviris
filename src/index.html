@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <!-- CSP de la INTERFAZ (no de las webs que visitas). Esta página tiene acceso
-       al puente window.cobalt (contraseñas, tarjetas), así que se blinda: nada
+       al puente window.navirisApp (contraseñas, tarjetas), así que se blinda: nada
        de <script> remotos ni eval, y las conexiones salientes se limitan a los
        servicios que la interfaz usa de verdad. img-src acepta https: y data:
        porque los favicons y miniaturas vienen de cualquier sitio. -->
@@ -551,6 +551,7 @@
   <script src="hub-escala.js"></script>
   <script src="atajos.js"></script>
   <script src="buscadores.js"></script>
+  <script src="migra-claves.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

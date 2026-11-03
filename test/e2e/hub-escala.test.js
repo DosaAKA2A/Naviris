@@ -47,7 +47,7 @@ async function aTamano(ui, t) {
   await ui.envia('Emulation.setDeviceMetricsOverride', { width: t.w, height: t.h, deviceScaleFactor: t.dsf, mobile: false, screenWidth: t.w, screenHeight: t.h + 40 });
 }
 async function deFabrica(ui) {
-  await ui.evalua(`['cobalt.widgets', 'cobalt.maqueta'].forEach((k) => localStorage.removeItem(k)); localStorage.setItem('cobalt.hub.v3', 'true'); true`);
+  await ui.evalua(`['naviris.widgets', 'naviris.maqueta'].forEach((k) => localStorage.removeItem(k)); localStorage.setItem('naviris.hub.v3', 'true'); true`);
   await ui.envia('Page.reload', { ignoreCache: true });
   await espera(1000);
   await hasta(() => ui.evalua(`typeof encuadreHub !== 'undefined' && !!encuadreHub && document.querySelectorAll('#widget-grid > .widget').length >= 8`));

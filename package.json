@@ -29,7 +29,7 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.estudiodeiris.cobalt",
+    "appId": "com.estudiodeiris.naviris",
     "productName": "Naviris",
     "afterSign": "build/evs-sign.js",
     "electronDownload": {
@@ -77,6 +77,7 @@
       ]
     },
     "nsis": {
+      "guid": "d31db246-92f5-5005-a1d2-33cc1464dc5d",
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,

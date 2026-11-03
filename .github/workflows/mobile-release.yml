@@ -27,13 +27,15 @@ jobs:
           if [ -n "$KS_B64" ]; then
             mkdir -p "$HOME/.android-keys"
             # tr elimina saltos y espacios por si el valor se pegó con la línea partida
-            echo "$KS_B64" | tr -d ' \t\r\n' | base64 -d > "$HOME/.android-keys/cobalt-release.jks"
+            echo "$KS_B64" | tr -d ' \t\r\n' | base64 -d > "$HOME/.android-keys/naviris-release.jks"
             {
-              echo "storeFile=$HOME/.android-keys/cobalt-release.jks"
+              echo "storeFile=$HOME/.android-keys/naviris-release.jks"
               echo "storePassword=$KS_PASS"
+              # El alias va DENTRO del almacén de claves de los secretos: cambiarlo
+              # exige renombrarlo allí (keytool -changealias) y subir el almacén otra vez.
               echo "keyAlias=cobalt"
               echo "keyPassword=$KS_PASS"
-            } > "$HOME/.android-keys/cobalt-release.properties"
+            } > "$HOME/.android-keys/naviris-release.properties"
             echo "Firma release configurada."
           else
             echo "Sin secretos de firma: el APK saldrá sin firmar."

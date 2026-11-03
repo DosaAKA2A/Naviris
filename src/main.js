@@ -6,15 +6,12 @@ const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
-const { migraPerfil } = require('./migraciones');
+const { migraPerfil, migraCarpetaV1, migraNombre, PART_NAVIRIS } = require('./migraciones');
 const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
 const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binarios (se prueba en test/)
 const atajos = require('./atajos');             // tabla única de atajos (también la lee el renderer)
 const { crearFreno } = require('./freno-recargas');
 const { aplicacionPara } = require('./externos');
-
-const PART_NORMAL = 'persist:cobalt';
-const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
 
 // Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
 // con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
@@ -37,14 +34,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: braveAdblock.ESQUEMA_SUSTITUTOS, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true } }
 ]);
 
-// Migración de perfil: el rebrand Cobalt→Naviris cambia la carpeta de userData,
-// así que si existe el perfil antiguo y no el nuevo, se renombra para conservar
-// sesiones, contraseñas y ajustes de los usuarios existentes.
-try {
-  const oldProfile = path.join(app.getPath('appData'), 'Cobalt');
-  const newProfile = path.join(app.getPath('appData'), 'Naviris');
-  if (fs.existsSync(oldProfile) && !fs.existsSync(newProfile)) fs.renameSync(oldProfile, newProfile);
-} catch (e) { console.log('[Naviris] No se pudo migrar el perfil:', e.message); }
+// El perfil de la v1, con el nombre viejo, pasa a ser el de Naviris (ver migraciones.js).
+try { migraCarpetaV1(app.getPath('appData')); } catch (e) { console.log('[Naviris] No se pudo migrar el perfil:', e.message); }
 
 // ---------- Rutas de binarios (yt-dlp / ffmpeg / deno) ----------
 // Desde v2.2.3 los binarios NO van en el instalador (~100 MB menos): se
@@ -351,7 +342,7 @@ function ensureBins() {
 }
 
 // ---------- Ajustes persistentes ----------
-const settingsPath = () => path.join(app.getPath('userData'), 'cobalt-settings.json');
+const settingsPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'settings.json');
 
 const DEFAULT_SETTINGS = {
   hardwareAcceleration: true,
@@ -419,7 +410,7 @@ function suppressWebAuthn() { /* ver arriba: el bloqueo vive en webview-preload 
 //   oculto, así que borrarlo empeoraba la marca de la cuenta. Esta variante NO se
 //   toca: la trata el preload (un reintento y, si vuelve, se deja a la vista y la
 //   interfaz ofrece la lista blanca).
-// Sin marca global para no repetirse (antes window.__cobaltYTtidy, legible por
+// Sin marca global para no repetirse (antes había una en window, legible por
 // YouTube): dom-ready llega una sola vez por documento. El observador va con
 // freno: sin él corrían cinco querySelector en cada mutación de YouTube, que
 // son miles por minuto con el vídeo puesto.
@@ -448,7 +439,7 @@ const YT_ADSKIP = `(function(){
 const YT_ADCSS = '#masthead-ad,ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,#player-ads,ytd-in-feed-ad-layout-renderer,ytd-ads-engagement-panel-content-renderer,#related ytd-ad-slot-renderer{display:none!important}';
 // Revela contenido sensible en X/Twitter
 const X_REVEAL = `(function(){
-  if(window.__cobaltX)return; window.__cobaltX=1;
+  if(window.__navX)return; window.__navX=1;
   function reveal(){
     try{
       document.querySelectorAll('[data-testid="sensitiveMediaWarning"]').forEach(function(w){ var b=w.querySelector('[role="button"]'); if(b) b.click(); });
@@ -462,7 +453,7 @@ const X_REVEAL = `(function(){
 // decisión del usuario). Los anuncios incrustados en el stream no se pueden quitar
 // sin un proxy del m3u8, así que esto no rompe la reproducción.
 const TWITCH_ADHIDE = `(function(){
-  if(window.__cobaltTwAd)return; window.__cobaltTwAd=1;
+  if(window.__navTwAd)return; window.__navTwAd=1;
   var s=document.createElement('style');
   s.textContent='[data-test-selector="sad-overlay"],.video-player__ad-info-container,[data-a-target="advertising-billboard"],div[aria-label="Advertisement"]{display:none!important}';
   document.documentElement.appendChild(s);
@@ -512,6 +503,15 @@ function saveSettings(s) {
 // Electron NO honra ese switch de Chromium por sí solo; hay que redirigir userData.
 const perfilCli = process.argv.find((a) => a.startsWith('--user-data-dir='));
 if (perfilCli) app.setPath('userData', perfilCli.slice('--user-data-dir='.length));
+
+/* Los nombres del perfil: naviris-*.json y la sesión persist:naviris. Los de
+   antes (con el nombre viejo del navegador) se copian aquí, antes de leer los
+   ajustes y de que Chromium abra la sesión. Si algo no se pudo copiar, este
+   arranque sigue con lo viejo y se reintenta en el siguiente (migraNombre). */
+const nombres = migraNombre(app.getPath('userData'), (m) => console.log('[Naviris] Cambio de nombre:', m));
+const ARCHIVOS = nombres.archivos;
+const PART_NORMAL = nombres.particion;
+const PART_PRIVATE = 'naviris-private'; // sin "persist:" → solo en memoria
 
 let settings = loadSettings();
 
@@ -1556,10 +1556,11 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   const query = {};
   if (isPrivate) query.private = '1';
   if (sacada) query.sacada = '1';
+  if (!isPrivate && PART_NORMAL !== PART_NAVIRIS) query.particion = PART_NORMAL;
   win.loadFile(path.join(__dirname, 'index.html'), Object.keys(query).length ? { query } : undefined);
   // La interfaz no navega nunca: ni un <meta refresh> inyectado ni un enlace o
   // archivo soltado sobre ella pueden cambiar index.html por otra página (que
-  // heredaría window.cobalt).
+  // heredaría window.navirisApp).
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   // Ni abre ventanas sueltas: una dirección web se abre en una pestaña de esta ventana.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -2273,7 +2274,7 @@ ipcMain.on('win:nueva', soloUI(() => ventanaConUrl(null, false)));
 ipcMain.handle('settings:get', soloUI(() => settings));
 // ---------- Información del sitio (popover del candado) ----------
 // Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
-const PARTICIONES_VALIDAS = new Set(['persist:cobalt', 'cobalt-private']);
+const PARTICIONES_VALIDAS = new Set([PART_NORMAL, PART_PRIVATE]);
 /* ===== Contenedores =====
    Un contenedor es una sesión con su propio bote de cookies: sirve para tener
    dos cuentas del mismo sitio abiertas a la vez sin que se pisen. La lista vive
@@ -2424,7 +2425,7 @@ ipcMain.handle('site:data', soloUI(async (_e, { url, partition }) => {
 // sesión de la partición normal — sin CORS ni CSP del renderer de por medio.
 ipcMain.handle('gmail:feed', soloUI(async () => {
   try {
-    const ses = session.fromPartition('persist:cobalt');
+    const ses = session.fromPartition(PART_NORMAL);
     const r = await ses.fetch('https://mail.google.com/mail/feed/atom', { credentials: 'include' });
     if (!r.ok) return { ok: false, status: r.status };
     return { ok: true, xml: await r.text() };
@@ -2456,7 +2457,7 @@ ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
       tipo = m[1] || tipo;
       bytes = Buffer.from(decodeURIComponent(m[2]), /;base64/i.test(src) ? 'base64' : 'utf8');
     } else {
-      const ses = session.fromPartition('persist:cobalt');
+      const ses = session.fromPartition(PART_NORMAL);
       const pide = (headers) => ses.fetch(src, { credentials: 'include', headers });
       let img;
       try { img = await pide(pagina ? { Referer: pagina } : {}); }
@@ -2547,7 +2548,7 @@ ipcMain.handle('clip:read', soloUI(async () => { try { return copiaExcluida() ? 
 ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
 ipcMain.handle('spotify:logged', soloUI(async () => {
   try {
-    const cookies = await session.fromPartition('persist:cobalt').cookies.get({ domain: '.spotify.com', name: 'sp_dc' });
+    const cookies = await session.fromPartition(PART_NORMAL).cookies.get({ domain: '.spotify.com', name: 'sp_dc' });
     return cookies.length > 0;
   } catch { return false; }
 }));
@@ -2678,7 +2679,7 @@ ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
 ipcMain.handle('clipboard:read', soloUI(() => { try { return clipboard.readText(); } catch { return ''; } }));
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
-const pwPath = () => path.join(app.getPath('userData'), 'cobalt-passwords.json');
+const pwPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'passwords.json');
 function loadPasswords() { try { return JSON.parse(fs.readFileSync(pwPath(), 'utf8')); } catch { return []; } }
 function savePasswords(list) { try { escribeSeguro(pwPath(), JSON.stringify(list)); } catch (e) { console.error('pw save', e); } }
 let pwSeq = Date.now();
@@ -2868,7 +2869,7 @@ ipcMain.handle('pw:reveal', soloUI(async (_e, id) => {
 // El número viaja y se guarda cifrado; en claro solo quedan marca, últimos 4 y
 // caducidad para pintar la lista. El CVC NO se guarda nunca (como Chrome):
 // autorrellenamos número/titular/caducidad y el CVC lo teclea el usuario.
-const cardsPath = () => path.join(app.getPath('userData'), 'cobalt-cards.json');
+const cardsPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'cards.json');
 function loadCards() { try { return JSON.parse(fs.readFileSync(cardsPath(), 'utf8')); } catch { return []; } }
 function saveCards(list) { try { escribeSeguro(cardsPath(), JSON.stringify(list)); } catch (e) { console.error('cards save', e); } }
 let cardSeq = Date.now();
@@ -2935,7 +2936,7 @@ ipcMain.handle('cards:fill', soloUI((_e, id) => revealCard(id, 'Naviris: verific
    genera TODOS los códigos futuros. Quien la tenga entra siempre. Por eso no
    se devuelve nunca al renderer salvo en `totp:reveal`, que pide Hello, y por
    eso los códigos solo salen con la caja desbloqueada. */
-const totpPath = () => path.join(app.getPath('userData'), 'cobalt-totp.json');
+const totpPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'totp.json');
 function loadTotp() { try { return JSON.parse(fs.readFileSync(totpPath(), 'utf8')); } catch { return []; } }
 function saveTotp(list) { try { escribeSeguro(totpPath(), JSON.stringify(list)); } catch (e) { console.error('totp save', e); } }
 

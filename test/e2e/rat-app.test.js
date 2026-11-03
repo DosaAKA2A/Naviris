@@ -1,6 +1,6 @@
 // Rat Tool dentro de Naviris: arranca la app (perfil temporal propio, CDP en el
 // puerto NAVIRIS_CDP_RAT o 9401) y prueba el panel y el proceso principal por
-// las mismas llamadas que usa la interfaz (window.cobalt.yt*). Una descarga
+// las mismas llamadas que usa la interfaz (window.navirisApp.yt*). Una descarga
 // real va a la carpeta Descargas del usuario: si ya hay un archivo con ese
 // nombre la prueba se salta (no lo pisa) y el que baja lo borra al acabar.
 // Necesita red; para saltarlo: set NAVIRIS_SIN_RED=1
@@ -73,9 +73,9 @@ test.before(async () => {
     if (p) { pendientes.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); }
   };
   await new Promise((r) => { ws.onopen = r; });
-  await hasta(() => evalua('!!(window.cobalt && window.ratTool && document.getElementById("rat-url"))'), 30000, 'el renderer');
-  await evalua(`window.__rat = []; window.cobalt.onDownloadNew((m) => window.__rat.push(JSON.parse(JSON.stringify(m))));
-    window.cobalt.onDownloadUpdate((m) => window.__rat.push(JSON.parse(JSON.stringify(m)))); true`);
+  await hasta(() => evalua('!!(window.navirisApp && window.ratTool && document.getElementById("rat-url"))'), 30000, 'el renderer');
+  await evalua(`window.__rat = []; window.navirisApp.onDownloadNew((m) => window.__rat.push(JSON.parse(JSON.stringify(m))));
+    window.navirisApp.onDownloadUpdate((m) => window.__rat.push(JSON.parse(JSON.stringify(m)))); true`);
 });
 
 test.after(async () => {
@@ -114,7 +114,7 @@ test('el texto del panel según el enlace', opt, async () => {
 });
 
 test('motor listo y yt-dlp revisado contra GitHub sin errores', opt, async () => {
-  assert.equal(await evalua('window.cobalt.ytAvailable()'), true);
+  assert.equal(await evalua('window.navirisApp.ytAvailable()'), true);
   // la revisión se lanza en segundo plano; se le dan unos segundos
   await espera(8000);
   const texto = fs.readFileSync(log, 'utf8');
@@ -122,13 +122,13 @@ test('motor listo y yt-dlp revisado contra GitHub sin errores', opt, async () =>
 });
 
 test('calidades reales en el selector (YouTube con Deno) y ninguna para una lista', opt, async () => {
-  const q = await evalua(`window.cobalt.ytFormats('https://www.youtube.com/watch?v=aqz-KE-bpKQ')`);
+  const q = await evalua(`window.navirisApp.ytFormats('https://www.youtube.com/watch?v=aqz-KE-bpKQ')`);
   assert.ok(q.includes(1080) && q.includes(720), JSON.stringify(q));
-  assert.deepEqual(await evalua(`window.cobalt.ytFormats('https://www.youtube.com/playlist?list=PLM6OA8eOe83s')`), []);
+  assert.deepEqual(await evalua(`window.navirisApp.ytFormats('https://www.youtube.com/playlist?list=PLM6OA8eOe83s')`), []);
 });
 
 test('una lista suelta no se descarga y el panel dice qué hacer', opt, async () => {
-  const id = await evalua(`window.cobalt.ytDownload('https://www.youtube.com/playlist?list=PLM6OA8eOe83s', 'video', '')`);
+  const id = await evalua(`window.navirisApp.ytDownload('https://www.youtube.com/playlist?list=PLM6OA8eOe83s', 'video', '')`);
   const m = await hasta(async () => { const u = await ultimo(id); return u && u.state !== 'progressing' && u; }, 20000, 'el aviso de lista');
   assert.equal(m.state, 'interrupted');
   assert.match(m.error, /Abre uno de sus videos/);
@@ -136,11 +136,11 @@ test('una lista suelta no se descarga y el panel dice qué hacer', opt, async ()
 
 test('descarga real a Descargas: archivo final, sin restos temporales', opt, async (t) => {
   const antes = tempsRat();
-  const id = await evalua(`window.cobalt.ytDownload('https://www.youtube.com/watch?v=jNQXAC9IVRw', 'video', '240')`);
-  const carpeta = await evalua(`window.cobalt.downloadPath(${JSON.stringify(id)})`);
+  const id = await evalua(`window.navirisApp.ytDownload('https://www.youtube.com/watch?v=jNQXAC9IVRw', 'video', '240')`);
+  const carpeta = await evalua(`window.navirisApp.downloadPath(${JSON.stringify(id)})`);
   const esperado = path.join(carpeta, 'Me at the zoo [jNQXAC9IVRw].mp4');
   if (fs.existsSync(esperado)) {
-    await evalua(`window.cobalt.cancelDownload(${JSON.stringify(id)})`);
+    await evalua(`window.navirisApp.cancelDownload(${JSON.stringify(id)})`);
     t.skip('ya hay un "' + path.basename(esperado) + '" en Descargas; no se pisa');
     return;
   }
@@ -161,11 +161,11 @@ test('descarga real a Descargas: archivo final, sin restos temporales', opt, asy
 
 test('cancelar no deja nada en Descargas ni en la carpeta temporal', opt, async () => {
   const antes = tempsRat();
-  const id = await evalua(`window.cobalt.ytDownload('https://www.youtube.com/watch?v=lTRiuFIWV54', 'video', '')`);
-  const carpeta = await evalua(`window.cobalt.downloadPath(${JSON.stringify(id)})`);
+  const id = await evalua(`window.navirisApp.ytDownload('https://www.youtube.com/watch?v=lTRiuFIWV54', 'video', '')`);
+  const carpeta = await evalua(`window.navirisApp.downloadPath(${JSON.stringify(id)})`);
   const enMarcha = await hasta(async () => { const u = await ultimo(id); return u && u.percent > 0 && u; }, 90000, 'que empiece a bajar');
   assert.match(enMarcha.name, /📚.*\[lTRiuFIWV54\]\.mp4$/, 'el nombre con emoji llega bien');
-  await evalua(`window.cobalt.cancelDownload(${JSON.stringify(id)})`);
+  await evalua(`window.navirisApp.cancelDownload(${JSON.stringify(id)})`);
   await espera(6000);
   assert.equal((await ultimo(id)).state, 'cancelled');
   assert.ok(!fs.existsSync(path.join(carpeta, enMarcha.name)), 'quedó el archivo en Descargas');
@@ -180,16 +180,16 @@ test('al arrancar borra solo los restos viejos del Rat Tool', opt, async () => {
 });
 
 test('canal de Twitch (directo): no se lanza y manda a Videos del canal', opt, async () => {
-  const id = await evalua(`window.cobalt.ytDownload('https://www.twitch.tv/twitch', 'video', '')`);
+  const id = await evalua(`window.navirisApp.ytDownload('https://www.twitch.tv/twitch', 'video', '')`);
   const m = await terminada(id, 10000);
   assert.equal(m.state, 'interrupted');
   assert.equal(m.error, 'Los directos no se descargan. Cuando acabe, descarga el video desde la pestaña Videos del canal');
-  assert.deepEqual(await evalua(`window.cobalt.ytFormats('https://www.twitch.tv/twitch')`), []);
+  assert.deepEqual(await evalua(`window.navirisApp.ytFormats('https://www.twitch.tv/twitch')`), []);
 });
 
 test('directo de YouTube (is_live): no se graba y el mensaje lo explica', opt, async () => {
   const antes = tempsRat();
-  const id = await evalua(`window.cobalt.ytDownload('https://www.youtube.com/@LofiGirl/live', 'video', '')`);
+  const id = await evalua(`window.navirisApp.ytDownload('https://www.youtube.com/@LofiGirl/live', 'video', '')`);
   const m = await terminada(id, 90000);
   assert.equal(m.state, 'interrupted');
   assert.equal(m.error, 'Los directos no se descargan. Cuando acabe, descarga el video ya publicado');
@@ -201,14 +201,14 @@ test('YouTube con restricción de edad: sin cookies de entrada y un solo reinten
   const url = 'https://www.youtube.com/watch?v=6kLq3WMV1nU';
   // Sin sesión de YouTube en el perfil: no hay reintento
   const n0 = veces(/se reintenta con las cookies/g);
-  const a = await terminada(await evalua(`window.cobalt.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 90000);
+  const a = await terminada(await evalua(`window.navirisApp.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 90000);
   assert.match(a.error, /restricción de edad.*YouTube/);
   assert.equal(veces(/se reintenta con las cookies/g), n0, 'reintentó sin tener sesión');
   // Con cookies de youtube.com (abrir YouTube en una pestaña las crea): un reintento, ni uno más
   await evalua(`createTab('https://www.youtube.com/'); true`);
   await espera(12000);
   const antes = tempsRat();
-  const b = await terminada(await evalua(`window.cobalt.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 120000);
+  const b = await terminada(await evalua(`window.navirisApp.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 120000);
   assert.equal(b.state, 'interrupted');
   assert.match(b.error, /restricción de edad.*YouTube/);
   assert.equal(veces(/se reintenta con las cookies/g), n0 + 1, 'no hizo exactamente un reintento');

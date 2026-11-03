@@ -768,7 +768,7 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
       // datos del player, y llega aquí por un evento del DOM (lo comparten los dos
       // mundos). ipcRenderer solo existe de este lado.
       document.addEventListener(EVENTO_MURO, function () {
-        try { ipcRenderer.sendToHost('cobalt-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
+        try { ipcRenderer.sendToHost('naviris-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
       });
     }
   } catch (e) { /* nada */ }
@@ -793,7 +793,7 @@ function tryCapture(root) {
     const pass = (root.querySelector ? root.querySelector('input[type="password"]') : null) || document.querySelector('input[type="password"]');
     if (!pass || !pass.value) return;
     const l = findLogin();
-    ipcRenderer.sendToHost('cobalt-capture', {
+    ipcRenderer.sendToHost('naviris-capture', {
       url: location.href,
       username: (l && l.user && l.user.value) || '',
       password: pass.value
@@ -809,7 +809,7 @@ document.addEventListener('click', (e) => {
 
 // --- Copia desde un campo de contraseña, de código o de número de tarjeta ---
 // Se avisa a la interfaz para que el widget Portapapeles no lo apunte en su
-// historial (onWebviewMessage, canal 'cobalt-copia-sensible').
+// historial (onWebviewMessage, canal 'naviris-copia-sensible').
 const AUTOCOMPLETE_SENSIBLE = ['current-password', 'new-password', 'one-time-code', 'cc-number'];
 function avisaCopiaSensible() {
   try {
@@ -820,7 +820,7 @@ function avisaCopiaSensible() {
     // Tipos como number no exponen la selección: entonces va el valor entero.
     const ini = el.selectionStart, fin = el.selectionEnd;
     const texto = ini != null && fin != null ? el.value.slice(ini, fin) : el.value;
-    if (texto) ipcRenderer.sendToHost('cobalt-copia-sensible', texto);
+    if (texto) ipcRenderer.sendToHost('naviris-copia-sensible', texto);
   } catch (e) { /* nada */ }
 }
 window.addEventListener('copy', avisaCopiaSensible, true);
@@ -830,7 +830,7 @@ window.addEventListener('cut', avisaCopiaSensible, true);
 let announced = false;
 function announce() {
   if (announced) return;
-  if (findLogin()) { announced = true; ipcRenderer.sendToHost('cobalt-loginform', { url: location.href }); }
+  if (findLogin()) { announced = true; ipcRenderer.sendToHost('naviris-loginform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') announce();
 document.addEventListener('DOMContentLoaded', announce);
@@ -857,7 +857,7 @@ function buscaOtp() {
 }
 function avisaOtp() {
   if (otpAvisado) return;
-  if (buscaOtp()) { otpAvisado = true; ipcRenderer.sendToHost('cobalt-otpform', { url: location.href }); }
+  if (buscaOtp()) { otpAvisado = true; ipcRenderer.sendToHost('naviris-otpform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') avisaOtp();
 document.addEventListener('DOMContentLoaded', avisaOtp);
@@ -906,13 +906,13 @@ function findCardForm() {
 let cardAnnounced = false;
 function announceCard() {
   if (cardAnnounced) return;
-  if (findCardForm()) { cardAnnounced = true; ipcRenderer.sendToHost('cobalt-cardform', { url: location.href }); }
+  if (findCardForm()) { cardAnnounced = true; ipcRenderer.sendToHost('naviris-cardform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') announceCard();
 document.addEventListener('DOMContentLoaded', announceCard);
 [600, 1500, 3000, 6000].forEach((ms) => setTimeout(announceCard, ms));
 
-ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
+ipcRenderer.on('naviris-fill-card', (_e, card, host) => {
   if (!esElSitio(host)) return;
   const f = findCardForm();
   if (!f) return;
@@ -937,7 +937,7 @@ ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
   }
 });
 
-// --- Twitch: AutoClaim por pestaña. Lo enciende y lo apaga la interfaz con 'cobalt-autoloot'. ---
+// --- Twitch: AutoClaim por pestaña. Lo enciende y lo apaga la interfaz con 'naviris-autoloot'. ---
 // Cada reclamo se avisa con un 'claim' y la cuenta de la sesión la lleva la interfaz.
 // Antes viajaba también un contador propio de este preload, que volvía a cero al
 // recargar la página y pisaba los drops que sumaba el webview oculto del inventario.
@@ -987,12 +987,12 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     const b = botonCofre();
     if (!b) return;
     b.click(); lastPoints = Date.now();
-    ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', balance: saldoPuntos() });
+    ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'points', balance: saldoPuntos() });
   }
   function reclamaDrops() {
     for (const el of botonesDeReclamo()) {
       pulsados.add(el); el.click();
-      ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop' });
+      ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'drop' });
     }
   }
   // --- Detección de drops pendientes por la API de inventario de Twitch ---
@@ -1053,13 +1053,13 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     fetchInventory().then(function (res) {
       if (countClaimable(res) > 0 && Date.now() - lastPendingPing > 30000) {
         lastPendingPing = Date.now();
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'drops-pending' });
+        ipcRenderer.sendToHost('naviris-twitch', { type: 'drops-pending' });
       }
     }).catch(function () { /* sin sesión o red caída: nada */ });
   }
   // Rol "claimer": en /drops/inventory pulsa los botones "Reclamar/Claim" reales de la
   // página (van por la maquinaria de Twitch, que sí firma con Client-Integrity). Lo
-  // dispara el host con 'cobalt-claim-inventory' sobre el webview oculto.
+  // dispara el host con 'naviris-claim-inventory' sobre el webview oculto.
   var claimerRan = false;
   function runInventoryClaimer() {
     if (claimerRan) return; claimerRan = true;
@@ -1078,13 +1078,13 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
             name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
           } catch (e) { /* nada */ }
           el.click(); clicked++;
-          ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', name: name });
+          ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'drop', name: name });
         }
       } catch (e) { /* nada */ }
-      if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim-done', clicked: clicked }); }
+      if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('naviris-twitch', { type: 'claim-done', clicked: clicked }); }
     }, 1500); // ~12s: la SPA de inventario tarda en pintar los botones
   }
-  ipcRenderer.on('cobalt-claim-inventory', function () { runInventoryClaimer(); });
+  ipcRenderer.on('naviris-claim-inventory', function () { runInventoryClaimer(); });
   // Mantiene el stream vivo en segundo plano: reanuda el vídeo y cierra el "¿sigues ahí?".
   function keepAlive() {
     try {
@@ -1166,7 +1166,7 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     });
   }
   function tick() { reclamaCofre(); reclamaDrops(); checkPendingDrops(false); keepAlive(); bajaCalidad(); }
-  ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
+  ipcRenderer.on('naviris-autoloot', function (_e, opt) {
     // De fondo sigue contando: sin el freno de las pestañas que no se ven.
     ipcRenderer.send('wv:sin-freno', !!(opt && opt.on));
     if (opt && opt.on) {
@@ -1200,13 +1200,13 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
 window.addEventListener('mouseup', function (e) {
   if (e.button === 3 || e.button === 4) {
     e.preventDefault();
-    try { ipcRenderer.sendToHost('cobalt-mouse-nav', e.button === 3 ? 'back' : 'forward'); } catch (err) { /* nada */ }
+    try { ipcRenderer.sendToHost('naviris-mouse-nav', e.button === 3 ? 'back' : 'forward'); } catch (err) { /* nada */ }
   }
 }, true);
 window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true);
 
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
-ipcRenderer.on('cobalt-fill', (_e, cred, host) => {
+ipcRenderer.on('naviris-fill', (_e, cred, host) => {
   if (!esElSitio(host)) return;
   const l = findLogin();
   if (!l) return;
@@ -1233,7 +1233,7 @@ ipcRenderer.on('cobalt-fill', (_e, cred, host) => {
       var de = document.documentElement;
       var v = de ? de.getAttribute('data-naviris-agent') : null;
       var on = v != null && v !== '' && v !== '0' && v !== 'false';
-      ipcRenderer.sendToHost('cobalt-agent', { on: on, label: on ? v : '' });
+      ipcRenderer.sendToHost('naviris-agent', { on: on, label: on ? v : '' });
     } catch (e) { /* nada */ }
   }
   try {

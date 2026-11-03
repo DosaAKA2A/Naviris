@@ -80,7 +80,7 @@ function preparaPerfil(nombre, ajustes = {}) {
     adblockEnabled: true, adblockWhitelist: [], agentMode: false, updatesAuto: false,
     restoreSession: false, appVersion: version, versionVista: version, devUpdates: false
   };
-  fs.writeFileSync(path.join(perfil, 'cobalt-settings.json'), JSON.stringify({ ...base, ...ajustes }, null, 2), 'utf8');
+  fs.writeFileSync(path.join(perfil, 'naviris-settings.json'), JSON.stringify({ ...base, ...ajustes }, null, 2), 'utf8');
   const listas = process.env.NAVIRIS_E2E_LISTAS;
   if (listas && fs.existsSync(path.join(listas, 'meta.json'))) {
     const destino = path.join(perfil, 'adblock');
@@ -101,7 +101,7 @@ async function arranca(nombre, ajustes) {
   app.navegador = await CDP.conecta(version.webSocketDebuggerUrl);
   const ui = await hasta(async () => (await lista()).find((t) => t.type === 'page' && /index\.html/.test(t.url) && !/private=1/.test(t.url)), { que: 'la ventana de Naviris' });
   app.ui = await CDP.conecta(ui.webSocketDebuggerUrl);
-  await hasta(() => evalua(app.ui, 'return typeof createTab === "function" && !!window.cobalt;'), { que: 'la interfaz' });
+  await hasta(() => evalua(app.ui, 'return typeof createTab === "function" && !!window.navirisApp;'), { que: 'la interfaz' });
   return app;
 }
 
@@ -109,7 +109,7 @@ async function lista() { return (await fetch(`http://127.0.0.1:${PUERTO}/json/li
 
 // Motor del bloqueador montado (con listas). Con listas sembradas tarda ~1 s.
 async function esperaMotor(app, tope = 120000) {
-  return hasta(async () => (await evalua(app.ui, 'return (await window.cobalt.adblockGet()).brave.engine;')), { tope, cada: 1000, que: 'el motor del bloqueador' });
+  return hasta(async () => (await evalua(app.ui, 'return (await window.navirisApp.adblockGet()).brave.engine;')), { tope, cada: 1000, que: 'el motor del bloqueador' });
 }
 
 async function cierra(app) {

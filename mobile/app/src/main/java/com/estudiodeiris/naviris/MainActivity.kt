@@ -1,4 +1,4 @@
-package com.estudiodeiris.cobalt
+package com.estudiodeiris.naviris
 
 import android.app.DownloadManager
 import android.content.Context
@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     private val REPO_API = "https://api.github.com/repos/DosaAKA2A/Naviris/releases/latest"
 
+    // El archivo de preferencias conserva el nombre que tuvo la app: renombrarlo
+    // dejaría a cada usuario sin sus marcadores, historial y ajustes.
     private val prefs by lazy { getSharedPreferences("cobalt", Context.MODE_PRIVATE) }
     private var adblock = true
 
@@ -315,7 +317,7 @@ class MainActivity : AppCompatActivity() {
         pm.menu.add(if (adblock) "Bloqueo de anuncios: ON" else "Bloqueo de anuncios: OFF")
         pm.menu.add("Compartir")
         // La versión va en el propio texto: antes había que entrar en "Acerca de"
-        // para saber cuál tenías, y quien venía de la v1 (llamada "Cobalt") no
+        // para saber cuál tenías, y quien venía de la v1 (con el nombre viejo) no
         // tenía ninguna de estas dos entradas.
         pm.menu.add("Buscar actualización · tienes la ${appVersion()}")
         pm.menu.add("Acerca de Naviris")
@@ -717,7 +719,7 @@ class MainActivity : AppCompatActivity() {
         try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
 
     /* ¿Está esta instalación firmada con el certificado oficial? Las primeras
-       versiones (la que se llamaba "Cobalt") salieron firmadas en modo debug, y
+       versiones (las de antes de llamarse Naviris) salieron firmadas en modo debug, y
        Android RECHAZA actualizarlas con un APK de otra firma: hay que
        desinstalar antes. Sin este aviso el usuario solo ve "no se instaló". */
     private val RELEASE_CERT_SHA256 = "bd29a7d9f4e4125bdbdfa7ec35a40e2a5be9529763ac0632903e4843dcd87be8"

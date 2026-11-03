@@ -3,17 +3,20 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-// Firma release: se toma de ~/.android-keys/cobalt-release.properties si existe
+// Firma release: se toma de ~/.android-keys/naviris-release.properties si existe
 // (en CI ese archivo se genera desde los secretos del repo)
-def signFile = new File(System.getProperty('user.home'), '.android-keys/cobalt-release.properties')
+def signFile = new File(System.getProperty('user.home'), '.android-keys/naviris-release.properties')
 def signProps = new Properties()
 if (signFile.exists()) signFile.withInputStream { signProps.load(it) }
 
 android {
-    namespace 'com.estudiodeiris.cobalt'
+    namespace 'com.estudiodeiris.naviris'
     compileSdk 34
 
     defaultConfig {
+        // El identificador de la app en Android NO se cambia: con otro, el APK nuevo
+        // se instalaría como una app aparte, sin los datos de la de siempre, y el
+        // buscador de actualizaciones de la vieja no la reemplazaría nunca.
         applicationId "com.estudiodeiris.cobalt"
         minSdk 24
         targetSdk 34

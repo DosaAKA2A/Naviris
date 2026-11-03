@@ -13,8 +13,8 @@ persona que use el navegador pueda juzgar por sí misma si le convence.
 
 | Dato | Dónde se guarda | Cómo se protege | ¿Sale de tu equipo? |
 |---|---|---|---|
-| Contraseñas de sitios | `cobalt-passwords.json` en tu perfil | Cifradas con `safeStorage` (DPAPI, atado a tu cuenta de Windows). Verlas o autorrellenarlas exige **Windows Hello** | **No, nunca** |
-| Tarjetas de crédito | `cobalt-cards.json` en tu perfil | Igual que las contraseñas. En claro solo quedan marca, últimos 4 dígitos y caducidad | **No, nunca** |
+| Contraseñas de sitios | `naviris-passwords.json` en tu perfil | Cifradas con `safeStorage` (DPAPI, atado a tu cuenta de Windows). Verlas o autorrellenarlas exige **Windows Hello** | **No, nunca** |
+| Tarjetas de crédito | `naviris-cards.json` en tu perfil | Igual que las contraseñas. En claro solo quedan marca, últimos 4 dígitos y caducidad | **No, nunca** |
 | CVC de la tarjeta | En ningún sitio | No se guarda jamás; lo tecleas tú en cada pago | — |
 | Historial y sesión | `localStorage` de la interfaz | Local | **No** |
 | Preferencias, marcadores, accesos, widgets, notas del hub | Local, y en la nube **solo si creas una cuenta** | En tránsito por HTTPS; en el servidor, ligadas a tu cuenta | Solo con cuenta, y solo eso |
