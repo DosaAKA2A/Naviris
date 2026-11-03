@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.8.2
+/* Naviris addon: Watch Party v2.8.3
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia
@@ -23,6 +23,10 @@
    La identidad de un video de MOOVIN es su ?v= (iris:<url>); la página vacía
    es iris:moovin. Esos identificadores son protocolo compartido: no cambiar.
 
+   v2.8.3 (2026-11-03): una conexión muerta en silencio (suspensión, cambio
+   de red) ya no deja la sala en "En la sala" sin sincronizar: ping/pong con
+   el relay y reconexión sola. Aplicar una pausa remota ya no salta si no hay
+   desvío (el salto de más volvía a la sala como eco).
    v2.8.1 (2026-09-19): el chat se ve a pantalla completa. El panel vive en
    el hub y el video en pantalla completa lo tapa todo, así que lo que decía
    la sala se perdía hasta salir. Ahora el agente pinta cada mensaje y cada
@@ -101,7 +105,9 @@
     'window.__navPartyApply=function(m){mute=Date.now()+' + ECHO_MS + ';var st=window.__navPartyState();' +
     'if(m.kind==="seek")doSeek(m.time);' +
     'else if(m.kind==="play"){if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + ')doSeek(m.time);doPlay()}' +
-    'else if(m.kind==="pause"){doPause();if(typeof m.time==="number")doSeek(m.time)}};' +
+    // La pausa solo salta si hay desvío: un salto de más dispara "seeking" y, si
+    // el reproductor lo resuelve pasada la ventana anti-eco, vuelve a la sala.
+    'else if(m.kind==="pause"){doPause();if(typeof m.time==="number"&&Math.abs(st.time-m.time)>' + DRIFT + ')doSeek(m.time)}};' +
     'window.__navPartyBeat=function(m){if(Date.now()<mute)return;var st=window.__navPartyState();if(!st.has)return;' +
     'if(m.paused&&!st.paused){mute=Date.now()+' + ECHO_MS + ';doPause()}' +
     'else if(!m.paused&&st.paused){mute=Date.now()+' + ECHO_MS + ';doPlay()}' +
@@ -567,7 +573,8 @@
       lock: false, navLock: true,          // por defecto SOLO el anfitrión cambia el video
       site: activeSite(), ultimoEp: null,
       hostUrl: '', hostTit: '',            // lo que ve el anfitrión (del latido)
-      objetivo: null, intento: 0, desync: false
+      objetivo: null, intento: 0, desync: false,
+      ultimoMsg: 0, conPong: false         // vigía de la conexión (ver abajo)
     };
     // El invitado se ata a la pestaña activa si es una página (aunque no sea
     // un sitio soportado: es la que va a navegar al video). Desde el hub no
@@ -580,6 +587,39 @@
        nada, que por fuera se ve igual que "no me cambia el episodio". */
     var reintento = 0, reTimer = null;
     var miParty = party;
+    /* Una conexión puede morir sin avisar (el portátil se suspende, cambia la
+       wifi): el socket sigue "abierto", la sala dice "En la sala" y no se
+       sincroniza nada. Cada VIVO_MS se manda un `ping`; el relay contesta
+       `pong`. Si el relay ya contestó alguna vez y lleva MUERTO_MS sin llegar
+       nada, se da el socket por muerto y se vuelve a entrar. Contra un relay
+       que no contesta `pong` (el desplegado antes de noviembre de 2026) no se
+       vigila: nunca se reconecta sin motivo. */
+    var VIVO_MS = 15000, MUERTO_MS = 40000;
+    var vigia = setInterval(function () {
+      if (party !== miParty) { clearInterval(vigia); return; }
+      var ws = party.ws;
+      if (!ws || reTimer) return;
+      if (ws.readyState >= 2) { reconecta(ws); return; }          // el onclose no llegó
+      if (ws.readyState !== 1) return;
+      if (party.conPong && Date.now() - party.ultimoMsg > MUERTO_MS) { reconecta(ws); return; }
+      send({ t: 'ping' });
+    }, VIVO_MS);
+    /* Corte de una conexión que ya funcionó: se suelta ese socket y se vuelve
+       a entrar sola con espera creciente. Si NUNCA llegó a conectar no se
+       reintenta: se avisa y se vuelve a entrar a mano (el addon ya exige
+       2.8.0, así que no es el CSP viejo: es la red o el relay). */
+    function reconecta(ws) {
+      if (!party || party.ws !== ws) return;
+      party.ws = null; party.ok = false; beatStop();
+      try { ws.close(); } catch (e) { /* ya cerrado */ }
+      if (!party.everOk) { party.status = 'No se pudo conectar con la sala. Revisa tu conexión y vuelve a intentarlo.'; render(); return; }
+      reintento++;
+      var espera = Math.min(30000, 1000 * Math.pow(2, reintento - 1));
+      party.status = 'Reconectando…';
+      if (reTimer) clearTimeout(reTimer);
+      reTimer = setTimeout(function () { reTimer = null; abreSocket(); }, espera);
+      render();
+    }
     function abreSocket() {
       if (party !== miParty) return;
       var ws;
@@ -591,6 +631,7 @@
       }
       party.ws = ws;
       ws.onopen = function () {
+        party.ultimoMsg = Date.now();
         var volvia = reintento > 0;
         reintento = 0;
         /* La foto va UNA vez al entrar, nunca en cada mensaje (serían
@@ -604,7 +645,9 @@
       };
       ws.onmessage = function (ev) {
         if (!party || party.ws !== ws) return;
+        party.ultimoMsg = Date.now();
         var m; try { m = JSON.parse(ev.data); } catch (x) { return; }
+        if (m.t === 'pong') { party.conPong = true; return; }
         // El avatar viaja en TODO mensaje (join/ev/beat/chat), así que se
         // aprende de cualquiera de ellos; la foto, del `perfil` que manda cada
         // quien al entrar (pesa). Quién lo manda lo dice `from`, que pone el
@@ -653,25 +696,11 @@
         else if (m.t === 'error') party.status = 'Error: ' + m.msg;
         render(); glow();
       };
-      // Si NUNCA llegó a conectar no se reintenta sola: se avisa y se vuelve a
-      // entrar a mano. (El addon ya exige 2.8.0, así que no es el CSP viejo de
-      // 2.7.3-dev.3 a dev.11: es la red o el relay.)
-      ws.onclose = function () {
-        if (!party || party.ws !== ws) return;
-        party.ok = false; beatStop();
-        if (!party.everOk) { party.status = 'No se pudo conectar con la sala. Revisa tu conexión y vuelve a intentarlo.'; render(); return; }
-        // Ya había conectado alguna vez: es un corte, se vuelve a entrar sola.
-        reintento++;
-        var espera = Math.min(30000, 1000 * Math.pow(2, reintento - 1));
-        party.status = 'Reconectando…';
-        if (reTimer) clearTimeout(reTimer);
-        reTimer = setTimeout(function () { reTimer = null; abreSocket(); }, espera);
-        render();
-      };
+      ws.onclose = function () { reconecta(ws); };
       ws.onerror = function () { if (party && party.ws === ws) { party.ok = false; party.status = party.everOk ? 'Sin conexión con el servidor' : 'No se pudo conectar con la sala. Revisa tu conexión y vuelve a intentarlo.'; render(); } };
       render(); glow();
     }
-    party.paraReconexion = function () { if (reTimer) { clearTimeout(reTimer); reTimer = null; } };
+    party.paraReconexion = function () { clearInterval(vigia); if (reTimer) { clearTimeout(reTimer); reTimer = null; } };
     abreSocket();
   }
   function leave(silent) {
