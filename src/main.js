@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
+const { conservaCookiesDeSesion } = require('./sesiones');
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
@@ -990,50 +991,11 @@ function setupSession(ses) {
   const vuelca = () => { try { ses.cookies.flushStore(); } catch { /* nada */ } };
   setInterval(vuelca, 3 * 60 * 1000);
 
-  /* ===== SESIONES QUE SOBREVIVEN AL CIERRE (2026-08-13) =====
-     A Dosa se le cerraba la sesión de Spotify al cerrar Naviris, y SOLO la de
-     Spotify. Comprobado en disco con la app cerrada: faltaba sp_dc, mientras
-     las de X y YouTube seguían ahí. La explicación: sp_dc es una cookie DE
-     SESIÓN (sin fecha de caducidad), y esas Chromium las tira al salir. Las de
-     X y YouTube son persistentes, por eso aguantaban.
-
-     Chrome no las tira si tienes activado "Continuar donde lo dejaste": ese
-     ajuste conserva las cookies de sesión entre arranques. Electron no trae
-     ese comportamiento, así que se implementa aquí — y se hace SOLO si el
-     ajuste equivalente de Naviris está activo, porque es su significado: si
-     pides continuar donde lo dejaste, la sesión de tus webs forma parte de
-     eso. Con el ajuste apagado, cerrar sigue cerrando sesiones.
-
-     Cómo: al salir, las cookies marcadas como de sesión se vuelven a escribir
-     con caducidad de 30 días. Es lo mismo que hace Chrome de facto. */
-  const DIAS_SESION = 30;
+  /* Sesiones que sobreviven al cierre: ver sesiones.js. Solo con "Continuar
+     donde lo dejaste", que es su significado. */
   async function conservaSesiones() {
     if (settings.restoreSession === false) return;
-    const todas = await ses.cookies.get({});
-    const caduca = Math.floor(Date.now() / 1000) + DIAS_SESION * 24 * 60 * 60;
-    let n = 0;
-    for (const c of todas) {
-      if (!c.session) continue;                    // las persistentes ya aguantan
-      const host = (c.domain || '').replace(/^\./, '');
-      if (!host) continue;
-      const url = (c.secure ? 'https://' : 'http://') + host + (c.path || '/');
-      /* Las cookies de UN solo host (hostOnly) se reescriben SIN domain. Con
-         domain, Chromium crea otra cookie distinta, de dominio, que convive con
-         la original: Google y YouTube recibían dos cookies con el mismo nombre
-         (una de ellas, copia vieja de 30 días que sobrevivía a cerrar sesión), y
-         las `__Host-`, que prohíben domain, fallaban en silencio y se perdían. */
-      const nueva = {
-        url, name: c.name, value: c.value, path: c.path,
-        secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite,
-        expirationDate: caduca
-      };
-      if (!c.hostOnly) nueva.domain = c.domain;
-      try {
-        await ses.cookies.set(nueva);
-        n++;
-      } catch { /* alguna cookie rara se resistirá; no vale la pena romper el cierre */ }
-    }
-    try { await ses.cookies.flushStore(); } catch { /* nada */ }
+    const n = await conservaCookiesDeSesion(ses.cookies);
     if (n) console.log(`[Naviris] ${n} cookies de sesión conservadas para el próximo arranque`);
   }
   // Lo espera el único before-quit (ver alSalir). La privada vive en memoria:
@@ -1619,9 +1581,31 @@ function atajosDeWebview(contents) {
      'will-prevent-unload', CANCELA la navegación en silencio: ni recarga ni
      aviso. Pasaba igual con el botón de recargar, Atrás/Adelante o al escribir
      otra dirección en esa pestaña. Se hace lo de Chrome: preguntar, y si el
-     usuario acepta, preventDefault() ignora el beforeunload y la navegación
-     sigue. */
+     usuario acepta, la navegación se repite sin pasar por el beforeunload.
+
+     EL AVISO NO PUEDE SER SÍNCRONO (2026-11-03). Con showMessageBoxSync el
+     proceso principal se quedaba parado mientras el aviso estuviera abierto, y
+     por él pasan las peticiones de TODAS las pestañas (onBeforeRequest y
+     compañía) y todo el IPC de la interfaz. Medido con una página con
+     beforeunload y F5: la interfaz no contestaba ni a pedir la versión y otra
+     pestaña no podía cargar nada, en todas las ventanas, hasta cerrar el aviso.
+     Solo pasa en webs con las que ya has interactuado (sin gesto del usuario
+     no hay beforeunload), por eso salía con el uso real y nunca en las pruebas
+     con un perfil recién creado.
+     Ahora la navegación se cancela, el aviso se abre sin bloquear y, si se
+     acepta, se repite: la dirección que falló (escribir una URL, un marcador,
+     atrás o adelante dejan un did-fail-load con ella) o, si no hubo ninguna,
+     la recarga. Esa repetición ya no vuelve a preguntar. */
+  let saltaAviso = false;     // la navegación que se repite tras aceptar
+  let avisoAbierto = false;
+  contents.on('did-start-navigation', (_e, _url, enDocumento, principal) => { if (principal && !enDocumento) saltaAviso = false; });
   contents.on('will-prevent-unload', (event) => {
+    if (saltaAviso) { saltaAviso = false; event.preventDefault(); return; }
+    if (avisoAbierto) return;
+    avisoAbierto = true;
+    let fallida = null;
+    const alFallar = (_e, codigo, _desc, url, principal) => { if (principal && codigo === -3) fallida = url; };
+    contents.on('did-fail-load', alFallar);
     const win = contents.hostWebContents ? BrowserWindow.fromWebContents(contents.hostWebContents) : null;
     const opciones = {
       type: 'question',
@@ -1633,8 +1617,15 @@ function atajosDeWebview(contents) {
       message: '¿Recargar o salir de esta página?',
       detail: 'Es posible que no se guarden los cambios que hayas hecho.'
     };
-    const r = win ? dialog.showMessageBoxSync(win, opciones) : dialog.showMessageBoxSync(opciones);
-    if (r === 0) event.preventDefault();
+    (win ? dialog.showMessageBox(win, opciones) : dialog.showMessageBox(opciones)).then(({ response }) => {
+      avisoAbierto = false;
+      if (contents.isDestroyed()) return;
+      contents.removeListener('did-fail-load', alFallar);
+      if (response !== 0) return;
+      saltaAviso = true;
+      if (fallida && fallida !== contents.getURL()) contents.loadURL(fallida).catch(() => {});
+      else contents.reload();
+    }).catch(() => { avisoAbierto = false; });
   });
 }
 
@@ -1749,6 +1740,50 @@ function frenoDeRecargas(contents) {
 }
 ipcMain.on('tab:reintenta-bucle', (e, id) => { if (esUI(e)) frenos.get(id)?.(); });
 
+/* ===== VENTANAS EMERGENTES CON window.opener (2026-11-03) =====
+   Todo window.open acababa en una pestaña nueva abierta desde la interfaz, sin
+   relación con la página que la pidió: window.open devolvía null y la página
+   nueva no tenía window.opener. Así se rompen los inicios de sesión en
+   ventanita («Iniciar sesión con Google», Twitch, Discord, PayPal...): la
+   ventana de login termina mandando el resultado con window.opener.postMessage
+   y la web de origen se queda esperando para siempre. Medido con una página de
+   prueba: el padre veía null y la hija «opener: no». Con una cuenta se pasa por
+   ahí a menudo; con un perfil de pruebas recién creado, nunca.
+   Las que piden ventana (disposition 'new-window': window.open con tamaño o
+   características) se abren como ventana de verdad, con su opener y en la
+   misma sesión (cookies del contenedor o de la privada incluidas); about:blank
+   también, porque muchas abren la ventana vacía y la dirigen después. Los
+   enlaces y el window.open sin características siguen yendo a una pestaña.
+   La ventana lleva el mismo preload y las mismas restricciones que una
+   pestaña, y sus propias emergentes siguen esta misma regla. */
+function ventanasDe(contents, host) {
+  contents.setWindowOpenHandler(({ url, disposition }) => {
+    const web = /^https?:/i.test(url);
+    if (disposition === 'new-window' && (web || url === 'about:blank')) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          backgroundColor: '#ffffff',
+          webPreferences: {
+            preload: path.join(__dirname, 'webview-preload.js'),
+            sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: false,
+            webSecurity: true, allowRunningInsecureContent: false, disableDialogs: true
+          }
+        }
+      };
+    }
+    // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano
+    // `origen` es el webContents que abrio el enlace: con eso la pestaña
+    // nueva se coloca justo detras de la suya y no al final de la barra.
+    if (web && host && !host.isDestroyed()) host.send('tab:open-url', { url, background: disposition === 'background-tab', origen: contents.id });
+    return { action: 'deny' };
+  });
+  contents.on('did-create-window', (win) => {
+    win.removeMenu();
+    ventanasDe(win.webContents, host);
+  });
+}
+
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     frenoDeRecargas(contents);
@@ -1764,15 +1799,7 @@ app.on('web-contents-created', (_event, contents) => {
     suppressWebAuthn(contents);
     atajosDeWebview(contents);
     menuContextual(contents);
-    contents.setWindowOpenHandler(({ url, disposition }) => {
-      if (url.startsWith('http:') || url.startsWith('https:')) {
-        // clic central / "abrir en pestaña nueva" => segundo plano; el resto en primer plano
-        // `origen` es el webContents que abrio el enlace: con eso la pestaña
-        // nueva se coloca justo detras de la suya y no al final de la barra.
-        contents.hostWebContents?.send('tab:open-url', { url, background: disposition === 'background-tab', origen: contents.id });
-      }
-      return { action: 'deny' };
-    });
+    ventanasDe(contents, contents.hostWebContents);
     // Inyecta el saltador de anuncios de YouTube y el revelado de X
     contents.on('dom-ready', () => {
       // Scrollbar de Naviris en TODAS las paginas. El Fluent de Chromium solo
