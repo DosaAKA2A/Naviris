@@ -1376,7 +1376,7 @@ async function ytDownload({ url, mode, quality }) {
 const SPLASH_VARIANTE = 'apertura';
 /* Cómo se abre la lente en 'apertura' (splash.js): 'clasica' (escalado rígido)
    o las líquidas 'gota' | 'muelle' | 'menisco' | 'marea'. Las otras variantes no la usan. */
-const SPLASH_LENTE = 'clasica';
+const SPLASH_LENTE = 'muelle';
 // Tamaño de cada una: la tarjeta más el margen de su sombra (la ventana es transparente)
 const SPLASH_TAMANO = { apertura: [288, 288], firma: [460, 220], icono: [240, 300] };
 const SPLASH_MINIMO = 1050; // ms en pantalla: la animación entera (~0,9 s) y un respiro
