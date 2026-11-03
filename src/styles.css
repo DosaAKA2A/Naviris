@@ -855,6 +855,16 @@ body.sacando-pestana { cursor: copy; }
 #perm-bar button:hover { background: var(--btn-hover); }
 #perm-bar button.primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 #perm-bar button.primary:hover { background: var(--accent-hover); }
+/* Aviso de ventana emergente bloqueada: el mismo estilo que #perm-bar */
+#emerg-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
+#emerg-bar .perm-ic { color: var(--text-dim); display: flex; }
+#emerg-bar .perm-ic svg { width: 15px; height: 15px; }
+#emerg-text { flex: 1; }
+#emerg-text b { color: var(--text-strong); }
+#emerg-bar button { border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: var(--btn); color: var(--text); }
+#emerg-bar button:hover { background: var(--btn-hover); }
+#emerg-bar button.primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+#emerg-bar button.primary:hover { background: var(--accent-hover); }
 /* Barra de contraseñas (guardar / autorrellenar) — reutiliza el estilo de #perm-bar */
 #pw-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
 #pw-bar .perm-ic { color: var(--text-dim); display: flex; }

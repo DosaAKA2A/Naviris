@@ -85,6 +85,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   borraDatos: (opciones) => ipcRenderer.invoke('datos:borra', opciones),
   onColgada: (cb) => ipcRenderer.on('tab:colgada', (_e, p) => cb(p)),
   guardaPagina: (wcId) => ipcRenderer.send('tab:guardar', wcId),
+  onEmergenteBloqueada: (cb) => ipcRenderer.on('tab:emergente-bloqueada', (_e, p) => cb(p)),
+  permitirEmergentes: (origen) => ipcRenderer.send('emergentes:permitir', origen),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 

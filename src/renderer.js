@@ -860,6 +860,7 @@ function activateTab(id) {
   const destino = tabs.find((t) => t.id === id);
   if (destino && !enEspacio(destino)) { destino.lastActive = Date.now(); cambiaEspacio(destino.espacio || null); return; }
   if (pwBarHost && id !== activeId) hidePwBar();   // ofrecía rellenar la pestaña que se deja
+  if (emergAviso && id !== emergAviso.tab) ocultaEmergentes();   // era de la pestaña que se deja
   activeId = id; const tab = activeTab(); if (!tab) return; tab.lastActive = Date.now();
   if (tab.asleep) despiertaPestana(tab);
   // La de novedades tambien: si no, se quedaba encima al cambiar de pestaña y
@@ -5932,7 +5933,7 @@ async function doFillPw(wv, cred, host) {
 
 /* ============ Permisos de sitios ============ */
 const PERM_LABELS = { media: 'usar la cámara y el micrófono', geolocation: 'saber tu ubicación', notifications: 'enviarte notificaciones', midi: 'usar dispositivos MIDI', midiSysex: 'usar dispositivos MIDI', 'clipboard-read': 'leer tu portapapeles', hid: 'acceder a dispositivos HID', serial: 'acceder a puertos serie', usb: 'acceder a dispositivos USB', bluetooth: 'usar Bluetooth' };
-const PERM_SHORT = { media: 'Cámara y micrófono', geolocation: 'Ubicación', notifications: 'Notificaciones', midi: 'MIDI', midiSysex: 'MIDI', 'clipboard-read': 'Portapapeles', hid: 'Dispositivos HID', serial: 'Puertos serie', usb: 'USB', bluetooth: 'Bluetooth' };
+const PERM_SHORT = { popups: 'Ventanas emergentes', media: 'Cámara y micrófono', geolocation: 'Ubicación', notifications: 'Notificaciones', midi: 'MIDI', midiSysex: 'MIDI', 'clipboard-read': 'Portapapeles', hid: 'Dispositivos HID', serial: 'Puertos serie', usb: 'USB', bluetooth: 'Bluetooth' };
 let permQueue = [];
 function showNextPerm() {
   if (!permQueue.length) { els.permBar.classList.add('hidden'); return; }
@@ -5955,6 +5956,27 @@ function answerPerm(decision) {
 window.cobalt.onPermAsk((req) => { permQueue.push(req); if (permQueue.length === 1) showNextPerm(); });
 els.permAllow.addEventListener('click', () => answerPerm('allow'));
 els.permBlock.addEventListener('click', () => answerPerm('block'));
+
+/* Ventanas emergentes que una web intentó abrir sin un clic (ver src/emergentes.js
+   en main): aviso en la barra, solo de la pestaña que se está viendo, con un botón
+   para permitirlas en ese sitio. Lo permitido sale en los permisos guardados. */
+const emergEls = { bar: document.getElementById('emerg-bar'), text: document.getElementById('emerg-text') };
+let emergAviso = null;   // { tab, origen, n }
+function ocultaEmergentes() { emergEls.bar.classList.add('hidden'); emergAviso = null; }
+window.cobalt.onEmergenteBloqueada((p) => {
+  const tab = pestanaDeWebContents(p.wc);
+  if (!tab || tab.id !== activeId) return;
+  if (emergAviso && emergAviso.tab === tab.id && emergAviso.origen === p.origen) emergAviso.n++;
+  else emergAviso = { tab: tab.id, origen: p.origen, n: 1 };
+  let host = p.origen; try { host = new URL(p.origen).hostname.replace(/^www\./, ''); } catch { /* nada */ }
+  emergEls.text.innerHTML = (emergAviso.n === 1 ? 'Se bloqueó una ventana emergente de ' : `Se bloquearon ${emergAviso.n} ventanas emergentes de `) + `<b>${escapeHtml(host)}</b>.`;
+  emergEls.bar.classList.remove('hidden');
+});
+document.getElementById('emerg-allow').addEventListener('click', () => {
+  if (emergAviso) { window.cobalt.permitirEmergentes(emergAviso.origen); toast('Ventanas emergentes permitidas en este sitio'); }
+  ocultaEmergentes();
+});
+document.getElementById('emerg-close').addEventListener('click', ocultaEmergentes);
 
 async function showPermManager() {
   const perms = await window.cobalt.permList();

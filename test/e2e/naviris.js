@@ -102,4 +102,4 @@ async function arranca() {
   return { ui, abre, cierra };
 }
 
-module.exports = { arranca, hasta, espera, RAIZ };
+module.exports = { arranca, conecta, lista, hasta, espera, RAIZ, PUERTO };
