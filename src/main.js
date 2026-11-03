@@ -7,6 +7,7 @@ const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
 const { migraPerfil } = require('./migraciones');
+const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binarios (se prueba en test/)
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
@@ -56,90 +57,233 @@ function binDir() {
 const ytDlpPath = () => path.join(binDir(), 'yt-dlp.exe');
 const ffmpegPath = () => path.join(binDir(), 'ffmpeg.exe');
 const denoPath = () => path.join(binDir(), 'deno.exe');
-// Argumentos para que yt-dlp use nuestro Deno en los retos JS de YouTube. yt-dlp
-// ya mira si hay un deno.exe junto a él, pero se le pasa la ruta completa para no
-// depender de esa búsqueda ni del PATH del usuario. Va por los args de spawn, sin
-// shell, así que la ruta con espacios no necesita comillas.
-const denoArgs = () => (fs.existsSync(denoPath()) ? ['--js-runtimes', 'deno:' + denoPath()] : []);
+// Deno para los retos JS de YouTube (ver ensureBins). yt-dlp ya mira si hay un
+// deno.exe junto a él, pero se le pasa la ruta completa para no depender de esa
+// búsqueda ni del PATH del usuario.
+const denoSiHay = () => (fs.existsSync(denoPath()) ? denoPath() : null);
 
-const BIN_YTDLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
-const BIN_FFMPEG_URL = 'https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip';
-const BIN_DENO_URL = 'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip';
-
+/* Descargas de los binarios, con lo que faltaba para fiarse de ellas:
+   · se escribe en "<destino>.descarga" y solo se renombra al final: antes un
+     corte a medias dejaba un yt-dlp.exe truncado que ensureBins daba por bueno
+     (existía) y el Rat Tool no volvía a funcionar;
+   · si en 60 s no llega nada se aborta (net.request no tiene plazo propio);
+   · se comprueba el tamaño y, quien llama, la huella SHA-256 publicada. */
 function downloadTo(url, dest, onProgress) {
   return new Promise((resolve, reject) => {
+    const tmp = dest + '.descarga';
     const req = net.request(url);
+    let plazo = null, acabado = false;
+    const fin = (err) => {
+      if (acabado) return; acabado = true; clearTimeout(plazo);
+      if (err) { try { req.abort(); } catch { /* ya cerrada */ } fs.rmSync(tmp, { force: true }); reject(err); return; }
+      try { fs.renameSync(tmp, dest); resolve(); } catch (e) { fs.rmSync(tmp, { force: true }); reject(e); }
+    };
+    const vigila = () => { clearTimeout(plazo); plazo = setTimeout(() => fin(new Error('la descarga se quedó parada')), 60000); };
+    vigila();
     req.on('response', (res) => {
-      if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
+      if (res.statusCode !== 200) { fin(new Error('HTTP ' + res.statusCode)); return; }
       const total = parseInt(res.headers['content-length'] || '0', 10);
       let got = 0;
-      const file = fs.createWriteStream(dest);
-      res.on('data', (c) => { got += c.length; file.write(c); if (total && onProgress) onProgress(got / total); });
-      res.on('end', () => file.end(() => resolve()));
-      res.on('error', reject);
+      const file = fs.createWriteStream(tmp);
+      file.on('error', fin);
+      res.on('data', (c) => { vigila(); got += c.length; file.write(c); if (total && onProgress) onProgress(got / total); });
+      res.on('end', () => file.end(() => fin(total && got !== total ? new Error('descarga incompleta') : null)));
+      res.on('error', fin);
     });
-    req.on('error', reject);
+    req.on('error', fin);
     req.end();
   });
 }
+// Texto corto (listas de huellas). Con `sinRedireccion` devuelve a dónde
+// redirige: así se sabe la última versión de yt-dlp sin bajar nada.
+function pideTexto(url, { sinRedireccion = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = net.request({ url, redirect: sinRedireccion ? 'manual' : 'follow' });
+    const plazo = setTimeout(() => { try { req.abort(); } catch { /* nada */ } reject(new Error('sin respuesta')); }, 30000);
+    // Solo con 'manual': si se escucha 'redirect', Electron no sigue la redirección
+    if (sinRedireccion) req.on('redirect', (_status, _metodo, destino) => { clearTimeout(plazo); try { req.abort(); } catch { /* nada */ } resolve(destino); });
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) { clearTimeout(plazo); reject(new Error('HTTP ' + res.statusCode)); return; }
+      let txt = '';
+      res.on('data', (c) => { txt += c.toString('utf8'); });
+      res.on('end', () => { clearTimeout(plazo); resolve(txt); });
+      res.on('error', (e) => { clearTimeout(plazo); reject(e); });
+    });
+    req.on('error', (e) => { clearTimeout(plazo); reject(e); });
+    req.end();
+  });
+}
+// Al panel solo cuando cambia el número (llegan cientos de trozos por segundo)
+const avisaPorcentaje = (meta, pct) => { const n = Math.round(pct); if (n !== meta.percent) { meta.percent = n; broadcast('download:update', meta); } };
+// Tres intentos, con 2 y 6 s de espera: GitHub corta a veces a mitad.
+async function conReintentos(fn) {
+  let ultimo;
+  for (const espera of [0, 2000, 6000]) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try { return await fn(); } catch (e) { ultimo = e; console.log('[Naviris] Motor de descargas, reintento:', e.message); }
+  }
+  throw ultimo;
+}
+const huellaDe = (f) => new Promise((resolve, reject) => {
+  const h = crypto.createHash('sha256');
+  fs.createReadStream(f).on('data', (c) => h.update(c)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
+});
+// Un archivo sin huella publicada o que no coincide no se queda
+async function compruebaHuella(f, esperada) {
+  const motivo = !esperada ? 'no se encontró la huella publicada'
+    : (await huellaDe(f)) !== esperada ? 'el archivo descargado no coincide con la huella publicada' : null;
+  if (motivo) { fs.rmSync(f, { force: true }); throw new Error(motivo); }
+}
+// Lanza el binario con --version (o -version) para saber que arranca. Devuelve
+// la primera línea, o null si no arranca o tarda más de 20 s.
+function versionDe(exe, arg = '--version') {
+  return new Promise((resolve) => {
+    let out = '', p;
+    try { p = spawn(exe, [arg], { windowsHide: true }); } catch { resolve(null); return; }
+    const plazo = setTimeout(() => { try { p.kill(); } catch { /* ya acabó */ } resolve(null); }, 20000);
+    p.stdout.on('data', (d) => { out += d.toString(); });
+    p.on('error', () => { clearTimeout(plazo); resolve(null); });
+    p.on('close', (code) => { clearTimeout(plazo); resolve(code === 0 ? (out.trim().split(/\r?\n/)[0] || null) : null); });
+  });
+}
+// Sin bloquear el proceso principal: con execSync todas las ventanas se
+// quedaban congeladas mientras se extraían los ~115 MB de ffmpeg.
+function descomprime(zip, destino) {
+  return new Promise((resolve, reject) => {
+    require('child_process').execFile('powershell.exe',
+      ['-NoProfile', '-Command', `Expand-Archive -Force -LiteralPath ${rat.literalPs(zip)} -DestinationPath ${rat.literalPs(destino)}`],
+      { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+  });
+}
+const buscaEn = (d, nombre) => {
+  for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+    const fp = path.join(d, f.name);
+    if (f.isDirectory()) { const r = buscaEn(fp, nombre); if (r) return r; }
+    else if (f.name.toLowerCase() === nombre) return fp;
+  }
+  return null;
+};
+// Cada binario se prepara en un nombre provisional, se comprueba que arranca y
+// solo entonces sustituye al bueno (renombrar en la misma carpeta es atómico).
+async function colocaBinario(provisional, nombre, argVersion) {
+  if (!(await versionDe(provisional, argVersion))) { fs.rmSync(provisional, { force: true }); throw new Error(nombre + ' no arranca'); }
+  fs.renameSync(provisional, path.join(binDir(), nombre));
+}
+async function instalaYtDlp(version, onProgress) {
+  ytDlpVersion = null;
+  const B = rat.BINARIOS.ytdlp;
+  const nuevo = path.join(binDir(), 'yt-dlp-nuevo.exe');
+  try {
+    const sumas = await pideTexto(B.sumas(version));
+    await downloadTo(B.url(version), nuevo, onProgress);
+    await compruebaHuella(nuevo, rat.huellaEnSumas(sumas, 'yt-dlp.exe'));
+    await colocaBinario(nuevo, 'yt-dlp.exe');
+  } finally {
+    fs.rmSync(nuevo, { force: true }); // si algo falló a medias
+  }
+}
+async function instalaDesdeZip(nombre, url, huella, argVersion, onProgress) {
+  const dir = binDir();
+  const base = nombre.replace(/\.exe$/, '');
+  const zip = path.join(dir, base + '.zip');
+  const tmp = path.join(dir, '_' + base);
+  const provisional = path.join(dir, base + '-nuevo.exe');
+  try {
+    await downloadTo(url, zip, onProgress);
+    await compruebaHuella(zip, await huella());
+    fs.rmSync(tmp, { recursive: true, force: true });
+    await descomprime(zip, tmp);
+    const found = buscaEn(tmp, nombre);
+    if (!found) throw new Error(nombre + ' no está en el zip');
+    fs.copyFileSync(found, provisional);
+    await colocaBinario(provisional, nombre, argVersion);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(zip, { force: true });
+    fs.rmSync(provisional, { force: true });
+  }
+}
+const versionPublicadaYtDlp = async () => {
+  const v = rat.versionDeRedireccion(await pideTexto(rat.BINARIOS.ytdlp.ultima, { sinRedireccion: true }));
+  if (!rat.esVersionYtDlp(v)) throw new Error('no se pudo leer la última versión de yt-dlp');
+  return v;
+};
+const INSTALADORES = {
+  'yt-dlp.exe': async (p) => instalaYtDlp(await conReintentos(versionPublicadaYtDlp), p),
+  'ffmpeg.exe': (p) => instalaDesdeZip('ffmpeg.exe', rat.BINARIOS.ffmpeg.url, async () => rat.BINARIOS.ffmpeg.sha256, '-version', p),
+  'deno.exe': (p) => instalaDesdeZip('deno.exe', rat.BINARIOS.deno.url,
+    async () => rat.huellaEnSumas(await pideTexto(rat.BINARIOS.deno.sumas), 'deno-x86_64-pc-windows-msvc.zip'), '--version', p)
+};
 
 /* yt-dlp envejece mal: YouTube, Instagram y X cambian cada pocas semanas y una
    copia de dos meses (la de Dosa era del 2026-07-04 en septiembre) deja de
-   sacar formatos o de entrar. `yt-dlp -U` se actualiza a sí mismo; se lanza en
-   silencio como mucho una vez cada tres días, al abrir el Rat Tool.
-   Desde la 2026.08 ya no basta con tenerlo al día: YouTube protege los enlaces
-   de los formatos con retos en JavaScript y yt-dlp necesita un motor de JS
-   externo para resolverlos (EJS). Sin él avisa "No supported JavaScript runtime
-   could be found", faltan casi todos los formatos y la descarga falla; por eso
-   ensureBins baja también Deno. */
-const YTDLP_REVISION_MS = 3 * 24 * 60 * 60 * 1000;
+   sacar formatos o de entrar. Antes se lanzaba `yt-dlp -U` cada tres días y
+   se apuntaba como revisado aunque fallara (sin red, carpeta sin permiso…),
+   así que un fallo dejaba yt-dlp viejo otros tres días, y nada comprobaba que
+   el binario siguiera arrancando. Ahora (rat.tocaRevisar):
+   · se mira la versión instalada; si no arranca o es anterior a
+     rat.VERSION_MINIMA_YTDLP, se actualiza ya;
+   · si no, una vez al día se pregunta a GitHub cuál es la última (una
+     redirección, sin descargar nada) y solo se baja si hay una nueva;
+   · la nueva se comprueba con la huella de su SHA2-256SUMS y arrancándola
+     antes de sustituir a la vieja, con reintentos;
+   · solo se apunta como revisado si salió bien; si no, se reintenta la
+     próxima vez que se abra el Rat Tool;
+   · si una descarga falla con un error típico de yt-dlp desfasado
+     (rat.pideActualizar), se fuerza la revisión en ese momento.
+   La descarga ESPERA a la actualización: sustituir yt-dlp.exe mientras se
+   lanza otra cosa arranca un binario a medias ("Error -3 while decompressing
+   data", visto en la prueba). Con descargas en marcha no se actualiza. */
+const YTDLP_REVISION_MS = 24 * 60 * 60 * 1000;
 let ytDlpUpdate = null;
-// Devuelve una promesa y la descarga la ESPERA: `-U` reescribe el propio
-// yt-dlp.exe, y lanzar una descarga mientras tanto arranca un binario a
-// medias ("Error -3 while decompressing data", visto en la prueba). Con
-// descargas en marcha no se actualiza.
-function actualizaYtDlp() {
+let ytDlpVersion = null; // la instalada; se pregunta al binario una vez por sesión
+let ytDlpForzadaEn = 0;  // última revisión forzada por un error (tope: una por hora)
+function actualizaYtDlp({ forzar = false } = {}) {
   if (ytDlpUpdate) return ytDlpUpdate;
   if (!fs.existsSync(ytDlpPath()) || ytJobs.size) return Promise.resolve();
-  if (Date.now() - (settings.ytDlpRevisado || 0) < YTDLP_REVISION_MS) return Promise.resolve();
-  ytDlpUpdate = new Promise((resolve) => {
-    let p;
-    try { p = spawn(ytDlpPath(), ['-U'], { windowsHide: true }); } catch { ytDlpUpdate = null; resolve(); return; }
-    const fin = () => { settings.ytDlpRevisado = Date.now(); saveSettings(settings); ytDlpUpdate = null; resolve(); };
-    p.on('close', fin);
-    p.on('error', () => { ytDlpUpdate = null; resolve(); });
-    setTimeout(() => { try { p.kill(); } catch { /* ya acabó */ } }, 60000);
-  });
+  ytDlpUpdate = (async () => {
+    const version = ytDlpVersion || (ytDlpVersion = await versionDe(ytDlpPath()));
+    if (!rat.tocaRevisar({ version, revisadoEn: settings.ytDlpRevisado, ahora: Date.now(), cadaMs: YTDLP_REVISION_MS, forzar, forzadaEn: ytDlpForzadaEn })) return;
+    if (forzar) ytDlpForzadaEn = Date.now();
+    let meta = null;
+    try {
+      const publicada = await conReintentos(versionPublicadaYtDlp);
+      if (!rat.esVersionYtDlp(version) || rat.comparaVersiones(version, publicada) < 0) {
+        meta = { id: 'naviris-bins', name: 'Actualizando el motor de descargas', percent: 0, state: 'progressing', kind: 'video' };
+        broadcast('download:new', meta);
+        await conReintentos(() => instalaYtDlp(publicada, (p) => avisaPorcentaje(meta, p * 95)));
+        ytDlpVersion = publicada;
+        meta.percent = 100; meta.state = 'completed'; broadcast('download:update', meta);
+      }
+      settings.ytDlpRevisado = Date.now(); saveSettings(settings);
+    } catch (e) {
+      console.log('[Naviris] No se pudo actualizar yt-dlp:', e.message);
+      if (meta) {
+        meta.state = 'failed';
+        meta.error = 'No se pudo actualizar el motor de descargas. Revisa tu conexión y vuelve a abrir el Rat Tool';
+        broadcast('download:update', meta);
+      }
+    }
+  })().finally(() => { ytDlpUpdate = null; });
   return ytDlpUpdate;
 }
 
 /* Cookies de la sesión para yt-dlp, en formato Netscape. Instagram no suelta
-   nada sin sesión y X esconde los vídeos "sensibles" o de cuentas privadas:
-   por línea de comandos "no se puede descargar" cuando en el navegador se
-   está viendo. Se pasan SOLO las del dominio del enlace (y su alias: x.com
-   y twitter.com comparten sesión) en un archivo temporal que se borra al
-   terminar. */
+   nada sin sesión, Reddit ya no da ni los videos públicos sin ella y X esconde
+   los "sensibles" o de cuentas privadas: por línea de comandos "no se puede
+   descargar" cuando en el navegador se está viendo. Se pasan SOLO las del
+   dominio del enlace (rat.dominiosCookies) en un archivo temporal que se borra
+   al terminar. */
 async function cookiesParaYtDlp(url) {
-  let host; try { host = new URL(url).hostname; } catch { return null; }
-  const raiz = host.split('.').slice(-2).join('.');
-  const dominios = new Set([raiz]);
-  if (/(^|\.)(x\.com|twitter\.com)$/.test(host)) { dominios.add('x.com'); dominios.add('twitter.com'); }
-  const lineas = ['# Netscape HTTP Cookie File'];
+  const cookies = [];
   try {
-    const ses = session.fromPartition('persist:cobalt');
-    for (const d of dominios) {
-      const cs = await ses.cookies.get({ domain: d }).catch(() => []);
-      for (const c of cs) {
-        const dom = c.domain.startsWith('.') ? c.domain : (c.hostOnly ? c.domain : '.' + c.domain);
-        const exp = c.expirationDate ? Math.floor(c.expirationDate) : 0;
-        lineas.push([(c.httpOnly ? '#HttpOnly_' : '') + dom, dom.startsWith('.') ? 'TRUE' : 'FALSE', c.path || '/', c.secure ? 'TRUE' : 'FALSE', exp, c.name, c.value].join('\t'));
-      }
-    }
+    const ses = session.fromPartition(PART_NORMAL);
+    for (const d of rat.dominiosCookies(url)) cookies.push(...await ses.cookies.get({ domain: d }).catch(() => []));
   } catch { return null; }
-  if (lineas.length < 2) return null;
+  if (!cookies.length) return null;
   try {
     const f = path.join(app.getPath('temp'), 'naviris-cookies-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.txt');
-    fs.writeFileSync(f, lineas.join('\n') + '\n', 'utf8');
+    fs.writeFileSync(f, rat.ficheroCookies(cookies), 'utf8');
     return f;
   } catch { return null; }
 }
@@ -154,28 +298,15 @@ const borraCookies = (f) => { if (f) { try { fs.rmSync(f, { force: true }); } ca
    yt-dlp.exe (no hace falta --remote-components). Probado: con
    --js-runtimes deno:<ruta> desaparece el aviso y salen todos los formatos hasta
    1080p y más. Las instalaciones que ya tenían yt-dlp y ffmpeg bajan solo Deno
-   (~42 MB en zip): la lista `missing` decide qué se descarga. */
-// Texto dentro de un literal '...' de PowerShell. PowerShell también cierra el
-// literal con las comillas tipográficas (‘ ’ ‚ ‛), así que se doblan todas:
-// una ruta como C:\Users\O'Brien rompía la orden.
-const literalPs = (s) => "'" + String(s).replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q) + "'";
-// Sin bloquear el proceso principal: con execSync todas las ventanas se
-// quedaban congeladas mientras se extraían los ~80 MB de ffmpeg.
-function descomprime(zip, destino) {
-  return new Promise((resolve, reject) => {
-    require('child_process').execFile('powershell.exe',
-      ['-NoProfile', '-Command', `Expand-Archive -Force -LiteralPath ${literalPs(zip)} -DestinationPath ${literalPs(destino)}`],
-      { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
-  });
-}
+   (~42 MB en zip): la lista `missing` decide qué se descarga. Las direcciones y
+   huellas están en rat.BINARIOS. */
 let binsPromise = null;
 function ensureBins() {
   const missing = ['yt-dlp.exe', 'ffmpeg.exe', 'deno.exe'].filter((b) => !fs.existsSync(path.join(binDir(), b)));
   if (!missing.length) return actualizaYtDlp().then(() => true);
   if (binsPromise) return binsPromise;
   binsPromise = (async () => {
-    const dir = binDir();
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(binDir(), { recursive: true });
     // Aparece como una descarga normal en el panel, con su progreso
     // Si solo falta Deno (instalaciones de antes de este cambio) el nombre lo
     // dice, para que no parezca que se vuelve a bajar todo el motor.
@@ -187,59 +318,29 @@ function ensureBins() {
     };
     broadcast('download:new', meta);
     // El progreso se reparte entre lo que falta según su tamaño aproximado
-    // (yt-dlp ~18 MB, ffmpeg ~80 MB en zip, Deno ~42 MB en zip), dejando un 5 %
+    // (yt-dlp ~24 MB, ffmpeg ~115 MB en zip, Deno ~43 MB en zip), dejando un 5 %
     // para descomprimir: cada tramo empieza donde acabó el anterior.
-    const PESO = { 'yt-dlp.exe': 18, 'ffmpeg.exe': 80, 'deno.exe': 42 };
+    const PESO = { 'yt-dlp.exe': 24, 'ffmpeg.exe': 115, 'deno.exe': 43 };
     const pesoTotal = missing.reduce((a, b) => a + PESO[b], 0);
     let base = 0;
-    const tramo = (bin) => {
-      const ini = base, ancho = 95 * PESO[bin] / pesoTotal;
-      base += ancho;
-      return (p) => { meta.percent = Math.round(ini + p * ancho); broadcast('download:update', meta); };
-    };
     try {
-      if (missing.includes('yt-dlp.exe')) {
-        await downloadTo(BIN_YTDLP_URL, path.join(dir, 'yt-dlp.exe'), tramo('yt-dlp.exe'));
-      }
-      if (missing.includes('ffmpeg.exe')) {
-        const zip = path.join(dir, 'ffmpeg.zip');
-        await downloadTo(BIN_FFMPEG_URL, zip, tramo('ffmpeg.exe'));
-        const tmp = path.join(dir, '_ff');
-        await descomprime(zip, tmp);
-        const findFf = (d) => {
-          for (const f of fs.readdirSync(d, { withFileTypes: true })) {
-            const fp = path.join(d, f.name);
-            if (f.isDirectory()) { const r = findFf(fp); if (r) return r; }
-            else if (f.name === 'ffmpeg.exe') return fp;
-          }
-          return null;
-        };
-        const found = findFf(tmp);
-        if (!found) throw new Error('ffmpeg no encontrado en el zip');
-        fs.copyFileSync(found, path.join(dir, 'ffmpeg.exe'));
-        fs.rmSync(tmp, { recursive: true, force: true });
-        fs.rmSync(zip, { force: true });
-      }
-      if (missing.includes('deno.exe')) {
-        // El zip de Deno trae un único deno.exe en la raíz; se extrae aparte y se
-        // copia, igual que ffmpeg, para no dejar a medias el deno.exe final.
-        const zip = path.join(dir, 'deno.zip');
-        await downloadTo(BIN_DENO_URL, zip, tramo('deno.exe'));
-        const tmp = path.join(dir, '_deno');
-        await descomprime(zip, tmp);
-        const found = path.join(tmp, 'deno.exe');
-        if (!fs.existsSync(found)) throw new Error('deno no encontrado en el zip');
-        fs.copyFileSync(found, path.join(dir, 'deno.exe'));
-        fs.rmSync(tmp, { recursive: true, force: true });
-        fs.rmSync(zip, { force: true });
+      for (const bin of missing) {
+        const ini = base, ancho = 95 * PESO[bin] / pesoTotal;
+        base += ancho;
+        await conReintentos(() => INSTALADORES[bin]((p) => avisaPorcentaje(meta, ini + p * ancho)));
       }
       meta.percent = 100; meta.state = 'completed'; broadcast('download:update', meta);
+      // yt-dlp recién bajado es el último; si ya estaba, se revisa ahora
+      if (missing.includes('yt-dlp.exe')) { settings.ytDlpRevisado = Date.now(); saveSettings(settings); } else await actualizaYtDlp();
       return true;
     } catch (e) {
-      meta.state = 'failed'; meta.error = 'No se pudo preparar el motor de descargas: ' + e.message;
+      console.log('[Naviris] No se pudo preparar el motor de descargas:', e.message);
+      meta.state = 'failed';
+      meta.error = 'No se pudo preparar el motor de descargas (' + e.message + '). Revisa tu conexión y vuelve a abrir el Rat Tool';
       broadcast('download:update', meta);
-      binsPromise = null; // permite reintentar
       return false;
+    } finally {
+      binsPromise = null; // permite reintentar
     }
   })();
   return binsPromise;
@@ -1079,20 +1180,34 @@ ipcMain.handle('sec:status', () => ({
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
 
-// Los errores de yt-dlp llegan en inglés y con la URL dentro; el panel de
-// descargas enseña esto en su lugar (el original va a la consola del main).
-function errorDeYtDlp(texto) {
-  const t = String(texto || '');
-  if (/Unsupported URL/i.test(t)) return 'Este sitio no es compatible con el Rat Tool';
-  if (/Sign in to confirm|not a bot/i.test(t)) return 'YouTube pide iniciar sesión para este video';
-  if (/Private video|login required|requires authentication|registered users|log in/i.test(t)) return 'El video es privado o necesita iniciar sesión';
-  if (/Requested format is not available/i.test(t)) return 'Esa calidad no está disponible para este video';
-  if (/Video unavailable|not available|has been removed|does not exist/i.test(t)) return 'El video no está disponible';
-  if (/No video formats found|no video in this/i.test(t)) return 'No se encontró ningún video en esa página';
-  if (/HTTP Error 403|Forbidden/i.test(t)) return 'El sitio rechazó la descarga';
-  if (/HTTP Error 404/i.test(t)) return 'No se encontró el video';
-  if (/Unable to download webpage|timed out|getaddrinfo|Connection|network/i.test(t)) return 'No se pudo conectar con el sitio';
-  return 'No se pudo descargar';
+// Mueve el archivo terminado de la carpeta temporal a Descargas, sustituyendo
+// uno igual si ya estaba (es la misma descarga repetida). Si la temporal está
+// en otro disco, renombrar no vale: se copia.
+function mueveADescargas(origen, outDir) {
+  fs.mkdirSync(outDir, { recursive: true });
+  const destino = path.join(outDir, path.basename(origen));
+  fs.rmSync(destino, { force: true });
+  try { fs.renameSync(origen, destino); } catch (e) {
+    if (e.code !== 'EXDEV') throw e;
+    fs.copyFileSync(origen, destino); fs.rmSync(origen, { force: true });
+  }
+  return destino;
+}
+const borraCarpeta = (d) => fs.rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }, () => { /* lo que quede, lo limpia Windows */ });
+// Al arrancar: lo que dejaron descargas cortadas al cerrar Naviris a mitad
+// (carpetas temporales y cookies). Solo nombres propios del Rat Tool y con más
+// de una hora (rat.restosTemporales); en segundo plano, sin frenar el arranque.
+function limpiaRestosRat() {
+  const tmp = app.getPath('temp');
+  fs.readdir(tmp, { withFileTypes: true }, (err, entradas) => {
+    if (err) return;
+    const candidatas = [];
+    for (const e of entradas) {
+      if (!/^naviris-(rat-descarga|cookies)-/.test(e.name)) continue;
+      try { candidatas.push({ nombre: e.name, carpeta: e.isDirectory(), mtimeMs: fs.statSync(path.join(tmp, e.name)).mtimeMs }); } catch { /* ya no está */ }
+    }
+    for (const n of rat.restosTemporales(candidatas, Date.now())) borraCarpeta(path.join(tmp, n));
+  });
 }
 
 async function ytDownload({ url, mode, quality }) {
@@ -1104,90 +1219,98 @@ async function ytDownload({ url, mode, quality }) {
   };
   downloads.set(id, { meta });
   broadcast('download:new', meta);
+  const falla = (error) => { meta.state = 'interrupted'; meta.error = error; meta.name = 'Error: ' + error; broadcast('download:update', meta); return id; };
 
-  if (!fs.existsSync(ytDlpPath())) {
-    meta.state = 'interrupted';
-    meta.name = 'El motor de descargas no está instalado';
-    broadcast('download:update', meta);
-    return id;
-  }
+  if (!fs.existsSync(ytDlpPath()) || !fs.existsSync(ffmpegPath())) return falla('El motor de descargas no está instalado. Revisa tu conexión y vuelve a abrir el Rat Tool');
+  // Con --no-playlist una lista suelta (playlist?list=…) se bajaba entera en
+  // una sola fila del panel, sin nombre ni progreso reales.
+  if (rat.esLista(url)) return falla('Es una lista de reproducción. Abre uno de sus videos y descárgalo desde ahí');
+  // Un canal de Twitch es su directo: no acabaría nunca (rat.esDirecto)
+  if (rat.esDirecto(url)) return falla(rat.mensajeDirecto(url));
 
-  const outTmpl = path.join(outDir, '%(title).120s [%(id)s].%(ext)s');
+  // Carpeta propia de esta descarga (ver rat.argsDescarga)
+  let dir;
+  try { dir = fs.mkdtempSync(path.join(app.getPath('temp'), rat.PREFIJO_TEMPORAL)); } catch { return falla('No se pudo preparar la descarga. Revisa el espacio libre en el disco'); }
+
   // Con la sesión del navegador y su mismo user agent: lo que se ve en la
-  // pestaña se puede bajar (Instagram, X). Ver cookiesParaYtDlp.
-  const cookies = await cookiesParaYtDlp(url);
-  // --js-runtimes: sin Deno YouTube solo deja formatos sueltos o ninguno (ver ensureBins).
-  const common = ['--no-playlist', '--newline', '--no-part', '--ffmpeg-location', ffmpegPath(), ...denoArgs(), '-o', outTmpl, '--user-agent', UA_LIMPIO];
-  if (cookies) common.push('--cookies', cookies);
-  const isTikTok = /tiktok\.com/.test(url);
-  let args;
-  if (mode === 'audio') {
-    args = ['-x', '--audio-format', 'mp3', '--audio-quality', '0', ...common, url];
-  } else if (isTikTok) {
-    // TikTok = archivo único sin marca de agua (play_addr); sin merge para evitar errores
-    args = ['-f', 'b', '--force-overwrites', ...common, url];
-  } else {
-    // Vídeo: por defecto la máxima calidad; si se pide una resolución, se limita a
-    // esa altura (p. ej. 720 => hasta 720p). Mejor vídeo + mejor audio, contenedor mp4.
-    const h = parseInt(quality, 10);
-    const sel = h > 0 ? `bv*[height<=${h}]+ba/b[height<=${h}]/b` : 'bv*+ba/b';
-    args = ['-f', sel, '-S', 'res,fps,ext:mp4:m4a', '--merge-output-format', 'mp4', ...common, url];
-  }
+  // pestaña se puede bajar (Instagram, X, Reddit). A YouTube, solo en el
+  // reintento, si pide iniciar sesión (rat.cookiesDeEntrada / reintentaConCookies).
+  // reintento: true en la segunda (y última) vuelta, la de las cookies
+  const lanza = (cookies, reintento) => {
+    const args = rat.argsDescarga({ url, mode, quality, dir, ffmpeg: ffmpegPath(), deno: denoSiHay(), ua: UA_LIMPIO, cookies });
+    const child = spawn(ytDlpPath(), args, { windowsHide: true });
+    ytJobs.set(id, child);
 
-  const child = spawn(ytDlpPath(), args, { windowsHide: true });
-  ytJobs.set(id, child);
-
-  let lastPct = 0, lastError = '';
-  const escritos = new Set();   // archivos que este trabajo ha empezado a escribir (se borran si se cancela)
-  const setFile = (p) => { const full = p.trim().replace(/^"|"$/g, ''); meta.path = full; meta.name = path.basename(full); escritos.add(full); };
-  const handle = (buf) => {
-    const text = buf.toString();
-    const dest = text.match(/(?:\[download\]|\[ExtractAudio\])\s+Destination:\s*(.+)/);
-    if (dest) setFile(dest[1]);
-    const merge = text.match(/Merging formats into "(.+?)"/);
-    if (merge) setFile(merge[1]);
-    const dl = text.match(/\[download\]\s+([\d.]+)%/);
-    if (dl) {
-      meta.percent = parseFloat(dl[1]);
-      const size = text.match(/of\s+~?\s*([\d.]+)(K|M|G)iB/);
-      if (size) {
-        const mult = { K: 1024, M: 1048576, G: 1073741824 }[size[2]];
-        meta.total = Math.round(parseFloat(size[1]) * mult);
-        meta.received = Math.round(meta.total * meta.percent / 100);
+    // Un tuit o un carrusel con varios videos son varias descargas en una: se
+    // mueven todas (antes caían todas en Descargas y así sigue siendo).
+    let lastPct = 0, lastError = '', directo = false;
+    const finales = [];
+    const alEvento = (e) => {
+      if (e.tipo === 'archivo') {
+        // El nombre con el que acabará (el MP3 o el MP4 ya unido)
+        meta.name = path.basename(e.ruta).replace(/\.[^.\\/]+$/, '') + (mode === 'audio' ? '.mp3' : '.mp4');
+        broadcast('download:update', meta);
+      } else if (e.tipo === 'final') {
+        finales.push(e.ruta);
+      } else if (e.tipo === 'estado') {
+        if (e.valor === 'is_live') directo = true;
+      } else if (e.tipo === 'progreso') {
+        meta.percent = e.percent;
+        if (e.total) { meta.total = e.total; meta.received = Math.round(e.total * e.percent / 100); }
+        if (Math.abs(meta.percent - lastPct) >= 1) { lastPct = meta.percent; broadcast('download:update', meta); }
+      } else if (e.tipo === 'error') lastError = e.texto;
+    };
+    const lectorOut = rat.creaLector(alEvento), lectorErr = rat.creaLector(alEvento);
+    child.stdout.on('data', lectorOut.escribe);
+    child.stderr.on('data', lectorErr.escribe);
+    child.on('error', (e) => { lastError = e.message; });
+    child.on('close', (code) => {
+      lectorOut.cierra(); lectorErr.cierra();
+      borraCookies(cookies);
+      ytJobs.delete(id);
+      // Cancelada por el usuario: el código de salida del proceso matado no es un
+      // error, y lo que quedó a medias está en la carpeta temporal.
+      if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
+      try {
+        for (const f of finales.filter((x) => fs.existsSync(x))) {
+          meta.path = mueveADescargas(f, outDir);
+          meta.name = path.basename(meta.path);
+          recordDlHistory(meta.path);
+        }
+        if (code === 0 && meta.path !== outDir) {
+          meta.state = 'completed'; meta.percent = 100;
+          if (!meta.total) { try { meta.total = meta.received = fs.statSync(meta.path).size; } catch { /* nada */ } }
+        }
+      } catch (e) {
+        lastError = e.message;
       }
-      if (Math.abs(meta.percent - lastPct) >= 1) { lastPct = meta.percent; broadcast('download:update', meta); }
-    }
-    if (/\[ExtractAudio\]|\[Merger\]/.test(text)) { meta.name = meta.name.replace(/\.(webm|m4a|mp4)$/, mode === 'audio' ? '.mp3' : '.mp4'); broadcast('download:update', meta); }
-    const err = text.match(/ERROR:\s*(.+)/);
-    if (err) lastError = err[1].trim();
+      const termina = () => {
+        if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
+        if (meta.state !== 'completed') {
+          console.log('[Naviris] yt-dlp:', code, lastError);
+          meta.state = 'interrupted';
+          // yt-dlp salta los directos sin error (--match-filter !is_live)
+          meta.error = directo && !finales.length ? rat.mensajeDirecto(url) : rat.errorDeYtDlp(lastError, url);
+          if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + meta.error;
+          // yt-dlp desfasado: se actualiza ya, sin esperar a la revisión diaria
+          if (rat.pideActualizar(lastError)) actualizaYtDlp({ forzar: true });
+        }
+        borraCarpeta(dir);
+        broadcast('download:update', meta);
+      };
+      // Un solo reintento, y solo si hay sesión que no se pasó la primera vez
+      if (meta.state !== 'completed' && !reintento && !rat.cookiesDeEntrada(url) && rat.reintentaConCookies(lastError, url)) {
+        cookiesParaYtDlp(url).then((c) => {
+          if (!c || meta.state === 'cancelled') { borraCookies(c); termina(); return; }
+          console.log('[Naviris] yt-dlp pide sesión, se reintenta con las cookies:', lastError);
+          lanza(c, true);
+        });
+        return;
+      }
+      termina();
+    });
   };
-  child.stdout.on('data', handle);
-  child.stderr.on('data', handle);
-  child.on('error', (e) => { lastError = e.message; });
-  child.on('close', (code) => {
-    borraCookies(cookies);
-    ytJobs.delete(id);
-    // Cancelada por el usuario: el código de salida del proceso matado no es un
-    // error, y lo que quedó a medias en Descargas se borra (con --no-part el
-    // archivo a medias lleva ya el nombre final).
-    if (meta.state === 'cancelled') {
-      for (const f of escritos) { try { fs.rmSync(f, { force: true }); } catch { /* en uso */ } }
-      return;
-    }
-    meta.state = code === 0 ? 'completed' : 'interrupted';
-    meta.percent = code === 0 ? 100 : meta.percent;
-    if (code !== 0) {
-      if (lastError) console.log('[Naviris] yt-dlp:', lastError);
-      meta.error = errorDeYtDlp(lastError);
-      if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + meta.error;
-    }
-    if (code === 0 && meta.path) {
-      // Tras ExtractAudio/Merger el nombre cambia de extensión pero meta.path no
-      const fin = path.join(path.dirname(meta.path), meta.name);
-      recordDlHistory(fs.existsSync(fin) ? fin : meta.path);
-    }
-    broadcast('download:update', meta);
-  });
+  lanza(rat.cookiesDeEntrada(url) ? await cookiesParaYtDlp(url) : null, false);
   return id;
 }
 
@@ -2367,7 +2490,7 @@ function verifyWindowsHello(reason) {
   return new Promise((resolve) => {
     // El motivo lleva el sitio de la contraseña (puede venir de un CSV importado):
     // va como literal escapado, nunca pegado a mano entre comillas.
-    const msg = literalPs(reason || 'Naviris te pide verificar tu identidad');
+    const msg = rat.literalPs(reason || 'Naviris te pide verificar tu identidad');
     const hwnd = hwndDeNaviris();
     const script = `
 [Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null
@@ -2857,32 +2980,27 @@ ipcMain.handle('import:bookmarks', soloUI((_e, key) => {
   } catch (e) { return { ok: false, error: e.message }; }
 }));
 
-// Lista las alturas de vídeo disponibles (1080, 720, …) para el selector de calidad
+// Calidades disponibles (1080, 720, …) para el selector: el lado corto de cada
+// formato, como las nombra YouTube (un Short de 1080x1920 es 1080p).
 ipcMain.handle('yt:formats', soloUI(async (_e, url) => {
-  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || !fs.existsSync(ytDlpPath())) return [];
-  // Mismas cookies y user agent que la descarga: si no, Instagram y X no
-  // enseñan calidades para un vídeo que luego sí bajaría.
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || rat.esLista(url) || rat.esDirecto(url) || !fs.existsSync(ytDlpPath())) return [];
+  // Mismas cookies, user agent y Deno que la descarga: si no, Instagram y X no
+  // enseñan calidades para un vídeo que luego sí bajaría, y YouTube sin Deno no
+  // enseña 1080p. YouTube, sin cookies salvo que pida sesión (un reintento).
+  const lee = (cookies) => new Promise((resolve) => {
+    const child = spawn(ytDlpPath(), rat.argsFormatos({ url, deno: denoSiHay(), ua: UA_LIMPIO, cookies }), { windowsHide: true });
+    let out = '', err = '';
+    const fin = (r) => { clearTimeout(timer); borraCookies(cookies); resolve(r); };
+    const timer = setTimeout(() => { try { child.kill(); } catch { /* ya acabó */ } fin({ calidades: [], err }); }, 30000);
+    child.stdout.on('data', (d) => { out += d.toString('utf8'); });
+    child.stderr.on('data', (d) => { err += d.toString('utf8'); });
+    child.on('error', () => fin({ calidades: [], err }));
+    child.on('close', () => { try { fin({ calidades: rat.calidades(JSON.parse(out)), err }); } catch { fin({ calidades: [], err }); } });
+  });
+  const r = await lee(rat.cookiesDeEntrada(url) ? await cookiesParaYtDlp(url) : null);
+  if (r.calidades.length || rat.cookiesDeEntrada(url) || !rat.reintentaConCookies(r.err, url)) return r.calidades;
   const cookies = await cookiesParaYtDlp(url);
-  return new Promise((resolve) => {
-  // Con Deno, como la descarga: sin él YouTube no enseña 1080p y el selector
-  // ofrecería calidades que no son las reales.
-  const args = ['--no-playlist', '--no-warnings', '--dump-single-json', ...denoArgs(), '--user-agent', UA_LIMPIO];
-  if (cookies) args.push('--cookies', cookies);
-  args.push(url);
-  const child = spawn(ytDlpPath(), args, { windowsHide: true });
-  let out = ''; const timer = setTimeout(() => { try { child.kill(); } catch {} resolve([]); }, 20000);
-  child.stdout.on('data', (d) => { out += d.toString(); });
-  child.on('error', () => { clearTimeout(timer); borraCookies(cookies); resolve([]); });
-  child.on('close', () => {
-    clearTimeout(timer); borraCookies(cookies);
-    try {
-      const info = JSON.parse(out);
-      const heights = new Set();
-      (info.formats || []).forEach((f) => { if (f.height && (f.vcodec !== 'none' || f.acodec === 'none')) heights.add(f.height); });
-      resolve([...heights].filter((h) => h >= 144).sort((a, b) => b - a));
-    } catch { resolve([]); }
-  });
-  });
+  return cookies ? (await lee(cookies)).calidades : [];
 }));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
@@ -3329,6 +3447,7 @@ app.whenReady().then(async () => {
   }
   // ¿Se actualizó desde la última vez? Entonces la interfaz enseñará qué cambió.
   revisaVersionInstalada();
+  limpiaRestosRat();
   braveAdblock.init();
   splashProgreso(62);
   // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.

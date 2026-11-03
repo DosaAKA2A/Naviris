@@ -405,9 +405,6 @@ const toUrl = (input) => {
 };
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const activeTab = () => tabs.find((t) => t.id === activeId) || null;
-// Detecta si una URL es de un vídeo descargable (YouTube /watch?, /shorts, youtu.be,
-// TikTok /video|/photo, X /status, Instagram /reel|/reels|/p|/tv, etc.)
-const isVideoUrl = (u) => /youtu\.be\/|\/(watch|shorts|video|status|reel|reels|clip|p|tv|embed)(\/|\?|$)/i.test(u || '');
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
@@ -5181,8 +5178,8 @@ cardEls.number.addEventListener('input', () => {
 });
 
 /* ============ Rat Tool ============ */
-const PLAT_MAP = { 'youtube.com': ['YouTube', 'youtube'], 'youtu.be': ['YouTube', 'youtube'], 'instagram.com': ['Instagram', 'instagram'], 'twitter.com': ['X', 'x'], 'x.com': ['X', 'x'], 'tiktok.com': ['TikTok', null], 'twitch.tv': ['Twitch', 'twitch'], 'facebook.com': ['Facebook', null], 'vimeo.com': ['Vimeo', null], 'reddit.com': ['Reddit', 'reddit'], 'dailymotion.com': ['Dailymotion', null] };
-function platOf(url) { const h = hostOf(url); for (const d in PLAT_MAP) if (h === d || h.endsWith('.' + d)) return PLAT_MAP[d]; return null; }
+// Plataformas y "¿es un video concreto?" viven en rat.js (window.ratTool): las
+// mismas reglas que usa el proceso principal y que prueba test/rat.test.js.
 // Extrae la URL del vídeo que se está viendo. En el feed de TikTok (/foryou) la
 // barra no cambia, así que buscamos el vídeo concreto por varias vías.
 function resolveMediaUrl() {
@@ -5381,7 +5378,7 @@ els.sbRat.addEventListener('click', async (e) => {
   // 1º: el vídeo de la PÁGINA ACTUAL (así, al pasar de TikTok a YouTube, detecta YouTube)
   if (tab?.kind === 'web' && tab.webview) { try { const real = await tab.webview.executeJavaScript(`(${resolveMediaUrl.toString()})()`); if (real) url = real; } catch {} }
   // 2º: solo si la página actual NO es un vídeo, usa el enlace copiado (útil en Instagram: copiar enlace → detectar)
-  if (!isVideoUrl(url)) {
+  if (!window.ratTool.esVideo(url)) {
     try { const clip = (await window.cobalt.readClipboard() || '').trim(); if (/^https?:\/\/\S+$/i.test(clip)) url = clip; } catch {}
   }
   els.ratUrl.value = url; updateRatPlat();
@@ -5415,21 +5412,24 @@ function activateAutoLoot(tab) {
   toast('AutoClaim activo: canal silenciado y en resolución mínima');
 }
 function updateRatPlat() {
-  const url = els.ratUrl.value.trim(); const p = platOf(url);
+  const url = els.ratUrl.value.trim(); const p = window.ratTool.plataforma(url);
   const tab = activeTab(); const onSite = tab?.kind === 'web' && p && hostOf(tab.url) === hostOf(url);
-  // Tarjeta de detección con logo + URL cuando estás en la web
-  if (p && onSite) {
+  const looksVideo = window.ratTool.esVideo(url);
+  // Tarjeta de detección con logo + URL cuando estás en la web y es un video
+  // (en el feed decía a la vez "Video detectado" y "Abre un video concreto")
+  if (p && onSite && looksVideo) {
     els.ratDetect.classList.remove('hidden');
-    els.ratDetectLogo.innerHTML = p[1] ? window.brandIcon(p[1]) : window.icon('film');
-    els.ratDetectName.textContent = 'Video en ' + p[0] + ' detectado';
+    els.ratDetectLogo.innerHTML = p.marca ? window.brandIcon(p.marca) : window.icon('film');
+    els.ratDetectName.textContent = 'Video en ' + p.nombre + ' detectado';
     els.ratDetectUrl.textContent = url;
   } else els.ratDetect.classList.add('hidden');
   // Toggle de sensibilidad solo en X
-  const onX = p && p[0] === 'X' && onSite;
+  const onX = p && p.id === 'x' && onSite;
   els.ratXtoggle.classList.toggle('hidden', !onX);
-  const looksVideo = isVideoUrl(url);
-  if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un video concreto</b> o pega su enlace (en el feed no se detecta).`;
-  else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p[0]}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
+  if (window.ratTool.esLista(url)) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Es una lista de reproducción</b>: abre uno de sus videos para descargarlo.`;
+  else if (window.ratTool.esDirecto(url)) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Es un directo</b>: cuando acabe, descarga el video desde la pestaña Videos del canal.`;
+  else if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un video concreto</b> o pega su enlace (en el feed no se detecta).`;
+  else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p.nombre}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
 }
 let ratQualityToken = 0, ratQualityTimer = null;
 async function loadRatQualities() {
