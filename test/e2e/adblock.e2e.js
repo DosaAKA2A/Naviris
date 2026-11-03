@@ -524,10 +524,9 @@ describe('Service workers y ventanas emergentes', { timeout: 6 * 60 * 1000 }, ()
     assert.deepEqual(conBlanca, { pagina: 'pasa', sw: 'pasa', swSinReferrer: 'pasa' }, 'con el sitio permitido no se debe bloquear nada');
   });
 
-  // Pendiente de decisión (ver INFORME): el <webview> lleva allowpopups y
-  // Electron no tiene bloqueador de ventanas emergentes por gesto, así que
-  // window.open sin clic abre pestaña. Se mide igual para ver el antes y después.
-  it('ventanas emergentes: sin gesto no se abre ninguna', { todo: 'falta decidir cómo bloquear window.open sin gesto' }, async () => {
+  // Sin clic no se abre nada, como en Chrome (src/emergentes.js); el resto de
+  // casos, con clic y con permiso, en test/e2e/rendimiento.e2e.js.
+  it('ventanas emergentes: sin gesto no se abre ninguna', async () => {
     const pestanas = () => n.evalua(app.ui, 'return tabs.length;');
     const ventanas = async () => (await (await fetch(`http://127.0.0.1:${n.PUERTO}/json/list`)).json()).filter((t) => t.type === 'page' || t.type === 'webview').length;
     const t0 = await pestanas(), v0 = await ventanas();

@@ -1033,6 +1033,7 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   var claimerRan = false;
   function runInventoryClaimer() {
     if (claimerRan) return; claimerRan = true;
+    ipcRenderer.send('wv:sin-freno', true);   // oculto, pero tiene que trabajar
     var tries = 0, clicked = 0;
     var iv = setInterval(function () {
       try {
@@ -1136,6 +1137,8 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   }
   function tick() { reclamaCofre(); reclamaDrops(); checkPendingDrops(false); keepAlive(); bajaCalidad(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
+    // De fondo sigue contando: sin el freno de las pestañas que no se ven.
+    ipcRenderer.send('wv:sin-freno', !!(opt && opt.on));
     if (opt && opt.on) {
       cortaVisibilidad();
       bajaRes = !!opt.lowRes;

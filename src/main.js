@@ -7,6 +7,7 @@ const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
 const { migraPerfil } = require('./migraciones');
+const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
 const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binarios (se prueba en test/)
 
 const PART_NORMAL = 'persist:cobalt';
@@ -1470,7 +1471,15 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
-    webPreferences.backgroundThrottling = false; // AutoLoot: NO frenar timers/vídeo en segundo plano (el tiempo de drops debe seguir contando)
+    /* Pestañas de fondo dormidas para el pintado, como en Chrome (2026-11-03).
+       Con backgroundThrottling a false (lo que había, por el AutoClaim) Electron no
+       deja que el webview se marque nunca como oculto: las pestañas de detrás y las
+       que tapa el hub seguían pintando a la frecuencia de la pantalla y se llevaban
+       la mayor parte de la CPU y la GPU con varias abiertas. Con el freno, la que no
+       se ve deja de pintar y sus temporizadores van a uno por segundo; el sonido, el
+       video con sonido y las llamadas siguen, y al volver se ve al instante. Las de
+       AutoClaim se lo quitan ellas mismas ('wv:sin-freno'). */
+    webPreferences.backgroundThrottling = true;
     /* NADA DE alert/confirm/prompt EN LAS WEBS (2026-08-13). Esos diálogos son
        modales NATIVOS colgados de nuestra ventana: mientras uno está abierto,
        la ventana entera deja de aceptar clics. Y en una ventana sin marco como
@@ -1878,6 +1887,12 @@ function apuntaHistorial(e, url, h) {
 }
 ipcMain.on('wv:historial', (e, id) => { e.returnValue = historialDe(e, id); });
 ipcMain.on('wv:historial-pendiente', (e, url, h) => { e.returnValue = apuntaHistorial(e, url, h); });
+// El AutoClaim de Twitch (la pestaña que farmea y el webview que reclama) tiene que
+// seguir contando aunque no se vea: el preload de esa página pide quitarle el freno
+// de fondo mientras está encendido (ver backgroundThrottling en will-attach-webview).
+ipcMain.on('wv:sin-freno', (e, on) => {
+  if (e.sender.getType() === 'webview' && e.senderFrame === e.sender.mainFrame) e.sender.setBackgroundThrottling(!on);
+});
 
 /* ===== FRENO CONTRA LOS BUCLES DE RECARGAS (2026-10-22) =====
    A Dosa, y a usuarios, YouTube se les quedaba en blanco "cargando". Medido por
@@ -1934,9 +1949,24 @@ ipcMain.on('tab:reintenta-bucle', (e, id) => { if (esUI(e)) frenos.get(id)?.(); 
    también, porque muchas abren la ventana vacía y la dirigen después. Los
    enlaces y el window.open sin características siguen yendo a una pestaña.
    La ventana lleva el mismo preload y las mismas restricciones que una
-   pestaña, y sus propias emergentes siguen esta misma regla. */
-function ventanasDe(contents, host) {
+   pestaña, y sus propias emergentes siguen esta misma regla.
+   Sin un gesto reciente de la persona no se abre nada (ver src/emergentes.js);
+   `pestana` es el id del webview de la pestaña de la que sale todo, para el aviso. */
+function ventanasDe(contents, host, pestana = contents.id) {
+  const gestos = emergentes.creaGestos();
+  // 'input-event' no ve lo que cae en un iframe de otro sitio (medido): el ratón y
+  // el teclado de todos los marcos llegan por los 'before-…'; los toques, por el primero.
+  const apunta = (_e, ev) => gestos.apunta(ev);
+  contents.on('input-event', apunta);
+  contents.on('before-mouse-event', apunta);
+  contents.on('before-input-event', apunta);
   contents.setWindowOpenHandler(({ url, disposition }) => {
+    const sitio = contents.getURL();
+    if (settings.permissions[emergentes.clavePermiso(sitio)] !== 'allow' && !gestos.gasta()) {
+      let origen = ''; try { origen = new URL(sitio).origin; } catch { /* nada */ }
+      if (origen && host && !host.isDestroyed()) host.send('tab:emergente-bloqueada', { wc: pestana, origen });
+      return { action: 'deny' };
+    }
     const web = /^https?:/i.test(url);
     if (disposition === 'new-window' && (web || url === 'about:blank')) {
       return {
@@ -1959,9 +1989,16 @@ function ventanasDe(contents, host) {
   });
   contents.on('did-create-window', (win) => {
     win.removeMenu();
-    ventanasDe(win.webContents, host);
+    ventanasDe(win.webContents, host, pestana);
   });
 }
+// «Permitir» en el aviso de la barra: ese sitio abre emergentes sin gesto.
+ipcMain.on('emergentes:permitir', soloUI((_e, origen) => {
+  const clave = emergentes.clavePermiso(origen);
+  if (!clave) return;
+  settings.permissions[clave] = 'allow';
+  saveSettings(settings);
+}));
 
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {

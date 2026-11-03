@@ -68,6 +68,8 @@ contextBridge.exposeInMainWorld('cobalt', {
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
   onBucle: (cb) => ipcRenderer.on('tab:bucle', (_e, p) => cb(p)),
   reintentaBucle: (id) => ipcRenderer.send('tab:reintenta-bucle', id),
+  onEmergenteBloqueada: (cb) => ipcRenderer.on('tab:emergente-bloqueada', (_e, p) => cb(p)),
+  permitirEmergentes: (origen) => ipcRenderer.send('emergentes:permitir', origen),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
