@@ -1,7 +1,8 @@
 // Bloqueador de anuncios con el motor de Brave (adblock-rs, el crate adblock-rust
 // oficial compilado para Node) y las MISMAS listas que usa Brave: se leen de su
 // catálogo público y se refrescan solas cada día, así los cambios que Brave
-// publica llegan sin actualizar Naviris.
+// publica llegan sin actualizar Naviris. Más la que uBlock trae por defecto y
+// Brave no (LISTAS_UBLOCK).
 const { app, net } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +15,14 @@ let Engine = null, FilterSet = null;
 try { ({ Engine, FilterSet } = require('adblock-rs')); } catch (e) { console.log('[Naviris] adblock-rs no disponible:', e.message); }
 
 const CATALOG_URL = 'https://raw.githubusercontent.com/brave/adblock-resources/master/filter_lists/list_catalog.json';
+/* Listas que uBlock Origin trae activadas por defecto y el catálogo de Brave
+   no. De su conjunto por defecto (assets.json) solo falta esta: la de Peter
+   Lowe, unos 3.500 dominios de anuncios y rastreo (+3 en adblock.turtlecute.org,
+   sin coste medible al montar ni en memoria; medido el 03/11/2026). Va sin
+   permisos (máscara 0): son solo reglas de red y no le hace falta inyectar
+   scriptlets de confianza. */
+const LISTAS_UBLOCK = ['https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext'];
+const claveUblock = LISTAS_UBLOCK.join(' ');
 const REFRESH_MS = 24 * 3600 * 1000; // cadencia de actualización de listas y recursos
 // Tope para regenerar TODOS los recursos (unos 80 archivos pequeños de GitHub).
 // Si no da tiempo, se sigue con los que ya había: mejor viejos que a medias.
@@ -127,6 +136,7 @@ async function bajarListas() {
     const mascara = Number(list.permission_mask) || 0;
     for (const s of list.sources || []) if (s.url) fuentes.push({ url: s.url, mascara });
   }
+  for (const url of LISTAS_UBLOCK) fuentes.push({ url, mascara: 0 });
   const grupos = new Map();
   let okLists = 0;
   for (const f of fuentes) {
@@ -168,20 +178,33 @@ function buildEngine(grupos, recursos) {
   ponMotor(montaMotor(grupos), recursos, 'montado en el hilo principal', Date.now() - t0);
 }
 
-function montaEnHilo(grupos) {
+/* Tope del hilo: montar cuesta 150-250 ms (medido). Si el hilo no contesta
+   nunca (colgado, o parado por un depurador, que es como lo vio la parte
+   «medición»), el bloqueador se quedaba apagado toda la sesión sin aviso: a los
+   10 s se termina el hilo y se monta en el principal, como cuando falla. */
+const HILO_TOPE_MS = 10000;
+const HILO_MOTOR = path.join(__dirname, 'adblock-motor.js');
+
+// `archivo` y `topeMs` solo cambian en los tests (un hilo que no contesta).
+function montaEnHilo(grupos, { archivo = HILO_MOTOR, topeMs = HILO_TOPE_MS } = {}) {
   return new Promise((ok, no) => {
-    const w = new Worker(path.join(__dirname, 'adblock-motor.js'), { workerData: { motorDelBloqueador: true, grupos: [...grupos] } });
-    w.once('message', ok);
-    w.once('error', no);
-    w.once('exit', (codigo) => no(new Error('el hilo del motor terminó con ' + codigo)));
+    const w = new Worker(archivo, { workerData: { motorDelBloqueador: true, grupos: [...grupos] } });
+    const tope = setTimeout(() => {
+      w.terminate();
+      no(new Error('el hilo del motor no contestó en ' + topeMs / 1000 + ' s'));
+    }, topeMs);
+    const fin = (f) => (v) => { clearTimeout(tope); f(v); };
+    w.once('message', fin(ok));
+    w.once('error', fin(no));
+    w.once('exit', fin((codigo) => no(new Error('el hilo del motor terminó con ' + codigo))));
   });
 }
 
-async function montaYGuarda(grupos, recursos) {
+async function montaYGuarda(grupos, recursos, hilo) {
   const t0 = Date.now();
   let buf = null;
   try {
-    buf = await montaEnHilo(grupos);
+    buf = await montaEnHilo(grupos, hilo);
     const e = new Engine(new FilterSet(false));
     e.deserialize(buf);
     ponMotor(e, recursos, 'montado en un hilo aparte', Date.now() - t0);
@@ -216,7 +239,8 @@ async function refresh(force = false) {
   const ahora = Date.now();
   // `mascaras` falta en los perfiles de antes de separar por permisos: se
   // rebajan las listas una vez para dejar fuera la de iOS (ver bajarListas).
-  const tocanListas = force || !meta.mascaras || ahora - meta.updated >= REFRESH_MS;
+  // Lo mismo si cambian las de uBlock (LISTAS_UBLOCK): sin esperar 24 h.
+  const tocanListas = force || !meta.mascaras || meta.ublock !== claveUblock || ahora - meta.updated >= REFRESH_MS;
   const copias = copiasDeRecursos();
   const tocanRecursos = force || !copias.length || ahora - copias[0].fecha >= REFRESH_MS;
   if (!tocanListas && !tocanRecursos) return;
@@ -229,7 +253,7 @@ async function refresh(force = false) {
         grupos = r.grupos;
         fs.mkdirSync(dir(), { recursive: true });
         for (const [m, texto] of grupos) fs.writeFileSync(rulesFile(m), texto, 'utf8');
-        meta = { ...meta, updated: Date.now(), lists: r.okLists, mascaras: [...grupos.keys()] };
+        meta = { ...meta, updated: Date.now(), lists: r.okLists, mascaras: [...grupos.keys()], ublock: claveUblock };
         fs.writeFileSync(metaFile(), JSON.stringify(meta), 'utf8');
         let kb = 0; for (const t of grupos.values()) kb += t.length / 1024;
         console.log('[Naviris] Listas de Brave actualizadas:', r.okLists, 'listas,', Math.round(kb), 'KB');
@@ -432,6 +456,6 @@ function status() {
   return { engine: !!engine, lists: meta.lists, updated: meta.updated };
 }
 
-// buildEngine se exporta para los tests (test/adblock.test.js): monta el motor
-// con listas y recursos fijos, sin red ni perfil.
-module.exports = { init, refresh, check, sustituto, ESQUEMA_SUSTITUTOS, cosmeticsFor, genericosPara, arranqueDe, status, buildEngine };
+// buildEngine y montaYGuarda se exportan para los tests (test/adblock.test.js):
+// montan el motor con listas y recursos fijos, sin red ni perfil.
+module.exports = { init, refresh, check, sustituto, ESQUEMA_SUSTITUTOS, cosmeticsFor, genericosPara, arranqueDe, status, buildEngine, montaYGuarda };

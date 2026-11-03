@@ -517,11 +517,14 @@ describe('Service workers y ventanas emergentes', { timeout: 6 * 60 * 1000 }, ()
     await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("remove", "127.0.0.1"); return true;');
     await n.cierraPestana(app, p);
     apunta('sw-lista-blanca', { sinBlanca, conBlanca });
-    // swSinReferrer no se comprueba: sin pestaña ni referrer, main no sabe de
-    // qué sitio es la petición y la evalúa como de primera parte (ver INFORME).
+    // swSinReferrer no se comprueba, ni con lista blanca ni sin ella: sin pestaña
+    // ni referrer, main no sabe de qué sitio es la petición. No se le aplica la
+    // lista blanca y el motor la evalúa como de primera parte, así que pasa o se
+    // bloquea según la regla sea $third-party o no (con la lista de Peter Lowe,
+    // la de taboola ya no lo es). Ver INFORME de «adblock».
     assert.equal(sinBlanca.pagina, 'bloqueada');
     assert.equal(sinBlanca.sw, 'bloqueada', 'lo que pide el service worker se debe bloquear');
-    assert.deepEqual(conBlanca, { pagina: 'pasa', sw: 'pasa', swSinReferrer: 'pasa' }, 'con el sitio permitido no se debe bloquear nada');
+    assert.deepEqual({ pagina: conBlanca.pagina, sw: conBlanca.sw }, { pagina: 'pasa', sw: 'pasa' }, 'con el sitio permitido no se debe bloquear nada');
   });
 
   // Pendiente de decisión (ver INFORME): el <webview> lleva allowpopups y
@@ -540,5 +543,73 @@ describe('Service workers y ventanas emergentes', { timeout: 6 * 60 * 1000 }, ()
     await n.captura(p, 'emergentes');
     apunta('ventanas-emergentes', { sinGesto, conGesto });
     assert.equal(sinGesto.pestanas + sinGesto.marcos, 0, 'se abrieron ventanas sin que la persona hiciera clic');
+  });
+});
+
+/* ============ «Permitir anuncios en este sitio» (botón del escudo) ============ */
+describe('Permitir anuncios en un sitio', { timeout: 4 * 60 * 1000 }, () => {
+  // Bloqueada sin sustituto por las listas (comprobado con el motor), como arriba.
+  const BLOQUEADA = 'https://cdn.taboola.com/libtrc/x/loader.js';
+  const HOST = 'lista-blanca.localtest.me';
+  let app, srv, url;
+  before(async () => {
+    srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      const pide = `fetch(${JSON.stringify(BLOQUEADA)}, { mode: 'no-cors' }).then(() => 'pasa', () => 'bloqueada')`;
+      // El iframe es de otro sitio (lvh.me, que también resuelve a 127.0.0.1; a
+      // 127.0.0.1 a secas las listas no dejan cargarlo desde otro sitio): cuenta
+      // lo que le pasa a su petición con postMessage.
+      if (req.url === '/marco') { res.end(`<!doctype html><script>${pide}.then((r) => parent.postMessage({ marco: r }, '*'));</script>`); return; }
+      // Un anuncio para el ocultado genérico por clase (.banner-ads, preload) y
+      // otro para el CSS de las listas que pone main en dom-ready ([data-ad-placeholder]).
+      res.end(`<!doctype html><title>Lista blanca</title>
+        <div class="banner-ads" id="generico" style="height:60px">anuncio</div>
+        <div data-ad-placeholder id="cosmetico" style="height:60px">anuncio</div>
+        <script>addEventListener('message', (e) => { window.marco = e.data.marco; }); ${pide}.then((r) => { window.red = r; });</script>
+        <iframe src="http://naviris-marco.lvh.me:${srv.address().port}/marco"></iframe>`);
+    }).listen(0);
+    await new Promise((r) => srv.once('listening', r));
+    url = `http://${HOST}:${srv.address().port}/`;
+    app = await n.arranca('lista-blanca');
+    await n.esperaMotor(app);
+  });
+  after(async () => { await n.cierra(app); srv.close(); });
+
+  const estado = (p) => n.hasta(() => n.enPestana(p, `return window.red && window.marco && document.readyState === 'complete'
+    && { red: window.red, marco: window.marco, generico: document.getElementById('generico').offsetHeight, cosmetico: document.getElementById('cosmetico').offsetHeight };`), { tope: 20000, que: 'la página de prueba' });
+  // El botón de verdad: abre el panel del escudo y pulsa «Permitir anuncios en…»
+  // o «Volver a bloquear en…», que guarda el sitio y recarga la pestaña.
+  async function pulsaBoton(p, empieza) {
+    const docs = n.documentos(p).length;
+    const texto = await n.hasta(() => n.evalua(app.ui, `if (els.shieldPop.classList.contains('hidden')) els.navShield.click();
+      const b = els.adblockSite; return !b.classList.contains('hidden') && b.textContent.startsWith(${JSON.stringify(empieza)}) && b.textContent;`), { tope: 10000, que: 'el botón ' + empieza });
+    await n.evalua(app.ui, 'els.adblockSite.click(); return true;');
+    await n.hasta(() => n.documentos(p).length > docs, { tope: 15000, que: 'la recarga' });
+    await n.evalua(app.ui, 'if (!els.shieldPop.classList.contains("hidden")) els.navShield.click(); return true;');
+    return texto;
+  }
+
+  it('el botón apaga red, cosméticos e iframes en ese sitio, recarga y se puede deshacer', async () => {
+    const p = await n.abrePestana(app, url);
+    const bloqueando = await estado(p);
+    const permitir = await pulsaBoton(p, 'Permitir anuncios en');
+    const bloqueadasAntes = n.red(p).bloqueadas.length;
+    const permitido = await estado(p);
+    const bloqueadasPermitido = n.red(p).bloqueadas.length - bloqueadasAntes;
+    const lista = await n.evalua(app.ui, 'return (await window.cobalt.adblockGet()).whitelist;');
+    const volver = await pulsaBoton(p, 'Volver a bloquear en');
+    const otraVez = await estado(p);
+    const listaFinal = await n.evalua(app.ui, 'return (await window.cobalt.adblockGet()).whitelist;');
+    await n.captura(p, 'lista-blanca');
+    await n.cierraPestana(app, p);
+    apunta('lista-blanca-boton', { bloqueando, permitir, permitido, bloqueadasPermitido, lista, volver, otraVez, listaFinal });
+    assert.deepEqual(bloqueando, { red: 'bloqueada', marco: 'bloqueada', generico: 0, cosmetico: 0 }, 'sin permitir, el bloqueador actúa');
+    assert.equal(permitir, 'Permitir anuncios en ' + HOST);
+    assert.deepEqual(lista, [HOST]);
+    assert.deepEqual(permitido, { red: 'pasa', marco: 'pasa', generico: 60, cosmetico: 60 }, 'con el sitio permitido no se toca nada, tampoco en su iframe');
+    assert.equal(bloqueadasPermitido, 0, 'peticiones bloqueadas en un sitio permitido');
+    assert.equal(volver, 'Volver a bloquear en ' + HOST);
+    assert.deepEqual(otraVez, bloqueando, 'al volver a bloquear, todo como al principio');
+    assert.deepEqual(listaFinal, []);
   });
 });
