@@ -1,7 +1,8 @@
 // e2e (app real por CDP): las pestañas que no se ven dejan de pintar sin cortar
 // el sonido ni recargar al volver, la de AutoClaim sigue trabajando de fondo, y
 // las ventanas emergentes solo se abren con un gesto de la persona (clic en la
-// página o en un iframe de otro sitio), con aviso y permiso por sitio.
+// página o en un iframe de otro sitio), con aviso y permiso por sitio, y al
+// permitir se abre en ese momento lo que se bloqueó.
 // Se ejecuta con: npm run test:e2e  (puerto CDP: NAVIRIS_E2E_PUERTO, 9405 por defecto)
 'use strict';
 const test = require('node:test');
@@ -49,6 +50,12 @@ const paginas = {
     document.getElementById('bi').onclick = () => window.open('http://localhost:${WEB}/destino?marco', '_blank', 'width=300,height=200');
   </script>`),
   '/hijo': () => html(`<script>if (window.opener) { window.opener.postMessage({ login: 'token' }, '*'); setTimeout(() => window.close(), 200); }</script>`),
+  // Sin clic, al cargar: un login en ventanita que espera window.opener y una pestaña.
+  '/bloquea-login': () => html(`<pre id="r">esperando</pre><script>
+      addEventListener('message', (e) => { if (e.data && e.data.login) document.getElementById('r').textContent = 'ok:' + e.data.login; });
+      if (!window.open('/hijo', 'login', 'width=480,height=600')) document.getElementById('r').textContent = 'null';
+      window.open('/destino?tab-bloqueada');
+    </script>`),
   '/destino': () => html('<h1>destino</h1>')
 };
 const atiende = (req, res) => {
@@ -88,7 +95,8 @@ async function fotogramas(c, ms = 1500) {
   return (await c.evalua('window.__raf')) - a;
 }
 const activa = (nav, expr) => nav.ui.evalua(`(() => { const t = tabs.find((x) => ${expr}); activateTab(t.id); return t.id; })()`);
-const ventanas = async () => (await lista()).filter((x) => x.type === 'page' && !/index\.html/.test(x.url));
+// Ventanas que abren las webs (ni la de Naviris ni el splash del arranque)
+const ventanas = async () => (await lista()).filter((x) => x.type === 'page' && !/(index|splash)\.html/.test(x.url));
 async function clic(c, sel) {
   const [x, y] = await c.evalua(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
   await c.clic(x, y);
@@ -182,12 +190,64 @@ test('ventanas emergentes: sin gesto se bloquean y avisan; con clic se abren', {
   await clic(c, '#f');
   await hasta(async () => (await ventanas()).some((x) => x.url.endsWith('?marco')), 5000);
 
-  // «Permitir en este sitio»: queda en los permisos y al recargar se abren sin clic
+  // «Permitir en este sitio»: se abre ya todo lo que se bloqueó en la pestaña, en
+  // orden (las dos pestañas y las dos ventanas: la del principio y la segunda
+  // del clic doble), queda en los permisos y al recargar se abren sin clic
+  const va0 = (await ventanas()).length, pa0 = await pestanas();
   await nav.ui.evalua(`(document.getElementById('emerg-allow').click(), 1)`);
+  await hasta(async () => (await pestanas()) - pa0 === 2 && (await ventanas()).length - va0 === 2, 8000);
+  const abiertas = (await ventanas()).map((x) => new URL(x.url).search);
+  assert.ok(abiertas.includes('?ventana') && abiertas.includes('?dos2'), 'las ventanas bloqueadas: ' + abiertas.join(' '));
+  const enPestanas = await nav.ui.evalua(`tabs.map((x) => x.url)`);
+  for (const q of ['?sola', '?script']) assert.ok(enPestanas.some((u) => u.endsWith(q)), 'falta la pestaña ' + q);
   const permisos = await nav.ui.evalua('window.navirisApp.permList()');
   assert.equal(permisos[sitio + '|popups'], 'allow');
+  await activa(nav, `x.url.endsWith('/emergentes')`);
   const v0 = (await ventanas()).length, p0 = await pestanas();
   await nav.ui.evalua(`(tabs.find((x) => x.url.endsWith('/emergentes')).webview.reload(), 1)`);
   await hasta(async () => (await pestanas()) - p0 === 2 && (await ventanas()).length - v0 === 1, 8000);
+  c.cierra();
+});
+
+test('al permitir, la ventana bloqueada se abre al momento y conserva window.opener', { timeout: 120000 }, async (t) => {
+  const nav = await arranca();
+  t.after(() => nav.cierra());
+  const pestanas = () => nav.ui.evalua('tabs.length');
+  const t0 = await pestanas();
+  const c = await pestana(nav, `http://127.0.0.1:${WEB}/bloquea-login`);
+  await espera(1500);
+  // Sin gesto: nada abierto, la página recibió null y el aviso cuenta las dos
+  assert.equal(await c.evalua(`document.getElementById('r').textContent`), 'null');
+  assert.equal((await pestanas()) - t0, 1);
+  assert.equal((await ventanas()).length, 0);
+  assert.equal(await nav.ui.evalua(`document.getElementById('emerg-text').textContent`), 'Se bloquearon 2 ventanas emergentes de 127.0.0.1.');
+
+  // Permitir: la ventanita de login sale ya, con opener (la página recibe el
+  // token), y la pestaña también, sin repetir ningún clic
+  await nav.ui.evalua(`(document.getElementById('emerg-allow').click(), 1)`);
+  assert.equal(await hasta(async () => { const r = await c.evalua(`document.getElementById('r').textContent`); return r.startsWith('ok:') && r; }, 8000), 'ok:token');
+  await hasta(async () => (await pestanas()) - t0 === 2, 5000);
+  assert.ok(await nav.ui.evalua(`tabs.some((x) => x.url.endsWith('?tab-bloqueada'))`));
+  assert.equal(await nav.ui.evalua(`document.getElementById('emerg-bar').classList.contains('hidden')`), true, 'el aviso se va');
+  c.cierra();
+});
+
+test('lo bloqueado se olvida al navegar: permitir después no abre nada', { timeout: 120000 }, async (t) => {
+  const nav = await arranca();
+  t.after(() => nav.cierra());
+  const pestanas = () => nav.ui.evalua('tabs.length');
+  const t0 = await pestanas();
+  const c = await pestana(nav, `http://127.0.0.1:${WEB}/bloquea-login`);
+  await espera(1500);
+  assert.equal(await nav.ui.evalua(`document.getElementById('emerg-bar').classList.contains('hidden')`), false);
+  const wc = await nav.ui.evalua(`tabs.find((x) => x.url.endsWith('/bloquea-login')).webview.getWebContentsId()`);
+  await c.evalua(`(location.href = '/destino?otra-pagina', 1)`);
+  await hasta(() => nav.ui.evalua(`tabs.some((x) => x.url.endsWith('?otra-pagina'))`), 5000);
+  assert.equal(await nav.ui.evalua(`document.getElementById('emerg-bar').classList.contains('hidden')`), true, 'el aviso de la página anterior se va');
+  // Aunque se permita el sitio (como haría el botón), lo de la página anterior ya no sale
+  await nav.ui.evalua(`(window.navirisApp.permitirEmergentes('http://127.0.0.1:${WEB}', ${wc}), 1)`);
+  await espera(2000);
+  assert.equal((await pestanas()) - t0, 1);
+  assert.equal((await ventanas()).length, 0);
   c.cierra();
 });

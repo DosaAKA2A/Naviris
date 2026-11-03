@@ -832,6 +832,8 @@ function attachWebview(tab, url) {
   });
   // Se quita cuando ya hay otra página en su sitio (al reintentar no parpadea en blanco).
   wv.addEventListener('did-navigate', () => { tab.avisos = 0; if (tab.fallo) { tab.fallo = null; if (tab.id === activeId) pintaFallo(); } });
+  // Lo bloqueado era de la página anterior (main también lo olvida al navegar).
+  wv.addEventListener('did-navigate', () => { if (emergAviso && emergAviso.tab === tab.id) ocultaEmergentes(); });
   /* Pestaña caída (2026-11-03): el proceso de la página murió (falta de
      memoria, un fallo de Chromium, el sistema lo mató). Antes quedaba un
      rectángulo gris sin nada; ahora sale la página de error con «Recargar».
@@ -5963,21 +5965,22 @@ els.permBlock.addEventListener('click', () => answerPerm('block'));
 
 /* Ventanas emergentes que una web intentó abrir sin un clic (ver src/emergentes.js
    en main): aviso en la barra, solo de la pestaña que se está viendo, con un botón
-   para permitirlas en ese sitio. Lo permitido sale en los permisos guardados. */
+   para permitirlas en ese sitio, que abre ya lo bloqueado en esa pestaña (main).
+   Lo permitido sale en los permisos guardados. */
 const emergEls = { bar: document.getElementById('emerg-bar'), text: document.getElementById('emerg-text') };
-let emergAviso = null;   // { tab, origen, n }
+let emergAviso = null;   // { tab, wc, origen, n }
 function ocultaEmergentes() { emergEls.bar.classList.add('hidden'); emergAviso = null; }
 window.navirisApp.onEmergenteBloqueada((p) => {
   const tab = pestanaDeWebContents(p.wc);
   if (!tab || tab.id !== activeId) return;
   if (emergAviso && emergAviso.tab === tab.id && emergAviso.origen === p.origen) emergAviso.n++;
-  else emergAviso = { tab: tab.id, origen: p.origen, n: 1 };
+  else emergAviso = { tab: tab.id, wc: p.wc, origen: p.origen, n: 1 };
   let host = p.origen; try { host = new URL(p.origen).hostname.replace(/^www\./, ''); } catch { /* nada */ }
   emergEls.text.innerHTML = (emergAviso.n === 1 ? 'Se bloqueó una ventana emergente de ' : `Se bloquearon ${emergAviso.n} ventanas emergentes de `) + `<b>${escapeHtml(host)}</b>.`;
   emergEls.bar.classList.remove('hidden');
 });
 document.getElementById('emerg-allow').addEventListener('click', () => {
-  if (emergAviso) { window.navirisApp.permitirEmergentes(emergAviso.origen); toast('Ventanas emergentes permitidas en este sitio'); }
+  if (emergAviso) { window.navirisApp.permitirEmergentes(emergAviso.origen, emergAviso.wc); toast('Ventanas emergentes permitidas en este sitio'); }
   ocultaEmergentes();
 });
 document.getElementById('emerg-close').addEventListener('click', ocultaEmergentes);

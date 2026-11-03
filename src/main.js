@@ -2091,7 +2091,9 @@ ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
    La ventana lleva el mismo preload y las mismas restricciones que una
    pestaña, y sus propias emergentes siguen esta misma regla.
    Sin un gesto reciente de la persona no se abre nada (ver src/emergentes.js);
-   `pestana` es el id del webview de la pestaña de la que sale todo, para el aviso. */
+   `pestana` es el id del webview de la pestaña de la que sale todo, para el aviso.
+   Lo bloqueado queda en `emergPendientes` para abrirlo si se permite el sitio. */
+const emergPendientes = emergentes.creaPendientes();
 function ventanasDe(contents, host, pestana = contents.id) {
   const gestos = emergentes.creaGestos();
   // 'input-event' no ve lo que cae en un iframe de otro sitio (medido): el ratón y
@@ -2100,11 +2102,18 @@ function ventanasDe(contents, host, pestana = contents.id) {
   contents.on('input-event', apunta);
   contents.on('before-mouse-event', apunta);
   contents.on('before-input-event', apunta);
-  contents.setWindowOpenHandler(({ url, disposition }) => {
+  const id = contents.id;
+  contents.on('did-navigate', () => emergPendientes.olvida(id));
+  contents.once('destroyed', () => emergPendientes.olvida(id));
+  contents.setWindowOpenHandler((detalles) => {
+    const { url, disposition } = detalles;
     const sitio = contents.getURL();
     if (settings.permissions[emergentes.clavePermiso(sitio)] !== 'allow' && !gestos.gasta()) {
       let origen = ''; try { origen = new URL(sitio).origin; } catch { /* nada */ }
-      if (origen && host && !host.isDestroyed()) host.send('tab:emergente-bloqueada', { wc: pestana, origen });
+      if (origen && host && !host.isDestroyed()) {
+        emergPendientes.apunta(pestana, id, origen, detalles);
+        host.send('tab:emergente-bloqueada', { wc: pestana, origen });
+      }
       return { action: 'deny' };
     }
     const web = /^https?:/i.test(url);
@@ -2132,12 +2141,20 @@ function ventanasDe(contents, host, pestana = contents.id) {
     ventanasDe(win.webContents, host, pestana);
   });
 }
-// «Permitir» en el aviso de la barra: ese sitio abre emergentes sin gesto.
-ipcMain.on('emergentes:permitir', soloUI((_e, origen) => {
+/* «Permitir» en el aviso de la barra: ese sitio abre emergentes sin gesto, y
+   lo que se le bloqueó en esa pestaña (`wc`, el id de su webview) se abre ya,
+   en orden, repitiendo su window.open en la página que lo pidió (ver
+   codigoAbrir). El mundo aislado es uno propio, no el del preload (999). */
+const MUNDO_EMERGENTES = 1031;
+ipcMain.on('emergentes:permitir', soloUI((_e, origen, wc) => {
   const clave = emergentes.clavePermiso(origen);
   if (!clave) return;
   settings.permissions[clave] = 'allow';
   saveSettings(settings);
+  for (const p of emergPendientes.saca(Number(wc), origen)) {
+    const desde = webContents.fromId(p.desde);
+    if (desde && !desde.isDestroyed()) desde.executeJavaScriptInIsolatedWorld(MUNDO_EMERGENTES, [{ code: emergentes.codigoAbrir(p) }], true).catch(() => {});
+  }
 }));
 
 app.on('web-contents-created', (_event, contents) => {
@@ -2164,13 +2181,13 @@ app.on('web-contents-created', (_event, contents) => {
     menuContextual(contents);
     ventanasDe(contents, contents.hostWebContents);
     /* Scriptlets de las listas en los IFRAMES (2026-11-03). El preload solo corre
-       en el marco principal, así que los `##+js(...)` nunca llegaban a un iframe.
-       Ahí vive el aviso de consentimiento de Sourcepoint (spiegel, bild, t-online,
-       chip, independent...), y las listas de cookies de Brave lo cierran con un
-       `trusted-click-element` DENTRO de ese iframe: sin él, la página se quedaba
-       tapada y sin scroll, y en Brave no. Se ponen en cuanto se confirma la
-       navegación del iframe, con la URL del iframe (como Brave) y la lista blanca
-       de la pestaña (como la red). */
+       en el marco principal, así que los `##+js(...)` nunca llegaban a un iframe:
+       los anuncios en iframe, los reproductores incrustados (el de YouTube) y los
+       avisos anti-bloqueador que viven en uno se quedaban sin ellos. Se ponen en
+       cuanto se confirma la navegación del iframe, con la URL del iframe (como
+       Brave) y la lista blanca de la pestaña (como la red). Los avisos de cookies
+       NO se tocan: la lista que los cerraba ya no se baja (LISTAS_FUERA en
+       adblock.js). */
     contents.on('did-frame-navigate', (_e, url, _codigo, _estado, principal, proceso, ruta) => {
       if (principal || !settings.adblockEnabled || !/^https?:/i.test(url) || isWhitelisted(contents.getURL())) return;
       const { scriptlets } = braveAdblock.arranqueDe(url);
