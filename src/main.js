@@ -261,6 +261,7 @@ const DEFAULT_SETTINGS = {
   blockPasskeys: true,      // las webs no ven passkey de plataforma (preload); si una insiste, Windows Hello real
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
+  sonidos: true,            // sonidos de Naviris: arranque, descarga terminada o fallida y recordatorios (src/sonidos.js)
   devUpdates: null,         // canal de actualizaciones: null = según la versión instalada; true/false = elección del usuario
   permissions: {},          // decisiones de permisos por sitio: "origin|tipo" -> allow|block
   addons: {}                // addons instalados: id -> { name, version, kind, matches, enabled, ... }
@@ -1218,27 +1219,34 @@ async function ytDownload({ url, mode, quality }) {
 }
 
 /* ---------- Ventana de arranque ----------
-   PETICIÓN DE DOSA (2026-08-17): "la ventana de Naviris al cargar sigue siendo
-   muy grande, debe ser solo un cuadrado con el logo y una pequeña barra de carga
-   que se aprecia de inicio a fin".
+   PETICIÓN DE DOSA (2026-08-17): el arranque es una ventana propia y pequeña
+   con el logo, y la principal no se muestra hasta que su interfaz está montada.
 
-   La placa cuadrada ya existía, pero vivía DENTRO de la ventana principal, que
-   se abre a 1280×800: lo que se veía era una ventana enorme con una plaquita
-   flotando en medio. Ahora el arranque es una ventana propia de 300×300 y la
-   principal no se muestra hasta que su interfaz está montada.
-
-   La barra avanza con hitos REALES del arranque (no por animación), y el splash
-   se queda un mínimo en pantalla para que se recorra entera aunque el equipo
-   arranque en frío o en caliente. */
+   REHECHO EL 2026-11-03 ("todavía no me convence, se puede ver más
+   profesional", y con sonido). Medido en este equipo, la interfaz queda
+   montada a ~0,5 s del arranque, pero el anillo con sus cinco etapas obligaba
+   a esperar 1,6 s más: la ventana salía a ~2,3 s. Ahora el splash dura lo que
+   dura su animación (SPLASH_MINIMO) y no más; si el arranque se alarga, sigue
+   en pantalla y enseña la etapa en curso. Ver splash.html para las tres
+   direcciones y src/sonidos.js para el sonido. */
+// CAMBIAR DE SPLASH = cambiar esta línea: 'apertura' | 'firma' | 'icono'
+const SPLASH_VARIANTE = 'apertura';
+// Tamaño de cada una: la tarjeta más el margen de su sombra (la ventana es transparente)
+const SPLASH_TAMANO = { apertura: [288, 288], firma: [460, 220], icono: [240, 300] };
+const SPLASH_MINIMO = 1050; // ms en pantalla: la animación entera (~0,9 s) y un respiro
+const SPLASH_SALIDA = 200;  // el fundido de salida de splash.html (.sale)
 let splashWin = null;
-let splashPct = 0;          // último tramo, por si el splash aún no ha cargado
-let splashDesde = 0;        // cuándo se mostró: sirve para el mínimo en pantalla
-const SPLASH_MINIMO = 1600; // ms para que el anillo y sus cinco etapas se lean de inicio a fin (320 ms cada una)
+let splashPct = 0;          // último hito, por si el splash aún no ha cargado
+let splashDesde = 0;        // cuándo empezó su animación: el mínimo en pantalla cuenta desde ahí
 
 function crearSplash() {
+  const [width, height] = SPLASH_TAMANO[SPLASH_VARIANTE];
   splashWin = new BrowserWindow({
-    width: 300, height: 300, resizable: false, movable: true,
-    frame: false, transparent: false, backgroundColor: '#0a0a0c',   // el mismo fondo que splash.html: sin cambio de tono en el primer fotograma
+    width, height, resizable: false, movable: true,
+    /* Sin mostrar hasta tener contenido: antes salía a los ~0,2 s como un
+       cuadrado vacío y el logo llegaba ~0,25 s después. */
+    show: false,
+    frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
     center: true, alwaysOnTop: true, skipTaskbar: false,
     maximizable: false, minimizable: false, fullscreenable: false,
     title: 'Naviris',
@@ -1252,13 +1260,19 @@ function crearSplash() {
       partition: 'naviris-splash'
     }
   });
-  splashWin.loadFile(path.join(__dirname, 'splash.html'));
+  splashWin.loadFile(path.join(__dirname, 'splash.html'), {
+    query: { v: SPLASH_VARIANTE, tema: settings.lightMode ? 'claro' : 'oscuro', sonido: settings.sonidos === false ? '0' : '1' }
+  });
   splashWin.once('ready-to-show', () => {
     if (!splashWin || splashWin.isDestroyed()) return;
     splashDesde = Date.now();
     splashWin.show();
   });
-  // El tramo que ya se hubiera cumplido antes de que la página existiera
+  /* La animación arranca con el sonido, y el audio puede tardar en empezar
+     (splash.js espera hasta 260 ms): el mínimo se cuenta desde que arranca de
+     verdad, para que la ventana nunca corte la animación a medias. */
+  ipcMain.once('splash:anda', () => { splashDesde = Date.now(); });
+  // El hito que ya se hubiera cumplido antes de que la página existiera
   splashWin.webContents.once('did-finish-load', () => splashProgreso(splashPct));
   splashWin.on('closed', () => { splashWin = null; });
 }
@@ -1266,21 +1280,25 @@ function crearSplash() {
 function splashProgreso(pct) {
   splashPct = Math.max(splashPct, pct);
   if (!splashWin || splashWin.isDestroyed()) return;
-  try { splashWin.webContents.send('splash:progreso', { pct: splashPct, version: app.getVersion() }); } catch {}
+  try { splashWin.webContents.send('splash:progreso', splashPct); } catch {}
 }
 
-// Cierra el arranque y enseña la ventana ya montada. El relevo se hace en este
-// orden (primero mostrar, luego cerrar) para que no se vea el escritorio entre
-// una y otra.
+/* El relevo: se enseña la ventana ya montada y, a la vez, el splash (que está
+   encima) se funde y se va, así que se ve una sola transición y nunca el
+   escritorio entre las dos. Tras el fundido la ventana se OCULTA y se cierra
+   un poco después: la cola del sonido de arranque sigue sonando hasta el final. */
 function cerrarSplash(win) {
-  const espera = Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde));
+  const espera = splashDesde ? Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde)) : 0;
   setTimeout(() => {
-    splashProgreso(100);
-    // Lo justo para que el último tramo de la barra se vea llegar al final
+    if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); }
+    if (!splashWin || splashWin.isDestroyed()) return;
+    const sw = splashWin;
+    try { sw.webContents.send('splash:sale'); } catch {}
     setTimeout(() => {
-      if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); }
-      if (splashWin && !splashWin.isDestroyed()) splashWin.close();
-    }, 260);
+      if (sw.isDestroyed()) return;
+      sw.hide();
+      setTimeout(() => { if (!sw.isDestroyed()) sw.close(); }, 1200);
+    }, SPLASH_SALIDA);
   }, espera);
 }
 

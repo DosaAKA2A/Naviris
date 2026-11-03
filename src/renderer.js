@@ -20,7 +20,7 @@ const els = {};
   'tabstrip', 'newtab-btn', 'nav-back', 'nav-fwd', 'nav-reload', 'urlbar',
   'nav-shield', 'nav-star', 'nav-menu', 'menu-pop', 'bookmarks-bar', 'content', 'hub', 'widget-grid',
   'hub-edit', 'hub-customize', 'widget-palette', 'palette-list', 'customize-panel', 'bg-presets',
-  'dial-modal', 'dial-name', 'dial-url', 'lib-grid', 'op-slider', 'op-valor', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav',
+  'dial-modal', 'dial-name', 'dial-url', 'lib-grid', 'op-slider', 'op-valor', 'opt-restore', 'opt-powersaver', 'opt-gpu', 'opt-light', 'opt-atajos', 'opt-mousenav', 'opt-sonidos',
   'opt-agent', 'opt-updauto', 'opt-smartsearch', 'opt-passkeys', 'shield-pop', 'adblock-toggle', 'adblock-count', 'adblock-site', 'adblock-list',
   'media-panel', 'mp-title', 'mp-grid', 'mp-all', 'sb-home', 'sb-rat', 'sb-spotify',
   'sidebar', 'sb-media', 'sb-downloads', 'sb-history', 'sb-bookmarks', 'sb-passwords', 'sb-res', 'sb-settings', 'res-pop', 'res-list',
@@ -428,6 +428,9 @@ function toast(msg, accion = null) {
   } else t.textContent = msg;
   t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(quita, accion ? 10000 : 3200);
 }
+
+/* Sonidos de Naviris (src/sonidos.js): suenan solo si el ajuste está activo */
+const suena = (nombre) => { if (settings.sonidos !== false) window.navSonido(nombre); };
 
 /* ============ Menú contextual reutilizable ============ */
 let ctxMenuEl = null;
@@ -4061,8 +4064,8 @@ setInterval(() => {
     if (r.avisado) continue;
     if (new Date(`${r.fecha}T${r.hora || '09:00'}`) <= ahora) {
       r.avisado = true; toca = true;
-      toast(`Recordatorio: ${r.texto}`);
-      try { new Notification('Naviris — Recordatorio', { body: r.texto }); } catch { /* sin permiso: queda el toast */ }
+      toast(`Recordatorio: ${r.texto}`); suena('aviso');
+      try { new Notification('Naviris — Recordatorio', { body: r.texto, silent: settings.sonidos !== false }); } catch { /* sin permiso: queda el toast */ }
     }
   }
   if (toca) guardaRecordatorios(l);
@@ -4733,7 +4736,15 @@ async function openDownloadInBrowser(id) {
   if (VIEWABLE.test(p)) createTab('file:///' + p.replace(/\\/g, '/')); else window.cobalt.openDownload(id);
 }
 window.cobalt.onDownloadNew((m) => { dlVivo.set(m.id, m); upsertDownload(m); actualizaDescargasW(); });
-window.cobalt.onDownloadUpdate((m) => { dlVivo.set(m.id, m); actualizaDescargasW(); if (m.state === 'completed') document.querySelectorAll('.w-dlw').forEach((el) => llenaHoyDescargas(el)); upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
+/* Cada descarga suena UNA vez: al terminar o al fallar. Cancelarla no suena
+   (lo acaba de hacer el usuario). 'failed' es el del motor de descargas. */
+const dlSonadas = new Set();
+function sonidoDescarga(m) {
+  const fin = m.state === 'completed' ? 'descarga' : (m.state === 'interrupted' || m.state === 'failed') ? 'error' : null;
+  if (!fin || dlSonadas.has(m.id)) return;
+  dlSonadas.add(m.id); suena(fin);
+}
+window.cobalt.onDownloadUpdate((m) => { sonidoDescarga(m); dlVivo.set(m.id, m); actualizaDescargasW(); if (m.state === 'completed') document.querySelectorAll('.w-dlw').forEach((el) => llenaHoyDescargas(el)); upsertDownload(m); if (m.state === 'completed') { toast('Descargado: ' + m.name); els.sbDownloads.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 400 }); if (els.dlPage.classList.contains('active')) window.cobalt.listDownloadFiles().then((f) => { dlpFiles = f; renderDownloadsPage(); }); } });
 function toggleDownloads(force) { const open = force !== undefined ? force : els.dlPanel.classList.contains('hidden'); if (open) { closeRightPanels(); els.dlPanel.classList.remove('hidden'); els.sbDownloads.classList.add('open'); } else { els.dlPanel.classList.add('hidden'); els.sbDownloads.classList.remove('open'); } }
 els.sbDownloads.addEventListener('click', () => toggleDownloadsPage());
 $('#dl-close').addEventListener('click', () => toggleDownloads(false));
@@ -5629,6 +5640,7 @@ els.vtabsNew.addEventListener('click', () => createTab());
 els.divSalir.innerHTML = window.icon('x-mark');
 els.divSalir.addEventListener('click', salirDivision);
 els.optMousenav.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del mouse activados' : 'Botones del mouse desactivados'); });
+els.optSonidos.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ sonidos: els.optSonidos.checked }); });
 els.optLight.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });
 // Interruptor de tema del hub: mismo ajuste que el del menú, con la bolita deslizante
 document.getElementById('hub-theme').addEventListener('click', async () => {
@@ -6923,6 +6935,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode; els.optUpdauto.checked = settings.updatesAuto !== false;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
+  els.optSonidos.checked = settings.sonidos !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
   contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];
   espacios = Array.isArray(settings.espacios) ? settings.espacios : [];

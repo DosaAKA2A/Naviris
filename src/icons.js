@@ -140,6 +140,9 @@
   // Logo de Naviris = isotipo correcto de Iris (assets/cobalt_logo.svg), gradiente animado
   const IRIS_VB = '0 0 876.27 874.83';
   const IRIS_D = 'M1.08,582.41L0,302.19C-.65,131.46,130.07-1.65,303,.02l306.38,2.95c152.34,1.47,267.72,141.24,266.88,290.55l-1.72,307.39c-.86,154.14-136.95,274.21-288.33,273.92l-299.69-.58C128.09,873.93,1.69,742.98,1.08,582.41ZM670.98,820.63c85.92-7.81,145.77-71.41,151.41-157.79,5.07-77.74-16.57-152.57-53.84-222.68-82.97-156.09-213.93-281-375.71-352.86-56.61-25.15-115.91-37.9-176.04-34.9C124.83,56.97,57.47,124.72,53.55,217.62c-11.51,273.02,343.75,627.9,617.43,603.01Z';
+  // El trazado en bruto (marco + lente), para quien anima sus dos piezas por
+  // separado: la ventana de arranque (splash.js).
+  window.irisRuta = { viewBox: IRIS_VB, d: IRIS_D };
   let irisSeq = 0;
   // Version PLANA del logo (currentColor): para sitios donde el logo debe ser
   // monocromo como el resto de marcas (p. ej. el acceso a iris.it.com).

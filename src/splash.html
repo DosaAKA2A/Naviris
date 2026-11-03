@@ -3,66 +3,125 @@
 <head>
   <meta charset="UTF-8" />
   <!-- Ventana de arranque: no navega, no pide red y no toca el puente window.cobalt.
-       Su CSP es la mínima que necesita (su propio script y estilos en línea). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'" />
+       Su CSP es la mínima que necesita (su propio script, estilos en línea y su sonido). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'" />
   <title>Naviris</title>
   <style>
-    /* Arranque 2026-09-09: anillo con etapas. Un solo tono, sin el degradado de
-       cinco colores: el arranque es momento de MARCA, y la marca aquí es la forma
-       del isotipo, no su paleta. */
-    /* La misma Inter empaquetada que la interfaz (styles.css): sin esto las
-       etapas y la versión salían en Segoe UI. */
+    /* ARRANQUE 2026-11-03. Fuera el anillo de progreso y las etapas: un
+       arranque de producto es UNA animación con intención y un relevo limpio
+       a la ventana, no una barra que cuenta. Tres direcciones; la que se usa
+       se elige en main.js (SPLASH_VARIANTE):
+         apertura  tarjeta cuadrada; la lente del isotipo se abre como un iris
+         firma     tarjeta apaisada con el logo y el nombre, como en naviris.site;
+                   el isotipo se dibuja en un trazo y se rellena
+         icono     sin ventana a la vista: la baldosa del icono de la app flota
+                   sobre el escritorio y un destello la enciende
+       La ventana es TRANSPARENTE: la tarjeta, su esquina y su sombra se pintan
+       aquí, y así la salida es un fundido de verdad (una ventana opaca solo
+       puede desaparecer de golpe). */
     @font-face {
       font-family: 'Inter Var';
       font-style: normal;
       font-weight: 100 900;
-      font-display: swap;
+      font-display: block;
       src: url('fonts/inter-var.woff2') format('woff2');
     }
+    :root {
+      /* Tokens del tema Naviris (mono) y, en .claro, los del tema claro (styles.css) */
+      --tarjeta: #151515; --borde: rgba(255,255,255,.07); --marca: #f2f2f2; --tenue: #9a9a9a; --apagado: #2e2e2e;
+      --sombra: 0 22px 56px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.35);
+      /* Curvas: entrada que frena (expo) y salida que acelera */
+      --frena: cubic-bezier(.16,1,.3,1);
+      --acelera: cubic-bezier(.5,0,.75,0);
+    }
+    :root.claro {
+      --tarjeta: #f6f7f9; --borde: rgba(18,20,26,.08); --marca: #2e3038; --tenue: #5d5f66; --apagado: #dcdee4;
+      --sombra: 0 22px 56px rgba(18,20,26,.18), 0 2px 8px rgba(18,20,26,.10);
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
     body {
-      background: #0a0a0c;
-      color: #cfd0d5;
       font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       user-select: none; cursor: default;
-      /* Toda la superficie arrastra: es una ventana sin marco y sin botones. */
-      -webkit-app-region: drag;
-      /* Anillo recto, siguiendo el borde de la ventana: el fondo del body pinta
-         todo el lienzo y un border-radius solo curvaba el anillo, no la ventana. */
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
     }
-    /* Entrada UNA vez y termina: ninguna animación queda viva (regla del proyecto). */
-    @keyframes entra { 0% { transform: translateY(8px) scale(.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
-    .anillo { position: relative; width: 148px; height: 148px; animation: entra .5s cubic-bezier(.2,.9,.3,1) both; }
-    .anillo svg.aro { position: absolute; inset: 0; transform: rotate(-90deg); }
-    /* El arco AVANZA con los hitos reales del proceso principal (ver splash.js);
-       la transición solo suaviza el salto entre uno y otro. */
-    .anillo .aro .avance { transition: stroke-dashoffset .45s cubic-bezier(.32,.72,.28,1); }
-    .anillo .centro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; line-height: 0; }
-    .anillo .iris-logo path { fill: #ececef; }
-    /* La etapa cambia de texto con un fundido corto; cada cambio es una animación
-       que termina, no un bucle. */
-    .etapa { font-size: 12.5px; color: #9a9ba3; min-height: 16px; animation: entra .5s cubic-bezier(.2,.9,.3,1) .1s both; }
-    .etapa.cambia { animation: aparece .28s ease-out both; }
-    @keyframes aparece { 0% { opacity: 0; transform: translateY(3px); } 100% { opacity: 1; transform: none; } }
-    .pie { position: absolute; bottom: 16px; font-size: 10px; letter-spacing: .4px; color: #55565e; }
+    /* Solo la tarjeta arrastra: el margen transparente de la sombra no cuenta. */
+    .tarjeta { position: relative; flex: none; background: var(--tarjeta); box-shadow: inset 0 0 0 1px var(--borde), var(--sombra);
+      display: flex; align-items: center; justify-content: center; -webkit-app-region: drag; opacity: 0; }
+    svg { display: block; overflow: visible; }
+    .relleno { fill: var(--marca); }
+
+    /* Etapa: SOLO si el arranque se alarga (primer arranque, Widevine bajando).
+       En un arranque normal no llega a verse. */
+    .etapa { position: absolute; left: 0; right: 0; bottom: 42px; text-align: center; font-size: 11.5px;
+      color: var(--tenue); opacity: 0; transition: opacity .3s ease; }
+    .etapa.visible { opacity: 1; }
+
+    /* Nada se mueve hasta que splash.js pone .anda (con el sonido ya sonando). */
+
+    /* ---------- APERTURA ---------- */
+    [data-v="apertura"] .tarjeta { width: 232px; height: 232px; border-radius: 16px; }
+    [data-v="apertura"] .logo { width: 92px; height: 92px; transform: scale(.92); }
+    /* Cerrada, la lente es una rendija sobre su eje largo (la diagonal): se
+       gira para dejar el eje corto en vertical, se aplasta y se devuelve. */
+    [data-v="apertura"] .lente { transform-box: fill-box; transform-origin: 50% 50%;
+      transform: rotate(45deg) scaleY(.035) rotate(-45deg); }
+    .anda[data-v="apertura"] .tarjeta { animation: aparece .3s var(--frena) both; }
+    .anda[data-v="apertura"] .logo { animation: asienta .9s var(--frena) both; }
+    .anda[data-v="apertura"] .lente { animation: abre .72s cubic-bezier(.7,0,.2,1) .1s both; }
+    @keyframes abre { to { transform: rotate(45deg) scaleY(1) rotate(-45deg); } }
+
+    /* ---------- FIRMA ---------- */
+    [data-v="firma"] .tarjeta { width: 404px; height: 164px; border-radius: 16px; gap: 22px; }
+    [data-v="firma"] .logo { width: 52px; height: 52px; }
+    /* El nombre con la medida del logotipo de naviris.site (700, +.04em) */
+    [data-v="firma"] .nombre { font-size: 30px; font-weight: 700; letter-spacing: .04em; color: var(--marca);
+      clip-path: inset(0 100% 0 0); transform: translateX(-8px); }
+    [data-v="firma"] .trazo { fill: none; stroke: var(--marca); stroke-width: 1.4px; vector-effect: non-scaling-stroke;
+      stroke-linecap: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; }
+    [data-v="firma"] .relleno { opacity: 0; }
+    .anda[data-v="firma"] .tarjeta { animation: aparece .3s var(--frena) both; }
+    .anda[data-v="firma"] .trazo { animation: dibuja .62s cubic-bezier(.45,0,.2,1) .04s both, apaga .3s ease .6s both; }
+    .anda[data-v="firma"] .relleno { animation: aparece .3s ease-out .52s both; }
+    .anda[data-v="firma"] .nombre { animation: escribe .62s var(--frena) .5s both; }
+    @keyframes dibuja { to { stroke-dashoffset: 0; } }
+    @keyframes apaga { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes escribe { to { clip-path: inset(0 0 0 0); transform: none; } }
+
+    /* ---------- ICONO ---------- */
+    /* La baldosa del icono de la app (build/icon.png), con su mismo radio relativo */
+    [data-v="icono"] .tarjeta { width: 168px; height: 168px; border-radius: 38px; transform: scale(.86);
+      background: linear-gradient(160deg, color-mix(in srgb, var(--tarjeta), #fff 5%), var(--tarjeta)); }
+    [data-v="icono"] .logo { width: 96px; height: 96px; }
+    .anda[data-v="icono"] .tarjeta { animation: aparece .4s var(--frena) both, crece .75s cubic-bezier(.2,.9,.25,1.1) both; }
+    @keyframes crece { to { transform: none; } }
+    /* Sin tarjeta debajo, la etapa va en una pastilla: se lee sobre cualquier fondo */
+    [data-v="icono"] .etapa { position: static; margin-top: 14px; padding: 5px 12px; border-radius: 999px;
+      background: var(--tarjeta); box-shadow: inset 0 0 0 1px var(--borde); }
+
+    /* ---------- comunes ---------- */
+    @keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes asienta { to { transform: none; } }
+    /* Salida: la tarjeta se va mientras la ventana principal aparece debajo */
+    .sale .tarjeta { opacity: 1; animation: vete .2s var(--acelera) both !important; }
+    .sale .etapa { opacity: 0; }
+    @keyframes vete { from { opacity: 1; } to { opacity: 0; transform: scale(.97); } }
+    .sale[data-v="icono"] .tarjeta { animation-name: vete-icono !important; }
+    @keyframes vete-icono { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.08); } }
+
+    /* Con las animaciones de Windows desactivadas: sin movimiento, solo fundidos */
+    @media (prefers-reduced-motion: reduce) {
+      .anda .logo, .anda .lente, .anda .trazo, .anda .nombre, .anda .relleno { animation-duration: .01s !important; animation-delay: 0s !important; }
+      .anda .tarjeta { animation: aparece .2s ease both !important; transform: none !important; }
+    }
   </style>
 </head>
 <body>
-  <div class="anillo">
-    <svg class="aro" viewBox="0 0 148 148" width="148" height="148" aria-hidden="true">
-      <circle cx="74" cy="74" r="70" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>
-      <circle class="avance" id="avance" cx="74" cy="74" r="70" fill="none" stroke="#e8e8ec" stroke-width="1.5" stroke-linecap="round"
-              stroke-dasharray="439.82" stroke-dashoffset="439.82"/>
-    </svg>
-    <div class="centro" id="marca"></div>
-  </div>
+  <div class="tarjeta" id="tarjeta"></div>
   <div class="etapa" id="etapa"></div>
-  <div class="pie" id="pie"></div>
   <script src="icons.js"></script>
+  <script src="sonidos.js"></script>
   <script src="splash.js"></script>
 </body>
 </html>
