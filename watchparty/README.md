@@ -23,9 +23,11 @@ vuelve a cargar la página por su cuenta.
   renderer). Botón en el riel que toma el color del sitio de la pestaña activa,
   panel lateral acoplado con sala, chat y estado. En la página solo se inyecta un
   agente mínimo que controla el `<video>` (en YouTube, su API de reproductor; en
-  Netflix, la suya interna). Se sirve desde `naviris.site/addons/` y se
-  actualiza solo: publicarlo es empujar al repo y subir la versión en
-  `addons/catalog.json`.
+  Netflix, la suya interna). Se sirve desde `naviris.site/addons/`: publicarlo
+  es empujar al repo y subir la versión en `addons/catalog.json`. OJO: lo que
+  ya está instalado NO se actualiza solo; cada persona tiene que darle a
+  «Actualizar a vX» en la página de addons (hasta entonces sigue con su copia
+  en `userData/addons/`).
 - **`worker/worker.js`** — el relay de PRODUCCIÓN: Cloudflare Worker + Durable
   Object en la cuenta de Studio Iris (`wss://naviris-party.studio-iris2026.workers.dev`).
   Salas en memoria; sockets con la API de hibernación.
@@ -46,6 +48,14 @@ vuelve a cargar la página por su cuenta.
 | `ev` | quien actúa | `kind`: `play` / `pause` / `seek` (+ `time`) o `nav` (+ `url`) |
 | `chat` | todos | `msg` |
 | `perfil` | todos, al entrar y cuando entra otro | `foto` (data URI png/jpeg/webp) |
+| `ping` | el addon, cada 15 s | nada: el relay contesta `pong` solo a quien lo manda |
+
+`ping`/`pong` es el vigía de la conexión: un socket puede morir sin avisar
+(suspensión, cambio de red) y seguir "abierto". Si el relay ya contestó algún
+`pong` y pasan 40 s sin llegar nada, el addon da el socket por muerto y vuelve
+a entrar. Contra un relay sin `pong` no vigila. En el worker lo contesta la
+respuesta automática de la API de hibernación, sin despertar al objeto.
+Un mensaje de más de 64 KB cierra ese socket con el código 1009 (en los dos).
 
 El relay reenvía `ev`, `beat`, `chat` y `perfil` a todos menos al emisor, añadiendo
 `from` y `host` (del attachment del join: es el único dato de quién manda en
@@ -80,13 +90,25 @@ addon contra un relay local hay que añadirlo al `connect-src` de `src/index.htm
 ## Probar
 
 ```bash
-node test.js     # 2 clientes simulados contra server.js: relay, sin eco, peers, chat, latido
+npm test           # test/watchparty-relay.test.js contra server.js
+npm run test:e2e   # test/e2e/watch-party.test.js: dos Naviris reales en YouTube
 ```
 
-De punta a punta se prueba con dos Naviris a la vez (perfiles aparte con
-`--user-data-dir` y `--remote-debugging-port` distintos), cargando el addon
-local en el renderer por CDP y usando el relay real. Última pasada completa:
-2026-09-09 (YouTube y MOOVIN con video real).
+`npm test` arranca `server.js` en un puerto libre y prueba salas, reenvío,
+reconexión con `sid`, anfitrión que se va, `ping`, mensajes inválidos y el
+tope de 64 KB. La MISMA batería sirve para el worker sin desplegarlo:
+
+```bash
+cd watchparty/worker && npx wrangler dev --port 8792      # en otra consola
+WP_RELAY_URL=ws://127.0.0.1:8792 npm test
+```
+
+El e2e abre dos Naviris desde el repo (perfiles temporales, puertos CDP
+`WP_E2E_PUERTOS`, por defecto 9402 y 9412), carga el addon del repo en la
+interfaz por CDP, crea la sala en uno, entra con el código desde el hub del
+otro y comprueba play, pausa, salto y chat en los dos sentidos contra el relay
+de producción. Necesita red. Un perfil nuevo en la UE ve el aviso de cookies
+de YouTube, que pausa el video hasta que se responde: el test lo rechaza.
 
 ## Reproducción con DRM
 

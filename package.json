@@ -19,7 +19,9 @@
     "dist": "electron-builder --win",
     "release": "npm run dist && node build/publish-release.js",
     "publish": "node build/publish-release.js",
-    "dist-publish": "npm run dist && node build/publish-release.js"
+    "dist-publish": "npm run dist && node build/publish-release.js",
+    "test": "node --test --test-timeout=20000 test/*.test.js",
+    "test:e2e": "node --test test/e2e/*.test.js"
   },
   "devDependencies": {
     "electron": "github:castlabs/electron-releases#v42.5.2+wvcus",

@@ -6,6 +6,8 @@
 
    Implementación sin dependencias externas: hace el handshake y el framing de
    WebSocket (solo texto) con módulos nativos de Node. Salas efímeras en memoria.
+   Mismo protocolo que worker/worker.js (el relay de producción): join / ev /
+   beat / chat / perfil / ping; cualquier cambio va en los DOS.
 
    Uso:  node server.js            (escucha en el puerto 8787 por defecto)
          PORT=9000 node server.js
@@ -23,9 +25,11 @@ const MAX_MSG = 64 * 1024; // 64 KB por mensaje: de sobra para señales y chat
 const rooms = new Map(); // code -> Set<socket>
 function roomOf(code) { let s = rooms.get(code); if (!s) { s = new Set(); rooms.set(code, s); } return s; }
 function leave(sock) {
+  // Se llama al recibir el frame de cierre Y al cerrarse el socket: solo la
+  // primera vez cuenta (antes la sala oía "salió" dos veces).
   const code = sock._room; if (!code) return;
-  const s = rooms.get(code); if (!s) return;
-  s.delete(sock);
+  sock._room = null;
+  const s = rooms.get(code); if (!s || !s.delete(sock)) return;
   if (s.size === 0) rooms.delete(code);
   else broadcast(code, { t: 'peers', n: s.size, who: sock._name, left: true }, null);
 }
@@ -41,6 +45,10 @@ function sendFrame(sock, str) {
   try { sock.write(Buffer.concat([header, payload])); } catch (e) { /* socket muerto */ }
 }
 function sendJSON(sock, obj) { sendFrame(sock, JSON.stringify(obj)); }
+// Cierre con código (frame de control): 1000 normal, 1009 mensaje demasiado grande.
+function sendClose(sock, code) {
+  try { sock.end(Buffer.from([0x88, 2, code >> 8, code & 0xff])); } catch (e) { /* socket muerto */ }
+}
 function broadcast(code, obj, except) {
   const s = rooms.get(code); if (!s) return;
   const str = JSON.stringify(obj);
@@ -51,6 +59,8 @@ function broadcast(code, obj, except) {
 function onMessage(sock, str) {
   let m; try { m = JSON.parse(str); } catch (e) { return; }
   if (!m || typeof m.t !== 'string') return;
+  // Vigía de la conexión (paridad con la respuesta automática del worker).
+  if (m.t === 'ping') { sendJSON(sock, { t: 'pong' }); return; }
   if (m.t === 'join') {
     const code = String(m.room || '').toUpperCase().slice(0, 12).replace(/[^A-Z0-9]/g, '');
     if (!code) { sendJSON(sock, { t: 'error', msg: 'sala invalida' }); return; }
@@ -98,7 +108,7 @@ function attach(sock) {
       let offset = 2;
       if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); offset = 4; }
       else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); offset = 10; }
-      if (len > MAX_MSG) { sock.destroy(); return; }
+      if (len > MAX_MSG) { leave(sock); sendClose(sock, 1009); return; } // paridad con el worker
       const need = offset + (masked ? 4 : 0) + len;
       if (buf.length < need) return; // frame incompleto: esperar más datos
       let payload;
@@ -110,7 +120,7 @@ function attach(sock) {
         payload = buf.slice(offset, offset + len);
       }
       buf = buf.slice(need);
-      if (opcode === 0x8) { leave(sock); sock.end(); return; }       // close
+      if (opcode === 0x8) { leave(sock); sendClose(sock, 1000); return; } // close (se contesta, como pide el protocolo)
       else if (opcode === 0x9) { sock.write(Buffer.from([0x8a, 0])); } // ping -> pong
       else if (opcode === 0x1 && fin) { onMessage(sock, payload.toString('utf8')); } // texto
       // (no se soportan frames fragmentados ni binarios: no hacen falta)

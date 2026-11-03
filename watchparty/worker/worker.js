@@ -1,7 +1,8 @@
 /* Naviris Watch Party — servidor de sincronización en Cloudflare Workers
    ---------------------------------------------------------------------------
    Port del server.js de Node al runtime de Workers. Mismo protocolo de
-   aplicación (join / ev / beat / chat / perfil, respuestas joined / peers / error):
+   aplicación (join / ev / beat / chat / perfil / ping, respuestas joined /
+   peers / pong / error):
    el addon no distingue entre ambos servidores. Lo hablan el addon de Naviris
    y la página de MOOVIN; cualquier cambio va en los DOS servidores.
 
@@ -26,8 +27,18 @@ export default {
   }
 };
 
+/* Vigía de la conexión: el cliente manda `ping` cada pocos segundos y se le
+   contesta `pong` sin despertar al objeto (respuesta automática de la API de
+   hibernación; exige el texto exacto, por eso webSocketMessage también lo
+   contesta por si llega escrito de otra forma). */
+const PING = '{"t":"ping"}';
+const PONG = '{"t":"pong"}';
+
 export class PartyRoom {
-  constructor(state) { this.state = state; }
+  constructor(state) {
+    this.state = state;
+    this.state.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
+  }
 
   async fetch(request) {
     if ((request.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') {
@@ -53,9 +64,12 @@ export class PartyRoom {
   }
 
   webSocketMessage(ws, data) {
-    if (typeof data !== 'string' || data.length > MAX_MSG) return; // solo texto
+    if (typeof data !== 'string') return; // solo texto
+    // Lo mismo que server.js: un mensaje que se pasa del tope cierra el socket.
+    if (data.length > MAX_MSG) { try { ws.close(1009, 'mensaje demasiado grande'); } catch { /* ya cerrado */ } return; }
     let m; try { m = JSON.parse(data); } catch { return; }
     if (!m || typeof m.t !== 'string') return;
+    if (m.t === 'ping') { this.send(ws, { t: 'pong' }); return; }
     if (m.t === 'join') {
       const code = String(m.room || '').toUpperCase().slice(0, 12).replace(/[^A-Z0-9]/g, '');
       if (!code) { this.send(ws, { t: 'error', msg: 'sala invalida' }); return; }
