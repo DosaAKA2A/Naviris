@@ -40,6 +40,9 @@ const CONFIANZA = [
   '##.banner-publi',
   '###caja-anuncio',
   '##.consent-generico',
+  // Ocultado genérico que no es de clase ni id: llega en el CSS de cualquier sitio.
+  '##[data-consent-aviso]',
+  '##[data-publi-generica]',
   'exento.example#@#.banner-publi',
   '@@||singenericos.example^$generichide'
 ].join('\n');
@@ -83,10 +86,29 @@ test('$third-party se evalúa contra la página cuando la petición no trae refe
   assert.equal(adblock.check(pide('https://tracker.example/t.js', 'script', { referrer: 'https://tracker.example/x' }), 'https://site.example/').bloquear, false);
 });
 
-test('cosméticos: oculta lo de las listas pero nunca los avisos de cookies', () => {
+test('cosméticos: fuera de YouTube oculta también los avisos de cookies, como Brave', () => {
   const c = adblock.cosmeticsFor('https://site.example/');
   assert.match(c.css, /\.anuncio/);
-  assert.doesNotMatch(c.css, /consent/);
+  assert.match(c.css, /\.consent-banner/);
+  assert.match(c.css, /\[data-consent-aviso\]/);
+});
+
+// Los avisos de cookies solo se dejan a la vista en YouTube: allí el aviso
+// escondido pero montado pausa el reproductor (ver sinAvisoDeCookies).
+const EN_YOUTUBE = ['https://www.youtube.com/watch?v=x', 'https://youtube.com/', 'https://m.youtube.com/', 'https://music.youtube.com/',
+  'https://www.youtube-nocookie.com/embed/x', 'https://youtube-nocookie.com/embed/x'];
+const FUERA_DE_YOUTUBE = ['https://site.example/', 'https://www.spiegel.de/', 'https://notyoutube.com/', 'https://youtube.com.example/', 'https://www.youtube.co/'];
+test('avisos de cookies: se dejan a la vista solo en YouTube y sus subdominios', () => {
+  for (const url of EN_YOUTUBE) {
+    const css = adblock.cosmeticsFor(url).css;
+    assert.doesNotMatch(css, /consent/i, url + ': CSS');
+    assert.match(css, /\[data-publi-generica\]/, url + ': el resto del CSS sigue');
+    assert.deepEqual(adblock.genericosPara(url, ['consent-generico', 'banner-publi'], []), ['.banner-publi'], url + ': genérico');
+  }
+  for (const url of FUERA_DE_YOUTUBE) {
+    assert.match(adblock.cosmeticsFor(url).css, /\[data-consent-aviso\]/, url + ': CSS');
+    assert.deepEqual(adblock.genericosPara(url, ['consent-generico'], []), ['.consent-generico'], url + ': genérico');
+  }
 });
 
 test('scriptlets: envueltos con scriptletGlobals y JavaScript válido', () => {
@@ -112,8 +134,8 @@ test('YouTube: ninguna regla pulsa sola el aviso de cookies (bucle de recargas)'
   assert.deepEqual(clics, [], 'quedan clics automáticos en YouTube');
 });
 
-test('ocultado genérico: solo lo que casa, con excepciones y sin avisos de cookies', () => {
-  const g = adblock.genericosPara('https://cualquiera.example/', ['banner-publi', 'normal', 'consent-generico'], ['caja-anuncio', 'cabecera']);
+test('ocultado genérico: solo lo que casa y con excepciones', () => {
+  const g = adblock.genericosPara('https://cualquiera.example/', ['banner-publi', 'normal'], ['caja-anuncio', 'cabecera']);
   assert.deepEqual(g.sort(), ['#caja-anuncio', '.banner-publi']);
   assert.deepEqual(adblock.genericosPara('https://exento.example/', ['banner-publi'], []), [], 'la excepción #@# del sitio se respeta');
   assert.deepEqual(adblock.genericosPara('https://singenericos.example/', ['banner-publi'], ['caja-anuncio']), [], '$generichide apaga el genérico');

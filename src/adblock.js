@@ -394,18 +394,26 @@ function cosmeticsFor(url) {
     const r = engine.urlCosmeticResources(url);
     if (!r) return null;
     let css = '';
-    /* Los avisos de cookies NO se esconden. Las listas de Brave tapan el de
-       YouTube (`##ytd-consent-bump-renderer`, `div[class^="ytd-consent"]`),
-       pero el aviso sigue montado y su componente PAUSA el reproductor cada
-       100 ms mientras esté ahí (`pausePlayer` de la app): el video arrancaba y
-       se quedaba parado a los 0,5 s sin que se viera por qué (Dosa,
-       2026-09-19). Con el aviso a la vista se acepta una vez y no vuelve. */
-    const sel = (r.hide_selectors || []).filter(sinAvisoDeCookies);
+    const sel = sinAvisoDeCookies(url, r.hide_selectors || []);
     for (let i = 0; i < sel.length; i += 200) css += sel.slice(i, i + 200).join(',') + '{display:none !important}\n';
     return { css };
   } catch (e) { return null; }
 }
-const sinAvisoDeCookies = (s) => !/consent/i.test(s);
+
+/* En YouTube los avisos de cookies NO se esconden. Las listas de Brave tapan
+   el suyo (`##ytd-consent-bump-renderer`, `div[class^="ytd-consent"]`), pero
+   el aviso sigue montado y su componente PAUSA el reproductor cada 100 ms
+   mientras esté ahí (`pausePlayer` de la app): el video arrancaba y se quedaba
+   parado a los 0,5 s sin que se viera por qué (Dosa, 2026-09-19). Con el aviso
+   a la vista se acepta una vez y no vuelve.
+   Solo en YouTube (sus subdominios y youtube-nocookie.com incluidos): hasta el
+   03/11/2026 se quitaban en toda la web, y en el resto Brave sí los esconde. */
+const YOUTUBE = /(^|\.)(youtube\.com|youtube-nocookie\.com)$/i;
+function sinAvisoDeCookies(url, selectores) {
+  let host = '';
+  try { host = new URL(url).hostname; } catch { /* sin host */ }
+  return YOUTUBE.test(host) ? selectores.filter((s) => !/consent/i.test(s)) : selectores;
+}
 
 /* Ocultado GENÉRICO por clase e id (`##.anuncio`, `###banner-ad`): son casi
    29.000 reglas de las listas (noviembre de 2026) que valen en cualquier sitio
@@ -422,12 +430,13 @@ function genericosPara(url, clases, ids) {
   try {
     const r = engine.urlCosmeticResources(url);
     if (!r || r.generichide) return [];
-    return (engine.hiddenClassIdSelectors(clases, ids, r.exceptions || []) || []).filter(sinAvisoDeCookies);
+    return sinAvisoDeCookies(url, engine.hiddenClassIdSelectors(clases, ids, r.exceptions || []) || []);
   } catch (e) { return []; }
 }
 
 /* Scriptlets (`##+js(...)`) de una URL, ya envueltos para inyectarse UNA vez
-   en el mundo principal al empezar el documento (lo hace webview-preload.js).
+   en el mundo principal al empezar el documento (lo hace webview-preload.js;
+   en los iframes, main, ver 'did-frame-navigate').
    adblock-rust junta todos los de la URL en un solo texto: primero las
    funciones (las de apoyo y las de cada scriptlet) y luego una llamada por
    regla, cada una en su try/catch. Aquí se mete en una función anónima, como

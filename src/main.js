@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen, webContents } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen, webContents, webFrameMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -2162,6 +2162,20 @@ app.on('web-contents-created', (_event, contents) => {
     contents.on('responsive', () => contents.hostWebContents?.send('tab:colgada', { wc: contents.id, colgada: false }));
     menuContextual(contents);
     ventanasDe(contents, contents.hostWebContents);
+    /* Scriptlets de las listas en los IFRAMES (2026-11-03). El preload solo corre
+       en el marco principal, así que los `##+js(...)` nunca llegaban a un iframe.
+       Ahí vive el aviso de consentimiento de Sourcepoint (spiegel, bild, t-online,
+       chip, independent...), y las listas de cookies de Brave lo cierran con un
+       `trusted-click-element` DENTRO de ese iframe: sin él, la página se quedaba
+       tapada y sin scroll, y en Brave no. Se ponen en cuanto se confirma la
+       navegación del iframe, con la URL del iframe (como Brave) y la lista blanca
+       de la pestaña (como la red). */
+    contents.on('did-frame-navigate', (_e, url, _codigo, _estado, principal, proceso, ruta) => {
+      if (principal || !settings.adblockEnabled || !/^https?:/i.test(url) || isWhitelisted(contents.getURL())) return;
+      const { scriptlets } = braveAdblock.arranqueDe(url);
+      if (!scriptlets) return;
+      try { webFrameMain.fromId(proceso, ruta)?.executeJavaScript(scriptlets).catch(() => {}); } catch { /* el marco ya no está */ }
+    });
     // Inyecta el saltador de anuncios de YouTube y el revelado de X
     contents.on('dom-ready', () => {
       // Scrollbar de Naviris en TODAS las paginas. El Fluent de Chromium solo
