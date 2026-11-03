@@ -60,7 +60,8 @@ async function lanza(puerto) {
     for (let i = 0; i < 20 && proc.exitCode === null; i++) await dormir(250);
     if (proc.exitCode === null) proc.kill();
     try { ws.close(); } catch { /* nada */ }
-    fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    // Algún proceso hijo puede tardar en soltar el perfil: se reintenta y, si no, se queda en Temp.
+    try { fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); } catch { /* lo limpia Windows */ }
   };
   // La interfaz sale en /json/list antes de terminar de cargar: se espera a la API de addons.
   for (let i = 0; i < 60; i++) {
