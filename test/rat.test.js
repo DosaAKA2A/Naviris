@@ -92,8 +92,9 @@ const todos = (args, opcion) => args.flatMap((a, i) => (a === opcion ? [args[i +
 
 test('argumentos de video: mejor calidad, H.264 preferido, MP4 y la URL al final tras "--"', () => {
   const a = rat.argsDescarga({ ...BASE, url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', mode: 'video', quality: '' });
-  assert.equal(valorDe(a, '-f'), 'bv*+ba/b');
-  assert.equal(valorDe(a, '-S'), 'res,fps,vcodec:h264,acodec:aac,ext:mp4:m4a');
+  assert.equal(valorDe(a, '-f'), "bv*[vcodec~='^(avc|h264)']+ba[acodec^=mp4a]/bv*[vcodec~='^(avc|h264)']+ba/bv*+ba/b");
+  assert.equal(valorDe(a, '-S'), 'res,fps,acodec:aac,ext:mp4:m4a');
+  assert.equal(valorDe(a, '--match-filter'), '!is_live');
   assert.equal(valorDe(a, '--merge-output-format'), 'mp4');
   assert.equal(valorDe(a, '--remux-video'), 'mp4');
   assert.equal(valorDe(a, '--encoding'), 'utf-8');
@@ -103,14 +104,18 @@ test('argumentos de video: mejor calidad, H.264 preferido, MP4 y la URL al final
   assert.equal(valorDe(a, '--ffmpeg-location'), BASE.ffmpeg);
   assert.equal(valorDe(a, '--user-agent'), BASE.ua);
   assert.ok(a.includes('--no-playlist') && a.includes('--no-part') && a.includes('--newline') && a.includes('-q') && a.includes('--progress'));
-  assert.deepEqual(todos(a, '--print'), ['before_dl:[rat] archivo %(filename)s', 'after_move:[rat] final %(filepath)s']);
+  assert.deepEqual(todos(a, '--print'), ['pre_process:[rat] estado %(live_status)s', 'before_dl:[rat] archivo %(filename)s', 'after_move:[rat] final %(filepath)s']);
   assert.deepEqual(a.slice(-2), ['--', 'https://www.youtube.com/watch?v=jNQXAC9IVRw']);
   assert.ok(!a.includes('--cookies'));
 });
 
 test('argumentos con calidad elegida: la más cercana por debajo (lado corto)', () => {
   const a = rat.argsDescarga({ ...BASE, url: 'https://www.youtube.com/shorts/pxqy51-bq5c', mode: 'video', quality: '720' });
-  assert.equal(valorDe(a, '-S'), 'res:720,fps,vcodec:h264,acodec:aac,ext:mp4:m4a');
+  assert.equal(valorDe(a, '-S'), 'res:720,fps,acodec:aac,ext:mp4:m4a');
+  // H.264 de lado corto <= 720 (horizontal: alto; vertical: ancho), luego cualquier códec
+  assert.equal(valorDe(a, '-f'), [
+    "bv*[vcodec~='^(avc|h264)'][aspect_ratio>=1][height<=720]+ba[acodec^=mp4a]", "bv*[vcodec~='^(avc|h264)'][aspect_ratio<1][width<=720]+ba[acodec^=mp4a]",
+    "bv*[vcodec~='^(avc|h264)'][aspect_ratio>=1][height<=720]+ba", "bv*[vcodec~='^(avc|h264)'][aspect_ratio<1][width<=720]+ba", 'bv*+ba', 'b'].join('/'));
   for (const q of ['', '0', 'abc', undefined, '-5']) {
     assert.match(valorDe(rat.argsDescarga({ ...BASE, url: 'https://x.com/a/status/1', mode: 'video', quality: q }), '-S'), /^res,/, String(q));
   }
@@ -127,7 +132,9 @@ test('argumentos de audio: MP3 a la mejor calidad', () => {
 
 test('TikTok: archivo único y nunca el formato con marca de agua', () => {
   const a = rat.argsDescarga({ ...BASE, url: 'https://www.tiktok.com/@a/video/1', mode: 'video', quality: '' });
-  assert.equal(valorDe(a, '-f'), 'b[format_note!*=?watermark]/b');
+  assert.equal(valorDe(a, '-f'), "b[format_note!*=?watermark][vcodec~='^(avc|h264)']/b[format_note!*=?watermark]/b");
+  const q = rat.argsDescarga({ ...BASE, url: 'https://www.tiktok.com/@a/video/1', mode: 'video', quality: '540' });
+  assert.equal(valorDe(q, '-f'), "b[format_note!*=?watermark][vcodec~='^(avc|h264)'][aspect_ratio>=1][height<=540]/b[format_note!*=?watermark][vcodec~='^(avc|h264)'][aspect_ratio<1][width<=540]/b[format_note!*=?watermark]/b");
   const audio = rat.argsDescarga({ ...BASE, url: 'https://www.tiktok.com/@a/video/1', mode: 'audio' });
   assert.equal(valorDe(audio, '-f'), 'ba/b');
 });
@@ -303,6 +310,8 @@ test('cuándo se revisa yt-dlp', () => {
   assert.equal(rat.tocaRevisar({ ...base, revisadoEn: ahora - DIA }), true);     // pasó el plazo
   assert.equal(rat.tocaRevisar({ ...base, revisadoEn: undefined }), true);       // nunca revisado
   assert.equal(rat.tocaRevisar({ ...base, forzar: true }), true);               // tras un error de motor viejo
+  assert.equal(rat.tocaRevisar({ ...base, forzar: true, forzadaEn: ahora - 10 * 60000 }), false); // tope: una forzada por hora
+  assert.equal(rat.tocaRevisar({ ...base, forzar: true, forzadaEn: ahora - 61 * 60000 }), true);
   assert.equal(rat.tocaRevisar({ ...base, version: '2026.08.19' }), true);       // por debajo de la mínima
   assert.equal(rat.tocaRevisar({ ...base, version: null }), true);               // no arranca
 });
@@ -311,4 +320,67 @@ test('literal de PowerShell: dobla las comillas, también las tipográficas', ()
   assert.equal(rat.literalPs("C:\\Users\\O'Brien\\bin.zip"), "'C:\\Users\\O''Brien\\bin.zip'");
   assert.equal(rat.literalPs('C:\\Users\\José ‘Pepe’\\x'), "'C:\\Users\\José ‘‘Pepe’’\\x'");
   assert.equal(rat.literalPs('C:\\Ñandú 100% $env:x'), "'C:\\Ñandú 100% $env:x'");
+});
+
+test('H.264: el filtro reconoce avc1 y h264 (TikTok), no VP9/AV1/HEVC', () => {
+  const rx = /^(avc|h264)/; // lo mismo que [vcodec~='^(avc|h264)'] en yt-dlp
+  for (const c of ['avc1.64001F', 'avc1.4D400C', 'h264']) assert.ok(rx.test(c), c);
+  for (const c of ['vp9', 'vp09.00.40.08', 'av01.0.08M.08', 'bytevc1', 'hev1', 'none']) assert.ok(!rx.test(c), c);
+  assert.equal(rat.formatoVideo('', false), "bv*[vcodec~='^(avc|h264)']+ba[acodec^=mp4a]/bv*[vcodec~='^(avc|h264)']+ba/bv*+ba/b");
+});
+
+test('directos: canal de Twitch y mensaje que manda al video publicado', () => {
+  for (const u of ['https://www.twitch.tv/ibai', 'https://twitch.tv/shroud/', 'https://m.twitch.tv/kaicenat']) assert.equal(rat.esDirecto(u), true, u);
+  for (const u of ['https://www.twitch.tv/videos/2915087502', 'https://www.twitch.tv/twitch/clip/Abc', 'https://clips.twitch.tv/Abc',
+    'https://www.twitch.tv/directory', 'https://www.twitch.tv/', 'https://www.twitch.tv/ibai/videos', 'https://www.youtube.com/@NASA/live', 'mal']) {
+    assert.equal(rat.esDirecto(u), false, u);
+  }
+  assert.equal(rat.mensajeDirecto('https://www.twitch.tv/ibai'), 'Los directos no se descargan. Cuando acabe, descarga el video desde la pestaña Videos del canal');
+  assert.match(rat.mensajeDirecto('https://www.youtube.com/watch?v=x'), /video ya publicado$/);
+  assert.equal(rat.errorDeYtDlp('[twitch:stream] ibai: The channel is not currently live', 'https://www.twitch.tv/ibai'), rat.mensajeDirecto('https://www.twitch.tv/ibai'));
+  assert.deepEqual(rat.leeLinea('[rat] estado is_live\r'), { tipo: 'estado', valor: 'is_live' });
+  assert.deepEqual(rat.leeLinea('[rat] estado not_live'), { tipo: 'estado', valor: 'not_live' });
+  assert.deepEqual(rat.calidades({ is_live: true, formats: [{ vcodec: 'avc1', width: 1920, height: 1080 }] }), []);
+});
+
+test('cookies de YouTube: no de entrada; un reintento solo si pide sesión', () => {
+  const yt = 'https://www.youtube.com/watch?v=x';
+  assert.equal(rat.cookiesDeEntrada(yt), false);
+  assert.equal(rat.cookiesDeEntrada('https://music.youtube.com/watch?v=x'), false);
+  for (const u of ['https://www.instagram.com/reel/a/', 'https://x.com/a/status/1', 'https://www.reddit.com/r/a/comments/b/', 'https://www.tiktok.com/@a/video/1', 'https://example.com/v']) {
+    assert.equal(rat.cookiesDeEntrada(u), true, u);
+  }
+  for (const t of ['[youtube] x: Sign in to confirm you are not a bot. Use --cookies-from-browser or --cookies for the authentication.',
+    '[youtube] x: Sign in to confirm your age. This video may be inappropriate for some users.',
+    '[youtube] x: Private video. Sign in if you have been granted access to this video',
+    '[youtube] x: Join this channel to get access to members-only content like this video']) {
+    assert.equal(rat.reintentaConCookies(t, yt), true, t);
+  }
+  for (const t of ['[youtube] x: Video unavailable', 'HTTP Error 403: Forbidden', 'Requested format is not available', '']) assert.equal(rat.reintentaConCookies(t, yt), false, t);
+  // en otras plataformas ya fueron de entrada: nunca hay reintento
+  assert.equal(rat.reintentaConCookies('login required', 'https://www.instagram.com/reel/a/'), false);
+});
+
+test('restos temporales: solo los del Rat Tool y con más de una hora', () => {
+  const ahora = Date.parse('2026-11-03T12:00:00Z'), hora = 3600000;
+  const e = (nombre, carpeta, haceMs) => ({ nombre, carpeta, mtimeMs: ahora - haceMs });
+  const entradas = [
+    e('naviris-rat-descarga-Ab12Cd', true, 2 * hora),               // sí
+    e('naviris-rat-descarga-Zz99yy', true, 30 * 60000),             // en marcha (reciente): no
+    e('naviris-cookies-1793704083000-k3j9x2.txt', false, 3 * hora), // sí
+    e('naviris-cookies-1793704083000-k3j9x2.txt', true, 3 * hora),  // carpeta con nombre de archivo: no
+    e('naviris-rat-descarga-Ab12Cd', false, 2 * hora),              // archivo con nombre de carpeta: no
+    e('naviris-rat-e2e-perfil-abc', true, 5 * hora),                // de las pruebas: no
+    e('naviris-rat-descarga-Ab12Cd-otra', true, 5 * hora),          // nombre parecido: no
+    e('naviris-rat-abcdef', true, 5 * hora),                        // prefijo viejo, sin "descarga-": no
+    e('otra-cosa', true, 50 * hora),
+    e('naviris-cookies-x.txt', false, 50 * hora)
+  ];
+  assert.deepEqual(rat.restosTemporales(entradas, ahora), ['naviris-rat-descarga-Ab12Cd', 'naviris-cookies-1793704083000-k3j9x2.txt']);
+  assert.equal(rat.PREFIJO_TEMPORAL, 'naviris-rat-descarga-');
+});
+
+test('ffmpeg fijado en 9.0.2 con su huella', () => {
+  assert.match(rat.BINARIOS.ffmpeg.url, /\/9\.0\.2\/ffmpeg-9\.0\.2-essentials_build\.zip$/);
+  assert.equal(rat.BINARIOS.ffmpeg.sha256, '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba');
 });

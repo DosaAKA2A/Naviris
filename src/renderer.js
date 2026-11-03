@@ -5416,6 +5416,7 @@ function updateRatPlat() {
   const onX = p && p.id === 'x' && onSite;
   els.ratXtoggle.classList.toggle('hidden', !onX);
   if (window.ratTool.esLista(url)) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Es una lista de reproducción</b>: abre uno de sus videos para descargarlo.`;
+  else if (window.ratTool.esDirecto(url)) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Es un directo</b>: cuando acabe, descarga el video desde la pestaña Videos del canal.`;
   else if (p && !looksVideo) els.ratPlat.innerHTML = `<b style="color:var(--danger)">Abre un video concreto</b> o pega su enlace (en el feed no se detecta).`;
   else els.ratPlat.innerHTML = p ? `Plataforma: <b>${p.nombre}</b>` : (url ? 'Se intentará con yt-dlp.' : '');
 }

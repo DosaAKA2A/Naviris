@@ -56,6 +56,18 @@
     const u = urlDe(url); if (!u) return false;
     return plataforma(url)?.id === 'youtube' && u.searchParams.has('list') && !esVideo(url);
   }
+  /* Canal de Twitch (twitch.tv/<canal>): lo que se bajaría es su directo, que
+     no acaba nunca. Se rechaza antes de lanzar yt-dlp. Los directos de otras
+     plataformas solo se saben al extraer (is_live): ver argsDescarga. */
+  const RUTAS_TWITCH = /^(directory|videos|settings|downloads|search|subscriptions|inventory|drops|wallet|friends|messages|login|signup|turbo|prime|jobs|p|u)$/i;
+  function esDirecto(url) {
+    const u = urlDe(url); if (!u || plataforma(url)?.id !== 'twitch' || esVideo(url)) return false;
+    const m = u.pathname.match(/^\/(\w{2,25})\/?$/);
+    return !!m && !RUTAS_TWITCH.test(m[1]);
+  }
+  const mensajeDirecto = (url) => (plataforma(url)?.id === 'twitch'
+    ? 'Los directos no se descargan. Cuando acabe, descarga el video desde la pestaña Videos del canal'
+    : 'Los directos no se descargan. Cuando acabe, descarga el video ya publicado');
 
   /* ---------- Argumentos de yt-dlp ---------- */
 
@@ -72,17 +84,32 @@
     return url;
   }
 
-  /* Orden de preferencia de formatos (-S):
-     · res[:N]   la mayor resolución, o la más cercana por debajo de N si se pidió
-                 una calidad (res es el lado corto: un Short de 1080x1920 es 1080p,
-                 igual que lo enseña el selector).
-     · vcodec:h264 a igual resolución, H.264: el MP4 se abre en cualquier
-                 reproductor, editor o móvil; AV1/VP9 solo cuando no hay H.264
-                 a esa resolución (YouTube por encima de 1080p).
-     · ext:mp4:m4a  y audio AAC, para no recomprimir. */
+  /* Qué formato de video se pide (-f), por orden, con la calidad elegida N
+     contada por el lado corto (un Short de 1080x1920 es 1080p, como en el
+     selector):
+     1. H.264 + AAC; 2. H.264 + el mejor audio. Con N, solo H.264 de lado corto
+        <= N (aspect_ratio dice cuál es el corto). H.264 se abre en cualquier
+        reproductor, editor o móvil; si en esa calidad YouTube solo da VP9/AV1
+        (por encima de 1080p), sale el H.264 más alto por debajo.
+     3. Si no hay ningún H.264 así, lo que haya (VP9, AV1…), lo más cercano a N.
+     TikTok: archivo único (sin unir video y audio) y nunca el formato
+     "download", que es el que lleva la marca de agua. TikTok llama "h264" al
+     códec; el resto, "avc1". */
+  const H264 = "[vcodec~='^(avc|h264)']";
+  function formatoVideo(quality, tiktok) {
+    const n = parseInt(quality, 10);
+    const lados = n > 0 ? [`[aspect_ratio>=1][height<=${n}]`, `[aspect_ratio<1][width<=${n}]`] : [''];
+    if (tiktok) {
+      const sinMarca = 'b[format_note!*=?watermark]';
+      return [...lados.map((l) => sinMarca + H264 + l), sinMarca, 'b'].join('/');
+    }
+    return [...lados.map((l) => `bv*${H264}${l}+ba[acodec^=mp4a]`), ...lados.map((l) => `bv*${H264}${l}+ba`), 'bv*+ba', 'b'].join('/');
+  }
+  // Orden dentro de cada opción (-S): la mayor resolución, o la más cercana por
+  // debajo de N; luego fps, y audio AAC y contenedor MP4 para no recomprimir.
   function ordenFormatos(quality) {
-    const h = parseInt(quality, 10);
-    return [(h > 0 ? 'res:' + h : 'res'), 'fps', 'vcodec:h264', 'acodec:aac', 'ext:mp4:m4a'].join(',');
+    const n = parseInt(quality, 10);
+    return [(n > 0 ? 'res:' + n : 'res'), 'fps', 'acodec:aac', 'ext:mp4:m4a'].join(',');
   }
 
   // Lo que yt-dlp imprime para Naviris (con -q solo sale esto, el progreso y los errores)
@@ -102,13 +129,17 @@
        de Windows y las rutas con tildes o emojis llegaban rotas (el panel no
        podía abrir el archivo; probado con "ñandú" y "📚").
      · --print: el nombre al empezar y la ruta final al terminar, en líneas
-       propias, en vez de adivinarlos de los mensajes de cada paso.
+       propias, en vez de adivinarlos de los mensajes de cada paso; y si es un
+       directo (pre_process sale antes del filtro).
+     · --match-filter !is_live: un directo no se graba (no acabaría nunca). yt-dlp
+       lo salta sin error y "[rat] estado is_live" dice por qué no hay archivo.
      · --no-playlist: un enlace de video dentro de una lista baja solo ese video.
      · --: la URL nunca se lee como una opción. */
   function argsDescarga(opts) {
     const { mode, quality, dir, ffmpeg, deno, ua, cookies } = opts;
     const url = urlParaYtDlp(opts.url);
     const comunes = ['--no-playlist', '-q', '--progress', '--newline', '--no-part', '--encoding', 'utf-8',
+      '--match-filter', '!is_live', '--print', 'pre_process:' + MARCA + ' estado %(live_status)s',
       '--print', 'before_dl:' + MARCA + ' archivo %(filename)s', '--print', 'after_move:' + MARCA + ' final %(filepath)s',
       '--ffmpeg-location', ffmpeg];
     // --js-runtimes: sin Deno YouTube solo deja formatos sueltos o ninguno (EJS).
@@ -116,10 +147,8 @@
     comunes.push('-P', dir, '-o', PLANTILLA, '--user-agent', ua);
     if (cookies) comunes.push('--cookies', cookies);
     if (mode === 'audio') return ['-f', 'ba/b', '-x', '--audio-format', 'mp3', '--audio-quality', '0', ...comunes, '--', url];
-    // TikTok: archivo único (sin unir video y audio) y nunca el formato
-    // "download", que es el que lleva la marca de agua.
-    const formato = plataforma(url)?.id === 'tiktok' ? 'b[format_note!*=?watermark]/b' : 'bv*+ba/b';
-    return ['-f', formato, '-S', ordenFormatos(quality), '--merge-output-format', 'mp4', '--remux-video', 'mp4', ...comunes, '--', url];
+    return ['-f', formatoVideo(quality, plataforma(url)?.id === 'tiktok'), '-S', ordenFormatos(quality),
+      '--merge-output-format', 'mp4', '--remux-video', 'mp4', ...comunes, '--', url];
   }
 
   function argsFormatos({ url, deno, ua, cookies }) {
@@ -133,8 +162,10 @@
 
   // Calidades para el selector a partir del JSON de yt-dlp: el lado corto de
   // cada formato con video (los "storyboard" de YouTube son imágenes, fuera).
+  // Un directo no ofrece ninguna: no se descarga.
   function calidades(info) {
     const set = new Set();
+    if (info && info.is_live) return [];
     for (const f of (info && info.formats) || []) {
       if (!f.vcodec || f.vcodec === 'none' || f.ext === 'mhtml') continue;
       const lado = Math.min(f.width || Infinity, f.height || Infinity);
@@ -142,6 +173,16 @@
     }
     return [...set].sort((a, b) => b - a);
   }
+
+  /* ---------- Sesión ----------
+     A YouTube no se le pasan de entrada las cookies: yt-dlp avisa de que usar
+     la cuenta puede hacer que YouTube la marque, y casi nada las necesita. Solo
+     si yt-dlp dice que hace falta iniciar sesión (edad, "Sign in to confirm",
+     privado, solo miembros) se reintenta UNA vez con ellas. Al resto de
+     plataformas se les pasan siempre (Instagram, X o Reddit no dan nada sin). */
+  const cookiesDeEntrada = (url) => plataforma(url)?.id !== 'youtube';
+  const PIDE_SESION = /Sign in to confirm|confirm your age|age[- ]restricted|inappropriate for some users|Private video|members[- ]only|Join this channel|login required|requires authentication|use --cookies/i;
+  const reintentaConCookies = (texto, url) => plataforma(url)?.id === 'youtube' && PIDE_SESION.test(String(texto || ''));
 
   /* ---------- Lectura de la salida ----------
      Una línea por evento (--newline). Los trozos que llegan por la tubería
@@ -152,6 +193,7 @@
     const l = linea.replace(/\r$/, '');
     let m;
     if ((m = l.match(/^\[rat\] (archivo|final) (.+)$/))) return { tipo: m[1], ruta: m[2].trim() };
+    if ((m = l.match(/^\[rat\] estado (\S+)/))) return { tipo: 'estado', valor: m[1] };
     if ((m = l.match(/^\[download\]\s+([\d.]+)%(?:\s+of\s+~?\s*([\d.]+)\s*(B|KiB|MiB|GiB|TiB))?/))) {
       const r = { tipo: 'progreso', percent: Math.min(100, parseFloat(m[1])) };
       if (m[2]) r.total = Math.round(parseFloat(m[2]) * MULT[m[3]]);
@@ -185,6 +227,7 @@
     if (/age[- ]restricted|confirm your age|inappropriate for some users/i.test(t)) return 'El video tiene restricción de edad. Inicia sesión en ' + sitio + ' en Naviris y vuelve a intentarlo';
     if (/Sign in to confirm|not a bot/i.test(t)) return 'YouTube pide verificar que no eres un bot. Inicia sesión en YouTube en Naviris y vuelve a intentarlo';
     if (/DRM/i.test(t)) return 'El video está protegido contra copia (DRM) y no se puede descargar';
+    if (/not currently live/i.test(t)) return mensajeDirecto(url);
     if (/live event will begin|Premieres in|is_upcoming|not started yet/i.test(t)) return 'El directo o estreno aún no ha empezado. Inténtalo cuando acabe';
     if (/Private video|login required|requires authentication|Account authentication is required|registered users|log in|logged-in|cookies/i.test(t)) return 'El video es privado o pide iniciar sesión. Inicia sesión en ' + sitio + ' en Naviris y vuelve a intentarlo';
     if (/Requested format is not available/i.test(t)) return 'Esa calidad no está disponible. Elige Máxima calidad y vuelve a intentarlo';
@@ -277,12 +320,27 @@
   }
   /* ¿Toca revisar yt-dlp? Siempre si no arranca o está por debajo de la mínima;
      si no, como mucho cada `cadaMs` y solo si la última revisión salió bien
-     (si falló, se reintenta la próxima vez que se abra el Rat Tool). */
-  function tocaRevisar({ version, revisadoEn, ahora, cadaMs, forzar }) {
-    if (forzar || !esVersionYtDlp(version)) return true;
+     (si falló, se reintenta la próxima vez que se abra el Rat Tool). Forzada
+     (tras un error de motor viejo) como mucho una vez por hora (`forzadaEn`):
+     varias descargas fallando seguidas no disparan una revisión cada una. */
+  const ESPERA_FORZADA_MS = 60 * 60 * 1000;
+  function tocaRevisar({ version, revisadoEn, ahora, cadaMs, forzar, forzadaEn }) {
+    if (!esVersionYtDlp(version)) return true;
+    if (forzar && ahora - (forzadaEn || 0) >= ESPERA_FORZADA_MS) return true;
     if (comparaVersiones(version, VERSION_MINIMA_YTDLP) < 0) return true;
     return ahora - (revisadoEn || 0) >= cadaMs;
   }
+
+  /* Restos de descargas cortadas (Naviris cerrado a mitad): las carpetas
+     temporales del Rat Tool y los archivos de cookies que no llegaron a
+     borrarse. Solo los nombres exactos que crea main.js y con más de una hora,
+     para no tocar nunca una descarga en marcha ni nada ajeno.
+     entradas: [{ nombre, carpeta: bool, mtimeMs }] de la carpeta temporal. */
+  const PREFIJO_TEMPORAL = 'naviris-rat-descarga-';
+  const RX_RESTO_CARPETA = /^naviris-rat-descarga-[A-Za-z0-9]{6}$/;
+  const RX_RESTO_COOKIES = /^naviris-cookies-\d+-[a-z0-9]{1,8}\.txt$/;
+  const restosTemporales = (entradas, ahora) => entradas.filter((e) => ahora - e.mtimeMs > 60 * 60 * 1000
+    && (e.carpeta ? RX_RESTO_CARPETA.test(e.nombre) : RX_RESTO_COOKIES.test(e.nombre))).map((e) => e.nombre);
 
   // Texto dentro de un literal '...' de PowerShell. PowerShell también cierra el
   // literal con las comillas tipográficas (‘ ’ ‚ ‛), así que se doblan todas:
@@ -290,9 +348,9 @@
   const literalPs = (s) => "'" + String(s).replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q) + "'";
 
   const api = {
-    PLATAFORMAS, plataforma, esVideo, esLista, urlParaYtDlp, ordenFormatos,
+    PLATAFORMAS, plataforma, esVideo, esLista, esDirecto, mensajeDirecto, urlParaYtDlp, formatoVideo, ordenFormatos,
     argsDescarga, argsFormatos, calidades, leeLinea, creaLector, errorDeYtDlp, pideActualizar,
-    dominiosCookies, ficheroCookies,
+    dominiosCookies, ficheroCookies, cookiesDeEntrada, reintentaConCookies, PREFIJO_TEMPORAL, restosTemporales,
     VERSION_MINIMA_YTDLP, BINARIOS, comparaVersiones, esVersionYtDlp, versionDeRedireccion, huellaEnSumas, tocaRevisar,
     literalPs
   };

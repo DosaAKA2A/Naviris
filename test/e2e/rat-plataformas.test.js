@@ -30,12 +30,13 @@ function descarga({ url, mode = 'video', quality = '', extra = [] }) {
     const args = rat.argsDescarga({ url, mode, quality, dir, ffmpeg: exe('ffmpeg.exe'), deno: exe('deno.exe'), ua: UA, cookies: null });
     const fin = args.splice(-2); // '--', url
     args.push('--print', 'after_move:[fmt] %(format_id)s|%(format_note)s', ...extra, ...fin);
-    const r = { archivo: null, finales: [], destinos: [], progreso: [], errores: [], formato: null };
+    const r = { archivo: null, finales: [], destinos: [], progreso: [], errores: [], estados: [], formato: null };
     const alEvento = (e) => {
       if (e.tipo === 'archivo') r.archivo = e.ruta;
       else if (e.tipo === 'final') r.finales.push(e.ruta);
       else if (e.tipo === 'progreso') r.progreso.push(e.percent);
       else if (e.tipo === 'error') r.errores.push(e.texto);
+      else if (e.tipo === 'estado') r.estados.push(e.valor);
     };
     const lo = rat.creaLector(alEvento), le = rat.creaLector(alEvento);
     const p = spawn(exe('yt-dlp.exe'), args, { windowsHide: true });
@@ -178,4 +179,26 @@ test('calidades reales de un video de YouTube (con Deno salen hasta 1080p)', opt
   const q = rat.calidades(JSON.parse(p.stdout));
   assert.ok(q.includes(1080) && q.includes(720) && q.includes(360), q.join(','));
   assert.deepEqual(q, [...q].sort((a, b) => b - a));
+});
+
+test('YouTube 4K a máxima calidad: sale H.264 1080p (no VP9/AV1 2160p)', opt, async () => {
+  const r = await descarga({ url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', extra: ['--download-sections', '*0-3'] });
+  const p = bajado(r, '.mp4');
+  assert.match(p.texto, /Video: h264.*1920x1080/);
+  assert.match(p.texto, /Audio: aac/);
+});
+
+test('YouTube a 1440p elegido sin H.264 a esa altura: el H.264 más alto por debajo', opt, async () => {
+  const r = await descarga({ url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', quality: '1440', extra: ['--download-sections', '*0-3'] });
+  assert.match(bajado(r, '.mp4').texto, /Video: h264.*1920x1080/);
+});
+
+test('directo de YouTube: yt-dlp lo salta y el lector lo avisa', opt, async () => {
+  const url = 'https://www.youtube.com/@LofiGirl/live';
+  const r = await descarga({ url });
+  assert.equal(r.code, 0);
+  assert.deepEqual(r.finales, []);
+  assert.ok(r.estados.includes('is_live'), r.estados.join(','));
+  assert.deepEqual(r.restos, []);
+  assert.match(rat.mensajeDirecto(url), /^Los directos no se descargan/);
 });

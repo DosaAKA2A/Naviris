@@ -45,11 +45,21 @@ async function hasta(fn, ms, que) {
 }
 const json = (ruta) => fetch(`http://127.0.0.1:${PUERTO}${ruta}`).then((r) => r.json());
 const ultimo = (id) => evalua(`(window.__rat || []).filter((m) => m.id === ${JSON.stringify(id)}).at(-1) || null`);
-const tempsRat = () => new Set(fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('naviris-rat-') && !d.startsWith('naviris-rat-e2e')));
+const tempsRat = () => new Set(fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('naviris-rat-descarga-') || d.startsWith('naviris-cookies-')));
+const veces = (rx) => (fs.readFileSync(log, 'utf8').match(rx) || []).length;
+const terminada = (id, ms) => hasta(async () => { const u = await ultimo(id); return u && u.state !== 'progressing' && u; }, ms, 'el final de ' + id);
+// Restos de una descarga cortada que Naviris debe barrer al arrancar (con más
+// de una hora), uno reciente que debe respetar y uno ajeno con nombre parecido.
+const RESTOS = { viejo: 'naviris-rat-descarga-e2eVJ1', reciente: 'naviris-rat-descarga-e2eRC1', ajeno: 'naviris-rat-descarga-e2e-ajeno', cookies: 'naviris-cookies-1-e2e1.txt' };
+const enTemp = (n) => path.join(os.tmpdir(), n);
 
 test.before(async () => {
   if (SALTAR) return;
   perfil = fs.mkdtempSync(path.join(os.tmpdir(), 'naviris-rat-e2e-perfil-'));
+  const haceDosHoras = new Date(Date.now() - 2 * 3600 * 1000);
+  for (const n of [RESTOS.viejo, RESTOS.reciente, RESTOS.ajeno]) { fs.mkdirSync(enTemp(n), { recursive: true }); fs.writeFileSync(path.join(enTemp(n), 'a medias.mp4'), 'x'); }
+  fs.writeFileSync(enTemp(RESTOS.cookies), '# Netscape HTTP Cookie File\n');
+  for (const n of [RESTOS.viejo, RESTOS.ajeno, RESTOS.cookies]) fs.utimesSync(enTemp(n), haceDosHoras, haceDosHoras);
   log = path.join(perfil, 'naviris.log');
   const salida = fs.openSync(log, 'a');
   app = spawn(ELECTRON, [REPO, '--user-data-dir=' + perfil, '--remote-debugging-port=' + PUERTO], { stdio: ['ignore', salida, salida], windowsHide: true });
@@ -81,6 +91,7 @@ test.after(async () => {
   if (app.exitCode === null) { try { process.kill(app.pid); } catch { /* nada */ } }
   await espera(1500);
   fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+  for (const n of Object.values(RESTOS)) fs.rmSync(enTemp(n), { recursive: true, force: true });
 });
 
 const opt = { skip: SALTAR, timeout: 240000 };
@@ -160,4 +171,47 @@ test('cancelar no deja nada en Descargas ni en la carpeta temporal', opt, async 
   assert.ok(!fs.existsSync(path.join(carpeta, enMarcha.name)), 'quedó el archivo en Descargas');
   const nuevos = [...tempsRat()].filter((d) => !antes.has(d));
   assert.deepEqual(nuevos, [], 'quedó la carpeta temporal');
+});
+
+test('al arrancar borra solo los restos viejos del Rat Tool', opt, async () => {
+  await hasta(() => !fs.existsSync(enTemp(RESTOS.viejo)) && !fs.existsSync(enTemp(RESTOS.cookies)), 15000, 'el barrido de restos');
+  assert.ok(fs.existsSync(enTemp(RESTOS.reciente)), 'borró una carpeta reciente (podía ser una descarga en marcha)');
+  assert.ok(fs.existsSync(enTemp(RESTOS.ajeno)), 'borró una carpeta que no es suya');
+});
+
+test('canal de Twitch (directo): no se lanza y manda a Videos del canal', opt, async () => {
+  const id = await evalua(`window.cobalt.ytDownload('https://www.twitch.tv/twitch', 'video', '')`);
+  const m = await terminada(id, 10000);
+  assert.equal(m.state, 'interrupted');
+  assert.equal(m.error, 'Los directos no se descargan. Cuando acabe, descarga el video desde la pestaña Videos del canal');
+  assert.deepEqual(await evalua(`window.cobalt.ytFormats('https://www.twitch.tv/twitch')`), []);
+});
+
+test('directo de YouTube (is_live): no se graba y el mensaje lo explica', opt, async () => {
+  const antes = tempsRat();
+  const id = await evalua(`window.cobalt.ytDownload('https://www.youtube.com/@LofiGirl/live', 'video', '')`);
+  const m = await terminada(id, 90000);
+  assert.equal(m.state, 'interrupted');
+  assert.equal(m.error, 'Los directos no se descargan. Cuando acabe, descarga el video ya publicado');
+  await espera(2000);
+  assert.deepEqual([...tempsRat()].filter((d) => !antes.has(d)), []);
+});
+
+test('YouTube con restricción de edad: sin cookies de entrada y un solo reintento con la sesión', opt, async () => {
+  const url = 'https://www.youtube.com/watch?v=6kLq3WMV1nU';
+  // Sin sesión de YouTube en el perfil: no hay reintento
+  const n0 = veces(/se reintenta con las cookies/g);
+  const a = await terminada(await evalua(`window.cobalt.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 90000);
+  assert.match(a.error, /restricción de edad.*YouTube/);
+  assert.equal(veces(/se reintenta con las cookies/g), n0, 'reintentó sin tener sesión');
+  // Con cookies de youtube.com (abrir YouTube en una pestaña las crea): un reintento, ni uno más
+  await evalua(`createTab('https://www.youtube.com/'); true`);
+  await espera(12000);
+  const antes = tempsRat();
+  const b = await terminada(await evalua(`window.cobalt.ytDownload(${JSON.stringify(url)}, 'video', '144')`), 120000);
+  assert.equal(b.state, 'interrupted');
+  assert.match(b.error, /restricción de edad.*YouTube/);
+  assert.equal(veces(/se reintenta con las cookies/g), n0 + 1, 'no hizo exactamente un reintento');
+  await espera(2000);
+  assert.deepEqual([...tempsRat()].filter((d) => !antes.has(d)), [], 'quedaron la carpeta temporal o el archivo de cookies');
 });

@@ -235,12 +235,14 @@ const INSTALADORES = {
 const YTDLP_REVISION_MS = 24 * 60 * 60 * 1000;
 let ytDlpUpdate = null;
 let ytDlpVersion = null; // la instalada; se pregunta al binario una vez por sesión
+let ytDlpForzadaEn = 0;  // última revisión forzada por un error (tope: una por hora)
 function actualizaYtDlp({ forzar = false } = {}) {
   if (ytDlpUpdate) return ytDlpUpdate;
   if (!fs.existsSync(ytDlpPath()) || ytJobs.size) return Promise.resolve();
   ytDlpUpdate = (async () => {
     const version = ytDlpVersion || (ytDlpVersion = await versionDe(ytDlpPath()));
-    if (!rat.tocaRevisar({ version, revisadoEn: settings.ytDlpRevisado, ahora: Date.now(), cadaMs: YTDLP_REVISION_MS, forzar })) return;
+    if (!rat.tocaRevisar({ version, revisadoEn: settings.ytDlpRevisado, ahora: Date.now(), cadaMs: YTDLP_REVISION_MS, forzar, forzadaEn: ytDlpForzadaEn })) return;
+    if (forzar) ytDlpForzadaEn = Date.now();
     let meta = null;
     try {
       const publicada = await conReintentos(versionPublicadaYtDlp);
@@ -1218,6 +1220,21 @@ function mueveADescargas(origen, outDir) {
   return destino;
 }
 const borraCarpeta = (d) => fs.rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }, () => { /* lo que quede, lo limpia Windows */ });
+// Al arrancar: lo que dejaron descargas cortadas al cerrar Naviris a mitad
+// (carpetas temporales y cookies). Solo nombres propios del Rat Tool y con más
+// de una hora (rat.restosTemporales); en segundo plano, sin frenar el arranque.
+function limpiaRestosRat() {
+  const tmp = app.getPath('temp');
+  fs.readdir(tmp, { withFileTypes: true }, (err, entradas) => {
+    if (err) return;
+    const candidatas = [];
+    for (const e of entradas) {
+      if (!/^naviris-(rat-descarga|cookies)-/.test(e.name)) continue;
+      try { candidatas.push({ nombre: e.name, carpeta: e.isDirectory(), mtimeMs: fs.statSync(path.join(tmp, e.name)).mtimeMs }); } catch { /* ya no está */ }
+    }
+    for (const n of rat.restosTemporales(candidatas, Date.now())) borraCarpeta(path.join(tmp, n));
+  });
+}
 
 async function ytDownload({ url, mode, quality }) {
   const id = 'yt' + (++downloadSeq);
@@ -1234,69 +1251,92 @@ async function ytDownload({ url, mode, quality }) {
   // Con --no-playlist una lista suelta (playlist?list=…) se bajaba entera en
   // una sola fila del panel, sin nombre ni progreso reales.
   if (rat.esLista(url)) return falla('Es una lista de reproducción. Abre uno de sus videos y descárgalo desde ahí');
+  // Un canal de Twitch es su directo: no acabaría nunca (rat.esDirecto)
+  if (rat.esDirecto(url)) return falla(rat.mensajeDirecto(url));
 
   // Carpeta propia de esta descarga (ver rat.argsDescarga)
   let dir;
-  try { dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'naviris-rat-')); } catch { return falla('No se pudo preparar la descarga. Revisa el espacio libre en el disco'); }
-  // Con la sesión del navegador y su mismo user agent: lo que se ve en la
-  // pestaña se puede bajar (Instagram, X, Reddit). Ver cookiesParaYtDlp.
-  const cookies = await cookiesParaYtDlp(url);
-  const args = rat.argsDescarga({ url, mode, quality, dir, ffmpeg: ffmpegPath(), deno: denoSiHay(), ua: UA_LIMPIO, cookies });
-  const child = spawn(ytDlpPath(), args, { windowsHide: true });
-  ytJobs.set(id, child);
+  try { dir = fs.mkdtempSync(path.join(app.getPath('temp'), rat.PREFIJO_TEMPORAL)); } catch { return falla('No se pudo preparar la descarga. Revisa el espacio libre en el disco'); }
 
-  // Un tuit o un carrusel con varios videos son varias descargas en una: se
-  // mueven todas (antes caían todas en Descargas y así sigue siendo).
-  let lastPct = 0, lastError = '';
-  const finales = [];
-  const alEvento = (e) => {
-    if (e.tipo === 'archivo') {
-      // El nombre con el que acabará (el MP3 o el MP4 ya unido)
-      meta.name = path.basename(e.ruta).replace(/\.[^.\\/]+$/, '') + (mode === 'audio' ? '.mp3' : '.mp4');
-      broadcast('download:update', meta);
-    } else if (e.tipo === 'final') {
-      finales.push(e.ruta);
-    } else if (e.tipo === 'progreso') {
-      meta.percent = e.percent;
-      if (e.total) { meta.total = e.total; meta.received = Math.round(e.total * e.percent / 100); }
-      if (Math.abs(meta.percent - lastPct) >= 1) { lastPct = meta.percent; broadcast('download:update', meta); }
-    } else if (e.tipo === 'error') lastError = e.texto;
+  // Con la sesión del navegador y su mismo user agent: lo que se ve en la
+  // pestaña se puede bajar (Instagram, X, Reddit). A YouTube, solo en el
+  // reintento, si pide iniciar sesión (rat.cookiesDeEntrada / reintentaConCookies).
+  // reintento: true en la segunda (y última) vuelta, la de las cookies
+  const lanza = (cookies, reintento) => {
+    const args = rat.argsDescarga({ url, mode, quality, dir, ffmpeg: ffmpegPath(), deno: denoSiHay(), ua: UA_LIMPIO, cookies });
+    const child = spawn(ytDlpPath(), args, { windowsHide: true });
+    ytJobs.set(id, child);
+
+    // Un tuit o un carrusel con varios videos son varias descargas en una: se
+    // mueven todas (antes caían todas en Descargas y así sigue siendo).
+    let lastPct = 0, lastError = '', directo = false;
+    const finales = [];
+    const alEvento = (e) => {
+      if (e.tipo === 'archivo') {
+        // El nombre con el que acabará (el MP3 o el MP4 ya unido)
+        meta.name = path.basename(e.ruta).replace(/\.[^.\\/]+$/, '') + (mode === 'audio' ? '.mp3' : '.mp4');
+        broadcast('download:update', meta);
+      } else if (e.tipo === 'final') {
+        finales.push(e.ruta);
+      } else if (e.tipo === 'estado') {
+        if (e.valor === 'is_live') directo = true;
+      } else if (e.tipo === 'progreso') {
+        meta.percent = e.percent;
+        if (e.total) { meta.total = e.total; meta.received = Math.round(e.total * e.percent / 100); }
+        if (Math.abs(meta.percent - lastPct) >= 1) { lastPct = meta.percent; broadcast('download:update', meta); }
+      } else if (e.tipo === 'error') lastError = e.texto;
+    };
+    const lectorOut = rat.creaLector(alEvento), lectorErr = rat.creaLector(alEvento);
+    child.stdout.on('data', lectorOut.escribe);
+    child.stderr.on('data', lectorErr.escribe);
+    child.on('error', (e) => { lastError = e.message; });
+    child.on('close', (code) => {
+      lectorOut.cierra(); lectorErr.cierra();
+      borraCookies(cookies);
+      ytJobs.delete(id);
+      // Cancelada por el usuario: el código de salida del proceso matado no es un
+      // error, y lo que quedó a medias está en la carpeta temporal.
+      if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
+      try {
+        for (const f of finales.filter((x) => fs.existsSync(x))) {
+          meta.path = mueveADescargas(f, outDir);
+          meta.name = path.basename(meta.path);
+          recordDlHistory(meta.path);
+        }
+        if (code === 0 && meta.path !== outDir) {
+          meta.state = 'completed'; meta.percent = 100;
+          if (!meta.total) { try { meta.total = meta.received = fs.statSync(meta.path).size; } catch { /* nada */ } }
+        }
+      } catch (e) {
+        lastError = e.message;
+      }
+      const termina = () => {
+        if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
+        if (meta.state !== 'completed') {
+          console.log('[Naviris] yt-dlp:', code, lastError);
+          meta.state = 'interrupted';
+          // yt-dlp salta los directos sin error (--match-filter !is_live)
+          meta.error = directo && !finales.length ? rat.mensajeDirecto(url) : rat.errorDeYtDlp(lastError, url);
+          if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + meta.error;
+          // yt-dlp desfasado: se actualiza ya, sin esperar a la revisión diaria
+          if (rat.pideActualizar(lastError)) actualizaYtDlp({ forzar: true });
+        }
+        borraCarpeta(dir);
+        broadcast('download:update', meta);
+      };
+      // Un solo reintento, y solo si hay sesión que no se pasó la primera vez
+      if (meta.state !== 'completed' && !reintento && !rat.cookiesDeEntrada(url) && rat.reintentaConCookies(lastError, url)) {
+        cookiesParaYtDlp(url).then((c) => {
+          if (!c || meta.state === 'cancelled') { borraCookies(c); termina(); return; }
+          console.log('[Naviris] yt-dlp pide sesión, se reintenta con las cookies:', lastError);
+          lanza(c, true);
+        });
+        return;
+      }
+      termina();
+    });
   };
-  const lectorOut = rat.creaLector(alEvento), lectorErr = rat.creaLector(alEvento);
-  child.stdout.on('data', lectorOut.escribe);
-  child.stderr.on('data', lectorErr.escribe);
-  child.on('error', (e) => { lastError = e.message; });
-  child.on('close', (code) => {
-    lectorOut.cierra(); lectorErr.cierra();
-    borraCookies(cookies);
-    ytJobs.delete(id);
-    // Cancelada por el usuario: el código de salida del proceso matado no es un
-    // error, y lo que quedó a medias está en la carpeta temporal.
-    if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
-    try {
-      for (const f of finales.filter((x) => fs.existsSync(x))) {
-        meta.path = mueveADescargas(f, outDir);
-        meta.name = path.basename(meta.path);
-        recordDlHistory(meta.path);
-      }
-      if (code === 0 && meta.path !== outDir) {
-        meta.state = 'completed'; meta.percent = 100;
-        if (!meta.total) { try { meta.total = meta.received = fs.statSync(meta.path).size; } catch { /* nada */ } }
-      }
-    } catch (e) {
-      lastError = e.message;
-    }
-    if (meta.state !== 'completed') {
-      console.log('[Naviris] yt-dlp:', code, lastError);
-      meta.state = 'interrupted';
-      meta.error = rat.errorDeYtDlp(lastError, url);
-      if (meta.name === 'Obteniendo información…') meta.name = 'Error: ' + meta.error;
-      // yt-dlp desfasado: se actualiza ya, sin esperar a la revisión diaria
-      if (rat.pideActualizar(lastError)) actualizaYtDlp({ forzar: true });
-    }
-    borraCarpeta(dir);
-    broadcast('download:update', meta);
-  });
+  lanza(rat.cookiesDeEntrada(url) ? await cookiesParaYtDlp(url) : null, false);
   return id;
 }
 
@@ -2867,22 +2907,24 @@ ipcMain.handle('import:bookmarks', soloUI((_e, key) => {
 // Calidades disponibles (1080, 720, …) para el selector: el lado corto de cada
 // formato, como las nombra YouTube (un Short de 1080x1920 es 1080p).
 ipcMain.handle('yt:formats', soloUI(async (_e, url) => {
-  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || rat.esLista(url) || !fs.existsSync(ytDlpPath())) return [];
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || rat.esLista(url) || rat.esDirecto(url) || !fs.existsSync(ytDlpPath())) return [];
   // Mismas cookies, user agent y Deno que la descarga: si no, Instagram y X no
   // enseñan calidades para un vídeo que luego sí bajaría, y YouTube sin Deno no
-  // enseña 1080p.
-  const cookies = await cookiesParaYtDlp(url);
-  return new Promise((resolve) => {
+  // enseña 1080p. YouTube, sin cookies salvo que pida sesión (un reintento).
+  const lee = (cookies) => new Promise((resolve) => {
     const child = spawn(ytDlpPath(), rat.argsFormatos({ url, deno: denoSiHay(), ua: UA_LIMPIO, cookies }), { windowsHide: true });
-    let out = '';
-    const timer = setTimeout(() => { try { child.kill(); } catch { /* ya acabó */ } resolve([]); }, 30000);
+    let out = '', err = '';
+    const fin = (r) => { clearTimeout(timer); borraCookies(cookies); resolve(r); };
+    const timer = setTimeout(() => { try { child.kill(); } catch { /* ya acabó */ } fin({ calidades: [], err }); }, 30000);
     child.stdout.on('data', (d) => { out += d.toString('utf8'); });
-    child.on('error', () => { clearTimeout(timer); borraCookies(cookies); resolve([]); });
-    child.on('close', () => {
-      clearTimeout(timer); borraCookies(cookies);
-      try { resolve(rat.calidades(JSON.parse(out))); } catch { resolve([]); }
-    });
+    child.stderr.on('data', (d) => { err += d.toString('utf8'); });
+    child.on('error', () => fin({ calidades: [], err }));
+    child.on('close', () => { try { fin({ calidades: rat.calidades(JSON.parse(out)), err }); } catch { fin({ calidades: [], err }); } });
   });
+  const r = await lee(rat.cookiesDeEntrada(url) ? await cookiesParaYtDlp(url) : null);
+  if (r.calidades.length || rat.cookiesDeEntrada(url) || !rat.reintentaConCookies(r.err, url)) return r.calidades;
+  const cookies = await cookiesParaYtDlp(url);
+  return cookies ? (await lee(cookies)).calidades : [];
 }));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
@@ -3329,6 +3371,7 @@ app.whenReady().then(async () => {
   }
   // ¿Se actualizó desde la última vez? Entonces la interfaz enseñará qué cambió.
   revisaVersionInstalada();
+  limpiaRestosRat();
   braveAdblock.init();
   splashProgreso(62);
   // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.
