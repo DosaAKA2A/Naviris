@@ -311,7 +311,8 @@
    scroll, .hub-scroll se recorta por encima de una FRANJA reservada donde solo
    viven el dock y los botones; ahí no entra ningún widget, ni scrolleando.
    En ventanas estrechas el dock sube sobre los botones y encoge sus tiles.
-   Se mide el ancho del propio hub (container), no el de la ventana. */
+   Se mide el ancho del propio hub (container), no el de la ventana. El alto de
+   la franja lo pone el renderer (--franja) con lo que miden dock y botones. */
 #hub { container-type: inline-size; --franja: 172px; }
 /* ===== TRANSPARENCIA REGULABLE (Dosa, 2026-09-09) =====
    Las baldosas son opacas de fábrica, pero el deslizador de "Aspecto del hub"
@@ -350,21 +351,20 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
 #hub.con-scroll #widget-grid { padding-bottom: 24px; }
-/* Sitio arriba para la esquina de cuenta/clima/tema cuando el hub va en flujo */
-#hub.reflujo #widget-grid { padding-top: 92px; }
+/* En flujo, la rejilla se centra a lo ancho; el sitio de arriba para la esquina
+   de cuenta/clima/tema lo pone el renderer con lo que mide (aplicaEncuadre). */
+#hub.reflujo #widget-grid { width: auto; justify-content: center; }
 @container (max-width: 1500px) {
   /* El dock se sube por encima de la fila de botones: en fila ya no caben */
   #hub-dock { bottom: 74px; }
 }
 @container (max-width: 1100px) {
-  #hub { --franja: 152px; }
   #hub-dock { gap: 6px; padding: 8px; border-radius: 22px; }
   #hub-dock .d-tile { width: 54px; height: 54px; border-radius: 15px; }
   #hub-dock .d-tile img { --icon-sz: 26px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 26px; height: 26px; } #hub-dock .d-tile .d-letter { font-size: 20px; }
   #hub-dock .dk-sep { height: 36px; }
 }
 @container (max-width: 800px) {
-  #hub { --franja: 136px; }
   #hub-dock { gap: 5px; padding: 6px; border-radius: 18px; }
   #hub-dock .d-tile { width: 44px; height: 44px; border-radius: 12px; }
   #hub-dock .d-tile img { --icon-sz: 22px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 22px; height: 22px; } #hub-dock .d-tile .d-letter { font-size: 17px; }
@@ -1005,7 +1005,10 @@ body.sacando-pestana { cursor: copy; }
 #hub.active { display: block; }
 /* Pagina FIJA en horizontal (sin scroll); en ventana rara (vertical o
    aplastada), el scroll vuelve como salvavidas (#hub.con-scroll). */
-#hub .hub-scroll { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
+/* clip y no hidden: con la rejilla escalada, las calles vacías pueden quedar
+   fuera de la vista, y un contenedor hidden aún se deja desplazar (el foco de
+   un campo lo movía de lado). clip no es desplazable. */
+#hub .hub-scroll { position: absolute; inset: 0; overflow: clip; z-index: 1; }
 #hub.con-scroll .hub-scroll { overflow-y: auto; overflow-x: hidden; }
 /* Fondo degradado genérico, editable por el usuario */
 /* FONDO + GRANO EN UNA SOLA CAPA (2026-08-11, fix definitivo de las lineas):
@@ -1028,11 +1031,16 @@ body.sacando-pestana { cursor: copy; }
    160x160 (el reloj = 2x1 de referencia), columnas segun ancho (las pone el
    renderer junto con auto-rows y gap) y widgets colocados por {col,row,w,h}.
    Sustituye a todos los mapas por tramo. */
-/* La pagina se CENTRA en vertical entre el margen superior y la reserva de
-   los FABs: la ultima fila jamas queda pegada a los botones. En flujo (con
-   scroll) vuelve al anclaje superior natural. */
-#widget-grid { margin: 0 auto; padding: 24px 0 130px; display: grid; justify-content: center; height: 100%; align-content: center; }
-#hub.con-scroll #widget-grid { height: auto; align-content: start; }
+/* EL HUB ESCALA ENTERO (2026-11-03): la rejilla se pinta a su tamaño de diseño
+   (celdas de 150) y --z la escala con zoom; el renderer la coloca con márgenes
+   (aplicaEncuadre). Las cuentas, en src/hub-escala.js.
+   SUELO DE LETRA: con la rejilla reducida, la etiqueta de 11 px saldría a 7.
+   --min-letra es lo que hay que pedir para que se vea a 11 reales, y la letra
+   pequeña de los widgets la usa con max() (fuera de la rejilla no existe y
+   max() deja el tamaño de siempre). El mínimo de Chromium (minimumFontSize)
+   no sirve: lo aplica ANTES del zoom de CSS. */
+#widget-grid { display: grid; width: max-content; position: relative; zoom: var(--z, 1);
+  --min-letra: calc(11px / var(--z, 1)); }
 #celda-fantasma { border: 2px dashed var(--realce); border-radius: var(--hub-r); background: color-mix(in srgb, var(--realce) 10%, transparent); pointer-events: none; z-index: 5; }
 #celda-fantasma.mal { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 /* El buscador centra su pastilla dentro de su rectangulo de celdas */
@@ -1068,11 +1076,11 @@ body.sacando-pestana { cursor: copy; }
 .w-clock { container: ck / size; text-align: left; position: relative; display: flex; flex-direction: column; justify-content: center; }
 @container ck (max-height: 132px) { .w-clock .time { font-size: 34px; } .ck-fecha { display: none; } }
 @container ck (max-height: 100px) { .w-clock .time { font-size: 26px; } .w-clock .greet { display: none; } }
-.ck-fecha { color: var(--text-dim); font-size: 12px; margin-top: 10px; }
+.ck-fecha { color: var(--text-dim); font-size: max(12px, var(--min-letra, 0px)); margin-top: 10px; }
 /* Jerarquía: el reloj es EL dato grande de la portada (referencias: número
    protagonista + etiqueta pequeña debajo) */
 .w-clock .time { font-family: "Inter Var","Segoe UI Variable Display","Segoe UI",sans-serif; font-size: 44px; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1; }
-.w-clock .greet { color: var(--text-dim); font-size: 12.5px; margin-top: 10px; letter-spacing: .2px; }
+.w-clock .greet { color: var(--text-dim); font-size: max(12.5px, var(--min-letra, 0px)); margin-top: 10px; letter-spacing: .2px; }
 
 /* Widget: búsqueda */
 /* Buscador limpio: superficie sola en reposo; el borde solo aparece con el
@@ -1082,32 +1090,32 @@ body.sacando-pestana { cursor: copy; }
 .w-searchwrap { background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-card-line); border-radius: var(--hub-r); padding: 0 8px; }
 .w-searchwrap:focus-within { border-color: var(--hub-hairline); }
 #hub-search { display: flex; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 0 14px; background: transparent; border: none; }
-#hub-search kbd { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--chip); color: var(--text-dim); }
+#hub-search kbd { font-family: var(--mono, ui-monospace, monospace); font-size: max(11px, var(--min-letra, 0px)); padding: 2px 7px; border-radius: 6px; background: var(--chip); color: var(--text-dim); }
 #hub-search .g-ico { color: var(--text-dim); }
-#hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; }
+#hub-search input { flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: max(14.5px, var(--min-letra, 0px)); }
 /* --text-dim, no --dim: el gris apagado daba 2.8:1 medido sobre el propio
    vidrio de la barra, y sobre una foto encima competia con la textura. */
 #hub-search input::placeholder { color: var(--text-dim); }
 
 /* Widget: fecha */
 .w-date .d-day { font-size: 40px; font-weight: 300; line-height: 1; }
-.w-date .d-rest { color: var(--text-dim); font-size: 13px; margin-top: 6px; }
+.w-date .d-rest { color: var(--text-dim); font-size: max(13px, var(--min-letra, 0px)); margin-top: 6px; }
 
 /* Widget: clima */
 .w-weather { display: flex; align-items: center; gap: 14px; }
 .w-weather .wx-ic { width: 44px; height: 44px; color: var(--wx-ic); flex-shrink: 0; }
 .w-weather .wx-ic svg { width: 44px; height: 44px; }
 .w-weather .wx-temp { font-size: 30px; font-weight: 300; line-height: 1; }
-.w-weather .wx-desc { color: var(--text-dim); font-size: 12.5px; margin-top: 4px; }
-.w-weather .wx-city { color: var(--text-dim); font-size: 11.5px; display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.w-weather .wx-desc { color: var(--text-dim); font-size: max(12.5px, var(--min-letra, 0px)); margin-top: 4px; }
+.w-weather .wx-city { color: var(--text-dim); font-size: max(11.5px, var(--min-letra, 0px)); display: flex; align-items: center; gap: 4px; margin-top: 3px; }
 .w-weather .wx-city svg { width: 12px; height: 12px; }
-.w-loading { color: var(--dim); font-size: 12.5px; }
+.w-loading { color: var(--dim); font-size: max(12.5px, var(--min-letra, 0px)); }
 
 /* Widget: notas */
-.w-notes textarea { width: 100%; min-height: 90px; resize: vertical; background: transparent; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.6; }
+.w-notes textarea { width: 100%; min-height: 90px; resize: vertical; background: transparent; border: none; outline: none; color: var(--text); font-family: inherit; font-size: max(13px, var(--min-letra, 0px)); line-height: 1.6; }
 .w-notes textarea::placeholder { color: var(--dim); }
-.w-head { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
-.w-head svg { width: 13px; height: 13px; }
+.w-head { display: flex; align-items: center; gap: 8px; font-size: max(11px, var(--min-letra, 0px)); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.w-head svg { width: 13px; height: 13px; flex-shrink: 0; }   /* con el hub reducido, la X de Tendencias se aplastaba a un punto */
 
 /* Widget: accesos (tiles) */
 /* Menos aire ARRIBA y ABAJO que el resto de tarjetas (2026-08-21): con los 24
@@ -1144,7 +1152,7 @@ body.sacando-pestana { cursor: copy; }
 .dial:active .d-tile { --dk-y: -2px; --dk-e: .96; transition-duration: .08s; }
 /* line-height FIJA: el alto del nombre entra en la cuenta de altoAccesos() y
    con `normal` lo pone la tipografia (y cambia de un equipo a otro). */
-.d-name { font-size: 11.5px; line-height: 14px; max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-2); }
+.d-name { font-size: max(11.5px, var(--min-letra, 0px)); line-height: 14px; max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-2); }
 .dial:hover .d-name { color: var(--text); }
 /* Eliminar tile: solo en modo edición */
 .d-x { position: absolute; top: -6px; left: -6px; z-index: 4; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); background: var(--danger); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -1157,7 +1165,7 @@ body.sacando-pestana { cursor: copy; }
 .dial.add:hover .d-tile { color: var(--text); box-shadow: none; --dk-y: 0px; }
 
 /* Modo edición de widgets */
-.widget .w-tools { position: absolute; top: -10px; right: -8px; z-index: 5; display: none; gap: 4px; }
+.widget .w-tools { position: absolute; top: -10px; right: -8px; z-index: 5; display: none; gap: 4px; zoom: max(1, calc(1 / var(--z, 1))); }
 #hub.editing .widget .w-tools { display: flex; }
 #hub.editing .widget .w-card { outline: 1.5px dashed var(--line-3); outline-offset: 3px; border-radius: 18px; }
 #hub.editing .widget { cursor: grab; }
@@ -1618,15 +1626,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .sp-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .w-sp.sp-vacio .sp-art img { display: none; }
 .sp-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 13px 56px 10px 0; }
-.sp-tit { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-sub { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-tit { font-size: max(14.5px, var(--min-letra, 0px)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-sub { font-size: max(12px, var(--min-letra, 0px)); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-ctr { display: flex; align-items: center; gap: 6px; margin-top: auto; }
 .sp-b { border: none; background: var(--chip); color: var(--text); border-radius: 999px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
 .sp-b svg { width: 14px; height: 14px; }
 .sp-b:hover { background: var(--chip-hover); transform: translateY(-1px); }
 .sp-b:active { transform: scale(.94); }
 .sp-b:disabled { opacity: .35; pointer-events: none; }
-.sp-abre { border: none; background: var(--chip); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 11.5px; cursor: pointer; font-family: inherit; transition: background var(--dur-1) var(--ease); }
+.sp-abre { border: none; background: var(--chip); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: max(11.5px, var(--min-letra, 0px)); cursor: pointer; font-family: inherit; transition: background var(--dur-1) var(--ease); }
 .sp-abre:hover { background: var(--chip-hover); }
 /* FAB de play: pastilla blanca nítida (como los círculos de las referencias),
    asentada en el scoop de la esquina */
@@ -1657,13 +1665,13 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    ilegible). El sobrante queda como lienzo transparente. */
 .w-cal .cal-grid, .w-cal .cal-sem, .w-cal .cal-top { flex-shrink: 0; }
 .cal-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
-.cal-mes { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-mes { font-size: max(12.5px, var(--min-letra, 0px)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-nav { width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 8px; background: var(--chip); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--dur-1) var(--ease); }
 .cal-nav:hover { background: var(--chip-hover); }
 .cal-nav svg { width: 13px; height: 13px; }
-.cal-sem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 9px; letter-spacing: .4px; color: var(--dim); text-align: center; margin-bottom: 2px; }
+.cal-sem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: max(9px, var(--min-letra, 0px)); letter-spacing: .4px; color: var(--dim); text-align: center; margin-bottom: 2px; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-.cal-d { position: relative; height: 34px; border: none; background: transparent; border-radius: 9px; color: var(--text); font-size: 10.5px; font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.cal-d { position: relative; height: 34px; border: none; background: transparent; border-radius: 9px; color: var(--text); font-size: max(10.5px, var(--min-letra, 0px)); font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--dur-1) var(--ease); }
 .cal-d:hover { background: var(--chip-hover); }
 .cal-d.hoy { background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-weight: 650; }
 /* Dia CON recordatorio: se ve de lejos — punto grande en el realce, numero
@@ -1673,15 +1681,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .cal-d.hoy.con::after { background: var(--cal-hoy-fg); box-shadow: none; }
 .cal-d.hoy.con { box-shadow: none; }
 .cal-lista { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; margin-bottom: 8px; }
-.cal-r { display: flex; align-items: center; gap: 8px; background: var(--chip); border-radius: 10px; padding: 6px 8px; font-size: 11.5px; }
+.cal-r { display: flex; align-items: center; gap: 8px; background: var(--chip); border-radius: 10px; padding: 6px 8px; font-size: max(11.5px, var(--min-letra, 0px)); }
 .cal-r-h { font-variant-numeric: tabular-nums; color: var(--text-dim); flex-shrink: 0; }
 .cal-r-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-r-x { border: none; background: transparent; color: var(--dim); width: 20px; height: 20px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cal-r-x:hover { color: var(--danger); background: var(--chip-hover); }
 .cal-r-x svg { width: 11px; height: 11px; }
-.cal-nada { color: var(--dim); font-size: 11.5px; padding: 8px 2px; }
+.cal-nada { color: var(--dim); font-size: max(11.5px, var(--min-letra, 0px)); padding: 8px 2px; }
 .cal-form { display: flex; gap: 6px; align-items: center; }
-.cal-form input { border: none; outline: none; background: var(--chip); color: var(--text); border-radius: 9px; font-family: inherit; font-size: 11.5px; padding: 7px 9px; }
+.cal-form input { border: none; outline: none; background: var(--chip); color: var(--text); border-radius: 9px; font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); padding: 7px 9px; }
 .cal-form input:focus { background: var(--chip-hover); }
 .cal-hora { flex-shrink: 0; width: 74px; }
 .cal-texto { flex: 1; min-width: 0; }
@@ -1700,10 +1708,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wx2-temp { font-size: 44px; font-weight: 250; line-height: 1; letter-spacing: -1px; }
 .wx2-ic { width: 38px; height: 38px; color: var(--text); flex-shrink: 0; }
 .wx2-ic svg { width: 38px; height: 38px; }
-.wx2-desc { font-size: 13px; font-weight: 550; margin-top: 4px; }
+.wx2-desc { font-size: max(13px, var(--min-letra, 0px)); font-weight: 550; margin-top: 4px; }
 .wx2-chips { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
-.wx2-chip { background: var(--chip); color: var(--text); border-radius: 999px; padding: 4px 9px; font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.wx2-city { color: var(--text-dim); font-size: 11.5px; margin-top: 9px; padding-right: 52px; }
+.wx2-chip { background: var(--chip); color: var(--text); border-radius: 999px; padding: 4px 9px; font-size: max(10.5px, var(--min-letra, 0px)); font-variant-numeric: tabular-nums; }
+.wx2-city { color: var(--text-dim); font-size: max(11.5px, var(--min-letra, 0px)); margin-top: 9px; padding-right: 52px; }
 .wx2-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
 .wx2-go:hover { transform: scale(1.08); }
 .wx2-go svg { width: 16px; height: 16px; }
@@ -1746,9 +1754,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   font-family: inherit; font-size: 11.5px; padding: 6px 12px; cursor: pointer; }
 .acc-foto-btns button:hover { background: var(--chip-hover); }
 .u-ava-off svg { width: 22px; height: 22px; }
-.u-nom { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.u-mail { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 40px; }
-.u-sync { font-size: 10.5px; color: var(--dim); margin-top: 8px; padding-right: 52px; }
+.u-nom { font-size: max(14px, var(--min-letra, 0px)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-mail { font-size: max(11.5px, var(--min-letra, 0px)); color: var(--text-dim); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 40px; }
+.u-sync { font-size: max(10.5px, var(--min-letra, 0px)); color: var(--dim); margin-top: 8px; padding-right: 52px; }
 .u-go { position: absolute; right: 2px; bottom: 2px; width: 42px; height: 42px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: transform var(--dur-1) var(--spring); }
 .u-go:hover { transform: scale(1.08); }
 .u-go svg { width: 16px; height: 16px; }
@@ -1778,9 +1786,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wh-btn { margin-left: auto; width: 24px; height: 24px; border: none; border-radius: 8px; background: transparent; color: var(--dim); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .wh-btn:hover { background: var(--chip); color: var(--text); }
 .wh-btn svg { width: 13px; height: 13px; }
-.wh-sub { margin-left: auto; font-size: 10px; letter-spacing: .4px; color: var(--dim); }
-.w-vacio { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; color: var(--text-dim); font-size: 12px; line-height: 1.5; padding: 6px 2px; }
-.w-cta { border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 7px 14px; cursor: pointer; transition: transform var(--dur-1) var(--spring); }
+.wh-sub { margin-left: auto; font-size: max(10px, var(--min-letra, 0px)); letter-spacing: .4px; color: var(--dim); }
+.w-vacio { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; color: var(--text-dim); font-size: max(12px, var(--min-letra, 0px)); line-height: 1.5; padding: 6px 2px; }
+.w-cta { border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); font-weight: 600; padding: 7px 14px; cursor: pointer; transition: transform var(--dur-1) var(--spring); }
 .w-cta:hover { transform: translateY(-1px); }
 
 /* ===== Widget "Tu música" (el rojo del mock): filas-pastilla nítidas ===== */
@@ -1798,7 +1806,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .spl-sub { grid-column: 1; font-size: 10.5px; font-weight: 500; color: var(--text-dim); min-width: 0; }
 /* Aviso de sesion del widget de X */
 .xt-login { margin-top: 8px; border: none; border-radius: 999px; background: var(--chip); color: var(--text-dim);
-  font-family: inherit; font-size: 10.5px; padding: 6px 11px; cursor: pointer; width: 100%; }
+  font-family: inherit; font-size: max(10.5px, var(--min-letra, 0px)); padding: 6px 11px; cursor: pointer; width: 100%; }
 .xt-login:hover { background: var(--chip-hover); color: var(--text); }
 .spl-i svg { grid-column: 2; grid-row: 1 / span 2; width: 13px; height: 13px; opacity: 0; transition: opacity var(--dur-1) var(--ease); }
 .spl-i:hover { transform: translateX(2px); }
@@ -1809,11 +1817,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* cabecera alineada con el texto de las filas (no con su borde) */
 .w-xt .w-head { padding: 0 2px 0 5px; }
 .w-xt .w-head svg { width: 13px; height: 13px; }
-.xt-chip { margin-left: auto; font-size: 9.5px; letter-spacing: .4px; background: var(--chip); color: var(--text-dim); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.xt-chip { margin-left: auto; font-size: max(9.5px, var(--min-letra, 0px)); letter-spacing: .4px; background: var(--chip); color: var(--text-dim); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .xt-lista { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; flex: 1; min-height: 0; overflow: hidden; }
-.xt-i { display: flex; align-items: center; gap: 9px; border: none; background: var(--chip); border-radius: 11px; color: var(--text); font-family: inherit; font-size: 12px; font-weight: 550; text-align: left; padding: 8px 11px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
+.xt-i { display: flex; align-items: center; gap: 9px; border: none; background: var(--chip); border-radius: 11px; color: var(--text); font-family: inherit; font-size: max(12px, var(--min-letra, 0px)); font-weight: 550; text-align: left; padding: 8px 11px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
 .xt-i:hover { background: var(--chip-hover); transform: translateX(2px); }
-.xt-n { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; width: 15px; text-align: center; flex-shrink: 0; }
+.xt-n { font-size: max(10px, var(--min-letra, 0px)); color: var(--dim); font-variant-numeric: tabular-nums; width: 15px; text-align: center; flex-shrink: 0; }
 .xt-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xt-i svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--text-dim); opacity: 0; transition: opacity var(--dur-1) var(--ease); }
 .xt-i:hover svg { opacity: 1; }
@@ -1821,7 +1829,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* ===== Widget Imagen (los violetas del mock): la imagen ES la tarjeta ===== */
 .w-img { padding: 0; overflow: hidden; position: relative; min-height: 150px; }
 .w-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.w-img .wi-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--dim); font-size: 12px; cursor: pointer; }
+.w-img .wi-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--dim); font-size: max(12px, var(--min-letra, 0px)); cursor: pointer; }
 .w-img .wi-vacio svg { width: 26px; height: 26px; }
 .wi-cambia { position: absolute; right: 10px; bottom: 10px; width: 32px; height: 32px; border: none; border-radius: 999px; background: rgba(10,10,12,.55); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--dur-2) var(--ease); }
 .w-img:hover .wi-cambia, .w-img:focus-within .wi-cambia { opacity: 1; }
@@ -1840,7 +1848,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* El dato grande: numero de no leidos con la etiqueta pegada a su linea base */
 .ml-hero { display: flex; align-items: baseline; gap: 7px; margin: 2px 0 12px; }
 .ml-n { font-size: 34px; font-weight: 600; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
-.ml-lbl { font-size: 11.5px; color: var(--text-dim); }
+.ml-lbl { font-size: max(11.5px, var(--min-letra, 0px)); color: var(--text-dim); }
 /* Sin scroll: lo que no cabe se oculta en JS, asi que la lista solo recorta */
 .ml-lista { display: flex; flex-direction: column; gap: 6px; overflow: hidden; flex: 1; min-height: 0; }
 /* Las filas se reparten el alto sobrante (con tope): al ocultar la que no
@@ -1848,15 +1856,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .ml-i { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-height: 44px; max-height: 58px; border: none; border-radius: 14px; background: rgba(255,255,255,.86); color: #17181c; font-family: inherit; text-align: left; padding: 8px 13px; cursor: pointer; transition: transform var(--dur-1) var(--spring), background var(--dur-1) var(--ease); width: 100%; }
 .ml-i:hover { transform: translateX(2px); background: #fff; }
 .ml-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-.ml-de { font-size: 11.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ml-asunto { font-size: 11px; color: #454851; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ml-resumen { display: none; font-size: 10.5px; color: #6b6f79; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ml-hora { flex-shrink: 0; align-self: flex-start; font-size: 10px; color: #7b7f88; font-variant-numeric: tabular-nums; }
+.ml-de { font-size: max(11.5px, var(--min-letra, 0px)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-asunto { font-size: max(11px, var(--min-letra, 0px)); color: #454851; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-resumen { display: none; font-size: max(10.5px, var(--min-letra, 0px)); color: #6b6f79; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-hora { flex-shrink: 0; align-self: flex-start; font-size: max(10px, var(--min-letra, 0px)); color: #7b7f88; font-variant-numeric: tabular-nums; }
 /* Ancha (3 celdas): cabe el adelanto del mensaje */
 .w-mail.t-3x3 .ml-resumen { display: block; }
-.ml-limpia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; justify-content: center; font-size: 12.5px; color: var(--text-dim); }
+.ml-limpia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; justify-content: center; font-size: max(12.5px, var(--min-letra, 0px)); color: var(--text-dim); }
 .ml-limpia svg { width: 22px; height: 22px; }
-.ml-pie { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: 11px; font-weight: 600; padding: 7px 12px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.ml-pie { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: max(11px, var(--min-letra, 0px)); font-weight: 600; padding: 7px 12px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
 .ml-pie:hover { background: var(--chip-hover); }
 .ml-pie svg { width: 12px; height: 12px; }
 
@@ -1881,15 +1889,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .4s var(--ease); }
 .dlw-centro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
 .dlw-centro svg { width: 22px; height: 22px; }
-.dlw-pct { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dlw-pct { font-size: max(13px, var(--min-letra, 0px)); font-weight: 650; font-variant-numeric: tabular-nums; }
 .dlw-meta { min-width: 0; }
-.dlw-nombre { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dlw-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.dlw-nombre { font-size: max(12.5px, var(--min-letra, 0px)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dlw-sub { font-size: max(11px, var(--min-letra, 0px)); color: var(--text-dim); margin-top: 2px; }
 .dlw-lista { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow: hidden; }
-.dlw-r { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); }
-.dlw-r-k { flex-shrink: 0; font-size: 8.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; background: var(--chip); border-radius: 6px; padding: 2px 6px; color: var(--text-dim); }
+.dlw-r { display: flex; align-items: center; gap: 8px; font-size: max(11px, var(--min-letra, 0px)); color: var(--text-dim); }
+.dlw-r-k { flex-shrink: 0; font-size: max(8.5px, var(--min-letra, 0px)); font-weight: 700; letter-spacing: .5px; text-transform: uppercase; background: var(--chip); border-radius: 6px; padding: 2px 6px; color: var(--text-dim); }
 .dlw-r-n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dlw-r { display: flex; align-items: center; gap: 8px; border: none; background: transparent; border-radius: 9px; color: var(--text); font-family: inherit; font-size: 11.5px; text-align: left; padding: 5px 7px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.dlw-r { display: flex; align-items: center; gap: 8px; border: none; background: transparent; border-radius: 9px; color: var(--text); font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); text-align: left; padding: 5px 7px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
 .dlw-r:hover { background: var(--chip); }
 .dlw-ir { margin-top: auto; width: 100%; }
 .w-dlw .w-head { padding: 0 2px; }
@@ -1903,9 +1911,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   background: var(--grad-realce); color: var(--grad-fg);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 18px -8px color-mix(in srgb, var(--realce) 55%, transparent); }
 .pv-ico svg { width: 24px; height: 24px; }
-.pv-t { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.pv-t { font-size: max(11px, var(--min-letra, 0px)); font-weight: 600; color: var(--text-dim); }
 .w-priv.t-2x1 { flex-direction: row; gap: 12px; }
-.w-priv.t-2x1 .pv-t { font-size: 12.5px; color: var(--text); }
+.w-priv.t-2x1 .pv-t { font-size: max(12.5px, var(--min-letra, 0px)); color: var(--text); }
 
 /* ===== Widget TARJETAS: mini tarjeta de credito (sin datos reales) ===== */
 .w-wallet { padding: 14px; height: 100%; display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
@@ -1917,20 +1925,20 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .wl-tarjeta::after { content: ''; position: absolute; inset: 0; background-image: var(--grain); background-size: 90px 90px; opacity: .1; mix-blend-mode: soft-light; pointer-events: none; }
 .wl-chip { width: 26px; height: 19px; border-radius: 5px; background: linear-gradient(140deg, rgba(255,255,255,.85), rgba(255,255,255,.45));
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
-.wl-puntos { display: flex; gap: 10px; margin-top: 10px; font-size: 13px; font-weight: 700; letter-spacing: 2px; opacity: .85; }
-.wl-marca { position: absolute; right: 12px; bottom: 9px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; opacity: .92; }
+.wl-puntos { display: flex; gap: 10px; margin-top: 10px; font-size: max(13px, var(--min-letra, 0px)); font-weight: 700; letter-spacing: 2px; opacity: .85; }
+.wl-marca { position: absolute; right: 12px; bottom: 9px; display: flex; align-items: center; gap: 6px; font-size: max(10.5px, var(--min-letra, 0px)); font-weight: 700; letter-spacing: .6px; opacity: .92; }
 /* Logo de la marca: Mastercard son sus dos círculos; el resto, su palabra, que
    es como se lee una tarjeta de verdad. */
 .wl-logo { display: inline-flex; align-items: center; }
 .wl-logo svg { width: 30px; height: 19px; }
-.wl-word { font-size: 13px; font-weight: 800; letter-spacing: .5px; }
+.wl-word { font-size: max(13px, var(--min-letra, 0px)); font-weight: 800; letter-spacing: .5px; }
 .wl-word.visa { font-style: italic; letter-spacing: 1px; }
-.wl-num { position: absolute; left: 14px; bottom: 9px; font-size: 11.5px; font-variant-numeric: tabular-nums; letter-spacing: 1.2px; opacity: .85; }
-.wl-cuenta { position: absolute; right: 12px; top: 11px; font-size: 10.5px; opacity: .75; }
+.wl-num { position: absolute; left: 14px; bottom: 9px; font-size: max(11.5px, var(--min-letra, 0px)); font-variant-numeric: tabular-nums; letter-spacing: 1.2px; opacity: .85; }
+.wl-cuenta { position: absolute; right: 12px; top: 11px; font-size: max(10.5px, var(--min-letra, 0px)); opacity: .75; }
 .wl-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.wl-hello { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-dim); }
+.wl-hello { display: inline-flex; align-items: center; gap: 6px; font-size: max(10.5px, var(--min-letra, 0px)); color: var(--text-dim); }
 .wl-hello svg { width: 13px; height: 13px; }
-.wl-ver { border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-family: inherit; font-size: 11px; font-weight: 650; padding: 7px 13px; cursor: pointer; transition: transform var(--dur-1) var(--spring); }
+.wl-ver { border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); font-family: inherit; font-size: max(11px, var(--min-letra, 0px)); font-weight: 650; padding: 7px 13px; cursor: pointer; transition: transform var(--dur-1) var(--spring); }
 .wl-ver:hover { transform: translateY(-1px); }
 .w-wallet.t-2x1 .wl-puntos { margin-top: 4px; }
 
@@ -1941,7 +1949,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .au-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
 .au-marca { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .au-marca svg { width: 15px; height: 15px; color: var(--realce); flex: none; }
-.au-tit { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+.au-tit { font-size: max(11px, var(--min-letra, 0px)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
 .au-tools { display: inline-flex; gap: 2px; }
 .au-tools button { width: 24px; height: 24px; border: none; border-radius: 7px; background: none; color: var(--text-dim);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background var(--dur-1), color var(--dur-1); }
@@ -1958,10 +1966,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--chip); color: var(--text); }
 .au-logo svg { width: 14px; height: 14px; }
-.au-logo-ini { font-size: 12px; font-weight: 700; color: var(--text-dim); }
+.au-logo-ini { font-size: max(12px, var(--min-letra, 0px)); font-weight: 700; color: var(--text-dim); }
 .au-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.au-em { font-size: 12.5px; font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.au-lb { font-size: 10.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-em { font-size: max(12.5px, var(--min-letra, 0px)); font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-lb { font-size: max(10.5px, var(--min-letra, 0px)); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .au-cod { display: flex; align-items: center; gap: 8px; flex: none; }
 /* Cifras tabulares: si no, los dígitos bailan al cambiar el código cada 30 s. */
 .au-num { font-family: var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums;
@@ -1984,10 +1992,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 /* El emblema "encendido" sigue el convenio del proyecto: superficie de realce y
    contenido en --accent-fg, que es legible en los tres temas (un color fijo no). */
 .au-emblema-on { background: color-mix(in srgb, var(--realce) 22%, transparent); color: var(--realce); }
-.au-hero-t { font-size: 13px; font-weight: 650; color: var(--text); }
-.au-hero-s { font-size: 11px; color: var(--text-dim); line-height: 1.45; max-width: 30ch; }
+.au-hero-t { font-size: max(13px, var(--min-letra, 0px)); font-weight: 650; color: var(--text); }
+.au-hero-s { font-size: max(11px, var(--min-letra, 0px)); color: var(--text-dim); line-height: 1.45; max-width: 30ch; }
 .au-cta { margin-top: 7px; border: none; border-radius: 999px; background: var(--accent); color: var(--accent-fg);
-  font-family: inherit; font-size: 11.5px; font-weight: 700; padding: 8px 15px; cursor: pointer;
+  font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); font-weight: 700; padding: 8px 15px; cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px;
   transition: transform var(--dur-1) var(--spring), filter var(--dur-1) var(--ease); }
 .au-cta svg { width: 14px; height: 14px; }
@@ -2064,7 +2072,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .au-err { font-size: 11.5px; color: var(--danger); min-height: 14px; }
 
 /* ===== Asas de estirado (modo Editar, tallas libres) ===== */
-.w-redim { position: absolute; display: none; z-index: 6; }
+.w-redim { position: absolute; display: none; z-index: 6; zoom: max(1, calc(1 / var(--z, 1))); }
 #hub.editing .w-redim { display: block; }
 .w-redim.r { top: 12px; bottom: 12px; right: -4px; width: 10px; cursor: ew-resize; }
 .w-redim.b { left: 12px; right: 12px; bottom: -4px; height: 10px; cursor: ns-resize; }
@@ -2091,6 +2099,11 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-sp.t-2x2 .sp-art { width: 76px; }  /* cuadrada: el alto lo fija aspect-ratio */
 .w-sp.t-2x2 .sp-meta { padding-right: 48px; }
 .w-sp.t-2x2.sp-vacio .sp-ctr .sp-b[data-cmd] { display: none; }
+/* Sin pestaña de Spotify el volumen no mueve nada y no dejaba sitio: "Abrir
+   Spotify" se partía en dos líneas y empujaba el título fuera de la tarjeta
+   (medido a escala 1 y peor con el hub reducido, 2026-11-03). */
+.sp-abre { white-space: nowrap; }
+.w-sp .sp-ctr:has(.sp-abre:not(.hidden)) :is(.sp-vol-ic, .sp-vol-sl) { display: none; }
 
 /* ===== Guias de la grilla en modo Editar ===== */
 /* Guias del modo Editar: celdas punteadas de siempre, en capa superpuesta
@@ -2117,7 +2130,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    fino debajo, las dos en columnas (la referencia que eligió Dosa). */
 .mon-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; flex: 1; align-content: center; }
 .mon-stat { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.mon-k { font-size: 10.5px; letter-spacing: .4px; color: var(--dim); }
+.mon-k { font-size: max(10.5px, var(--min-letra, 0px)); letter-spacing: .4px; color: var(--dim); }
 .mon-v { font-size: 23px; font-weight: 300; letter-spacing: -.5px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 .mon-riel { height: 3px; border-radius: 99px; background: var(--chip); overflow: hidden; }
 /* La barra se llena por transform, no por width, y SIN transición (auditoría
@@ -2127,20 +2140,20 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    con transición, 62 ms sin ella). */
 .mon-riel i { display: block; height: 100%; border-radius: 99px; background: var(--grad-medida, var(--grad-realce)); transform: scaleX(0); transform-origin: left; }
 .w-mon.t-1x1 .mon-stats { grid-template-columns: 1fr; gap: 6px; } .w-mon.t-1x1 .mon-v { font-size: 17px; }
-.mon-pie { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--dim); }
+.mon-pie { display: flex; justify-content: space-between; gap: 8px; font-size: max(10.5px, var(--min-letra, 0px)); color: var(--dim); }
 .w-mon.t-2x1 .mon-pie { display: none; }
 
 /* ===== Widget PORTAPAPELES ===== */
 .w-clip { padding: 16px; height: 100%; display: flex; flex-direction: column; }
 .clip-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; flex: 1; min-height: 0; overflow: hidden; }
-.clip-i { display: block; border: none; background: var(--chip); border-radius: 10px; color: var(--text); font-family: inherit; font-size: 11.5px; text-align: left; padding: 7px 10px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
+.clip-i { display: block; border: none; background: var(--chip); border-radius: 10px; color: var(--text); font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); text-align: left; padding: 7px 10px; cursor: pointer; transition: background var(--dur-1) var(--ease); }
 .clip-i span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clip-i:hover { background: var(--chip-hover); }
 
 /* ===== Widget NOTAS (checklist) ===== */
 .w-notes { padding: 16px; height: 100%; display: flex; flex-direction: column; }
 .nt-lista { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; flex: 1; min-height: 0; overflow-y: auto; }
-.nt-i { display: flex; align-items: center; gap: 9px; font-size: 12px; padding: 5px 7px; border-radius: 9px; cursor: pointer; }
+.nt-i { display: flex; align-items: center; gap: 9px; font-size: max(12px, var(--min-letra, 0px)); padding: 5px 7px; border-radius: 9px; cursor: pointer; }
 .nt-i:hover { background: var(--chip); }
 .nt-i input { position: absolute; opacity: 0; pointer-events: none; }
 .nt-box { flex-shrink: 0; width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid var(--line-3); display: flex; align-items: center; justify-content: center; color: transparent; transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
@@ -2158,7 +2171,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .nt-i:hover .nt-x, .nt-i:focus-within .nt-x { opacity: 1; }
 .nt-x:hover { color: var(--danger); }
 .nt-add { display: flex; gap: 6px; margin-top: 8px; }
-.nt-add input { flex: 1; min-width: 0; border: none; outline: none; background: var(--chip); color: var(--text); border-radius: 9px; font-family: inherit; font-size: 11.5px; padding: 7px 10px; }
+.nt-add input { flex: 1; min-width: 0; border: none; outline: none; background: var(--chip); color: var(--text); border-radius: 9px; font-family: inherit; font-size: max(11.5px, var(--min-letra, 0px)); padding: 7px 10px; }
 .nt-add button { flex-shrink: 0; width: 30px; height: 30px; border: none; border-radius: 999px; background: var(--cal-hoy-bg); color: var(--cal-hoy-fg); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform var(--dur-1) var(--spring); }
 .nt-add button:hover { transform: scale(1.08); }
 .nt-add button svg { width: 14px; height: 14px; }
@@ -2169,8 +2182,8 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
   background: radial-gradient(120% 90% at 30% 0%, color-mix(in srgb, var(--realce) 16%, transparent), transparent 60%); }
 .mv-cartel svg { width: 52px; height: 52px; }
 .mv-meta { position: relative; padding: 14px 16px 16px; background: linear-gradient(to top, rgba(0,0,0,.55), transparent); }
-.mv-tit { font-size: 15px; font-weight: 700; letter-spacing: .2px; }
-.mv-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+.mv-tit { font-size: max(15px, var(--min-letra, 0px)); font-weight: 700; letter-spacing: .2px; }
+.mv-sub { font-size: max(11px, var(--min-letra, 0px)); color: var(--text-dim); margin-top: 1px; }
 .mv-play { position: absolute; right: 12px; top: 12px; width: 40px; height: 40px; border: none; border-radius: 999px; background: var(--grad-realce); color: var(--grad-fg);
   cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 18px -8px rgba(0,0,0,.5); transition: transform var(--dur-1) var(--spring); }
 .mv-play:hover { transform: scale(1.08); }
@@ -2179,7 +2192,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* ===== Botones de accion del Monitor (modo juego / liberar) ===== */
 .mon-acc { display: flex; gap: 6px; margin-top: auto; flex-shrink: 0; } /* pegados abajo: el hueco se reparte arriba */
-.mon-b { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: 11px; font-weight: 600; padding: 8px 10px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
+.mon-b { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 999px; background: var(--chip); color: var(--text); font-family: inherit; font-size: max(11px, var(--min-letra, 0px)); font-weight: 600; padding: 8px 10px; cursor: pointer; transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--spring); }
 .mon-b svg { width: 12px; height: 12px; }
 .mon-b:hover { background: var(--chip-hover); transform: translateY(-1px); }
 .mon-juego:hover { background: color-mix(in srgb, var(--realce) 22%, transparent); }
@@ -2246,7 +2259,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-clip.t-1x1 .w-head { display: flex; justify-content: center; margin: 0; color: var(--text-dim); }
 .w-clip.t-1x1 .w-head svg { width: 36px; height: 36px; }
 .w-clip.t-1x1 .w-vacio { display: none; }
-.w-wallet.t-1x1 .wl-marca { font-size: 12px; }
+.w-wallet.t-1x1 .wl-marca { font-size: max(12px, var(--min-letra, 0px)); }
 .w-moov.t-1x1 .mv-meta { display: none; }
 .w-moov.t-1x1 .mv-play { right: 50%; top: 50%; transform: translate(50%, -50%); }
 .w-moov.t-1x1 .mv-play:hover { transform: translate(50%, -50%) scale(1.08); }
@@ -2263,15 +2276,15 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 /* Monitor 2x2: las barras respiran y ocupan el aire que sobraba */
 .w-mon.t-2x2 .mon-pie { margin-top: 2px; }
-.w-mon.t-2x2 .mon-b { padding: 10px 12px; font-size: 11.5px; }
+.w-mon.t-2x2 .mon-b { padding: 10px 12px; font-size: max(11.5px, var(--min-letra, 0px)); }
 
 /* Monitor 1x2 (columna estrecha): etiqueta y valor sobre la barra, y los
    botones apilados abajo — todo cabe sin apretar. */
 .w-mon.t-1x2 { padding: 12px; gap: 10px; }
-.w-mon.t-1x2 .w-head { font-size: 10px; }
-.w-mon.t-1x2 .mon-pie { flex-direction: column; gap: 1px; font-size: 9.5px; }
+.w-mon.t-1x2 .w-head { font-size: max(10px, var(--min-letra, 0px)); }
+.w-mon.t-1x2 .mon-pie { flex-direction: column; gap: 1px; font-size: max(9.5px, var(--min-letra, 0px)); }
 .w-mon.t-1x2 .mon-acc { flex-direction: column; gap: 5px; }
-.w-mon.t-1x2 .mon-b { width: 100%; font-size: 10.5px; padding: 8px 6px; }
+.w-mon.t-1x2 .mon-b { width: 100%; font-size: max(10.5px, var(--min-letra, 0px)); padding: 8px 6px; }
 
 /* 1x1: iconos de app con placa IDENTICA (54x54, glifo 24, degradado del tema).
    En Moovin manda su glifo tv-minimal, no el play. */
@@ -2444,3 +2457,41 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
 .ep-fila .ep-b:hover { color: var(--text); background: var(--bg); }
 .ep-fila .ep-b.ep-x:hover { color: var(--danger); }
 .ep-fila .ep-b svg { width: 12px; height: 12px; }
+
+/* ===== DENSIDAD COMPACTA (2026-11-03) =====
+   En una ventana de menos de 760 px de alto (un portátil de 768 o de 864 con
+   la escala de Windows al 125 %) las barras se comían 106 px y el dock con los
+   botones otros 160: el hub se quedaba en una rendija. Es la MISMA interfaz con
+   menos aire: barras algo más bajas, dock y botones proporcionados. El dock
+   no sube sobre los botones (en su sitio de siempre caben en la misma fila si
+   los botones van solo con icono, y su nombre sigue en el tooltip; si aun así
+   no cabe, sube encima como en las ventanas estrechas). */
+@media (max-height: 760px) {
+  :root { --titlebar-h: 34px; --navbar-h: 38px; }
+  #titlebar { margin: 6px 8px 3px; border-radius: 14px; }
+  .tab { height: 26px; }
+  #newtab-btn { width: 26px; height: 26px; }
+  #navbar { margin: 1px 8px 5px 4px; }
+  #navbar > button { width: 30px; height: 30px; }
+  #navbar > button svg { width: 16px; height: 16px; }
+  #urlbox { height: 28px; }
+  #bookmarks-bar { min-height: 28px; padding: 2px 12px; margin-bottom: 5px; }
+  #sidebar { margin: 6px 4px 8px 8px; padding: 8px 0; }
+  .sb-btn { width: 32px; height: 32px; }
+  .hub-corner { top: 10px; right: 14px; gap: 6px; }
+  .hub-pill { padding: 5px 10px; }
+  .hub-actions { left: 14px; bottom: 12px; }
+  .hub-fab { padding: 7px 11px; }
+  #hub-version { right: 14px; bottom: 12px; }
+  #hub-dock { bottom: 12px; gap: 6px; padding: 7px; border-radius: 22px; }
+  #hub-dock .d-tile { width: 50px; height: 50px; border-radius: 14px; }
+  #hub-dock .d-tile img { --icon-sz: 24px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 24px; height: 24px; } #hub-dock .d-tile .d-letter { font-size: 19px; }
+  #hub-dock .dk-sep { height: 32px; }
+  @container (max-width: 1500px) {
+    #hub-dock { bottom: 12px; }
+    .hub-fab .lbl { display: none; }
+  }
+  /* Con muchos accesos o el hub estrecho no cabe entre los botones: sube
+     (el renderer lo mide y pone la clase, ver medidasMalla). */
+  #hub.dock-sube #hub-dock { bottom: 56px; }
+}
