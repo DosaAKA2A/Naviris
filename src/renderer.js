@@ -5582,7 +5582,7 @@ async function refreshAdblockUI() {
   const info = await window.cobalt.adblockGet(); els.adblockToggle.checked = info.enabled; els.navShield.classList.toggle('off', !info.enabled);
   els.adblockCount.textContent = info.enabled ? `${info.blocked} peticiones bloqueadas` : 'Desactivado';
   const tab = activeTab(); const host = tab?.kind === 'web' ? hostOf(tab.url) : '';
-  if (host) { const allowed = info.whitelist.includes(host); els.adblockSite.classList.remove('hidden'); els.adblockSite.textContent = allowed ? `Volver a bloquear en ${host}` : `Permitir anuncios en ${host}`; els.adblockSite.dataset.host = host; els.adblockSite.dataset.allowed = allowed ? '1' : ''; } else els.adblockSite.classList.add('hidden');
+  if (host) { const permitido = info.whitelist.find((d) => host === d || host.endsWith('.' + d)); const allowed = !!permitido; els.adblockSite.classList.remove('hidden'); els.adblockSite.textContent = allowed ? `Volver a bloquear en ${permitido}` : `Permitir anuncios en ${host}`; els.adblockSite.dataset.host = permitido || host; els.adblockSite.dataset.allowed = allowed ? '1' : ''; } else els.adblockSite.classList.add('hidden');
   els.adblockList.innerHTML = '';
   for (const d of info.whitelist) { const row = document.createElement('div'); row.className = 'sp-item'; const s = document.createElement('span'); s.textContent = d; const rm = document.createElement('button'); rm.innerHTML = window.icon('trash'); rm.addEventListener('click', async () => { await window.cobalt.adblockWhitelist('remove', d); refreshAdblockUI(); }); row.append(s, rm); els.adblockList.appendChild(row); }
 }
