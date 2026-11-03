@@ -13,12 +13,11 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test --test-timeout=20000 \"test/*.test.js\"",
-    "test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.test.js\" \"test/e2e/*.e2e.js\"",
+    "test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.test.js\" \"test/e2e/arranque.e2e.js\" \"test/e2e/perfiles.e2e.js\"",
     "icon": "electron build/render-icon.js",
     "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
     "adblock-recursos": "node build/adblock-recursos.js",
-    "test": "node --test test/*.test.js",
     "test:e2e:adblock": "node --test --test-concurrency=1 test/e2e/adblock.e2e.js",
     "dist": "electron-builder --win",
     "release": "npm run dist && node build/publish-release.js",
