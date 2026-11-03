@@ -83,6 +83,8 @@
           <button id="url-secure" type="button" title="Conexión" aria-label="Información del sitio" data-ico="lock-closed"></button>
           <input id="urlbar" type="text" spellcheck="false" autocomplete="off"
                  placeholder="Busca o escribe una dirección" />
+          <!-- Sin foco: el dominio en blanco y la ruta en gris (pintaVistaUrl) -->
+          <span id="url-vista" aria-hidden="true"><span class="uv-dom"></span><span class="uv-ruta"></span></span>
           <div id="suggest" class="hidden"></div>
         </div>
         <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-half"></button>
@@ -207,6 +209,13 @@
                  al bajarlo se vuelven translúcidas y se enciende el desenfoque. -->
             <div class="hp-fila"><span id="op-tit">Transparencia</span><b id="op-valor">0 %</b></div>
             <input id="op-slider" type="range" aria-labelledby="op-tit" min="0" max="65" step="5" value="0" title="Cuánto se transparentan los widgets del hub" />
+            <!-- Dock de accesos (Naviris 3): el de siempre, con su contenedor, o la
+                 repisa de vidrio tenue. Lo aplica aplicaDock(). -->
+            <div class="hp-fila"><span id="dock-tit">Dock de accesos</span></div>
+            <div class="hp-seg" role="radiogroup" aria-labelledby="dock-tit">
+              <button type="button" role="radio" data-dock="contenedor">Con contenedor</button>
+              <button type="button" role="radio" data-dock="repisa">Repisa de vidrio</button>
+            </div>
           </div>
         </section>
 
@@ -229,7 +238,7 @@
         <section id="dl-page" class="overlay-page hidden">
           <div class="bmp-inner">
             <div class="bmp-head">
-              <h2><span data-ico="download"></span> Descargas</h2>
+              <h2>Descargas</h2>
               <div class="bmp-tools">
                 <button id="dlp-folder" class="ghost-btn"><span data-ico="folder"></span> Abrir carpeta</button>
               </div>

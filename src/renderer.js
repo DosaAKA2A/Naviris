@@ -435,31 +435,103 @@ function toast(msg, accion = null) {
 /* Sonidos de Naviris (src/sonidos.js): suenan solo si el ajuste está activo */
 const suena = (nombre) => { if (settings.sonidos !== false) window.navSonido(nombre); };
 
-/* ============ Menú contextual reutilizable ============ */
-let ctxMenuEl = null;
-function closeCtxMenu() { ctxMenuEl?.remove(); ctxMenuEl = null; }
-window.addEventListener('mousedown', (e) => { if (ctxMenuEl && !ctxMenuEl.contains(e.target)) closeCtxMenu(); });
-window.addEventListener('blur', closeCtxMenu);
-window.addEventListener('resize', closeCtxMenu);
-function showCtxMenu(x, y, items) {
-  closeCtxMenu();
-  const m = document.createElement('div'); m.className = 'ctx-menu';
+/* ============ Menú contextual de Naviris ============
+   UNO para todo (Naviris 3): pestañas, accesos, marcadores y también la página
+   y los campos de texto, que antes eran el menú de Windows (ver muestraMenu en
+   main.js). Mismo tamaño, iconos y atajos que el resto de la interfaz.
+   - Teclado: flechas (con vuelta), Inicio/Fin, Intro o espacio para elegir,
+     Esc o Tab para cerrar. Al cerrar sin elegir, el foco vuelve adonde estaba.
+   - Nunca se sale de la ventana: se abre hacia el lado que cabe y, si es más
+     alto que la ventana, hace scroll dentro.
+   - Encima de una página funciona igual: el menú es de la interfaz y se pinta
+     sobre el webview. Hacer clic en la página le quita el foco y lo cierra.
+   - Movimiento: abre en 200 ms (frena) desde el punto del clic y cierra en
+     110 ms (acelera). Abierto con el teclado no se anima. */
+let ctxMenuEl = null, ctxFocoPrevio = null;
+function closeCtxMenu(devolverFoco = true) {
+  const m = ctxMenuEl; if (!m) return;
+  ctxMenuEl = null;
+  const previo = ctxFocoPrevio; ctxFocoPrevio = null;
+  if (devolverFoco && previo?.isConnected && m.contains(document.activeElement)) previo.focus({ preventScroll: true });
+  if (previo === els.urlbar) pintaVistaUrl();   // la barra vuelve a su vista si el foco no volvió
+  m.classList.remove('abierto');
+  m.inert = true;
+  setTimeout(() => m.remove(), 140);
+}
+window.addEventListener('mousedown', (e) => { if (ctxMenuEl && !ctxMenuEl.contains(e.target)) closeCtxMenu(false); });
+window.addEventListener('blur', () => closeCtxMenu(false));
+window.addEventListener('resize', () => closeCtxMenu(false));
+/* items: { label, icon, kbd, disabled, danger, action } o { sep: true }.
+   op.teclado: abierto con el teclado (sin animación y con la primera opción
+   marcada). op.foco: adónde vuelve el foco si se cierra sin elegir. */
+function showCtxMenu(x, y, items, op = {}) {
+  closeCtxMenu(false);
+  ctxFocoPrevio = op.foco || (document.activeElement !== document.body ? document.activeElement : null);
+  const m = document.createElement('div'); m.className = 'ctx-menu'; m.tabIndex = -1;
+  m.setAttribute('role', 'menu'); m.setAttribute('aria-label', op.titulo || 'Menú contextual');
   for (const it of items) {
-    if (it.sep) { const s = document.createElement('div'); s.className = 'ctx-sep'; m.appendChild(s); continue; }
-    const b = document.createElement('button'); b.className = 'ctx-item' + (it.danger ? ' danger' : '');
-    b.innerHTML = (it.icon ? `<span class="ctx-ic">${window.icon(it.icon)}</span>` : '') + `<span>${escapeHtml(it.label)}</span>`;
+    if (it.sep) {
+      // Sin separadores repetidos ni al principio o al final.
+      if (m.lastElementChild && !m.lastElementChild.classList.contains('ctx-sep')) { const s = document.createElement('div'); s.className = 'ctx-sep'; s.setAttribute('role', 'separator'); m.appendChild(s); }
+      continue;
+    }
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ctx-item' + (it.danger ? ' danger' : '');
+    b.setAttribute('role', 'menuitem'); b.tabIndex = -1; b.disabled = !!it.disabled;
+    if (it.label.length > 40) b.title = it.label;   // las muy largas se cortan con puntos suspensivos
+    b.innerHTML = `<span class="ctx-ic">${it.icon ? window.icon(it.icon) : ''}</span><span class="ctx-tx">${escapeHtml(it.label)}</span>` + (it.kbd ? `<kbd>${escapeHtml(it.kbd)}</kbd>` : '');
     b.addEventListener('click', (ev) => { ev.stopPropagation(); closeCtxMenu(); it.action(); });
     m.appendChild(b);
   }
+  if (m.lastElementChild?.classList.contains('ctx-sep')) m.lastElementChild.remove();
+  if (op.teclado) m.classList.add('sin-mov');
   document.body.appendChild(m);
-  const r = m.getBoundingClientRect();
-  m.style.left = Math.max(6, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
-  // Si el menu es MAS ALTO que la ventana, el tope de arriba lo dejaba
-  // asomando por abajo y sus ultimas opciones quedaban fuera de alcance.
-  m.style.top = Math.max(6, Math.min(y, Math.max(6, window.innerHeight - r.height - 8))) + 'px';
+  const w = m.offsetWidth, h = m.offsetHeight, W = window.innerWidth, H = window.innerHeight;
+  const izq = x + w > W - 8 && x - w >= 8;
+  const arriba = y + h > H - 8 && y - h >= 8;
+  m.style.left = (izq ? x - w : Math.max(8, Math.min(x, W - w - 8))) + 'px';
+  m.style.top = (arriba ? y - h : Math.max(8, Math.min(y, H - h - 8))) + 'px';
+  m.style.transformOrigin = (izq ? 'right' : 'left') + ' ' + (arriba ? 'bottom' : 'top');
   ctxMenuEl = m;
+  m.addEventListener('keydown', teclaMenu);
+  // El ratón marca la opción que señala (el teclado sigue desde ahí).
+  m.addEventListener('mouseover', (e) => { const b = e.target.closest('.ctx-item'); if (b && !b.disabled) b.focus({ preventScroll: true }); });
+  m.addEventListener('mouseleave', () => { if (m === ctxMenuEl) m.focus({ preventScroll: true }); });
+  // Clic fuera de la interfaz (en la página): el foco se va y el menú se cierra.
+  m.addEventListener('focusout', (e) => { if (m === ctxMenuEl && !m.contains(e.relatedTarget)) closeCtxMenu(false); });
+  const primera = op.teclado && m.querySelector('.ctx-item:not(:disabled)');
+  (primera || m).focus({ preventScroll: true });
+  void m.offsetWidth;   // estado inicial pintado: así la transición arranca desde él
+  m.classList.add('abierto');
   window.nvsRepasa?.(m);   // se abre con el botón derecho, que no dispara el repaso del clic
 }
+function teclaMenu(e) {
+  const m = ctxMenuEl; if (!m) return;
+  const its = [...m.querySelectorAll('.ctx-item:not(:disabled)')];
+  const i = its.indexOf(document.activeElement);
+  const ve = (j) => { e.preventDefault(); its[(j + its.length) % its.length]?.focus(); };
+  if (e.key === 'ArrowDown') ve(i + 1);
+  else if (e.key === 'ArrowUp') ve(i < 0 ? -1 : i - 1);
+  else if (e.key === 'Home') ve(0);
+  else if (e.key === 'End') ve(-1);
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i >= 0) its[i].click(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCtxMenu(); }
+  else if (e.key === 'Tab') { e.preventDefault(); closeCtxMenu(); }
+  e.stopPropagation();   // las teclas del menú no llegan a los atajos de la interfaz
+}
+/* Los menús que arma el main: el de la página (con el id de su webview) y el
+   de los campos de la interfaz. Las coordenadas ya vienen en las de la ventana
+   (medido: las del clic derecho de un webview no son relativas a la página).
+   Al elegir se devuelve el número de la opción y el main ejecuta su acción. */
+window.navirisApp.onMenu((m) => {
+  const { x, y } = m;
+  let foco = document.activeElement;
+  if (m.wc != null) {
+    foco = pestanaDeWebContents(m.wc)?.webview;
+    if (!foco) return;
+  }
+  const items = m.items.map((it) => it.sep ? { sep: true } : { label: it.label, icon: it.icon, kbd: it.kbd, disabled: it.disabled, action: () => window.navirisApp.eligeMenu(m.id, it.n) });
+  showCtxMenu(x, y, items, { foco, teclado: !!m.teclado, titulo: m.wc != null ? 'Menú de la página' : 'Menú del campo' });
+});
 // Abre una URL en una pestaña de fondo, sin cambiar la pestaña actual
 function openBackground(url) { createTab(url, false); toast('Abierto en segundo plano'); }
 // Opciones comunes de un enlace (dial del hub, marcador…)
@@ -971,7 +1043,7 @@ function menuDePestana(e, tab) {
   // La mitad derecha de la pantalla dividida se va con ella: se deshace antes.
   const mueveA = (idEsp) => { if (tab.id === divId) salirDivision(); tab.espacio = idEsp; mudaDeSesion(tab); sigueEnEspacio(); renderTabs(true); saveSession(); };
   const items = [
-    { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
+    { label: 'Nueva pestaña', icon: 'plus', kbd: 'Ctrl+T', action: () => createTab() },
     { sep: true },
     ...(web && tab.id !== activeId ? [{ label: 'Abrir en pantalla dividida', icon: 'square-2-stack', action: () => dividirCon(tab) }] : []),
     ...(espacios.length ? [{ sep: true }] : []),
@@ -981,7 +1053,7 @@ function menuDePestana(e, tab) {
     ...(web && !IS_PRIVATE ? [{ label: 'Abrir en un contenedor nuevo', icon: 'layers', action: () => abreEnContenedor(tab.url, nuevoContenedor()) }] : []),
     ...(web && !IS_PRIVATE ? contenedores.filter((c) => !tab.contenedor || c.id !== tab.contenedor.id).map((c) => ({ label: 'Abrir en ' + c.nombre, icon: 'layers', action: () => abreEnContenedor(tab.url, c) })) : []),
     ...(divId !== null && tab.id === divId ? [{ label: 'Salir de la pantalla dividida', icon: 'x-mark', action: () => salirDivision() }] : []),
-    ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => recargaWv(tab.webview) }] : []),
+    ...(web ? [{ label: 'Recargar', icon: 'arrow-path', kbd: tab.id === activeId ? 'F5' : '', action: () => recargaWv(tab.webview) }] : []),
     { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => vis.forEach((t) => { if (t.kind === 'web' && !t.asleep) recargaWv(t.webview); }) },
     ...(web ? [{ label: 'Copiar dirección de página', icon: 'clipboard', action: () => copiarDireccion(tab) }] : []),
     { sep: true },
@@ -992,12 +1064,12 @@ function menuDePestana(e, tab) {
     ...(web ? [{ label: tab.muted ? 'Activar sonido de la pestaña' : 'Silenciar pestaña', icon: tab.muted ? 'speaker-wave' : 'speaker-x-mark', action: () => toggleMute(tab) }] : []),
     { label: 'Silenciar otras pestañas', icon: 'speaker-x-mark', action: () => vis.forEach((t) => { if (t.id !== tab.id && t.kind === 'web' && !t.muted) toggleMute(t); }) },
     { sep: true },
-    { label: 'Cerrar pestaña', icon: 'x-mark', action: () => closeTab(tab.id) },
+    { label: 'Cerrar pestaña', icon: 'x-mark', kbd: tab.id === activeId && !tab.pinned ? 'Ctrl+W' : '', action: () => closeTab(tab.id) },
     ...(otras.length ? [{ label: 'Cerrar otras pestañas', icon: 'x-mark', action: () => otras.forEach((t) => closeTab(t.id)) }] : []),
     ...(aLaDerecha.length ? [{ label: 'Cerrar pestañas a la derecha', icon: 'x-mark', action: () => aLaDerecha.forEach((t) => closeTab(t.id)) }] : []),
     ...(duplicadas.length ? [{ label: 'Cerrar pestañas duplicadas', icon: 'x-mark', action: () => duplicadas.forEach((t) => closeTab(t.id)) }] : []),
     { sep: true },
-    { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada }
+    { label: 'Reabrir última pestaña cerrada', icon: 'rotate-ccw', kbd: 'Ctrl+Mayús+T', action: reabrirCerrada }
   ];
   showCtxMenu(e.clientX, e.clientY, items);
 }
@@ -1016,7 +1088,7 @@ function makeTabEl(tab, mini) {
     el.appendChild(marca);
   }
   const title = document.createElement('span'); title.className = 't-title'; title.textContent = tab.title;
-  const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark');
+  const close = document.createElement('button'); close.className = 't-close'; close.innerHTML = window.icon('x-mark'); close.setAttribute('aria-label', 'Cerrar pestaña');
   close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tab.id); });
   // El hub no tiene favicon: lleva la casa del botón de Inicio. Sin ella, con
   // la barra llena se quedaba en un hueco vacío o en una X suelta.
@@ -1033,7 +1105,7 @@ function makeTabEl(tab, mini) {
     // Botón de silencio: aparece si la pestaña suena o está silenciada
     if (tab.kind === 'web' && (tab.audible || tab.muted)) {
       const spk = document.createElement('button'); spk.className = 't-mute' + (tab.muted ? ' muted' : '');
-      spk.title = tab.muted ? 'Activar sonido' : 'Silenciar pestaña';
+      spk.title = tab.muted ? 'Activar sonido' : 'Silenciar pestaña'; spk.setAttribute('aria-label', spk.title);
       spk.innerHTML = window.icon(tab.muted ? 'speaker-x-mark' : 'speaker-wave');
       spk.addEventListener('click', (e) => { e.stopPropagation(); toggleMute(tab); });
       el.appendChild(spk);
@@ -1085,7 +1157,7 @@ function posicionDestino(x, y) {
      la misma X: ahí manda la altura. */
   const arr = arrastre;
   const vertical = document.documentElement.classList.contains('vtabs');
-  const cajas = [...els.tabstrip.querySelectorAll('.tab')]
+  const cajas = [...els.tabstrip.querySelectorAll('.tab:not(.ida)')]
     .map((n) => ({ n, id: Number(n.dataset.tabId), r: n.getBoundingClientRect() }))
     .filter((c) => c.id && c.id !== arr.id);
   let destino = null, antes = true;
@@ -1187,11 +1259,78 @@ function renderTabs(forzar) {
   const f = firmaTabs();
   if (!forzar && f === ultimaFirmaTabs) return;
   ultimaFirmaTabs = f;
+  const antes = fotoPestanas();
   // AutoClaim v2: un solo canal, sin grupo de pestañas acopladas; la pestaña
   // que farmea se queda en su sitio con su indicador (.farming)
   els.tabstrip.innerHTML = '';
+  els.tabstrip.classList.remove('deslizando');
   for (const tab of tabsVisibles()) els.tabstrip.appendChild(makeTabEl(tab));
   ajustaPestanas();
+  if (antes) animaPestanas(antes);
+  pestanaPintadaActiva = activeId;
+}
+/* ===== Movimiento de la barra de pestañas (Naviris 3) =====
+   La sección «Movimiento» de las propuestas, en la barra de verdad. Solo
+   transform y opacity, con la API de animaciones del navegador: cada una sale
+   de donde está lo que se ve, así que una interrumpida no salta.
+   - Pestaña nueva: entra en 240 ms (frena). La que se cierra se va en 160 ms
+     (acelera) y las vecinas ocupan su sitio deslizándose (FLIP, 200 ms).
+   - Cambiar de pestaña con el ratón: la lengüeta de la hoja viaja de la que se
+     deja a la nueva en 220 ms (frena).
+   Lo que se hace con el teclado (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1…) no se
+   anima, ni las pestañas en vertical, ni una tanda grande (restaurar sesión).
+   Con «reducir movimiento» solo quedan los fundidos. */
+let movTeclado = false, pestanaPintadaActiva = null;
+const movReducido = matchMedia('(prefers-reduced-motion: reduce)');
+function fotoPestanas() {
+  const strip = els.tabstrip;
+  if (movTeclado || document.documentElement.classList.contains('vtabs') || !strip.isConnected || !strip.offsetWidth) return null;
+  const cajas = new Map();
+  for (const n of strip.children) if (n.classList.contains('tab') && !n.classList.contains('ida')) cajas.set(Number(n.dataset.tabId), { n, r: n.getBoundingClientRect() });
+  // Una lengüeta a medio viaje: la siguiente sale de donde se ve ahora.
+  const leng = strip.querySelector('#tab-lengueta');
+  return { cajas, leng: leng ? leng.getBoundingClientRect() : null, strip: strip.getBoundingClientRect() };
+}
+function animaPestanas(antes) {
+  const strip = els.tabstrip, reducido = movReducido.matches;
+  const ahora = new Map([...strip.querySelectorAll('.tab:not(.ida)')].map((n) => [Number(n.dataset.tabId), n]));
+  const nuevas = [...ahora.keys()].filter((id) => !antes.cajas.has(id));
+  const idas = [...antes.cajas.keys()].filter((id) => !ahora.has(id));
+  if (nuevas.length > 2 || idas.length > 3) return;   // restaurar sesión, cerrar otras…
+  for (const id of nuevas) {
+    ahora.get(id).animate(reducido ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'none' }],
+      { duration: 240, easing: 'cubic-bezier(.16,1,.3,1)' });
+  }
+  // La que se cierra: un fantasma en su sitio que se apaga.
+  for (const id of idas) {
+    const { n, r } = antes.cajas.get(id);
+    n.classList.remove('active'); n.classList.add('ida'); n.inert = true;
+    n.style.cssText = `position:absolute;bottom:0;left:${r.left - antes.strip.left + strip.scrollLeft}px;width:${r.width}px;pointer-events:none`;
+    strip.appendChild(n);
+    n.animate(reducido ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.92)' }],
+      { duration: 160, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }).onfinish = () => n.remove();
+  }
+  if (reducido) return;
+  // Las que se mueven de sitio (al abrir, cerrar o reordenar), de su sitio de antes al nuevo.
+  for (const [id, n] of ahora) {
+    const a = antes.cajas.get(id); if (!a) continue;
+    const dx = a.r.left - n.getBoundingClientRect().left;
+    if (Math.abs(dx) > .5) n.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.16,1,.3,1)' });
+  }
+  deslizaLengueta(antes, ahora);
+}
+function deslizaLengueta(antes, ahora) {
+  const strip = els.tabstrip, n = ahora.get(activeId);
+  const desde = antes.leng || (pestanaPintadaActiva !== activeId ? antes.cajas.get(pestanaPintadaActiva)?.r : null);
+  if (!n || !desde || !antes.cajas.has(activeId)) return;   // una pestaña nueva ya entra con su propio fundido
+  const r = n.getBoundingClientRect();
+  if (Math.abs(desde.left - r.left) < .5) return;
+  const leng = document.createElement('span'); leng.id = 'tab-lengueta';
+  leng.style.cssText = `left:${n.offsetLeft}px;width:${r.width}px`;
+  strip.prepend(leng);
+  strip.classList.add('deslizando');
+  leng.animate([{ transform: `translateX(${desde.left - r.left}px)` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.16,1,.3,1)' })
+    .onfinish = () => { if (leng.isConnected) { leng.remove(); strip.classList.remove('deslizando'); } };
 }
 /* Cuánto le toca a cada pestaña con el ancho que hay: por debajo de cierto
    tamaño se les quita primero la X y luego el título, hasta quedarse en el
@@ -1250,9 +1389,10 @@ function aplicaVerticales(on) {
   ajustaPestanas();
 }
 
-/* Lo que mide una pestaña con sitio de sobra, y el hueco entre dos. Tienen
-   que ir a la par con `.tab { max-width }` y `#tabstrip { gap }` del CSS. */
-const ANCHO_PESTANA = 240, HUECO_PESTANA = 4;
+/* Lo que mide una pestaña con sitio de sobra, el hueco entre dos y el relleno
+   de los lados de la barra (el sitio de las curvas de la activa). Tienen que
+   ir a la par con `.tab { max-width }` y `#tabstrip { gap; padding }` del CSS. */
+const ANCHO_PESTANA = 240, HUECO_PESTANA = 2, RELLENO_BARRA = 20;
 function ajustaPestanas() {
   const strip = els.tabstrip;
   // En vertical cada pestaña ocupa el ancho entero: no hay nada que repartir, y
@@ -1260,16 +1400,16 @@ function ajustaPestanas() {
   if (document.documentElement.classList.contains('vtabs')) {
     strip.classList.remove('compacto', 'minimo'); strip.style.flexBasis = ''; return;
   }
-  const sueltas = strip.querySelectorAll('.tab:not(.pinned)').length;
+  const sueltas = strip.querySelectorAll('.tab:not(.pinned):not(.ida)').length;
   if (!sueltas) { strip.classList.remove('compacto', 'minimo'); strip.style.flexBasis = ''; return; }
   let fijas = 0;
-  strip.querySelectorAll('.tab.pinned').forEach((t) => { fijas += t.offsetWidth + HUECO_PESTANA; });
+  strip.querySelectorAll('.tab.pinned:not(.ida)').forEach((t) => { fijas += t.offsetWidth + HUECO_PESTANA; });
   /* EL ANCHO QUE PIDE LA BARRA. Sin esto se quedaba en la mitad de la ventana
      y las pestañas salian estrechas con hueco vacio al lado (medido el
      2026-08-30: 503 px de 1260). Se pide lo que ocuparian todas a su ancho
      completo; si no cabe, el `flex-shrink` las encoge como siempre. */
-  strip.style.flexBasis = (fijas + sueltas * (ANCHO_PESTANA + HUECO_PESTANA)) + 'px';
-  const cada = (strip.clientWidth - fijas) / sueltas - HUECO_PESTANA;
+  strip.style.flexBasis = (RELLENO_BARRA + fijas + sueltas * (ANCHO_PESTANA + HUECO_PESTANA)) + 'px';
+  const cada = (strip.clientWidth - RELLENO_BARRA - fijas) / sueltas - HUECO_PESTANA;
   strip.classList.toggle('compacto', cada < 108);
   strip.classList.toggle('minimo', cada < 66);
 }
@@ -1298,7 +1438,29 @@ function syncNavUI() {
   els.navStar.classList.toggle('starred', !!marked);
   if (!marked) els.navStar.classList.remove('removing');
   els.navStar.innerHTML = window.icon(marked ? (els.navStar.classList.contains('removing') ? 'bookmark-remove' : 'bookmark-added') : 'bookmark-add');
+  pintaVistaUrl();
 }
+/* Barra sin foco (Naviris 3): el dominio en blanco y el resto en gris, sin el
+   https:// delante. Solo si lo escrito ES la dirección de la pestaña; con foco,
+   o con algo a medio escribir, se ve el campo tal cual (y entero). */
+const urlVista = { box: document.getElementById('urlbox'), dom: document.querySelector('#url-vista .uv-dom'), ruta: document.querySelector('#url-vista .uv-ruta') };
+function pintaVistaUrl() {
+  const t = activeTab(), v = els.urlbar.value;
+  let u = null;
+  // Con el menú de la barra abierto, la barra sigue como con foco (se ve lo que se va a copiar o cortar).
+  const conFoco = document.activeElement === els.urlbar || (ctxMenuEl && ctxFocoPrevio === els.urlbar);
+  if (!conFoco && t?.kind === 'web' && v && v === t.url) { try { u = new URL(v); } catch { /* se queda el campo */ } }
+  const web = u && /^https?:$/.test(u.protocol);
+  urlVista.box.classList.toggle('vista', !!web);
+  if (!web) return;
+  // La ruta legible, como la ve una persona (%C3%AD → í); el dominio, tal cual.
+  let resto = (u.port ? ':' + u.port : '') + u.pathname + u.search + u.hash;
+  try { resto = decodeURI(resto); } catch { /* se queda codificada */ }
+  urlVista.dom.textContent = u.hostname;
+  urlVista.ruta.textContent = resto === '/' ? '' : resto;
+}
+els.urlbar.addEventListener('focus', pintaVistaUrl);
+els.urlbar.addEventListener('blur', pintaVistaUrl);
 // Con la página ya guardada, pasar por encima ofrece QUITARLA: cinta con un
 // menos en rojo. Al salir del botón vuelve el estado normal.
 els.navStar.addEventListener('mouseenter', () => {
@@ -1632,8 +1794,9 @@ function armaDock(grid) {
   grid.addEventListener('mouseleave', limpia);
   grid.addEventListener('mouseover', (e) => {
     const d = e.target.closest('.dial');
-    // En modo edicion mandan el meneo y el arrastre: el dock se aparta.
-    if (!d || !grid.contains(d) || els.hub.classList.contains('editing')) { limpia(); return; }
+    // En modo edicion mandan el meneo y el arrastre: el dock se aparta. La
+    // repisa de vidrio no magnifica: cada icono sube solo (CSS).
+    if (!d || !grid.contains(d) || els.hub.classList.contains('editing') || grid.classList.contains('repisa')) { limpia(); return; }
     const fila = [...grid.querySelectorAll('.dial')].filter((x) => x.offsetTop === d.offsetTop)
       .sort((a, b) => a.offsetLeft - b.offsetLeft);
     limpia();
@@ -2269,12 +2432,15 @@ let ultimoCols = 0, dragId = null;
 function renderDock() {
   const dock = els.hubDock; if (!dock) return;
   dock.innerHTML = '';
-  dials.forEach((d) => { const el = makeDialEl(d); el.title = d.name; dock.appendChild(el); });
+  // En la repisa el nombre sale como etiqueta propia encima del icono (.d-name): sin el tooltip del sistema.
+  const repisa = dock.classList.contains('repisa');
+  dock.style.setProperty('--dk-n', dials.length + 1);   // para encoger los tiles si no caben (CSS)
+  dials.forEach((d) => { const el = makeDialEl(d); if (repisa) el.removeAttribute('title'); else el.title = d.name; dock.appendChild(el); });
   const sep = document.createElement('div'); sep.className = 'dk-sep'; dock.appendChild(sep);
-  const add = document.createElement('div'); add.className = 'dial add'; add.title = 'Añadir acceso';
-  add.tabIndex = 0; add.setAttribute('role', 'button');
+  const add = document.createElement('div'); add.className = 'dial add'; if (!repisa) add.title = 'Añadir acceso';
+  add.tabIndex = 0; add.setAttribute('role', 'button'); add.setAttribute('aria-label', 'Añadir acceso');
   add.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); add.click(); } });
-  add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div>`;
+  add.innerHTML = `<div class="d-tile">${window.icon('plus')}</div><div class="d-name">Añadir acceso</div>`;
   add.addEventListener('click', () => { els.dialName.value = ''; els.dialUrl.value = ''; renderLibreria(); els.dialModal.classList.remove('hidden'); els.dialName.focus(); });
   dock.appendChild(add);
   if (!dock.dataset.armado) { armaDock(dock); dock.dataset.armado = '1'; }
@@ -4645,6 +4811,22 @@ if (els.opSlider) {
   });
 }
 aplicaOpacidad(store.get('naviris.hubTransparencia', 0));
+/* ===== ESTILO DEL DOCK (Naviris 3) =====
+   El de siempre, con su contenedor (por defecto), o la repisa de vidrio tenue
+   de las propuestas. Sin contenedor no: sobre las fotos se perdía (Dosa,
+   2026-11-03). Se elige en «Aspecto del hub». */
+const DOCK_ESTILOS = ['contenedor', 'repisa'];
+function aplicaDock(estilo) {
+  const e = DOCK_ESTILOS.includes(estilo) ? estilo : 'contenedor';
+  els.hubDock.classList.toggle('repisa', e === 'repisa');
+  document.querySelectorAll('[data-dock]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.dock === e)));
+  return e;
+}
+document.querySelectorAll('[data-dock]').forEach((b) => b.addEventListener('click', () => {
+  store.set('naviris.dockEstilo', aplicaDock(b.dataset.dock));
+  renderDock();
+}));
+aplicaDock(store.get('naviris.dockEstilo', 'contenedor'));
 
 function renderBgPresets() {
   els.bgPresets.innerHTML = '';
@@ -4748,7 +4930,7 @@ function upsertDownload(m) {
   row.querySelector('.dl-name').textContent = m.name;
   row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : ((m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
-  row.querySelector('.dl-bar > i').style.width = pct + '%';
+  row.querySelector('.dl-bar > i').style.transform = `scaleX(${pct / 100})`;
   // La página de descargas, si está abierta, sigue el progreso en vivo
   if (els.dlPage.classList.contains('active')) renderDlActive();
   const act = row.querySelector('.dl-act:not(.dl-act2)');
@@ -4767,6 +4949,7 @@ function accionDescarga(b, m) {
   if (!archivo) return;
   b.innerHTML = window.icon(enCurso ? (m.paused ? 'play' : 'pause') : 'arrow-path');
   b.title = enCurso ? (m.paused ? 'Reanudar' : 'Pausar') : 'Reintentar';
+  b.setAttribute('aria-label', b.title);
   b.onclick = (e) => {
     e.stopPropagation();
     if (enCurso) { if (m.paused) window.navirisApp.resumeDownload(m.id); else window.navirisApp.pauseDownload(m.id); return; }
@@ -4914,17 +5097,17 @@ els.perfClose?.addEventListener('click', () => togglePerf(false));
 /* ============ Página de descargas: archivos reales por tipo y fecha ============ */
 const DLP_TYPES = [
   { key: 'all', label: 'Todo' },
-  { key: 'image', label: 'Imágenes', re: /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|tiff?)$/i, ico: 'photo' },
-  { key: 'video', label: 'Video', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'film' },
+  { key: 'image', label: 'Imágenes', re: /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|tiff?)$/i, ico: 'file-image' },
+  { key: 'video', label: 'Video', re: /\.(mp4|webm|mkv|mov|avi|m4v)$/i, ico: 'file-video' },
   { key: 'audio', label: 'Música', re: /\.(mp3|wav|m4a|flac|ogg|opus|aac)$/i, ico: 'musical-note' },
-  { key: 'doc', label: 'Documentos', re: /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|json|epub|rtf)$/i, ico: 'clipboard' },
-  { key: 'zip', label: 'Comprimidos', re: /\.(zip|rar|7z|tar|gz|iso)$/i, ico: 'archive' },
+  { key: 'doc', label: 'Documentos', re: /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|json|epub|rtf)$/i, ico: 'file-text' },
+  { key: 'zip', label: 'Comprimidos', re: /\.(zip|rar|7z|tar|gz|iso)$/i, ico: 'file-archive' },
   { key: 'app', label: 'Programas', re: /\.(exe|msi|apk)$/i, ico: 'squares-plus' },
   { key: 'other', label: 'Otros' }
 ];
 let dlpFilter = 'all', dlpFiles = [];
 const dlpTypeOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || { key: 'other' }).key;
-const dlpIcoOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || {}).ico || 'archive';
+const dlpIcoOf = (n) => (DLP_TYPES.find((t) => t.re && t.re.test(n)) || {}).ico || 'file';
 function dlpGroup(ms) {
   const d = new Date(ms), now = new Date();
   const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
@@ -4941,13 +5124,17 @@ function dlpGroup(ms) {
    segundo y rehacerlas en cada uno se comía el clic en "Cancelar". Solo se
    rehace la fila que pasa de en curso a fallida (cambia su botón). */
 const dlpFilas = new Map();   // id de descarga → { row, failed }
+/* Icono del tipo con la marca de hecho debajo: al terminar se cruzan (CSS). */
+const dlpIcono = (nombre) => `<span class="dlp-base">${window.icon(dlpIcoOf(nombre))}</span><span class="dlp-ok">${window.icon('check')}</span>`;
 function renderDlActive() {
   // Todo lo de esta sesión que NO haya terminado bien: en curso arriba y
-  // fallidas visibles (antes desaparecían sin decir nada).
-  const live = [...dlMeta.values()].filter((m) => m.state !== 'completed');
+  // fallidas visibles (antes desaparecían sin decir nada). La que termina con
+  // la página abierta se queda un momento marcada como hecha (.fin) y pasa a
+  // la lista de abajo.
+  const live = [...dlMeta.values()].filter((m) => m.state !== 'completed' || dlpFilas.has(m.id));
   for (const [id, f] of dlpFilas) {
     const m = dlMeta.get(id);
-    if (!m || m.state === 'completed' || f.failed !== (m.state !== 'progressing')) { f.row.remove(); dlpFilas.delete(id); }
+    if (!m || (m.state !== 'completed' && f.failed !== (m.state !== 'progressing'))) { f.row.remove(); dlpFilas.delete(id); }
   }
   if (!live.length) { els.dlpActive.innerHTML = ''; return; }
   if (!els.dlpActive.querySelector(':scope > .dlp-day')) {
@@ -4955,22 +5142,23 @@ function renderDlActive() {
     els.dlpActive.prepend(h);
   }
   for (const m of live) {
-    const failed = m.state !== 'progressing';
-    const pct = m.percent != null ? Math.round(m.percent) : (m.total ? Math.round(m.received / m.total * 100) : null);
+    const hecha = m.state === 'completed';
+    const failed = !hecha && m.state !== 'progressing';
+    const pct = hecha ? 100 : m.percent != null ? Math.round(m.percent) : (m.total ? Math.round(m.received / m.total * 100) : null);
     // Sin Content-Length no hay porcentaje: se muestran los bytes recibidos en
     // vez de un 0% que parecería atascado.
-    const sub = failed
-      ? (m.state === 'cancelled' ? 'Cancelada' : 'Error: ' + (m.error || 'la descarga se interrumpió'))
+    const sub = hecha ? 'Completado · ' + (fmtBytes(m.received) || '0 B')
+      : failed ? (m.state === 'cancelled' ? 'Cancelada' : 'Error: ' + (m.error || 'la descarga se interrumpió'))
       : (m.paused ? 'En pausa · ' : '') + (pct != null
         ? `${pct}% · ${fmtBytes(m.received) || '0 B'}${m.total ? ' / ' + fmtBytes(m.total) : ''}`
         : `${m.paused ? '' : 'Descargando… '}${fmtBytes(m.received) || '0 B'}`);
     let row = dlpFilas.get(m.id)?.row;
     if (!row) {
       row = document.createElement('div'); row.className = 'dlp-row live' + (failed ? ' failed' : '');
-      row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(m.name))}</div>`
+      row.innerHTML = `<div class="dlp-ic">${dlpIcono(m.name)}</div>`
         + `<div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub"></div>`
         + (failed ? '' : '<div class="dlp-bar"><i></i></div>')
-        + `</div><div class="dlp-acts"><button class="dlp-pausa"></button><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
+        + `</div><div class="dlp-acts"><button class="dlp-pausa"></button><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}" aria-label="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
       row.querySelector('.dlp-cancel').addEventListener('click', (e) => {
         e.stopPropagation();
         if (failed) { dlMeta.delete(m.id); renderDlActive(); } else window.navirisApp.cancelDownload(m.id);
@@ -4979,12 +5167,20 @@ function renderDlActive() {
       els.dlpActive.appendChild(row);
     }
     row.querySelector('.dlp-name').textContent = m.name;
+    row.title = m.name;
     row.querySelector('.dlp-sub').textContent = sub;
-    accionDescarga(row.querySelector('.dlp-pausa'), m);
+    row.classList.toggle('pausa', !!m.paused && !failed);
+    if (hecha) {
+      if (!row.classList.contains('fin')) {
+        row.classList.add('fin');
+        row.querySelector('.dlp-acts').classList.add('hidden');
+        setTimeout(() => { row.remove(); dlpFilas.delete(m.id); renderDownloadsPage(); }, 1600);
+      }
+    } else accionDescarga(row.querySelector('.dlp-pausa'), m);
     if (!failed) {
       const bar = row.querySelector('.dlp-bar');
       bar.classList.toggle('indet', pct == null);
-      bar.firstElementChild.style.width = (pct != null ? pct : 100) + '%';
+      bar.firstElementChild.style.transform = `scaleX(${pct != null ? pct / 100 : 1})`;
     }
   }
 }
@@ -4995,13 +5191,17 @@ function renderDownloadsPage() {
     const n = t.key === 'all' ? dlpFiles.length : dlpFiles.filter((f) => dlpTypeOf(f.name) === t.key).length;
     if (t.key !== 'all' && !n) continue;
     const b = document.createElement('button');
-    b.className = 'mp-chip' + (dlpFilter === t.key ? ' active' : '');
-    b.textContent = n ? `${t.label} · ${n}` : t.label;
+    b.className = 'dlp-filtro' + (dlpFilter === t.key ? ' on' : '');
+    b.setAttribute('aria-pressed', String(dlpFilter === t.key));
+    b.textContent = t.label;
+    if (n) { const c = document.createElement('span'); c.textContent = n; b.appendChild(c); }
     b.addEventListener('click', () => { dlpFilter = t.key; renderDownloadsPage(); });
     els.dlpFilters.appendChild(b);
   }
   els.dlpList.innerHTML = '';
-  const files = dlpFiles.filter((f) => dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter);
+  // La que acaba de terminar sigue arriba marcada como hecha: no se repite aquí.
+  const enCurso = new Set([...dlpFilas.keys()].map((id) => dlMeta.get(id)?.name));
+  const files = dlpFiles.filter((f) => !enCurso.has(f.name) && (dlpFilter === 'all' || dlpTypeOf(f.name) === dlpFilter));
   if (!files.length) {
     // Con algo bajando no se dice "no has descargado nada": eso confundía
     if (!els.dlpActive.childElementCount) {
@@ -5016,7 +5216,7 @@ function renderDownloadsPage() {
     if (g !== last) { const h = document.createElement('div'); h.className = 'dlp-day'; h.textContent = g; els.dlpList.appendChild(h); last = g; }
     const row = document.createElement('div'); row.className = 'dlp-row'; row.title = f.name;
     const when = new Date(f.mtime).toLocaleString('es', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(f.name))}</div><div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub">${fmtBytes(f.size)} · ${when}</div></div><div class="dlp-acts"><button class="dlp-reveal" title="Mostrar en carpeta">${window.icon('folder')}</button></div>`;
+    row.innerHTML = `<div class="dlp-ic">${dlpIcono(f.name)}</div><div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub">${fmtBytes(f.size)} · ${when}</div></div><div class="dlp-acts"><button class="dlp-reveal" title="Mostrar en carpeta" aria-label="Mostrar en carpeta">${window.icon('folder')}</button></div>`;
     row.querySelector('.dlp-name').textContent = f.name;
     row.querySelector('.dlp-reveal').addEventListener('click', (e) => { e.stopPropagation(); window.navirisApp.revealDownloadFile(f.name); });
     row.addEventListener('click', () => { if (VIEWABLE.test(f.name)) createTab('file:///' + f.path.replace(/\\/g, '/')); else window.navirisApp.openDownloadFile(f.name); });
@@ -5940,6 +6140,7 @@ async function doFillPw(wv, cred, host) {
 /* ============ Permisos de sitios ============ */
 const PERM_LABELS = { media: 'usar la cámara y el micrófono', geolocation: 'saber tu ubicación', notifications: 'enviarte notificaciones', midi: 'usar dispositivos MIDI', midiSysex: 'usar dispositivos MIDI', 'clipboard-read': 'leer tu portapapeles', hid: 'acceder a dispositivos HID', serial: 'acceder a puertos serie', usb: 'acceder a dispositivos USB', bluetooth: 'usar Bluetooth' };
 const PERM_SHORT = { popups: 'Ventanas emergentes', media: 'Cámara y micrófono', geolocation: 'Ubicación', notifications: 'Notificaciones', midi: 'MIDI', midiSysex: 'MIDI', 'clipboard-read': 'Portapapeles', hid: 'Dispositivos HID', serial: 'Puertos serie', usb: 'USB', bluetooth: 'Bluetooth' };
+const ICONO_PERMISO = { notifications: 'bell', media: 'camera', geolocation: 'map-pin', 'clipboard-read': 'clipboard' };
 let permQueue = [];
 function showNextPerm() {
   if (!permQueue.length) { els.permBar.classList.add('hidden'); return; }
@@ -5951,6 +6152,8 @@ function showNextPerm() {
   }
   let host = req.origin; try { host = new URL(req.origin).hostname.replace(/^www\./, ''); } catch {}
   els.permText.innerHTML = `<b>${escapeHtml(host)}</b> quiere ${escapeHtml(what)}.`;
+  // El icono dice de qué va (campana para las notificaciones, como en la propuesta)
+  els.permBar.querySelector('.perm-ic').innerHTML = window.icon(ICONO_PERMISO[req.permission] || 'lock-closed');
   els.permRemember.checked = true;
   els.permBar.classList.remove('hidden');
 }
@@ -6862,6 +7065,10 @@ function muevePestana(paso) {
   renderTabs(true); saveSession();
 }
 function ejecutaAtajo(cmd) {
+  movTeclado = true;   // lo que haga el atajo en la barra de pestañas no se anima
+  try { ejecutaComando(cmd); } finally { movTeclado = false; }
+}
+function ejecutaComando(cmd) {
   if (cmd === 'reload') recargar(false);
   else if (cmd === 'reload-hard') recargar(true);
   else if (cmd === 'back') irAtras();
@@ -6921,8 +7128,8 @@ window.addEventListener('auxclick', (e) => { if (e.button === 3 || e.button === 
 // 'system-context-menu' y manda las coordenadas. Menú de barra, como Chrome.
 window.navirisApp.onTabstripMenu(({ x, y }) => {
   showCtxMenu(x, y, [
-    { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
-    { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada },
+    { label: 'Nueva pestaña', icon: 'plus', kbd: 'Ctrl+T', action: () => createTab() },
+    { label: 'Reabrir última pestaña cerrada', icon: 'rotate-ccw', kbd: 'Ctrl+Mayús+T', action: reabrirCerrada },
     { sep: true },
     { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabsVisibles().forEach((t) => { if (t.kind === 'web' && !t.asleep) recargaWv(t.webview); }) }
   ]);
@@ -7020,8 +7227,9 @@ els.tabDialogo.addEventListener('keydown', (e) => {
 });
 
 /* Clic derecho en un campo de texto de la interfaz (barra de direcciones,
-   buscar en la página, filtros, ajustes): el menú nativo de editar. La barra
-   añade «Pegar e ir». Ver 'ui:menu-campo' en main.js. */
+   buscar en la página, filtros, ajustes): el menú de editar, con el mismo
+   aspecto que los demás. La barra añade «Pegar e ir». Ver 'ui:menu-campo' en
+   main.js. Con la tecla de menú se abre en el campo, no donde esté el ratón. */
 document.addEventListener('contextmenu', (e) => {
   if (e.defaultPrevented) return;
   const el = e.target;
@@ -7031,7 +7239,10 @@ document.addEventListener('contextmenu', (e) => {
   if (document.activeElement !== el) el.focus();
   const valor = texto ? el.value : el.textContent;
   const seleccion = texto ? el.selectionStart !== el.selectionEnd : !!String(getSelection() || '');
-  window.navirisApp.menuCampo({ urlbar: el === els.urlbar, seleccion, vacio: !valor });
+  const teclado = !e.pointerType;
+  const r = el.getBoundingClientRect();
+  window.navirisApp.menuCampo({ urlbar: el === els.urlbar, seleccion, vacio: !valor, teclado,
+    x: teclado ? r.left + 12 : e.clientX, y: teclado ? r.bottom + 4 : e.clientY });
 });
 window.navirisApp.onPegarEIr((texto) => { els.urlbar.value = texto; navigateActive(texto); hideSuggest(); els.urlbar.blur(); });
 
