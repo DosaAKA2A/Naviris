@@ -435,8 +435,30 @@ describe('Bloqueo general y sitios grandes', { timeout: 10 * 60 * 1000 }, () => 
     assert.ok(r.puntos >= 0.85 * r.de, `puntuación baja: ${r.puntos}/${r.de}`);
   });
 
+  /* Los scriptlets llegan también a los iframes (did-frame-navigate en main). El
+     aviso de consentimiento de Sourcepoint vive en un iframe y las listas de
+     cookies lo cierran con un clic DENTRO de él: sin eso la página se quedaba
+     tapada y sin scroll (Brave no lo enseña). */
+  for (const [nombre, url] of [['spiegel', 'https://www.spiegel.de/'], ['bild', 'https://www.bild.de/']]) {
+    it('aviso de consentimiento en un iframe: se cierra y la página se desplaza: ' + nombre, async () => {
+      const p = await n.abrePestana(app, url);
+      await n.espera(15000);
+      const r = await n.enPestana(p, `
+        const c = document.querySelector('[id^="sp_message_container"]');
+        const visible = !!c && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().height > 0;
+        const y0 = scrollY; scrollBy(0, 600); const baja = scrollY - y0; scrollTo(0, y0);
+        return { aviso: visible, abierto: document.documentElement.classList.contains('sp-message-open'), baja, cookie: /consentUUID=/.test(document.cookie) };`);
+      await n.captura(p, 'web-consentimiento-' + nombre);
+      apunta('web-consentimiento-' + nombre, r);
+      await n.cierraPestana(app, p);
+      assert.equal(r.aviso, false, 'el aviso de consentimiento sigue a la vista');
+      assert.equal(r.abierto, false, 'la página sigue marcada con el aviso abierto');
+      assert.ok(r.baja > 0, 'la página no se desplaza');
+    });
+  }
+
   const SITIOS = [
-    ['google-login', 'https://accounts.google.com/ServiceLogin', '#identifierId'],
+    ['google-login','https://accounts.google.com/ServiceLogin', '#identifierId'],
     ['twitch', 'https://www.twitch.tv/', 'a[href^="/"], [data-a-target]'],
     ['x', 'https://x.com/', 'input[name="username_or_email"], [data-testid="loginButton"], a[href="/login"]'],
     ['crunchyroll', 'https://www.crunchyroll.com/', 'header, [class*="erc-"], main']
