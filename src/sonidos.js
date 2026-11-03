@@ -20,8 +20,8 @@
      'cristal'  campana de vidrio                   (pensada con 'icono') */
 (() => {
   const PALETA = 'aire';
-  // Casi imperceptible (Dosa, 03/11): los archivos están a -18 LUFS y aquí se bajan unos 16 dB más.
-  const VOLUMEN = 0.15;
+  // Casi imperceptible (Dosa, 03/11): los archivos están a -18 LUFS y aquí se bajan unos 26 dB más.
+  const VOLUMEN = 0.05;
   // Varias descargas que acaban a la vez suenan una sola vez.
   const ENTRE_IGUALES = 400;
   const ultimo = {};
