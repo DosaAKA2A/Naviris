@@ -12,6 +12,8 @@
   },
   "scripts": {
     "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "node --test \"test/e2e/*.e2e.js\"",
     "icon": "electron build/render-icon.js",
     "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
