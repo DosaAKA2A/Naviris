@@ -350,6 +350,53 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
       });
     }
   } catch (e) { /* nada */ }
+  // --- Videos con tarjeta de sitio web: se reproducen aquí, sin abrir la web ---
+  // En los anuncios y posts con "video website card" (tarjeta unificada
+  // video_website), X tapa el video con un enlace a la web del anunciante: haces
+  // clic para verlo y se te abre otra pestaña. Medido el 2026-11-03 en x.com
+  // (cliente nuevo, sin sesión): el reproductor lleva encima un
+  // <a href="https://…" target="_blank" class="absolute inset-0"> que ocupa todo el
+  // video. Aquí ese clic se queda en el video: pausa o reanuda. Si el enlace envuelve
+  // al reproductor en vez de taparlo (o va por t.co), vale igual. Las de app
+  // (video_app) ya traen un reproductor normal y no se tocan. El título y el "De sitio.com" de debajo siguen abriendo la web, igual que
+  // los enlaces normales, las tarjetas sin video y el clic con Ctrl o con la rueda.
+  // Va por el DOM y no podando la tarjeta: en el cliente nuevo de X el enlace no sale
+  // del componente "media" sino de la tarjeta entera (si falta, usa la URL del título),
+  // así que quitárselo no sirve y quitarlas todas borra la tarjeta con su video.
+  // Escucha en `window` en fase de captura, antes que X, desde el mundo aislado del
+  // preload: la página no lo ve y no hace falta tocar ninguna función suya.
+  window.addEventListener('click', function (e) {
+    const v = videoTapadoPorEnlace(e);
+    if (!v) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (v.paused) v.play().catch(() => {}); else v.pause();
+  }, true);
+}
+// El <video> que tapa un enlace a otro sitio cuando el clic cae justo encima del
+// video; si no es eso, null. El enlace puede envolver al reproductor o estar
+// encima como hermano (lo que hace X hoy): se busca el único video del bloque.
+function videoTapadoPorEnlace(e) {
+  if (!e.isTrusted || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return null;
+  const t = e.target;
+  const a = t && t.closest && t.closest('a[href]');
+  if (!a) return null;
+  // Los controles del reproductor (silenciar, pantalla completa…) siguen a lo suyo
+  const control = t.closest('button, [role="button"], [role="slider"], input');
+  if (control && a.contains(control)) return null;
+  let u;
+  try { u = new URL(a.href, location.href); } catch (err) { return null; }
+  if (!/^https?:$/.test(u.protocol) || /(^|\.)(x\.com|twitter\.com)$/.test(u.hostname)) return null;
+  let v = a.querySelector('video');
+  for (let p = a.parentElement, i = 0; !v && p && i < 4; p = p.parentElement, i++) {
+    const vs = p.querySelectorAll('video');
+    if (vs.length > 1) return null;
+    if (vs.length === 1) v = vs[0];
+  }
+  if (!v) return null;
+  const r = v.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return null;
+  return v;
 }
 // --- Passkeys bloqueadas: la página no ve autenticador de plataforma ---
 // Con el ajuste blockPasskeys, main.js registra un autenticador virtual (por
@@ -808,44 +855,63 @@ ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
   }
 });
 
-// --- Twitch: AutoLoot por pestaña. Lo activa/para la interfaz con 'cobalt-autoloot'. ---
+// --- Twitch: AutoClaim por pestaña. Lo enciende y lo apaga la interfaz con 'cobalt-autoloot'. ---
+// Cada reclamo se avisa con un 'claim' y la cuenta de la sesión la lleva la interfaz.
+// Antes viajaba también un contador propio de este preload, que volvía a cero al
+// recargar la página y pisaba los drops que sumaba el webview oculto del inventario.
 if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
-  let claims = 0, lastPoints = 0, timer = null;
-  function clickChest() {
-    try {
-      if (Date.now() - lastPoints < 5000) return; // evita doble conteo del mismo cofre
-      // Selectores en orden de robustez. El del contenedor de resumen es
-      // idioma-agnóstico (el cofre es el 2º hijo) y es el más fiable.
-      var sum = document.querySelector('.community-points-summary');
-      var btn = (sum && (sum.querySelector(':scope > *:nth-child(2) button')
-                      || sum.querySelector('button[aria-label="Claim Bonus"]')))
-              || (document.querySelector('.claimable-bonus__icon') || {}).closest
-                 && document.querySelector('.claimable-bonus__icon').closest('button');
-      if (btn) {
-        btn.click(); lastPoints = Date.now(); claims++;
-        var bal = null; // saldo de puntos del canal, para el historial
-        try { var ps = document.querySelector('.community-points-summary'); if (ps) { var digs = (ps.textContent || '').replace(/[^\d]/g, ''); if (digs) bal = parseInt(digs, 10); } } catch (e) { /* nada */ }
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims, balance: bal });
-      }
-    } catch (e) { /* nada */ }
+  let timer = null, obs = null, lastPoints = 0;
+  // Texto EXACTO (anclado) de los botones de reclamar un drop, en inglés y en español:
+  // así no se pulsa "claim your channel points" ni otros que solo contengan "claim".
+  const RE_RECLAMAR = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
+  // Un botón se pulsa (y se cuenta) una sola vez: si Twitch tarda en quitarlo, la
+  // siguiente vuelta del reloj no lo cuenta de nuevo.
+  const pulsados = new WeakSet();
+  const limpio = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  // Visible según sus medidas: el aviso de drop es position:fixed y su offsetParent
+  // es null, así que no sirve filtrar por offsetParent.
+  function botonesDeReclamo() {
+    return Array.from(document.querySelectorAll('button, [role="button"]')).filter((el) => {
+      if (pulsados.has(el)) return false;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 4 || r.height <= 4) return false;
+      return RE_RECLAMAR.test(limpio(el.textContent)) || RE_RECLAMAR.test(limpio(el.getAttribute('aria-label')));
+    });
   }
-  // Visible según dimensiones (el toast de reclamo de drop es position:fixed y
-  // su offsetParent es null, por eso NO se puede filtrar por offsetParent).
-  function isVisible(el) { var r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4; }
-  function claimDrops() {
-    try {
-      var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
-      document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
-        if (!isVisible(el)) return;
-        var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        // Texto EXACTO (anclado) para no pulsar "claim your channel points" (los
-        // puntos los reclama clickChest) ni otros botones que contengan "claim".
-        if (RE.test(txt) || RE.test(aria)) {
-          el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims });
-        }
-      });
-    } catch (e) { /* nada */ }
+  // El cofre de bonificación de puntos. Aparece en el 2º hijo del resumen de puntos
+  // (no depende del idioma) y lleva el icono .claimable-bonus__icon. Repasado el
+  // 2026-11-03 con el DOM de Twitch de hoy y con las extensiones de reclamo al día,
+  // que usan los mismos selectores.
+  function botonCofre() {
+    const sum = document.querySelector('.community-points-summary');
+    const b = sum && (sum.querySelector(':scope > :nth-child(2) button') || sum.querySelector('button[aria-label="Claim Bonus"]'));
+    if (b) return b;
+    const icono = document.querySelector('.claimable-bonus__icon');
+    return icono && icono.closest('button');
+  }
+  // Saldo de puntos del canal, para el historial. Antes se juntaban TODOS los dígitos
+  // del resumen, que también enseña el saldo de Bits, y salía un número pegado
+  // ("0" Bits + "1250" puntos = 01250). Twitch abrevia los saldos grandes ("12,3 mil",
+  // "1.2K"): con abreviatura el número es aproximado.
+  function saldoPuntos() {
+    const el = document.querySelector('[data-test-selector="copo-balance-string"]');
+    const m = el && limpio(el.textContent).replace(/\s/g, '').match(/^([\d.,]+)(k|mil|m|mill\.?)?$/);
+    if (!m) return null;
+    if (!m[2]) return parseInt(m[1].replace(/[.,]/g, ''), 10);
+    return Math.round(parseFloat(m[1].replace(',', '.')) * (m[2] === 'k' || m[2] === 'mil' ? 1e3 : 1e6));
+  }
+  function reclamaCofre() {
+    if (Date.now() - lastPoints < 5000) return; // el cofre tarda en irse: un solo reclamo por cofre
+    const b = botonCofre();
+    if (!b) return;
+    b.click(); lastPoints = Date.now();
+    ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', balance: saldoPuntos() });
+  }
+  function reclamaDrops() {
+    for (const el of botonesDeReclamo()) {
+      pulsados.add(el); el.click();
+      ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop' });
+    }
   }
   // --- Detección de drops pendientes por la API de inventario de Twitch ---
   // OJO: el reclamo DIRECTO por GraphQL lo rechaza Twitch con "failed integrity check"
@@ -915,29 +981,22 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   var claimerRan = false;
   function runInventoryClaimer() {
     if (claimerRan) return; claimerRan = true;
-    var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
     var tries = 0, clicked = 0;
     var iv = setInterval(function () {
       try {
-        document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
-          if (el.__navClaimed) return;
-          var r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
-          var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          if (RE.test(txt) || RE.test(aria)) {
-            el.__navClaimed = true;
-            // Nombre de la recompensa: sube al contenedor-tarjeta y coge el texto más
-            // destacado (heading). Best-effort; se afina con la prueba en dev.
-            var name = '';
-            try {
-              var card = el.closest('.inventory-max-width, [data-test-selector*="DropsGrantedCard"], [class*="card" i]') || el.parentElement;
-              var h = card && (card.querySelector('h3, h4, p[class*="bold" i], strong') || card.querySelector('p'));
-              name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
-            } catch (e) { /* nada */ }
-            el.click(); clicked++;
-            ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', name: name });
-          }
-        });
+        for (const el of botonesDeReclamo()) {
+          pulsados.add(el);
+          // Nombre de la recompensa: sube al contenedor-tarjeta y coge el texto más
+          // destacado (heading). Best-effort; se afina con la prueba en dev.
+          var name = '';
+          try {
+            var card = el.closest('.inventory-max-width, [data-test-selector*="DropsGrantedCard"], [class*="card" i]') || el.parentElement;
+            var h = card && (card.querySelector('h3, h4, p[class*="bold" i], strong') || card.querySelector('p'));
+            name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+          } catch (e) { /* nada */ }
+          el.click(); clicked++;
+          ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', name: name });
+        }
       } catch (e) { /* nada */ }
       if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim-done', clicked: clicked }); }
     }, 1500); // ~12s: la SPA de inventario tarda en pintar los botones
@@ -947,7 +1006,7 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
   function keepAlive() {
     try {
       var v = document.querySelector('video');
-      if (v && v.paused) { try { v.play(); } catch (e) { /* nada */ } }
+      if (v && v.paused) v.play().catch(function () { /* nada */ });
       document.querySelectorAll('button').forEach(function (el) {
         if (el.offsetParent === null) return;
         var t = (el.textContent || '').trim().toLowerCase();
@@ -955,29 +1014,29 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       });
     } catch (e) { /* nada */ }
   }
-  // Engaña a la API de visibilidad: Twitch solo cuenta el TIEMPO de visualización
-  // de los drops si cree que la pestaña está visible. En segundo plano dejaría de
-  // avanzar el progreso (los puntos sí caían porque los reclamamos nosotros, pero
-  // los drops necesitan ese tiempo). Esto lo mantiene contando siempre.
-  let visSpoofed = false;
-  function spoofVisible() {
-    if (visSpoofed) return; visSpoofed = true;
-    try {
-      Object.defineProperty(document, 'hidden', { get: function () { return false; }, configurable: true });
-      Object.defineProperty(document, 'visibilityState', { get: function () { return 'visible'; }, configurable: true });
-      Object.defineProperty(document, 'webkitHidden', { get: function () { return false; }, configurable: true });
-      Object.defineProperty(document, 'webkitVisibilityState', { get: function () { return 'visible'; }, configurable: true });
-      var block = function (e) { e.stopImmediatePropagation(); };
-      document.addEventListener('visibilitychange', block, true);
-      window.addEventListener('visibilitychange', block, true);
-      document.addEventListener('webkitvisibilitychange', block, true);
-      window.addEventListener('webkitvisibilitychange', block, true);
-    } catch (e) { /* nada */ }
+  // Que Twitch no se entere de que no se le mira. Con la pestaña de fondo dentro de
+  // Naviris la página sigue diciendo "visible" (el webview se pinta fuera de la
+  // pantalla); solo con la ventana MINIMIZADA pasa a "hidden" y el reproductor sigue
+  // igual (medido el 2026-11-03: 20 s minimizada, el directo no se para). Lo que sí
+  // se puede hacer es cortar el aviso visibilitychange, en captura y antes que nadie:
+  // los escuchadores son del DOM, así que desde este mundo aislado también le llegan
+  // cortados a Twitch. Antes, además, se redefinían document.hidden y visibilityState,
+  // pero en un webview esas dos las fija Electron como propiedades NO configurables
+  // (siguen la visibilidad de la ventana) y ni aquí ni en el mundo de la página se
+  // pueden cambiar: no hacían nada.
+  let visibilidadCortada = false;
+  function cortaVisibilidad() {
+    if (visibilidadCortada) return; visibilidadCortada = true;
+    const corta = (e) => e.stopImmediatePropagation();
+    for (const t of ['visibilitychange', 'webkitvisibilitychange']) {
+      document.addEventListener(t, corta, true);
+      window.addEventListener(t, corta, true);
+    }
   }
   // Baja la calidad desde el MENÚ del reproductor de Twitch: cambio EN VIVO (sin
   // recargar) y solo de ESTA pestaña. Asíncrono con esperas porque el menú de React
-  // tarda en pintarse tras abrirlo; si consultas al instante, no encuentra las opciones
-  // (ese era el fallo). Llama cb(true) si logró pulsar la opción más baja.
+  // tarda en pintarse tras abrirlo; si consultas al instante, no encuentra las opciones.
+  // Llama cb(true) si llegó a pulsar la opción más baja.
   function applyLowQualityViaMenu(cb) {
     try {
       var gear = document.querySelector('[data-a-target="player-settings-button"]');
@@ -997,49 +1056,53 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       }, 450);
     } catch (e) { cb(false); }
   }
-  var qualityHandled = false;
-  function lowResThisTabOnly() {
-    if (qualityHandled) return; qualityHandled = true;
-    // Baja SOLO esta pestaña a 160p por el menú (en vivo, sin recargar). Seleccionar por
-    // menú escribe video-quality GLOBAL en localStorage; lo guardamos y lo restauramos al
-    // final para que las pestañas/streams NUEVOS sigan en Automática (no heredan el 160p).
-    var savedLS = null;
-    try { savedLS = localStorage.getItem('video-quality'); } catch (e) { /* nada */ }
-    function restoreLS() {
-      try { if (savedLS == null) localStorage.removeItem('video-quality'); else localStorage.setItem('video-quality', savedLS); } catch (e) { /* nada */ }
-    }
-    var tries = 0;
-    function attempt() {
-      var v = document.querySelector('video');
-      if (v && v.videoHeight && v.videoHeight <= 200) { restoreLS(); return; } // confirmado bajo
-      if (++tries > 20) { restoreLS(); return; } // no se pudo: al menos no dejamos el LS sucio
-      applyLowQualityViaMenu(function () { setTimeout(attempt, 1800); }); // reintenta y re-verifica la altura
-    }
-    attempt();
+  // Se mira en cada vuelta del reloj y no una vez por documento: al navegar dentro de
+  // Twitch (entrar en otro canal, un raid) el reproductor carga el stream nuevo en
+  // Automática y la pestaña volvía a 720p con el AutoClaim puesto (medido el
+  // 2026-11-03). Elegir en el menú escribe video-quality en localStorage, que es
+  // GLOBAL: se guarda antes y se repone después para que las pestañas y los streams
+  // NUEVOS sigan en Automática. Hasta 5 elecciones por canal; si no baja, se deja.
+  // Con el video parado no se toca: en un descanso publicitario el menú no trae las
+  // calidades y cada vuelta gastaba un intento (medido el 2026-11-03).
+  let bajaRes = false, bajando = false, rutaRes = '', intentosRes = 0;
+  function bajaCalidad() {
+    if (!bajaRes || bajando) return;
+    const v = document.querySelector('video');
+    if (!v || v.paused || !v.videoHeight || v.videoHeight <= 200) return;
+    if (rutaRes !== location.pathname) { rutaRes = location.pathname; intentosRes = 0; }
+    if (intentosRes >= 5) return;
+    bajando = true;
+    let guardada = null;
+    try { guardada = localStorage.getItem('video-quality'); } catch (e) { /* nada */ }
+    applyLowQualityViaMenu(function (ok) {
+      if (ok) intentosRes++;
+      setTimeout(function () {
+        try { if (guardada == null) localStorage.removeItem('video-quality'); else localStorage.setItem('video-quality', guardada); } catch (e) { /* nada */ }
+        bajando = false;
+      }, 1500);
+    });
   }
-  let obs = null;
-  function tick() { clickChest(); claimDrops(); checkPendingDrops(false); keepAlive(); }
+  function tick() { reclamaCofre(); reclamaDrops(); checkPendingDrops(false); keepAlive(); bajaCalidad(); }
   ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
     if (opt && opt.on) {
-      spoofVisible(); // sin esto, los drops no acumulan tiempo en segundo plano
-      if (opt.lowRes) lowResThisTabOnly();
-      if (!timer) {
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
-        checkPendingDrops(true); // comprobación inmediata: si ya hay drops pendientes, dispara el claimer
-        tick();
-        timer = setInterval(tick, 8000);
-        // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
-        try {
-          let deb = null;
-          // Los cambios del chat (no para nunca) no traen ni cofres ni drops.
-          obs = new MutationObserver(function (muts) {
-            if (muts.every(function (m) { return m.target.closest && m.target.closest('.chat-scrollable-area__message-container'); })) return;
-            if (deb) return; deb = setTimeout(function () { deb = null; clickChest(); claimDrops(); }, 800);
-          });
-          obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-        } catch (e) { /* nada */ }
-      }
+      cortaVisibilidad();
+      bajaRes = !!opt.lowRes;
+      if (timer) return;
+      checkPendingDrops(true); // comprobación inmediata: si ya hay drops pendientes, dispara el claimer
+      tick();
+      timer = setInterval(tick, 8000);
+      // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
+      try {
+        let deb = null;
+        // Los cambios del chat (no para nunca) no traen ni cofres ni drops.
+        obs = new MutationObserver(function (muts) {
+          if (muts.every(function (m) { return m.target.closest && m.target.closest('.chat-scrollable-area__message-container'); })) return;
+          if (deb) return; deb = setTimeout(function () { deb = null; reclamaCofre(); reclamaDrops(); }, 800);
+        });
+        obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      } catch (e) { /* nada */ }
     } else {
+      bajaRes = false;
       if (timer) { clearInterval(timer); timer = null; }
       if (obs) { obs.disconnect(); obs = null; }
     }

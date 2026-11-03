@@ -5677,14 +5677,26 @@ function refreshAgentBadge() {
   const connected = (Date.now() - agentLastPing < 15000) || tabs.some((t) => t.agentControlled);
   b.classList.toggle('connected', connected);
 }
+// Un reclamo de AutoClaim (puntos o drop): suma a la sesión de su pestaña, lo guarda
+// en el historial y avisa. La cuenta la lleva solo la interfaz: antes se fiaba del
+// contador del preload, que volvía a cero al recargar la página y se comía los
+// drops que reclama el webview oculto.
+function apuntaReclamo(tab, d) {
+  const seg = (tab.url.split('twitch.tv/')[1] || '').split(/[/?#]/)[0];
+  tab.twitchClaims = (tab.twitchClaims || 0) + 1; renderTabs();
+  recordLoot(d.kind, 'twitch.tv' + (seg ? '/' + seg : ''), { name: d.name, balance: d.balance });
+  toast(d.kind === 'drop' ? (d.name ? 'Drop reclamado: ' + d.name : 'Drop de Twitch reclamado') : `Punto de Twitch reclamado (${tab.twitchClaims})`);
+}
 // Webview OCULTO que reclama los drops pendientes SIN tocar la pestaña que farmea:
-// carga /drops/inventory (misma sesión, PARTITION compartida), pulsa el botón real de
-// Twitch (que sí viaja con Client-Integrity) y se autodestruye. El farmeo no se corta.
+// carga /drops/inventory en la MISMA sesión que esa pestaña (antes iba siempre a la
+// general y, con Twitch abierto en un contenedor o en un espacio protegido, entraba
+// sin cuenta y no reclamaba nada), pulsa el botón real de Twitch (que sí viaja con
+// Client-Integrity) y se autodestruye. El farmeo no se corta.
 let dropClaimer = null;
 function ensureDropClaimer(sourceTab) {
   if (dropClaimer) return; // ya hay uno trabajando
   const wv = document.createElement('webview');
-  wv.setAttribute('partition', PARTITION);
+  wv.setAttribute('partition', particionDeTab(sourceTab));
   wv.setAttribute('allowpopups', '');
   wv.classList.add('agent-hidden'); // renderizado pero fuera de pantalla: invisible al usuario
   wv.src = 'https://www.twitch.tv/drops/inventory';
@@ -5698,13 +5710,8 @@ function ensureDropClaimer(sourceTab) {
   wv.addEventListener('ipc-message', (ev) => {
     if (ev.channel !== 'cobalt-twitch') return;
     const d = (ev.args && ev.args[0]) || {};
-    if (d.type === 'claim' && d.kind === 'drop') {
-      if (sourceTab) { sourceTab.twitchClaims = (sourceTab.twitchClaims || 0) + 1; renderTabs(); }
-      recordLoot('drop', (sourceTab && sourceTab.url && sourceTab.url.split('twitch.tv/')[1] ? 'twitch.tv/' + sourceTab.url.split('twitch.tv/')[1].split(/[/?#]/)[0] : 'twitch.tv/drops'), { name: d.name });
-      toast(d.name ? ('Drop reclamado: ' + d.name) : 'Drop de Twitch reclamado');
-    } else if (d.type === 'claim-done') {
-      cleanup();
-    }
+    if (d.type === 'claim' && d.kind === 'drop') apuntaReclamo(sourceTab, d);
+    else if (d.type === 'claim-done') cleanup();
   });
   els.content.appendChild(wv);
   dropClaimer = { wv, timer: setTimeout(cleanup, 45000) }; // salvavidas si algo falla
@@ -5746,15 +5753,9 @@ async function onWebviewMessage(wv, e) {
   // Twitch: se atiende aunque la pestaña esté en segundo plano (ahí es donde se deja el stream)
   if (e.channel === 'cobalt-twitch') {
     const tab = tabs.find((t) => t.webview === wv); if (!tab) return;
-    const seg = tab.url.split('twitch.tv/')[1];
-    const channel = hostOf(tab.url).replace(/^www\./, '') + (seg ? '/' + seg.split(/[/?#]/)[0] : '');
     // Hay drops ganados sin reclamar: abre el webview oculto que los reclama sin cortar el farmeo.
-    if (data.type === 'drops-pending') { ensureDropClaimer(tab); return; }
-    if (data.type === 'claim') {
-      tab.twitchClaims = data.count || ((tab.twitchClaims || 0) + 1); renderTabs();
-      recordLoot(data.kind, channel, { name: data.name, balance: data.balance });
-      toast(data.kind === 'drop' ? 'Drop de Twitch reclamado' : `Punto de Twitch reclamado (${tab.twitchClaims})`);
-    }
+    if (data.type === 'drops-pending') ensureDropClaimer(tab);
+    else if (data.type === 'claim') apuntaReclamo(tab, data);
     return;
   }
   if (activeTab()?.webview !== wv) return; // el resto (contraseñas) solo en la pestaña activa
