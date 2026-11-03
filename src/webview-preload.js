@@ -44,6 +44,52 @@ if (ARRANQUE.scriptlets) {
   try { webFrame.executeJavaScript(ARRANQUE.scriptlets).catch(() => {}); } catch (e) { /* nada */ }
 }
 
+// --- Ocultado genérico por clase e id (`##.anuncio`, ver genericosPara en adblock.js) ---
+// Como uBlock y Brave: se apuntan las clases e ids que van apareciendo y se
+// pregunta a main, en tandas de 100 ms y solo por los NUEVOS, qué reglas les
+// tocan. Todo corre en el mundo aislado de este preload: la página no ve el
+// observador ni nada nuevo en window. No se activa donde las listas lo apagan
+// (`generichide`, YouTube incluido) ni con el sitio en la lista blanca.
+if (ARRANQUE.genericos) {
+  try {
+    const vistas = new Set();   // 'c' + clase / 'i' + id ya preguntados
+    let clases = [], ids = [], tanda = 0;
+    const apunta = (el) => {
+      const id = el.id;
+      if (id && typeof id === 'string' && !vistas.has('i' + id)) { vistas.add('i' + id); ids.push(id); }
+      const cl = el.classList;
+      if (cl) for (let i = 0; i < cl.length; i++) if (!vistas.has('c' + cl[i])) { vistas.add('c' + cl[i]); clases.push(cl[i]); }
+    };
+    const recorre = (raiz) => {
+      if (raiz.nodeType !== 1) return;
+      apunta(raiz);
+      const hijos = raiz.querySelectorAll('[id],[class]');
+      for (let i = 0; i < hijos.length; i++) apunta(hijos[i]);
+    };
+    const envia = () => {
+      tanda = 0;
+      const c = clases, d = ids;
+      clases = []; ids = [];
+      ipcRenderer.invoke('adblock:genericos', c, d).then((sel) => {
+        for (let i = 0; i < sel.length; i += 200) webFrame.insertCSS(sel.slice(i, i + 200).join(',') + '{display:none !important}');
+      }).catch(() => {});
+    };
+    const programa = () => { if (!tanda && (clases.length || ids.length)) tanda = setTimeout(envia, 100); };
+    const obs = new MutationObserver((cambios) => {
+      for (const m of cambios) {
+        if (m.type === 'attributes') apunta(m.target);
+        else for (const n of m.addedNodes) recorre(n);
+      }
+      programa();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+      recorre(document.documentElement);
+      programa();
+      obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'] });
+    }, { once: true });
+  } catch (e) { /* nada */ }
+}
+
 // --- Identidad coherente del navegador (client hints) ---
 // main ya reescribe las cabeceras Sec-CH-UA, pero eso no basta: los antifraude
 // leen TAMBIÉN navigator.userAgentData desde JavaScript, y ahí Chromium seguía
@@ -457,116 +503,122 @@ if (enMoovin) {
   } catch (e) { /* nada */ }
 }
 
-// --- YouTube: bloqueo de anuncios a nivel del player, en document_start ---
-// El preload corre ANTES que los scripts de la página: vaciamos los campos de anuncio
-// de la respuesta del player (adPlacements/playerAds/adSlots) ANTES de que el player
-// la lea. Se cubren las TRES vías por las que llega esa respuesta:
+// --- YouTube: el muro anti-bloqueador, el arranque a 0:00 y la poda de respaldo ---
+// Los anuncios del reproductor los quitan los scriptlets de las listas (arriba):
+// json-prune, json-prune-fetch-response/xhr-response, trusted-replace-*-response
+// y set ytInitialPlayerResponse.*, los mismos que usan uBlock y Brave. Este bloque
+// ya NO poda por su cuenta cuando esos scriptlets llegan: lo hacía además de
+// ellos, y eso era doble trabajo en cada JSON.parse de YouTube y, peor, una
+// diferencia con uBlock que la página puede ver (Response.prototype.json dejaba
+// de ser nativa; medido el 03/11/2026 con la batería e2e, prueba "huellas").
+// La poda propia queda solo de RESPALDO, para cuando el motor aún no tiene
+// scriptlets que dar (primer arranque, antes de bajar las listas). Cubre las tres
+// vías por las que llega la respuesta del player:
 //   1. ytInitialPlayerResponse embebido en el HTML (primera carga, con URL directa).
 //   2. fetch(...).json()  -> Response.prototype.json.
 //   3. XHR + JSON.parse   -> buena parte de /youtubei/v1/player viaja así.
-// Cubrir solo la 2 era el fallo de antes: abrir un vídeo por URL directa iba limpio,
-// pero navegar dentro de YouTube (SPA) traía anuncios, porque esa vía no pasa por
-// Response.json. El hook de JSON.parse lleva una guarda barata (mira la cadena antes
-// de tocar nada) para no pagar el coste en los miles de parseos de YouTube, que es
-// justo por lo que se había quitado.
 // Se inyecta con contextBridge.executeInMainWorld, no con un <script> inline: el
 // <script> dependía de que main.js borrase la CSP de YouTube entera (un debilitamiento
 // real de seguridad) y aun así podía fallar en silencio. Ver el bloque de X arriba.
 if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
   try {
-    if (ipcRenderer.sendSync('yt-adblock-on', location.href)) {
+    // El interruptor del adblock Y la lista blanca (ver 'preload:arranque').
+    if (ARRANQUE.bloqueo) {
       // Nombre del evento con el que el mundo de la página avisa del muro: uno
       // nuevo por documento, porque la página también puede escuchar `document`
       // y un nombre fijo ("naviris-yt-muro") era una firma del navegador.
       const EVENTO_MURO = 'e' + Math.random().toString(36).slice(2, 10);
       contextBridge.executeInMainWorld({
-        args: [EVENTO_MURO],
-        func: function (EVENTO_MURO) {
+        args: [EVENTO_MURO, !ARRANQUE.scriptlets],
+        func: function (EVENTO_MURO, podar) {
           // Sin marca global (`window.__navYT`) para no inyectarse dos veces: el
           // preload corre una sola vez por documento, así que no hacía falta, y
           // una variable con ese nombre la puede leer cualquier script de YouTube.
-          // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
-          // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
-          //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
-          //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
-          //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
-          //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
-          //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
-          //   señal más con la que YouTube puede reconocer el bloqueador (la
-          //   lección de Amazon: no inventar señales sin medirlas).
-          // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
-          //   carga inicial, sí se anulan los tres, como hace uBlock con
-          //   `set ytInitialPlayerResponse.playerAds undefined`.
-          var AD_PLAYER = ['adPlacements', 'adSlots'];
-          var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
-          // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
-          // (o.playerResponse, y solo si era objeto), así que las respuestas donde
-          // el player response viene anidado —o como CADENA JSON, que es como lo
-          // sirven las rutas de Shorts— no se tocaban.
-          function prune(o, prof, campos) {
-            try {
-              if (!o || typeof o !== 'object' || prof > 4) return o;
-              for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
-              if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
-                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
-              }
-              var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
-              for (var k = 0; k < claves.length; k++) {
-                var v = o[claves[k]];
-                if (v && typeof v === 'object') {
-                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
-                  else prune(v, prof + 1, campos);
+          // Poda de respaldo, solo sin scriptlets (ver arriba).
+          if (podar) (function () {
+            // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
+            // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
+            //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
+            //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
+            //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
+            //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
+            //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
+            //   señal más con la que YouTube puede reconocer el bloqueador (la
+            //   lección de Amazon: no inventar señales sin medirlas).
+            // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
+            //   carga inicial, sí se anulan los tres, como hace uBlock con
+            //   `set ytInitialPlayerResponse.playerAds undefined`.
+            var AD_PLAYER = ['adPlacements', 'adSlots'];
+            var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
+            // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
+            // (o.playerResponse, y solo si era objeto), así que las respuestas donde
+            // el player response viene anidado —o como CADENA JSON, que es como lo
+            // sirven las rutas de Shorts— no se tocaban.
+            function prune(o, prof, campos) {
+              try {
+                if (!o || typeof o !== 'object' || prof > 4) return o;
+                for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
+                if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
+                  try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
                 }
-              }
+                var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
+                for (var k = 0; k < claves.length; k++) {
+                  var v = o[claves[k]];
+                  if (v && typeof v === 'object') {
+                    if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
+                    else prune(v, prof + 1, campos);
+                  }
+                }
+              } catch (e) { /* nada */ }
+              return o;
+            }
+            // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
+            function sospechosa(s) {
+              return typeof s === 'string' && s.length > 3000 &&
+                (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
+            }
+            // Se engancha la Response y no fetch, así que da igual cómo se pidió:
+            // con una URL o con fetch(new Request(...)), que es como YouTube pide
+            // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
+            // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
+            // Con Proxy y no con una función nuestra, como hace uBlock: así
+            // JSON.parse.toString() sigue diciendo "[native code]" y conserva su
+            // nombre y su length (2). Una función normal se distinguía a simple
+            // vista, y cada diferencia con uBlock es algo con lo que YouTube puede
+            // reconocer el bloqueador.
+            try {
+              Response.prototype.json = new Proxy(Response.prototype.json, {
+                apply: function (fn, yo, args) {
+                  return Reflect.apply(fn, yo, args).then(function (d) { return prune(d, 0, AD_PLAYER); });
+                }
+              });
             } catch (e) { /* nada */ }
-            return o;
-          }
-          // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
-          function sospechosa(s) {
-            return typeof s === 'string' && s.length > 3000 &&
-              (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
-          }
-          // Se engancha la Response y no fetch, así que da igual cómo se pidió:
-          // con una URL o con fetch(new Request(...)), que es como YouTube pide
-          // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
-          // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
-          // Con Proxy y no con una función nuestra, como hace uBlock: así
-          // JSON.parse.toString() sigue diciendo "[native code]" y conserva su
-          // nombre y su length (2). Una función normal se distinguía a simple
-          // vista, y cada diferencia con uBlock es algo con lo que YouTube puede
-          // reconocer el bloqueador.
-          try {
-            Response.prototype.json = new Proxy(Response.prototype.json, {
-              apply: function (fn, yo, args) {
-                return Reflect.apply(fn, yo, args).then(function (d) { return prune(d, 0, AD_PLAYER); });
-              }
-            });
-          } catch (e) { /* nada */ }
-          try {
-            JSON.parse = new Proxy(JSON.parse, {
-              apply: function (fn, yo, args) {
-                var r = Reflect.apply(fn, yo, args);
-                try { if (sospechosa(args[0])) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
-                return r;
-              }
-            });
-          } catch (e) { /* nada */ }
-          // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
-          // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
-          // además el propio XHR obligaría a registrar un listener en send(), que
-          // corre DESPUÉS del onreadystatechange que la página haya asignado antes:
-          // llegaríamos tarde justo en el caso que queríamos cubrir.
-          // Respuesta embebida: se poda la que YA esté puesta (puede haberse asignado
-          // antes que nosotros) y se deja el setter para la que venga.
-          try {
-            var _v;
-            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
-            Object.defineProperty(window, 'ytInitialPlayerResponse', {
-              configurable: true,
-              get: function () { return _v; },
-              set: function (n) { _v = prune(n, 0, AD_INICIAL); }
-            });
-          } catch (e) { /* nada */ }
+            try {
+              JSON.parse = new Proxy(JSON.parse, {
+                apply: function (fn, yo, args) {
+                  var r = Reflect.apply(fn, yo, args);
+                  try { if (sospechosa(args[0])) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
+                  return r;
+                }
+              });
+            } catch (e) { /* nada */ }
+            // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
+            // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
+            // además el propio XHR obligaría a registrar un listener en send(), que
+            // corre DESPUÉS del onreadystatechange que la página haya asignado antes:
+            // llegaríamos tarde justo en el caso que queríamos cubrir.
+            // Respuesta embebida: se poda la que YA esté puesta (puede haberse asignado
+            // antes que nosotros) y se deja el setter para la que venga.
+            try {
+              var _v;
+              try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
+              Object.defineProperty(window, 'ytInitialPlayerResponse', {
+                configurable: true,
+                get: function () { return _v; },
+                set: function (n) { _v = prune(n, 0, AD_INICIAL); }
+              });
+            } catch (e) { /* nada */ }
+          })();
           // Vídeos con anuncio cosido en el servidor (SSAP, `daiConfig`): al
           // podarles los campos de anuncio, el reproductor se queda en
           // "unstarted" (estado -1) esperando un anuncio que ya no está y el
