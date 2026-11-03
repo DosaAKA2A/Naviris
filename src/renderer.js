@@ -1684,10 +1684,12 @@ const WIDGET_TYPES = {
    Cada widget tiene UNA geometria {col,row,w,h}; si en una pantalla estrecha
    no cabe, se recoloca TEMPORALMENTE sin tocar la composicion. Ventana rara
    (vertical): modo flujo con scroll. */
-let CELDA_W = 160, CELDA_H = 160;
-const CELDA_GAP = 12; // reforma 2.8.1: baldosas más juntas
+/* La celda se dibuja SIEMPRE a su tamaño de diseño y la rejilla entera escala
+   con `zoom` (src/hub-escala.js): estas son medidas de diseño, no de pantalla. */
+const CELDA_W = hubEscala.CELDA, CELDA_H = hubEscala.CELDA;
+const CELDA_GAP = hubEscala.GAP; // reforma 2.8.1: baldosas más juntas
 const FILAS_LOGICAS = 5;
-let ultimoBucket = 'm', ultimasFilas = FILAS_LOGICAS; // 'm' = la unica maqueta
+let ultimasFilas = FILAS_LOGICAS;
 const TAMANOS = {
   clock: [[2, 1], [2, 2]],
   search: [[4, 1], [6, 1], [3, 1]],
@@ -1794,65 +1796,61 @@ function tallaValida(w) {
    te destrozaba la composición buena.
 
    Ahora hay UNA maqueta (la tuya) y la ventana solo decide cómo se enseña:
-     · Cabe entera            -> misma maqueta, celda más pequeña.
+     · Lo ocupado cabe        -> misma maqueta ESCALADA entera (zoom), con las
+       calles vacías de alrededor como aire (src/hub-escala.js).
      · Cabe a lo ancho pero no a lo alto -> misma maqueta y SCROLL vertical.
      · No cabe ni a lo ancho (ventana estrecha o vertical) -> REFLUJO: se
        reordena en orden de lectura en las columnas que quepan.
    El reflujo NO se guarda nunca: al agrandar la ventana vuelve tu maqueta
    intacta. Solo se guarda lo que muevas tú en modo edición. */
-/* Las celdas NO bajan de este tamaño: los widgets están dibujados para una
-   celda de ~150px y encogiéndolos se les rompe el contenido (el Monitor se
-   corta, el reproductor se aplasta, las filas de Correo se parten). Antes se
-   encogía hasta 66px con tal de que la maqueta cupiera, y eso era lo que se
-   veía roto. Se prefiere reordenar y hacer scroll antes que encoger.
-
-   UN SOLO NÚMERO, 150 (2026-08-18). Había tres —150 de diseño, 132 "cómoda" y
-   118 "mínima"— y los dos de abajo eran ilusiones. Probado en la app: a 120px
-   el reproductor monta el botón "Abrir Spotify" encima del control de volumen
-   y la tarjeta de la cuenta pierde el texto; a 132px el reproductor SIGUE
-   roto igual. O sea que no hay un tamaño intermedio en el que esto se vea
-   bien: o los widgets se dibujan al tamaño para el que están hechos, o se
-   rompen. Así que la maqueta no se pinta nunca por debajo de 150, y si no
-   cabe se prueba la composición estrecha y, si tampoco, reflujo — donde los
-   widgets también van a 150 y el buscador y los accesos mandan. */
-const CELDA_DISENO = 150;  // tamaño con el que están dibujados los widgets
-/* SUELO REAL (2026-09-09): por debajo de esto sí se reordena en columnas. Antes
-   el suelo ERA la celda de diseño, y eso dejaba 1920×1080 —la pantalla más
-   común— siempre en modo lista: la celda le sale a 122 px, así que el hub se
-   reordenaba y Editar quedaba bloqueado ("no le deja editar"). Con 116 la
-   composición aguanta en 1080p y solo se reordena de verdad cuando no cabe. */
-const CELDA_MINIMA = 116;
-/* Lo que se reserva arriba y abajo, en CONSTANTES y no leyendo el padding vivo:
-   el padding cambia con la clase .con-scroll, que a su vez depende de esta
-   cuenta — leerlo hacía que las dos se persiguieran y la celda oscilara. */
-const RESERVA_SUP = 24, RESERVA_INF = 130;
+/* Hasta noviembre de 2026 la celda no bajaba de 116 px porque el contenido de
+   los widgets estaba en px fijos para 150 ("a 120 px el reproductor monta el
+   botón encima del volumen"): por debajo, reflujo. Eso dejaba en reflujo a
+   todos los portátiles. Ahora el contenido escala CON la celda (zoom sobre la
+   rejilla), así que encoger ya no rompe nada: las cuentas viven en
+   src/hub-escala.js. */
+/* Lo que pisa el hub por fuera de la rejilla se MIDE, no se supone: el dock y
+   los botones de abajo cambian con el ancho (suben sobre los botones) y con el
+   alto (densidad compacta). No dependen de la rejilla, así que medirlos no
+   provoca la persecución que obligó a usar constantes con el padding. */
 let COLS_MAESTRA = 13, FILAS_MAESTRA = 7;
 function medidasMalla() {
-  // OJO: en el primer render el hub aun mide 0 y caer a window.innerHeight
-  // daba una celda mas grande de la cuenta (la malla no cabia y aparecia
-  // scroll). 116px = titlebar + navbar.
-  const anchoHub = els.hub.clientWidth || (window.innerWidth - 48);
-  const altoHub = els.hub.clientHeight || (window.innerHeight - 116);
-  const anchoUtil = anchoHub * 0.94;
-  const altoUtil = altoHub - RESERVA_SUP - RESERVA_INF;
-  const C = COLS_MAESTRA, F = FILAS_MAESTRA;
-  const cwAncho = Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C);
-  const cwAlto = Math.floor((altoUtil - (F - 1) * CELDA_GAP) / F);
-  if (cwAncho >= CELDA_MINIMA) {
-    // La maqueta se conserva. Si el alto no da, celda mínima y scroll: mucho
-    // mejor que reordenar los widgets por una ventana un poco baja.
-    // El SUELO solo decide si se reordena; el TAMAÑO sigue mandándolo la celda
-    // de diseño, para que en pantallas grandes los widgets no encojan.
-    const cw = Math.min(cwAncho, Math.max(cwAlto, CELDA_DISENO));
-    return { bucket: 'm', cols: C, cw, filas: F, reflujo: false, raro: cw > cwAlto };
-  }
-  // Ventana estrecha o vertical: reflujo en columnas, con la celda de DISEÑO
-  // (los widgets se ven como deben) y scroll. Solo se encoge por debajo si la
-  // ventana es tan estrecha que no cabrían ni dos columnas.
-  let cw = CELDA_DISENO;
-  let cols = Math.floor((anchoUtil + CELDA_GAP) / (cw + CELDA_GAP));
-  if (cols < 2) { cols = 2; cw = Math.max(96, Math.floor((anchoUtil - CELDA_GAP) / 2)); }
-  return { bucket: 'm', cols, cw, filas: 400, reflujo: true, raro: true };
+  const r = els.hub.getBoundingClientRect();
+  // En el primer render el hub puede medir 0: titlebar + navbar y riel lateral.
+  const hub = { ancho: r.width || (window.innerWidth - 70), alto: r.height || (window.innerHeight - 106) };
+  let dock = els.hubDock.getBoundingClientRect();
+  const acc = document.querySelector('.hub-actions').getBoundingClientRect();
+  /* En pantallas bajas el dock va en la fila de los botones (densidad compacta).
+     Si con tus accesos choca a lo ancho con los botones o con la versión, sube
+     encima. Se mira solo el ancho, que no cambia al subir: no hay vaivén. */
+  const ver = document.getElementById('hub-version').getBoundingClientRect();
+  const choca = (q) => q.width && dock.left < q.right + 8 && q.left < dock.right + 8;
+  const sube = !!dock.width && (choca(acc) || choca(ver));
+  if (sube !== els.hub.classList.contains('dock-sube')) { els.hub.classList.toggle('dock-sube', sube); dock = els.hubDock.getBoundingClientRect(); }
+  const inf = (r.height && dock.height) ? Math.ceil(r.bottom - Math.min(dock.top, acc.top)) + 12 : 130;
+  const esq = document.querySelector('.hub-corner').getBoundingClientRect();
+  const esquina = (r.height && esq.height) ? { ancho: r.right - esq.left, alto: esq.bottom - r.top } : null;
+  const caja = hubEscala.cajaOcupada(delBucket().map((x) => x.geo.m));
+  const m = hubEscala.encuadre({
+    hub, cols: COLS_MAESTRA, filas: FILAS_MAESTRA, inf, esquina, caja,
+    edicion: els.hub.classList.contains('editing')
+  });
+  // En reflujo la rejilla va en flujo: arriba solo se le deja sitio a la esquina.
+  m.inf = inf; m.caja = caja; m.sup = esquina ? esquina.alto + 8 : 92;
+  return m;
+}
+/* Coloca y escala la rejilla. Solo escribe estilo de la rejilla: no rehace
+   widgets, así que se puede llamar en cada fotograma de un redimensionado. El
+   margen va en px de DISEÑO porque el zoom también escala los de la propia
+   rejilla. */
+let encuadreHub = null;
+function aplicaEncuadre(m) {
+  const g = els.widgetGrid.style;
+  g.setProperty('--z', m.s);   // zoom de la rejilla (y contrazoom de las herramientas de edición)
+  els.hub.style.setProperty('--franja', m.inf + 'px');
+  if (m.modo === 'reflujo') { g.marginLeft = g.marginTop = ''; g.paddingTop = (m.sup / m.s) + 'px'; }
+  else { g.marginLeft = (m.x / m.s) + 'px'; g.marginTop = (m.y / m.s) + 'px'; g.paddingTop = ''; }
+  encuadreHub = m;
 }
 function libre(occ, col, row, w, h, cols) {
   if (col < 1 || row < 1 || col + w - 1 > cols || row + h - 1 > ultimasFilas) return false;
@@ -2119,7 +2117,7 @@ const CROMO_ANCHO = 70;
 function cabenColumnas(C) {
   const p = window.screen || {};
   const anchoUtil = (((p.width || window.innerWidth) - CROMO_ANCHO) * 0.94);
-  return Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C) >= CELDA_DISENO;
+  return Math.floor((anchoUtil - (C - 1) * CELDA_GAP) / C) >= CELDA_W;
 }
 /* Qué composición le toca a esta pantalla. Manda la FORMA, como quería Dosa:
    21:9 lleva 17 columnas y 16:9 lleva 13. Pero un 21:9 corto (2560x1080) no da
@@ -2249,23 +2247,55 @@ function renderDock() {
   dock.appendChild(add);
   if (!dock.dataset.armado) { armaDock(dock); dock.dataset.armado = '1'; }
 }
+/* LISTAS SIN SCROLL (tendencias, correo, descargas, portapapeles): solo se
+   enseñan las filas que CABEN completas. Se mide en pantalla
+   (getBoundingClientRect): offsetTop cuenta desde el widget mientras la lista
+   no está posicionada y escondía filas que cabían; en el portapapeles 2x1 no
+   cabía ni la primera. Eran cuatro copias de lo mismo, medidas UNA vez: con el
+   hub escalado la letra pequeña tiene suelo y la proporción cambia con la
+   escala, así que ahora cada lista se recuerda y se vuelve a medir cuando la
+   escala se asienta (remideListas, desde reencuadra). */
+const listasRecortadas = new Map();   // lista -> [selector de fila, holgura en px]
+function mideFilas(cont, sel, holgura) {
+  const filas = cont.querySelectorAll(sel);
+  filas.forEach((f) => { f.style.display = ''; });
+  const tope = cont.getBoundingClientRect().bottom;
+  filas.forEach((f) => { if (f.getBoundingClientRect().bottom > tope + holgura) f.style.display = 'none'; });
+}
+function recortaFilas(cont, sel, holgura = 0.5) {
+  listasRecortadas.set(cont, [sel, holgura]);
+  requestAnimationFrame(() => { if (cont.isConnected) mideFilas(cont, sel, holgura); });
+}
+function remideListas() {
+  for (const [cont, [sel, holgura]] of listasRecortadas) {
+    if (cont.isConnected) mideFilas(cont, sel, holgura); else listasRecortadas.delete(cont);
+  }
+}
 function renderHub() {
   renderDock();
   els.widgetGrid.innerHTML = '';
+  // Las pastillas de la esquina DUPLICAN widgets: con el widget presente en el
+  // hub, su pastilla sobra (y en pantallas normales chocaba con la columna
+  // derecha). El conmutador de tema, que no tiene widget, se queda. Va ANTES
+  // de medir: lo que ocupa la esquina entra en las cuentas del encuadre.
+  const tipos = new Set(widgets.map((x) => x.type));
+  document.getElementById('hub-account')?.classList.toggle('hidden', tipos.has('user'));
+  document.getElementById('hub-weather')?.classList.toggle('hidden', tipos.has('weather'));
   const m = medidasMalla();
-  ultimoBucket = m.bucket; ultimasFilas = m.filas;
-  const reflujo = !!m.reflujo;
-  els.hub.classList.toggle('con-scroll', !!m.raro);
+  const reflujo = m.modo === 'reflujo';
+  ultimasFilas = reflujo ? 400 : FILAS_MAESTRA;
+  els.hub.classList.toggle('con-scroll', m.modo !== 'maqueta');
   els.hub.classList.toggle('reflujo', reflujo);
-  if (reflujo) els.hub.classList.remove('editing');   // sin sitio no se compone
   const cols = m.cols; ultimoCols = cols;
-  CELDA_W = m.cw; CELDA_H = m.cw; // celda cuadrada que ESCALA con el monitor
   els.widgetGrid.style.gridTemplateColumns = `repeat(${cols}, ${CELDA_W}px)`;
   // Filas SIEMPRE explicitas: si la grilla solo creaba las usadas, el bloque
   // centrado quedaba desplazado respecto a la malla de guias. En reflujo van
   // implicitas: las filas las pone el contenido, no un numero fijo (las 60 de
-  // antes creaban 10.000px de vacio con la mitad fuera del scroll).
-  els.widgetGrid.style.gridTemplateRows = reflujo ? 'none' : `repeat(${m.filas}, ${CELDA_H}px)`;
+  // antes creaban 10.000px de vacio con la mitad fuera del scroll). Con scroll
+  // y sin editar se pintan hasta la última OCUPADA: las vacías de debajo solo
+  // alargarían el recorrido.
+  const filasPintadas = (m.modo === 'scroll' && m.caja && !els.hub.classList.contains('editing')) ? m.caja.r1 : FILAS_MAESTRA;
+  els.widgetGrid.style.gridTemplateRows = reflujo ? 'none' : `repeat(${filasPintadas}, ${CELDA_H}px)`;
   els.widgetGrid.style.gridAutoRows = `${CELDA_H}px`;
   els.widgetGrid.style.gap = `${CELDA_GAP}px`;
   // Alto de los accesos y empuje de los de abajo: SOLO para esta pintada. En
@@ -2401,7 +2431,7 @@ function renderHub() {
   // En reflujo no hay guias: no se puede componer (y con las filas del
   // contenido serian miles de celdas dibujadas para nada).
   const malla = document.createElement('div'); malla.className = 'gmalla';
-  const filasGuia = reflujo ? 0 : ultimasFilas;
+  const filasGuia = reflujo ? 0 : filasPintadas;
   const midCols = cols % 2 ? [(cols + 1) / 2] : [cols / 2, cols / 2 + 1];
   const midFilas = filasGuia % 2 ? [(filasGuia + 1) / 2] : [filasGuia / 2, filasGuia / 2 + 1];
   for (let r = 1; r <= filasGuia; r++) for (let c = 1; c <= cols; c++) {
@@ -2412,19 +2442,12 @@ function renderHub() {
     g.style.width = CELDA_W + 'px'; g.style.height = CELDA_H + 'px';
     malla.appendChild(g);
   }
+  // La rejilla ya no lleva padding ni centrado propio (la coloca aplicaEncuadre):
+  // la capa de guías va pegada a su esquina, en px de diseño como las celdas.
+  malla.style.width = hubEscala.tam(cols) + 'px';
+  malla.style.height = Math.max(0, hubEscala.tam(filasGuia)) + 'px';
   els.widgetGrid.appendChild(malla);
-  requestAnimationFrame(() => {
-    const cs = getComputedStyle(els.widgetGrid);
-    const padL = parseFloat(cs.paddingLeft) || 0, padT = parseFloat(cs.paddingTop) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0, padB = parseFloat(cs.paddingBottom) || 0;
-    const anchoCeldas = cols * CELDA_W + (cols - 1) * CELDA_GAP;
-    const altoCeldas = Math.max(0, filasGuia * CELDA_H + (filasGuia - 1) * CELDA_GAP);
-    const dispW = els.widgetGrid.clientWidth - padL - padR;
-    const dispH = els.widgetGrid.clientHeight - padT - padB;
-    malla.style.left = (padL + Math.max(0, (dispW - anchoCeldas) / 2)) + 'px';
-    malla.style.top = (padT + Math.max(0, (dispH - altoCeldas) / 2)) + 'px';
-    malla.style.width = anchoCeldas + 'px'; malla.style.height = altoCeldas + 'px';
-  });
+  aplicaEncuadre(m);
   armaDnd();
   /* AL TOPE en cada recomposición. Si venías con la ventana pequeña y el hub
      desplazado, al maximizar la maqueta entera NO lleva scroll: el contenedor
@@ -2435,37 +2458,16 @@ function renderHub() {
   // Los contenedores que scrollean dentro de los widgets acaban de nacer:
   // se enganchan al scroll propio (nunca la barra del sistema).
   if (window.nvsRepasa) requestAnimationFrame(window.nvsRepasa);
-  // Si al medir de verdad la celda sale distinta (primer render sin layout),
-  // se repinta UNA vez con la medida buena.
-  if (!renderHub._ajustando) {
-    requestAnimationFrame(() => {
-      const m2 = medidasMalla();
-      if (m2.cw !== CELDA_W || m2.cols !== ultimoCols || m2.filas !== ultimasFilas) {
-        renderHub._ajustando = true; renderHub(); renderHub._ajustando = false;
-      }
-    });
-  }
   tickClock();
-  // Las pastillas de la esquina DUPLICAN widgets: con el widget presente en el
-  // hub, su pastilla sobra (y en pantallas normales chocaba con la columna
-  // derecha). El conmutador de tema, que no tiene widget, se queda.
-  const tipos = new Set(widgets.map((x) => x.type));
-  document.getElementById('hub-account')?.classList.toggle('hidden', tipos.has('user'));
-  document.getElementById('hub-weather')?.classList.toggle('hidden', tipos.has('weather'));
 }
 /* Motor de arrastre de la grilla: fantasma verde/rojo bajo el cursor; soltar
    coloca si el area esta libre, intercambia si cae sobre otro y AMBOS caben,
    y avisa si no hay sitio. */
+/* El ratón va en px de pantalla y la rejilla está escalada: el rectángulo de
+   getBoundingClientRect ya viene con el zoom, y el paso de celda se multiplica
+   por la escala (hubEscala.celdaEn). */
 function celdaDe(e) {
-  const r = els.widgetGrid.getBoundingClientRect();
-  const cs = getComputedStyle(els.widgetGrid);
-  const anchoMalla = ultimoCols * CELDA_W + (ultimoCols - 1) * CELDA_GAP;
-  const x0 = r.left + (r.width - anchoMalla) / 2; // la malla va centrada
-  const y0 = r.top + parseFloat(cs.paddingTop);
-  return {
-    col: Math.max(1, Math.floor((e.clientX - x0) / (CELDA_W + CELDA_GAP)) + 1),
-    row: Math.max(1, Math.floor((e.clientY - y0) / (CELDA_H + CELDA_GAP)) + 1)
-  };
+  return hubEscala.celdaEn(e.clientX, e.clientY, els.widgetGrid.getBoundingClientRect(), encuadreHub.s);
 }
 /* Estirar por los BORDES (modo Editar, tallas libres): arrastras el asa y la
    caja crece/encoge por celdas con vista previa; si el rectangulo final pisa
@@ -2503,8 +2505,8 @@ function armaRedim(el, w, dir) {
     const occ = new Set(); delBucket().forEach((x) => { if (x.id !== w.id) ocupa(occ, x); });
     const mueve = (ev) => {
       let nw = w0, nh = h0;
-      if (dir.includes('r')) nw = Math.max(1, w0 + Math.round((ev.clientX - x0) / (CELDA_W + CELDA_GAP)));
-      if (dir.includes('b')) nh = Math.max(1, h0 + Math.round((ev.clientY - y0) / (CELDA_H + CELDA_GAP)));
+      if (dir.includes('r')) nw = Math.max(1, w0 + hubEscala.celdasDe(ev.clientX - x0, encuadreHub.s));
+      if (dir.includes('b')) nh = Math.max(1, h0 + hubEscala.celdasDe(ev.clientY - y0, encuadreHub.s));
       nw = Math.min(nw, ultimoCols - w.col + 1);
       el.style.gridColumn = w.col + ' / span ' + nw;
       el.style.gridRow = w.row + ' / span ' + nh;
@@ -3260,15 +3262,7 @@ function renderXTrends(body) {
       e.stopPropagation(); navigateActive('https://x.com/search?q=' + encodeURIComponent(items[i]));
     }));
     // Sin scrollbar: solo las filas que CABEN completas en la talla actual.
-    // Medido en pantalla: offsetTop cuenta desde el widget (con su cabecera)
-    // mientras la lista no está posicionada, y se escondían filas que cabían.
-    requestAnimationFrame(() => {
-      const cont = body.querySelector('.xt-lista'); if (!cont) return;
-      const tope = cont.getBoundingClientRect().bottom;
-      cont.querySelectorAll('.xt-i').forEach((f) => {
-        if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none';
-      });
-    });
+    const cont = body.querySelector('.xt-lista'); if (cont) recortaFilas(cont, '.xt-i');
   };
   /* La caché duraba 20 min PARA TODO, también para el respaldo mundial: una
      vez caía ahí seguía enseñando mundiales veinte minutos aunque ya tuvieras
@@ -3443,11 +3437,7 @@ function renderMail(body) {
     ata();
     recorta();
     function recorta() {
-      const cont = body.querySelector('.ml-lista'); if (!cont) return;
-      requestAnimationFrame(() => {
-        const tope = cont.getBoundingClientRect().bottom;   // en pantalla: ver renderXTrends
-        cont.querySelectorAll('.ml-i').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 2) f.style.display = 'none'; });
-      });
+      const cont = body.querySelector('.ml-lista'); if (cont) recortaFilas(cont, '.ml-i', 2);
     }
     function ata() {
       body.querySelectorAll('.ml-recarga').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); pinta(true); }));
@@ -3498,10 +3488,7 @@ function llenaHoyDescargas(body) {
       return `<button class="dlw-r" data-n="${escapeHtml(f.name)}"><span class="dlw-r-k">${escapeHtml(ext)}</span><span class="dlw-r-n">${escapeHtml(f.name)}</span></button>`;
     }).join('') || '<div class="w-vacio">Hoy no has descargado nada</div>';
     cont.querySelectorAll('.dlw-r').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); window.cobalt.openDownloadFile(b.dataset.n); }));
-    requestAnimationFrame(() => {
-      const tope = cont.getBoundingClientRect().bottom;   // en pantalla: ver renderXTrends
-      cont.querySelectorAll('.dlw-r').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none'; });
-    });
+    recortaFilas(cont, '.dlw-r');
   }).catch(() => { cont.innerHTML = '<div class="w-vacio">No se pudo leer la carpeta</div>'; });
 }
 function actualizaDescargasW() {
@@ -3716,11 +3703,7 @@ function pintaClip() {
         { label: 'Eliminar', icon: 'trash', danger: true, action: () => { store.set('cobalt.clip', clipHist().filter((x) => x !== t)); pintaClip(); } }
       ]);
     }));
-    requestAnimationFrame(() => {
-      // En pantalla: con offsetTop (desde el widget) en 2x1 no cabía ni la primera
-      const tope = cont.getBoundingClientRect().bottom;
-      cont.querySelectorAll('.clip-i').forEach((f) => { if (f.getBoundingClientRect().bottom > tope + 0.5) f.style.display = 'none'; });
-    });
+    recortaFilas(cont, '.clip-i');
   });
 }
 
@@ -4399,17 +4382,16 @@ function cierraMenusHub(excepto) {
   });
 })();
 
+/* Editar ya no se bloquea en ventanas pequeñas: al entrar se enseña la maqueta
+   ENTERA escalada a lo ancho (con scroll si a lo alto no cabe), así que
+   siempre hay celdas donde colocar y lo que se guarda es tu composición real,
+   nunca el reflujo. Al salir vuelve el encuadre normal. */
 els.hubEdit.addEventListener('click', () => {
-  // En reflujo lo que se ve NO es tu maqueta, sino una recolocación temporal
-  // por falta de ancho: componer ahí guardaría posiciones sin sentido.
-  if (els.hub.classList.contains('reflujo')) {
-    toast('Agranda la ventana para componer el hub');
-    return;
-  }
   const on = els.hub.classList.toggle('editing'); els.hubEdit.classList.toggle('on', on);
   els.widgetPalette.classList.toggle('hidden', !on); cierraMenusHub();
   els.hubEdit.querySelector('.lbl').textContent = on ? 'Listo' : 'Editar';
   if (on) renderPalette();
+  renderHub();
 });
 function renderPalette() {
   els.paletteList.innerHTML = '';
@@ -4590,14 +4572,29 @@ function ajustarVidrioAlFondo(v) {
   img.src = m[1];
 }
 
-/* Al cambiar de tamaño la ventana, el hub se recompone si cambia la celda, el
-   número de columnas o el modo (reflujo). Antes aquí se regeneraban también el
-   grano y la copia desenfocada del fondo: reforma 2.8.1, ya no existen. */
-let resizeTimer = null;
-window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => {
+/* Al cambiar de tamaño el hub (ventana, panel lateral, barra de marcadores o
+   el propio hub al aparecer) la rejilla se REENCUADRA: escala y posición, sin
+   rehacer ni un widget, en el mismo fotograma (el ResizeObserver llega después
+   de maquetar y antes de pintar, una vez por fotograma como mucho: no hace
+   falta otro freno). Solo si cambia el modo (maqueta, scroll o reflujo) o las
+   columnas del reflujo hay que repintar los widgets, y eso se agrupa: arrastrar
+   el borde de la ventana no rehace el hub en cada paso. Antes todo esperaba
+   250 ms y repintaba entero. */
+let rehaceHub = null, remideTimer = null;
+function reencuadra() {
+  if (!els.hub.clientWidth || !encuadreHub) return;
   const m = medidasMalla();
-  if (m.cw !== CELDA_W || m.cols !== ultimoCols || !!m.reflujo !== els.hub.classList.contains('reflujo')) renderHub();
-}, 250); });
+  if (m.modo !== encuadreHub.modo || m.cols !== encuadreHub.cols) {
+    clearTimeout(rehaceHub); rehaceHub = setTimeout(renderHub, 120);
+    return;
+  }
+  if (m.s !== encuadreHub.s) { clearTimeout(remideTimer); remideTimer = setTimeout(remideListas, 150); }
+  if (m.s !== encuadreHub.s || m.x !== encuadreHub.x || m.y !== encuadreHub.y || m.inf !== encuadreHub.inf || m.sup !== encuadreHub.sup) aplicaEncuadre(m);
+}
+// También la esquina y el dock: la pastilla del clima llega tarde (red) y el
+// dock cambia con los accesos, y los dos cuentan como sitio ocupado.
+const vigilaEncuadre = new ResizeObserver(reencuadra);
+[els.hub, els.hubDock, document.querySelector('.hub-corner')].forEach((el) => vigilaEncuadre.observe(el));
 /* ===== TRANSPARENCIA DE LAS BALDOSAS (2026-09-09) =====
    Un solo número (0 = opacas, 65 = muy transparentes) que el CSS reparte entre
    todas las superficies del hub con color-mix. El desenfoque solo se enciende
@@ -7071,7 +7068,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
       const h = thumb.offsetHeight;
       const recorrido = Math.max(40, alto - MARGEN * 2) - h;   // el mismo hueco que usa medir()
       if (recorrido <= 0) return;
-      host.scrollTop = arrastre.top0 + (e.clientY - arrastre.y0) * ((total - alto) / recorrido);
+      host.scrollTop = arrastre.top0 + (e.clientY - arrastre.y0) / arrastre.zoom * ((total - alto) / recorrido);
     };
     const suelta = () => {
       arrastre = null; rodando();
@@ -7079,7 +7076,9 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
     };
     thumb.addEventListener('mousedown', (e) => {
       e.preventDefault(); e.stopPropagation();
-      arrastre = { y0: e.clientY, top0: host.scrollTop };
+      // Dentro del hub escalado el ratón va en px de pantalla y el contenedor en
+      // los suyos: sin esto el pulgar corría más o menos que el puntero.
+      arrastre = { y0: e.clientY, top0: host.scrollTop, zoom: (host.getBoundingClientRect().height / host.offsetHeight) || 1 };
       bar.classList.add('visible', 'rodando');
       // En window solo mientras se arrastra: fijos, cada contenedor dejaba dos para siempre.
       window.addEventListener('mousemove', mueve); window.addEventListener('mouseup', suelta);
