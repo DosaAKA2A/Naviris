@@ -141,3 +141,21 @@ test('motor montado en un hilo aparte y serializado: decide igual que el montado
   assert.doesNotMatch(s('https://otra.example/'), /banderaSinPermiso/);
   assert.doesNotMatch(s('https://www.youtube.com/'), /Accept the use of cookie/, 'REGLAS_FUERA también en el hilo');
 });
+
+// Va la última: deja montado un motor distinto del de las pruebas de arriba.
+test('si el hilo del motor no contesta, se termina al tope y se monta en el principal', async () => {
+  const lineas = [];
+  const log = console.log;
+  console.log = (...a) => lineas.push(a.join(' '));
+  const t0 = Date.now();
+  try {
+    await adblock.montaYGuarda(new Map([[1, '||colgado.example^']]), RECURSOS, { archivo: path.join(__dirname, 'ayudas', 'hilo-colgado.js'), topeMs: 300 });
+  } finally { console.log = log; }
+  const ms = Date.now() - t0;
+  assert.ok(ms >= 300 && ms < 5000, 'tardó ' + ms + ' ms');
+  assert.equal(lineas.filter((l) => /no contestó en 0\.3 s/.test(l)).length, 1, 'una línea en el registro: ' + lineas.join(' | '));
+  assert.ok(lineas.some((l) => /montado en el hilo principal/.test(l)));
+  assert.equal(adblock.check(pide('https://colgado.example/x.js'), 'https://site.example/').bloquear, true, 'el motor de respaldo bloquea');
+  // Que el hilo se termina de verdad lo comprueba el propio proceso del test: un
+  // hilo que siguiera dando vueltas no le dejaría acabar.
+});
