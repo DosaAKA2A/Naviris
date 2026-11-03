@@ -15,7 +15,7 @@ const carpeta = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'naviris
 test.after(() => { for (const d of temporales) fs.rmSync(d, { recursive: true, force: true }); });
 
 // Perfil sintético con la tabla de cookies de Chromium (solo las columnas que se miran).
-function perfil(cookies, particiones = ['cobalt']) {
+function perfil(cookies, particiones = ['naviris']) {
   const ud = carpeta();
   for (const p of particiones) {
     const dir = path.join(ud, 'Partitions', p, 'Network');
@@ -32,7 +32,7 @@ function perfil(cookies, particiones = ['cobalt']) {
   }
   return ud;
 }
-const quedan = (ud, p = 'cobalt') => {
+const quedan = (ud, p = 'naviris') => {
   const db = new DatabaseSync(path.join(ud, 'Partitions', p, 'Network', 'Cookies'));
   const r = db.prepare('SELECT host_key AS host, name AS nombre, top_frame_site_key AS top FROM cookies').all().map((c) => ({ ...c }));
   db.close();
@@ -43,7 +43,7 @@ const PARTICIONADA_YT = { host: '.youtube.com', nombre: 'VISITOR_INFO1_LIVE', to
 
 test('borra la YSC de youtube.com que salió de un iframe (firma de la conversión)', () => {
   const ud = perfil([PARTICIONADA_YT, { host: '.youtube.com', nombre: 'YSC' }]);
-  const borradas = limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'cobalt', 'Network', 'Cookies'));
+  const borradas = limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'naviris', 'Network', 'Cookies'));
   assert.deepEqual(borradas, [{ host: '.youtube.com', nombre: 'YSC' }]);
   assert.deepEqual(quedan(ud).map((c) => c.nombre), ['VISITOR_INFO1_LIVE']);   // la particionada no se toca
 });
@@ -51,7 +51,7 @@ test('borra la YSC de youtube.com que salió de un iframe (firma de la conversi�
 test('nunca toca cookies de sesión iniciada, aunque tengan la firma', () => {
   const nombres = ['SID', 'SAPISID', '__Secure-1PSID', '__Secure-3PSIDTS', 'LOGIN_INFO', 'auth_token', 'ct0', 'twid', 'server_session_id', '_csrf', 'sp_dc'];
   const ud = perfil([PARTICIONADA_YT, ...nombres.map((nombre) => ({ host: '.youtube.com', nombre }))]);
-  assert.deepEqual(limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'cobalt', 'Network', 'Cookies')), []);
+  assert.deepEqual(limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'naviris', 'Network', 'Cookies')), []);
 });
 
 test('no borra si falta cualquier parte del criterio', () => {
@@ -64,11 +64,11 @@ test('no borra si falta cualquier parte del criterio', () => {
     { host: '.youtube.com', nombre: 'C', top: 'https://x.com' },         // particionada de verdad
     { host: 'www.youtube.com', nombre: 'D' }                             // otro host_key
   ]);
-  assert.deepEqual(limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'cobalt', 'Network', 'Cookies')), []);
+  assert.deepEqual(limpiaCookiesDeIframes(path.join(ud, 'Partitions', 'naviris', 'Network', 'Cookies')), []);
 });
 
 test('corre una sola vez, en todas las sesiones persistentes, y lo apunta', () => {
-  const ud = perfil([PARTICIONADA_YT, { host: '.youtube.com', nombre: 'YSC' }], ['cobalt', 'cont-abc']);
+  const ud = perfil([PARTICIONADA_YT, { host: '.youtube.com', nombre: 'YSC' }], ['naviris', 'cont-abc']);
   const settings = {};
   const borradas = migraPerfil(settings, ud);
   assert.equal(borradas.length, 2);
@@ -86,7 +86,7 @@ test('perfil nuevo sin bases: se apunta como hecha sin borrar nada', () => {
 
 test('si una base no se puede abrir, no se apunta y se reintenta', () => {
   const ud = perfil([]);
-  fs.writeFileSync(path.join(ud, 'Partitions', 'cobalt', 'Network', 'Cookies'), 'esto no es sqlite');
+  fs.writeFileSync(path.join(ud, 'Partitions', 'naviris', 'Network', 'Cookies'), 'esto no es sqlite');
   const settings = {};
   assert.throws(() => migraPerfil(settings, ud));
   assert.equal(settings.migraciones, undefined);

@@ -78,13 +78,13 @@ async function abreNaviris(perfil) {
   const proc = spawn(electron, [RAIZ, '--user-data-dir=' + perfil, '--remote-debugging-port=' + PUERTO], { stdio: 'ignore' });
   const t = await hasta(async () => (await lista()).find((x) => x.type === 'page' && /index\.html/.test(x.url)), 30000);
   const ui = await conecta(t.webSocketDebuggerUrl);
-  await hasta(() => ui.ev(`typeof createTab === 'function' && typeof window.cobalt === 'object'`));
+  await hasta(() => ui.ev(`typeof createTab === 'function' && typeof window.navirisApp === 'object'`));
   await espera(1500);
   return { proc, ui };
 }
 async function cierraNaviris({ proc, ui }) {
   // Cierre normal (botón de la ventana): pasa por el before-quit
-  await ui.ev('window.cobalt.close(), 1').catch(() => {});
+  await ui.ev('window.navirisApp.close(), 1').catch(() => {});
   ui.cierra();
   await Promise.race([new Promise((r) => proc.once('exit', r)), espera(15000)]);
   if (proc.exitCode === null) proc.kill();
@@ -143,7 +143,7 @@ test('el aviso de beforeunload no congela el proceso principal y al aceptar reca
     app.ui.ev(`tabs.find((t) => t.webview && t.webview.getURL().endsWith('/bu')).webview.reload(), 1`).catch(() => {});
     await espera(1500);
     // Con el aviso abierto, la interfaz y la red de otra pestaña siguen respondiendo
-    const ipc = await Promise.race([app.ui.ev(`window.cobalt.version().then(() => 'ok')`), espera(3000).then(() => 'colgado')]);
+    const ipc = await Promise.race([app.ui.ev(`window.navirisApp.version().then(() => 'ok')`), espera(3000).then(() => 'colgado')]);
     assert.equal(ipc, 'ok');
     const red = await Promise.race([otra.ev(`fetch('/?' + Math.random()).then((r) => r.status)`), espera(3000).then(() => 'colgado')]);
     assert.equal(red, 200);

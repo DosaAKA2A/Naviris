@@ -1,5 +1,5 @@
 // Genera build/icon.ico (multi-resolución) a partir de build/icon.png, para que
-// el instalador NSIS y el ejecutable muestren el logo de Cobalt.
+// el instalador NSIS y el ejecutable muestren el logo de Naviris.
 // Se ejecuta con Electron: los .ico con PNG embebido los soporta Windows Vista+.
 const { app, nativeImage } = require('electron');
 const fs = require('fs');

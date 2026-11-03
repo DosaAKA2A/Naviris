@@ -184,7 +184,7 @@ test('ventanas emergentes: sin gesto se bloquean y avisan; con clic se abren', {
 
   // «Permitir en este sitio»: queda en los permisos y al recargar se abren sin clic
   await nav.ui.evalua(`(document.getElementById('emerg-allow').click(), 1)`);
-  const permisos = await nav.ui.evalua('window.cobalt.permList()');
+  const permisos = await nav.ui.evalua('window.navirisApp.permList()');
   assert.equal(permisos[sitio + '|popups'], 'allow');
   const v0 = (await ventanas()).length, p0 = await pestanas();
   await nav.ui.evalua(`(tabs.find((x) => x.url.endsWith('/emergentes')).webview.reload(), 1)`);

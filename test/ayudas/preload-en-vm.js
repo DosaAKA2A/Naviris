@@ -2,7 +2,7 @@
 // del sitio indicado, con Electron y el DOM sustituidos por piezas mínimas. Sirve
 // para probar sin la app la lógica que el preload engancha a la página: los
 // escuchadores que pone en window/document y lo que contesta a los mensajes de la
-// interfaz ('cobalt-autoloot'…). Lo que la página tenga que encontrar en el DOM lo
+// interfaz ('naviris-autoloot'…). Lo que la página tenga que encontrar en el DOM lo
 // pone cada test en `dom` (selector -> elemento o lista).
 'use strict';
 const fs = require('node:fs');

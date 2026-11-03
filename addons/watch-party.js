@@ -234,11 +234,14 @@
 
   /* La foto y el nombre de TU cuenta de Naviris. Los addons de herramienta
      corren dentro del hub, así que se leen de su localStorage tal cual: la
-     foto ya está reducida a 128x128 y guardada como data URI. */
+     foto ya está reducida a 128x128 y guardada como data URI. Desde la 3.0
+     las claves empiezan por "naviris."; la 2.x usa el nombre viejo y este
+     addon sirve a las dos, así que se mira cuál es por el puente de la 3.0. */
+  var CLAVES = window.navirisApp ? 'naviris.' : 'cobalt.';
   function miCuenta() {
     try {
-      var foto = JSON.parse(localStorage.getItem('cobalt.account.foto') || 'null');
-      var nombre = JSON.parse(localStorage.getItem('cobalt.account.nombre') || 'null');
+      var foto = JSON.parse(localStorage.getItem(CLAVES + 'account.foto') || 'null');
+      var nombre = JSON.parse(localStorage.getItem(CLAVES + 'account.nombre') || 'null');
       return { foto: fotoValida(foto) ? foto : '', nombre: (nombre || '').trim() };
     } catch (e) { return { foto: '', nombre: '' }; }
   }

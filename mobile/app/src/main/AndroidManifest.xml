@@ -17,8 +17,16 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="true"
-            android:launchMode="singleTask">
+            android:exported="false"
+            android:launchMode="singleTask" />
+
+        <!-- La entrada de la app conserva el nombre de componente de siempre: los
+             launchers guardan el icono del escritorio (y Android < 10 el navegador
+             predeterminado) con ese nombre, y si desaparece se pierden. -->
+        <activity-alias
+            android:name="com.estudiodeiris.cobalt.MainActivity"
+            android:targetActivity=".MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -30,7 +38,7 @@
                 <data android:scheme="http" />
                 <data android:scheme="https" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <activity
             android:name=".PasswordActivity"

@@ -216,7 +216,7 @@ describe('YouTube con el bloqueador', { timeout: 15 * 60 * 1000 }, () => {
     await n.espera(6000);
     const h = await n.enPestana(p, `
       const ts = (f) => { try { return Function.prototype.toString.call(f); } catch (e) { return 'error'; } };
-      const propias = Object.getOwnPropertyNames(window).filter((k) => /cobalt|naviris|scriptlet|ubol?o?g|brave/i.test(k));
+      const propias = Object.getOwnPropertyNames(window).filter((k) => /naviris|scriptlet|ubol?o?g|brave/i.test(k));
       return {
         responseJson: ts(Response.prototype.json),
         jsonParse: ts(JSON.parse),
@@ -283,12 +283,12 @@ describe('YouTube con el bloqueador', { timeout: 15 * 60 * 1000 }, () => {
     await n.captura(p, 'yt-muro-simulado');
     // 3) El botón mete youtube.com en la lista blanca y recarga.
     await n.evalua(app.ui, 'els.toast.querySelector("button").click(); return true;');
-    const blanca = await n.hasta(async () => { const a = await n.evalua(app.ui, 'return (await window.cobalt.adblockGet()).whitelist;'); return a.includes('youtube.com') ? a : null; }, { tope: 5000, que: 'youtube.com en la lista blanca' });
+    const blanca = await n.hasta(async () => { const a = await n.evalua(app.ui, 'return (await window.navirisApp.adblockGet()).whitelist;'); return a.includes('youtube.com') ? a : null; }, { tope: 5000, que: 'youtube.com en la lista blanca' });
     await n.hasta(() => n.documentos(p).length > docs1 + recargasDeMas, { tope: 8000, que: 'la recarga tras permitir' });
     apunta('yt-muro-simulado', { reintentoTrasMs: msReintento, toast, muroSigueVisible: sigue, recargasDeMas, listaBlanca: blanca });
     assert.equal(sigue, true, 'el muro se borró u ocultó (caja negra)');
     assert.equal(recargasDeMas, 0, 'recargó otra vez en vez de dejar el muro');
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("remove", "youtube.com"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("remove", "youtube.com"); return true;');
   });
 });
 
@@ -336,9 +336,9 @@ describe('Lista blanca de YouTube y CPU', { timeout: 10 * 60 * 1000 }, () => {
 
   it('CPU reproduciendo: con el bloqueador frente a YouTube en la lista blanca', async () => {
     const con = await cpuReproduciendo(VIDEOS[2]);
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("add", "youtube.com"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("add", "youtube.com"); return true;');
     const sin = await cpuReproduciendo(VIDEOS[2]);
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("remove", "youtube.com"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("remove", "youtube.com"); return true;');
     apunta('yt-cpu', { conBloqueador: con, listaBlanca: sin });
     assert.ok(con.avanza >= 20, 'el video no avanzó con el bloqueador');
     // Margen amplio: la medida tiene ruido; lo que se busca es un disparo (el caso Ghostery).
@@ -346,14 +346,14 @@ describe('Lista blanca de YouTube y CPU', { timeout: 10 * 60 * 1000 }, () => {
   });
 
   it('lista blanca: con youtube.com permitido salen los anuncios y no se toca nada', async () => {
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("add", "youtube.com"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("add", "youtube.com"); return true;');
     const antes = n.red(p).bloqueadas.length;
     await n.navega(p, 'https://www.youtube.com/watch?v=' + VIDEOS[0]);
     const r = await muestrea(p, 12);
     const h = await n.enPestana(p, 'return Function.prototype.toString.call(JSON.parse);');
     await n.captura(p, 'yt-lista-blanca');
     const bloqueadas = n.red(p).bloqueadas.slice(antes);
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("remove", "youtube.com"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("remove", "youtube.com"); return true;');
     apunta('yt-lista-blanca', { anuncio: r.anuncio, datosAnuncio: r.datosAnuncio, bloqueadas: bloqueadas.length, jsonParse: h });
     assert.equal(bloqueadas.length, 0, 'se bloquearon peticiones en un sitio permitido');
     assert.equal(h, 'function parse() { [native code] }', 'JSON.parse parcheado en un sitio permitido');
@@ -534,9 +534,9 @@ describe('Service workers y ventanas emergentes', { timeout: 6 * 60 * 1000 }, ()
   it('la lista blanca vale también para lo que pide el service worker del sitio', async () => {
     const p = await n.abrePestana(app, base + '/');
     const sinBlanca = await pruebaSW(p);
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("add", "127.0.0.1"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("add", "127.0.0.1"); return true;');
     const conBlanca = await pruebaSW(p);
-    await n.evalua(app.ui, 'await window.cobalt.adblockWhitelist("remove", "127.0.0.1"); return true;');
+    await n.evalua(app.ui, 'await window.navirisApp.adblockWhitelist("remove", "127.0.0.1"); return true;');
     await n.cierraPestana(app, p);
     apunta('sw-lista-blanca', { sinBlanca, conBlanca });
     // swSinReferrer no se comprueba, ni con lista blanca ni sin ella: sin pestaña
@@ -617,10 +617,10 @@ describe('Permitir anuncios en un sitio', { timeout: 4 * 60 * 1000 }, () => {
     const bloqueadasAntes = n.red(p).bloqueadas.length;
     const permitido = await estado(p);
     const bloqueadasPermitido = n.red(p).bloqueadas.length - bloqueadasAntes;
-    const lista = await n.evalua(app.ui, 'return (await window.cobalt.adblockGet()).whitelist;');
+    const lista = await n.evalua(app.ui, 'return (await window.navirisApp.adblockGet()).whitelist;');
     const volver = await pulsaBoton(p, 'Volver a bloquear en');
     const otraVez = await estado(p);
-    const listaFinal = await n.evalua(app.ui, 'return (await window.cobalt.adblockGet()).whitelist;');
+    const listaFinal = await n.evalua(app.ui, 'return (await window.navirisApp.adblockGet()).whitelist;');
     await n.captura(p, 'lista-blanca');
     await n.cierraPestana(app, p);
     apunta('lista-blanca-boton', { bloqueando, permitir, permitido, bloqueadasPermitido, lista, volver, otraVez, listaFinal });
