@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
+const { migraPerfil } = require('./migraciones');
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
@@ -405,6 +406,16 @@ const perfilCli = process.argv.find((a) => a.startsWith('--user-data-dir='));
 if (perfilCli) app.setPath('userData', perfilCli.slice('--user-data-dir='.length));
 
 let settings = loadSettings();
+
+// Arreglos de una sola vez sobre el perfil (ver migraciones.js). Aquí, antes de
+// que Chromium abra sus bases de datos; si fallan, se reintentan al volver a abrir.
+try {
+  const borradas = migraPerfil(settings, app.getPath('userData'));
+  if (borradas) {
+    saveSettings(settings);
+    if (borradas.length) console.log(`[Naviris] ${borradas.length} cookies de iframes mal convertidas borradas:`, borradas.map((c) => c.nombre + ' ' + c.host).join(', '));
+  }
+} catch (e) { console.log('[Naviris] Migración del perfil pendiente:', e.message); }
 
 // Tras una ACTUALIZACIÓN (cambia la versión), forzamos el Modo agente a OFF. Motivo:
 // cuando la app se reinicia sola durante el update, el puerto CDP a veces no llega a
