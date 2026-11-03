@@ -70,7 +70,12 @@ function arranca() {
 }
 document.fonts.ready.then(() => {
   const audio = q.get('sonido') === '1' ? window.navSonido('arranque') : null;
-  if (audio) { audio.addEventListener('playing', arranca, { once: true }); setTimeout(arranca, 260); } else arranca();
+  // La ventana no se cierra hasta que el sonido acaba (main.js, splash:fin): cerrarla cortaría la cola
+  const fin = () => window.navSplash.fin();
+  if (audio) {
+    audio.addEventListener('playing', arranca, { once: true }); setTimeout(arranca, 260);
+    audio.addEventListener('ended', fin, { once: true }); audio.addEventListener('error', fin, { once: true });
+  } else { arranca(); fin(); }
 });
 
 /* Los hitos del arranque siguen llegando del proceso principal (Widevine,

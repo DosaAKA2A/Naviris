@@ -1235,9 +1235,14 @@ const SPLASH_VARIANTE = 'apertura';
 const SPLASH_TAMANO = { apertura: [288, 288], firma: [460, 220], icono: [240, 300] };
 const SPLASH_MINIMO = 1050; // ms en pantalla: la animación entera (~0,9 s) y un respiro
 const SPLASH_SALIDA = 200;  // el fundido de salida de splash.html (.sale)
+// Tope de seguridad tras ocultarse, por si el audio nunca avisa de que acabó (el de arranque dura < 3 s)
+const SPLASH_TOPE_SONIDO = 4000;
 let splashWin = null;
 let splashPct = 0;          // último hito, por si el splash aún no ha cargado
 let splashDesde = 0;        // cuándo empezó su animación: el mínimo en pantalla cuenta desde ahí
+let splashSonando = true;   // hasta que splash.js avisa de que su sonido acabó (o de que no hay)
+let splashOculto = false;   // ya hizo su salida: solo espera a que acabe el sonido para cerrarse
+let splashAnda = Promise.resolve(); // se cumple cuando arranca la animación del splash
 
 function crearSplash() {
   const [width, height] = SPLASH_TAMANO[SPLASH_VARIANTE];
@@ -1271,7 +1276,14 @@ function crearSplash() {
   /* La animación arranca con el sonido, y el audio puede tardar en empezar
      (splash.js espera hasta 260 ms): el mínimo se cuenta desde que arranca de
      verdad, para que la ventana nunca corte la animación a medias. */
-  ipcMain.once('splash:anda', () => { splashDesde = Date.now(); });
+  let anda;
+  splashAnda = new Promise((r) => { anda = r; });
+  ipcMain.once('splash:anda', () => { splashDesde = Date.now(); anda(); });
+  // Cerrar la ventana corta su audio: se cierra cuando el sonido termina, no antes
+  ipcMain.once('splash:fin', () => {
+    splashSonando = false;
+    if (splashOculto && splashWin && !splashWin.isDestroyed()) splashWin.close();
+  });
   // El hito que ya se hubiera cumplido antes de que la página existiera
   splashWin.webContents.once('did-finish-load', () => splashProgreso(splashPct));
   splashWin.on('closed', () => { splashWin = null; });
@@ -1285,9 +1297,15 @@ function splashProgreso(pct) {
 
 /* El relevo: se enseña la ventana ya montada y, a la vez, el splash (que está
    encima) se funde y se va, así que se ve una sola transición y nunca el
-   escritorio entre las dos. Tras el fundido la ventana se OCULTA y se cierra
-   un poco después: la cola del sonido de arranque sigue sonando hasta el final. */
-function cerrarSplash(win) {
+   escritorio entre las dos. Tras el fundido la ventana se OCULTA, y se cierra
+   cuando el sonido de arranque termina su cola (splash:fin) o, como mucho,
+   SPLASH_TOPE_SONIDO después. */
+async function cerrarSplash(win) {
+  /* En un equipo rápido la interfaz puede estar lista ANTES de que el splash
+     empiece su animación (medido: ui:listo a 0,28 s y splash a 0,35 s). Se
+     espera a que empiece, para que el arranque se vea siempre entero; con
+     tope, por si el splash fallara. */
+  await Promise.race([splashAnda, new Promise((r) => setTimeout(r, 1500))]);
   const espera = splashDesde ? Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde)) : 0;
   setTimeout(() => {
     if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); }
@@ -1297,7 +1315,9 @@ function cerrarSplash(win) {
     setTimeout(() => {
       if (sw.isDestroyed()) return;
       sw.hide();
-      setTimeout(() => { if (!sw.isDestroyed()) sw.close(); }, 1200);
+      splashOculto = true;
+      if (!splashSonando) sw.close();
+      else setTimeout(() => { if (!sw.isDestroyed()) sw.close(); }, SPLASH_TOPE_SONIDO);
     }, SPLASH_SALIDA);
   }, espera);
 }

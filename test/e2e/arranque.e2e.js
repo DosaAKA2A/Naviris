@@ -2,7 +2,8 @@
 // temporal y --inspect-brk, engancha los eventos de ventanas en el proceso
 // principal antes de que corra main.js y comprueba el relevo del splash:
 //   - el splash se muestra ya con contenido (nada de cuadrado vacío),
-//   - suena el arranque, y sigue sonando aunque el splash se oculte,
+//   - suena el arranque ENTERO: sigue aunque el splash se oculte y la ventana
+//     no se cierra hasta que acaba,
 //   - la ventana principal sale en cuanto la interfaz está lista y la
 //     animación ha terminado (SPLASH_MINIMO desde que arranca), ni antes ni más tarde,
 //   - el splash se oculta tras el fundido y se cierra.
@@ -18,6 +19,16 @@ const RAIZ = path.join(__dirname, '..', '..');
 const ELECTRON = require('electron');
 const PUERTO = process.env.NAVIRIS_E2E_PUERTO || '9406';
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+/* Duración real de un Ogg Opus: posición (granule) de la última página menos el
+   pre-skip de la cabecera, a 48 kHz. */
+function duracionOpus(ruta) {
+  const b = fs.readFileSync(ruta);
+  const ultima = b.lastIndexOf(Buffer.from('OggS'));
+  const preskip = b.readUInt16LE(b.indexOf(Buffer.from('OpusHead')) + 10);
+  return (Number(b.readBigInt64LE(ultima + 6)) - preskip) / 48;
+}
+const PALETA = fs.readFileSync(path.join(RAIZ, 'src', 'sonidos.js'), 'utf8').match(/const PALETA = '([a-z]+)';/)[1];
+const DURACION_ARRANQUE = duracionOpus(path.join(RAIZ, 'src', 'sonidos', PALETA, 'arranque.ogg'));
 const MINIMO = Number(fs.readFileSync(path.join(RAIZ, 'src', 'main.js'), 'utf8').match(/const SPLASH_MINIMO = (\d+);/)[1]);
 
 const GANCHO = `(() => {
@@ -85,6 +96,11 @@ test('el splash arranca, suena y releva a la ventana sin esperas de más', { tim
     assert.ok(m.ventanaVisible >= m.animacionEmpieza + MINIMO - 20, 'la ventana cortó la animación del splash');
     assert.ok(m.sonidoEmpieza && m.sonidoEmpieza - m.splashVisible < 400, 'el sonido de arranque no empezó con el splash');
     assert.ok(m.sonidoTermina > m.splashOculto, 'el sonido se cortó al ocultar el splash');
+    const sono = m.sonidoTermina - m.sonidoEmpieza;
+    console.log(`sonido de arranque: dura ${Math.round(DURACION_ARRANQUE)} ms, sonó ${sono} ms`);
+    assert.ok(sono >= DURACION_ARRANQUE - 60, `el sonido se cortó: sonó ${sono} ms de ${Math.round(DURACION_ARRANQUE)}`);
+    assert.ok(m.splashCerrado >= m.sonidoTermina, 'el splash se cerró antes de que acabara el sonido');
+    assert.ok(m.splashCerrado - m.sonidoTermina < 300, 'el splash tardó en cerrarse tras el sonido');
     assert.ok(m.splashOculto && m.splashCerrado, 'el splash no se ocultó o no se cerró');
   } finally {
     await new Promise((r) => { if (app.exitCode !== null) return r(); app.once('exit', r); setTimeout(() => { try { app.kill(); } catch {} r(); }, 6000); });

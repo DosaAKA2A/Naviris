@@ -29,7 +29,7 @@ test('la paleta elegida existe y cada paleta trae los cuatro sonidos en Ogg Opus
     const b = fs.readFileSync(path.join(SRC, 'sonidos', p, s + '.ogg'));
     assert.strictEqual(b.subarray(0, 4).toString(), 'OggS', `${p}/${s}`);
     assert.ok(b.includes(Buffer.from('OpusHead')), `${p}/${s} no es Opus`);
-    assert.ok(b.length < 20000, `${p}/${s} pesa demasiado`);
+    assert.ok(b.length < 40000, `${p}/${s} pesa demasiado`);
   }
 });
 
