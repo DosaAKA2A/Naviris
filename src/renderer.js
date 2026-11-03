@@ -35,7 +35,9 @@ const els = {};
   'pw-bar', 'pw-text', 'pw-no', 'pw-yes',
   'find-bar', 'find-input', 'find-count', 'find-prev', 'find-next', 'find-close',
   'sb-perf', 'hub-dock', 'perf-panel', 'perf-close', 'perf-resumen', 'perf-list', 'perf-nota', 'find-otras',
-  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir', 'sb-espacios', 'esp-pop'
+  'vtabs-col', 'vtabs-slot', 'vtabs-new', 'opt-vtabs', 'div-barra', 'div-salir', 'sb-espacios', 'esp-pop',
+  'opt-buscador', 'opt-preguntar-descargas', 'tab-dialogo', 'td-tit', 'td-texto', 'td-url', 'td-valor', 'td-silencio', 'td-silenciar', 'td-cancelar', 'td-aceptar',
+  'datos-modal', 'datos-periodo', 'datos-historial', 'datos-cookies', 'datos-cache', 'datos-cancelar', 'datos-borrar'
 ].forEach((id) => { els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
 
 // 5 minutos dormía pestañas que seguías usando (te ibas a leer otra cosa y al
@@ -401,7 +403,7 @@ const toUrl = (input) => {
   const conPuerto = /^[\w.-]+:\d+(?=[/?#]|$)/.test(t);
   const hasScheme = !conPuerto && /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t);
   const looksUrl = !t.includes(' ') && (hasScheme || conPuerto || t.includes('.') || /^localhost(?=[/?#]|$)/i.test(t));
-  return looksUrl ? (hasScheme ? t : (ES_LOCAL.test(t) ? 'http://' : 'https://') + t) : 'https://www.google.com/search?q=' + encodeURIComponent(t);
+  return looksUrl ? (hasScheme ? t : (ES_LOCAL.test(t) ? 'http://' : 'https://') + t) : window.naviBuscadores.urlDeBusqueda(settings.buscador, t);
 };
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const activeTab = () => tabs.find((t) => t.id === activeId) || null;
@@ -695,6 +697,12 @@ function sigueEnEspacio() {
    pestaña activa, que Chromium deja en blanco (ver did-fail-load). */
 function motivoFallo(f) {
   const h = hostOf(f.url) || f.url, c = f.codigo;
+  // La pestaña se cayó (render-process-gone): no es la red, es la página.
+  if (f.caida) {
+    if (f.caida === 'oom') return ['Esta pestaña se quedó sin memoria', 'La página usaba demasiada memoria y se cerró. Recárgala para seguir.'];
+    if (f.caida === 'killed') return ['Esta pestaña se cerró', 'Windows o un programa del equipo cerró la página. Recárgala para seguir.'];
+    return ['Esta pestaña dejó de funcionar', 'La página se cerró de forma inesperada. Recárgala para seguir.'];
+  }
   if (!navigator.onLine || c === -106 || c === -21) return ['No hay conexión a internet', 'Revisa tu conexión y vuelve a intentarlo.'];
   if (c === -105 || c === -137) return ['No se puede acceder a este sitio', 'No se encontró la dirección de ' + h + '. Revisa que esté bien escrita.'];
   if (c === -102) return ['No se puede acceder a este sitio', h + ' rechazó la conexión.'];
@@ -714,10 +722,11 @@ function pintaFallo() {
   document.getElementById('fallo-tit').textContent = titulo;
   const m = document.getElementById('fallo-motivo'); m.textContent = motivo; m.title = f.desc;   // el código de Chromium, solo al pasar el ratón
   document.getElementById('fallo-url').textContent = f.url;
+  document.getElementById('fallo-reintentar').lastChild.textContent = f.caida ? 'Recargar' : 'Reintentar';
 }
 document.getElementById('fallo-reintentar')?.addEventListener('click', () => {
   const tab = activeTab();
-  if (tab && tab.fallo && tab.webview) { try { tab.webview.reload(); } catch { /* nada */ } }
+  if (tab && tab.fallo && tab.webview) recargaWv(tab.webview);
 });
 let mediaTimer = null;
 function attachWebview(tab, url) {
@@ -818,7 +827,21 @@ function attachWebview(tab, url) {
     if (tab.id === activeId) { syncNavUI(); pintaFallo(); }
   });
   // Se quita cuando ya hay otra página en su sitio (al reintentar no parpadea en blanco).
-  wv.addEventListener('did-navigate', () => { if (tab.fallo) { tab.fallo = null; if (tab.id === activeId) pintaFallo(); } });
+  wv.addEventListener('did-navigate', () => { tab.avisos = 0; if (tab.fallo) { tab.fallo = null; if (tab.id === activeId) pintaFallo(); } });
+  /* Pestaña caída (2026-11-03): el proceso de la página murió (falta de
+     memoria, un fallo de Chromium, el sistema lo mató). Antes quedaba un
+     rectángulo gris sin nada; ahora sale la página de error con «Recargar».
+     No se recarga sola: si la página se cae al cargar, sería otro bucle.
+     'clean-exit' es un cierre normal (al dormir o cerrar la pestaña). */
+  wv.addEventListener('render-process-gone', (e) => {
+    const razon = e.details?.reason || e.reason;
+    if (razon === 'clean-exit' || tab.asleep || tab.webview !== wv) return;
+    let url = tab.url; try { url = wv.getURL() || tab.url; } catch { /* nada */ }
+    tab.fallo = { url, caida: razon === 'oom' || razon === 'killed' ? razon : 'crashed', desc: razon || '' };
+    tab.audible = false;
+    renderTabs();
+    if (tab.id === activeId) { syncNavUI(); pintaFallo(); }
+  });
   // Silenciada a mano: al recrear el webview (despertar) sigue silenciada desde el principio.
   wv.addEventListener('did-attach', () => { if (tab.muted) { try { wv.setAudioMuted(true); } catch { /* nada */ } } });
   wv.addEventListener('media-started-playing', () => { tab.audible = true; if (tab.muted) { try { wv.setAudioMuted(true); } catch {} } renderTabs(); });
@@ -859,6 +882,7 @@ function activateTab(id) {
   renderTabs(); syncNavUI(); applyResponsive(); updateLootUI();
   if (!els.mediaPanel.classList.contains('hidden')) collectMedia();
   pintaFallo();
+  pintaDialogo();
   // El muro de YouTube que salió con la pestaña de fondo, si sigue en ese video.
   if (tab.muroPendiente) {
     const vid = tab.muroPendiente; tab.muroPendiente = null;
@@ -950,8 +974,8 @@ function menuDePestana(e, tab) {
     ...(web && !IS_PRIVATE ? [{ label: 'Abrir en un contenedor nuevo', icon: 'layers', action: () => abreEnContenedor(tab.url, nuevoContenedor()) }] : []),
     ...(web && !IS_PRIVATE ? contenedores.filter((c) => !tab.contenedor || c.id !== tab.contenedor.id).map((c) => ({ label: 'Abrir en ' + c.nombre, icon: 'layers', action: () => abreEnContenedor(tab.url, c) })) : []),
     ...(divId !== null && tab.id === divId ? [{ label: 'Salir de la pantalla dividida', icon: 'x-mark', action: () => salirDivision() }] : []),
-    ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => { try { tab.webview?.reload(); } catch {} } }] : []),
-    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => vis.forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) },
+    ...(web ? [{ label: 'Recargar', icon: 'arrow-path', action: () => recargaWv(tab.webview) }] : []),
+    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => vis.forEach((t) => { if (t.kind === 'web' && !t.asleep) recargaWv(t.webview); }) },
     ...(web ? [{ label: 'Copiar dirección de página', icon: 'clipboard', action: () => copiarDireccion(tab) }] : []),
     { sep: true },
     ...(web ? [{ label: 'Duplicar pestaña', icon: 'square-2-stack', action: () => duplicarTab(tab) }] : []),
@@ -1253,6 +1277,7 @@ function navigateActive(input) {
   const tab = activeTab() || createTab();
   if (tab.kind === 'hub') { attachWebview(tab, url); tab.title = 'Cargando…'; activateTab(tab.id); }
   else {
+    avisaNavUsuario(tab.webview);
     tab.webview.src = url;
     // Marcadores, Descargas o Addons escondían el webview: vuelve a la vista (y la mitad derecha, si hay división).
     tab.webview.classList.add('active'); aplicaDivision();
@@ -1293,7 +1318,7 @@ setInterval(() => {
 let sugItems = [], sugSel = -1;
 function buildSuggestions(q) {
   const query = q.trim().toLowerCase(); const out = [];
-  if (query) { if (toUrl(q).startsWith('https://www.google.com/search')) out.push({ type: 'search', label: q, url: toUrl(q) }); else out.push({ type: 'go', label: q, url: toUrl(q) }); }
+  if (query) { const u = toUrl(q); out.push({ type: window.naviBuscadores.esBusqueda(settings.buscador, u) ? 'search' : 'go', label: q, url: u }); }
   const pool = [...bookmarksFlat().map((b) => ({ type: 'bookmark', label: b.title, url: b.url, score: 1000 })), ...dials.map((d) => ({ type: 'dial', label: d.name, url: d.url, score: 800 })), ...history.map((h) => ({ type: 'history', label: h.title, url: h.url, score: h.visits * 10 + 100 }))];
   const seen = new Set(out.map((o) => o.url));
   for (const m of pool.filter((p) => p.url && (p.url.toLowerCase().includes(query) || (p.label || '').toLowerCase().includes(query))).sort((a, b) => b.score - a.score)) { if (seen.has(m.url)) continue; seen.add(m.url); out.push(m); if (out.length >= 8) break; }
@@ -2650,7 +2675,7 @@ async function loadWeather(el, kind) {
       </div>
       <div class="wx2-city">${escapeHtml(geo.city || '')}</div>
       <button class="wx2-go" title="Pronóstico completo">${window.icon('arrow-up-right')}</button>`;
-    el.querySelector('.wx2-go').addEventListener('click', (e) => { e.stopPropagation(); navigateActive(`https://www.google.com/search?q=clima+${encodeURIComponent(geo.city || '')}`); });
+    el.querySelector('.wx2-go').addEventListener('click', (e) => { e.stopPropagation(); navigateActive(window.naviBuscadores.urlDeBusqueda(settings.buscador, 'clima ' + (geo.city || ''))); });
   } catch { el.innerHTML = '<div class="w-loading">Clima no disponible (sin conexión)</div>'; }
 }
 
@@ -4710,19 +4735,38 @@ function upsertDownload(m) {
   let row = dlRows.get(m.id);
   const pct = m.percent != null ? m.percent : (m.total ? Math.round(m.received / m.total * 100) : 0);
   const done = m.state === 'completed', error = m.state === 'interrupted' || m.state === 'cancelled';
-  if (!row) { row = document.createElement('div'); row.className = 'dl-item'; row.innerHTML = `<div class="dl-top"><div class="dl-kind"></div><div class="dl-info"><div class="dl-name"></div><div class="dl-sub"></div></div><button class="dl-act"></button></div><div class="dl-bar"><i></i></div>`; dlRows.set(m.id, row); els.dlList.prepend(row); row.addEventListener('click', (e) => { if (e.target.closest('.dl-act')) return; openDownloadInBrowser(m.id); }); }
+  if (!row) { row = document.createElement('div'); row.className = 'dl-item'; row.innerHTML = `<div class="dl-top"><div class="dl-kind"></div><div class="dl-info"><div class="dl-name"></div><div class="dl-sub"></div></div><button class="dl-act dl-act2"></button><button class="dl-act"></button></div><div class="dl-bar"><i></i></div>`; dlRows.set(m.id, row); els.dlList.prepend(row); row.addEventListener('click', (e) => { if (e.target.closest('.dl-act')) return; openDownloadInBrowser(m.id); }); }
   row.classList.toggle('done', done); row.classList.toggle('error', error);
   row.querySelector('.dl-kind').innerHTML = window.icon(m.kind === 'audio' ? 'musical-note' : m.kind === 'video' ? 'film' : done ? 'check' : 'arrow-down-tray');
   row.querySelector('.dl-name').textContent = m.name;
-  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : (pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
+  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : ((m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
   row.querySelector('.dl-bar > i').style.width = pct + '%';
   // La página de descargas, si está abierta, sigue el progreso en vivo
   if (els.dlPage.classList.contains('active')) renderDlActive();
-  const act = row.querySelector('.dl-act');
+  const act = row.querySelector('.dl-act:not(.dl-act2)');
   if (done) { act.innerHTML = window.icon('folder'); act.title = 'Mostrar en carpeta'; act.onclick = (e) => { e.stopPropagation(); window.cobalt.revealDownload(m.id); }; }
   else if (error) { act.innerHTML = window.icon('x-mark'); act.title = 'Cerrar'; act.onclick = (e) => { e.stopPropagation(); row.remove(); dlRows.delete(m.id); }; }
   else { act.innerHTML = window.icon('x-mark'); act.title = 'Cancelar'; act.onclick = (e) => { e.stopPropagation(); window.cobalt.cancelDownload(m.id); }; }
+  accionDescarga(row.querySelector('.dl-act2'), m);
+}
+/* Pausar y reanudar la que está en curso; reintentar la que falló o se
+   canceló (2026-11-03). Solo las del navegador ('file'): las del Rat Tool son
+   yt-dlp y no se pueden pausar. La reintentada vuelve como descarga nueva. */
+function accionDescarga(b, m) {
+  const archivo = m.kind === 'file' && m.state !== 'completed';
+  const enCurso = m.state === 'progressing';
+  b.classList.toggle('hidden', !archivo);
+  if (!archivo) return;
+  b.innerHTML = window.icon(enCurso ? (m.paused ? 'play' : 'pause') : 'arrow-path');
+  b.title = enCurso ? (m.paused ? 'Reanudar' : 'Pausar') : 'Reintentar';
+  b.onclick = (e) => {
+    e.stopPropagation();
+    if (enCurso) { if (m.paused) window.cobalt.resumeDownload(m.id); else window.cobalt.pauseDownload(m.id); return; }
+    window.cobalt.retryDownload(m.id);
+    dlRows.get(m.id)?.remove(); dlRows.delete(m.id); dlMeta.delete(m.id);
+    if (els.dlPage.classList.contains('active')) renderDlActive();
+  };
 }
 async function openDownloadInBrowser(id) {
   const m = dlMeta.get(id); if (!m || m.state !== 'completed') return;
@@ -4910,16 +4954,16 @@ function renderDlActive() {
     // vez de un 0% que parecería atascado.
     const sub = failed
       ? (m.state === 'cancelled' ? 'Cancelada' : 'Error: ' + (m.error || 'la descarga se interrumpió'))
-      : pct != null
+      : (m.paused ? 'En pausa · ' : '') + (pct != null
         ? `${pct}% · ${fmtBytes(m.received) || '0 B'}${m.total ? ' / ' + fmtBytes(m.total) : ''}`
-        : `Descargando… ${fmtBytes(m.received) || '0 B'}`;
+        : `${m.paused ? '' : 'Descargando… '}${fmtBytes(m.received) || '0 B'}`);
     let row = dlpFilas.get(m.id)?.row;
     if (!row) {
       row = document.createElement('div'); row.className = 'dlp-row live' + (failed ? ' failed' : '');
       row.innerHTML = `<div class="dlp-ic">${window.icon(dlpIcoOf(m.name))}</div>`
         + `<div class="dlp-info"><div class="dlp-name"></div><div class="dlp-sub"></div>`
         + (failed ? '' : '<div class="dlp-bar"><i></i></div>')
-        + `</div><div class="dlp-acts"><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
+        + `</div><div class="dlp-acts"><button class="dlp-pausa"></button><button class="dlp-cancel" title="${failed ? 'Descartar' : 'Cancelar'}">${window.icon('x-mark')}</button></div>`;
       row.querySelector('.dlp-cancel').addEventListener('click', (e) => {
         e.stopPropagation();
         if (failed) { dlMeta.delete(m.id); renderDlActive(); } else window.cobalt.cancelDownload(m.id);
@@ -4929,6 +4973,7 @@ function renderDlActive() {
     }
     row.querySelector('.dlp-name').textContent = m.name;
     row.querySelector('.dlp-sub').textContent = sub;
+    accionDescarga(row.querySelector('.dlp-pausa'), m);
     if (!failed) {
       const bar = row.querySelector('.dlp-bar');
       bar.classList.toggle('indet', pct == null);
@@ -5583,9 +5628,9 @@ stp.clear.addEventListener('click', async () => {
 stp.config.addEventListener('click', () => { cerrarSitePop(); showPermManager(); });
 
 /* ============ Navegación ============ */
-els.navBack.addEventListener('click', () => activeTab()?.webview?.goBack());
-els.navFwd.addEventListener('click', () => activeTab()?.webview?.goForward());
-els.navReload.addEventListener('click', () => { const wv = activeTab()?.webview; if (!wv) return; wv.isLoading() ? wv.stop() : wv.reload(); });
+els.navBack.addEventListener('click', irAtras);
+els.navFwd.addEventListener('click', irAdelante);
+els.navReload.addEventListener('click', () => { const wv = activeTab()?.webview; if (!wv) return; if (wv.isLoading()) wv.stop(); else recargaWv(wv); });
 // El botón de inicio de la navbar se retiró (2026-08-11): estaba duplicado
 // con el del sidebar (#sb-home), que es el que manda.
 els.newtabBtn.addEventListener('click', () => createTab());
@@ -5608,7 +5653,8 @@ document.addEventListener('click', (e) => {
 }, true);   // en captura: los botones que abren otro popover cortan la propagación y quedaban dos abiertos a la vez
 els.menuPop.addEventListener('click', (e) => {
   const a = e.target.closest('button')?.dataset.action; if (!a) return; els.menuPop.classList.add('hidden');
-  if (a === 'newtab') createTab(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
+  if (a === 'newtab') createTab(); if (a === 'newwindow') window.cobalt.newWindow(); if (a === 'private') window.cobalt.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
+  if (a === 'borrar-datos') abreBorrarDatos();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   // Con la estable ya descargada, la entrada del menú instala directamente: el
   // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
@@ -5624,6 +5670,24 @@ els.menuPop.addEventListener('click', (e) => {
   })();
 });
 els.optSmartsearch.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ smartSearch: els.optSmartsearch.checked }); });
+// Motor de búsqueda (src/buscadores.js): la lista sale de ahí, no del HTML.
+function pintaBuscador() {
+  const sel = els.optBuscador, b = window.naviBuscadores;
+  if (!sel.options.length) {
+    for (const [id, m] of Object.entries(b.BUSCADORES)) sel.add(new Option(m.nombre, id));
+  }
+  sel.value = b.BUSCADORES[settings.buscador] ? settings.buscador : b.POR_DEFECTO;
+  els.urlbar.placeholder = 'Busca en ' + b.buscador(settings.buscador).nombre + ' o escribe una dirección';
+}
+els.optBuscador.addEventListener('change', async () => {
+  settings = await window.cobalt.setSettings({ buscador: els.optBuscador.value });
+  pintaBuscador();
+  toast('Buscador: ' + window.naviBuscadores.buscador(settings.buscador).nombre);
+});
+els.optPreguntarDescargas.addEventListener('change', async () => {
+  settings = await window.cobalt.setSettings({ preguntarDescargas: els.optPreguntarDescargas.checked });
+  toast(els.optPreguntarDescargas.checked ? 'Cada descarga preguntará dónde guardarse' : 'Las descargas van directas a Descargas');
+});
 els.optPasskeys.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
 els.optRestore.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('cobalt.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
 els.optPowersaver.addEventListener('change', async () => { settings = await window.cobalt.setSettings({ powerSaver: els.optPowersaver.checked }); });
@@ -6456,12 +6520,17 @@ window.cobalt.onMaximized((max) => { $('#win-max').title = max ? 'Restaurar' : '
 // teclas por su cuenta, así que estos van en la ventana y actúan sobre la
 // pestaña activa.
 function activeWv() { const t = activeTab(); return t?.kind === 'web' ? t.webview : null; }
-function recargar(forzado) {
-  const wv = activeWv(); if (!wv) return;
+function avisaNavUsuario(wv) { try { window.cobalt.navUsuario(wv.getWebContentsId()); } catch { /* aún sin montar */ } }
+// Recarga que pide la persona (F5, Ctrl+R, el botón, los menús): main la deja
+// pasar aunque el freno de bucles esté puesto (ver freno-recargas.js).
+function recargaWv(wv, forzado) {
+  if (!wv) return;
+  avisaNavUsuario(wv);
   try { forzado ? wv.reloadIgnoringCache() : wv.reload(); } catch { /* nada */ }
 }
-function irAtras() { const wv = activeWv(); try { if (wv?.canGoBack()) wv.goBack(); } catch { /* nada */ } }
-function irAdelante() { const wv = activeWv(); try { if (wv?.canGoForward()) wv.goForward(); } catch { /* nada */ } }
+function recargar(forzado) { recargaWv(activeWv(), forzado); }
+function irAtras() { const wv = activeWv(); try { if (wv?.canGoBack()) { avisaNavUsuario(wv); wv.goBack(); } } catch { /* nada */ } }
+function irAdelante() { const wv = activeWv(); try { if (wv?.canGoForward()) { avisaNavUsuario(wv); wv.goForward(); } } catch { /* nada */ } }
 function pararCarga() { const wv = activeWv(); try { wv?.stop(); } catch { /* nada */ } }
 /* Zoom (Ctrl+'+', Ctrl+'-', Ctrl+0 y Ctrl+rueda), con los escalones de Chrome.
    Antes se sumaba ±1 a un tab.zoom propio (niveles de 1,2x: 83 %, 69 %…), pero
@@ -6675,41 +6744,18 @@ function alternarDevtools() {
   const wv = activeWv(); if (!wv) { toast('Abre una página para inspeccionarla'); return; }
   try { wv.isDevToolsOpened() ? wv.closeDevTools() : wv.openDevTools(); } catch { /* nada */ }
 }
+/* El teclado de la interfaz. Los atajos salen de la MISMA tabla que usa main
+   con el foco dentro de una web (src/atajos.js) y van a ejecutaAtajo, así los
+   dos caminos hacen siempre lo mismo. Aquí solo queda lo que no es un atajo:
+   Escape, que cierra lo que esté abierto antes de parar la carga, y los
+   Alt+letra de los addons. */
 window.addEventListener('keydown', (e) => {
   const k = (e.key || '').toLowerCase();
-  const soloCtrl = e.ctrlKey && !e.shiftKey && !e.altKey;
   const escribiendo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   // Con los atajos desactivados siguen vivos solo los de ventana (F11, F12) y
   // Escape: quedarse en pantalla completa sin forma de salir sería una trampa.
   if (settings.atajos === false && !/^(F11|F12|Escape)$/.test(e.key)) return;
 
-  // --- Pestañas ---
-  if (e.ctrlKey && e.shiftKey && k === 'n') { e.preventDefault(); window.cobalt.newPrivateWindow(); return; }
-  if (e.ctrlKey && e.shiftKey && k === 't') { e.preventDefault(); reabrirCerrada(); return; }
-  if (soloCtrl && k === 't') { e.preventDefault(); createTab(); return; }
-  // Ctrl+W respeta las fijadas (como Chrome): se sueltan o cierran desde su menú
-  if (soloCtrl && k === 'w') { e.preventDefault(); const t = activeTab(); if (t && !t.pinned) closeTab(t.id); return; }
-  // Se recorren las pestañas que se VEN, como Ctrl+1…9: las de otros espacios no entran en la rueda.
-  if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); const v = tabsVisibles(), i = v.findIndex((t) => t.id === activeId); const n = v[(i + (e.shiftKey ? v.length - 1 : 1)) % v.length]; if (n) activateTab(n.id); return; }
-  if (e.ctrlKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
-    e.preventDefault(); const v = tabsVisibles(), i = v.findIndex((t) => t.id === activeId);
-    const n = v[(i + (e.key === 'PageDown' ? 1 : v.length - 1)) % v.length]; if (n) activateTab(n.id); return;
-  }
-  // Ctrl+1..8 va a esa pestaña; Ctrl+9 a la última (igual que Chrome)
-  if (soloCtrl && /^[1-9]$/.test(k)) {
-    e.preventDefault();
-    const vis = tabsVisibles();
-    const n = k === '9' ? vis[vis.length - 1] : vis[parseInt(k, 10) - 1];
-    if (n) activateTab(n.id);
-    return;
-  }
-
-  // --- Navegación ---
-  if (e.key === 'F5' || (soloCtrl && k === 'r')) { e.preventDefault(); recargar(e.shiftKey); return; }
-  if ((e.ctrlKey && e.shiftKey && k === 'r') || (e.shiftKey && e.key === 'F5')) { e.preventDefault(); recargar(true); return; }
-  if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); irAtras(); return; }
-  if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); irAdelante(); return; }
-  if (e.altKey && e.key === 'Home') { e.preventDefault(); els.sbHome.click(); return; }
   if (e.key === 'Escape') {
     // Escape sale de lo que este abierto ANTES de parar la carga: primero los
     // menus del hub, luego las paginas de Novedades y Addons (se vuelve al
@@ -6719,6 +6765,7 @@ window.addEventListener('keydown', (e) => {
     // Lo que está encima de todo se cierra primero: el menú contextual y el cuadro de texto o contraseña.
     if (ctxMenuEl) { closeCtxMenu(); return; }
     if (!els.promptModal.classList.contains('hidden')) { els.promptCancel.click(); return; }
+    if (!els.datosModal.classList.contains('hidden')) { els.datosModal.classList.add('hidden'); return; }
     // Y los menús y popovers del riel y de la barra, como en Chrome.
     if ([els.menuPop, els.shieldPop, sitePop, els.ratPop, els.resPop, els.lootPanel, els.espPop].some((p) => !p.classList.contains('hidden')) || folderPop) { cerrarPopsHerramientas(); return; }
     if (cerrarBuscar()) return;
@@ -6726,32 +6773,20 @@ window.addEventListener('keydown', (e) => {
     if (cierraNovedadesPagina()) return;
     if (adEls.page.classList.contains('active')) { hideAddonsPage(); els.hub.classList.add('active'); return; }
     if (!escribiendo) { pararCarga(); return; }
+    return;
   }
 
-  // --- Barra de direcciones ---
-  if ((soloCtrl && k === 'l') || e.key === 'F6' || (e.altKey && k === 'd')) { e.preventDefault(); els.urlbar.focus(); els.urlbar.select(); return; }
-
-  // --- Ventana y página ---
-  if (e.altKey && !e.ctrlKey && k === 'p') { e.preventDefault(); miniReproductor(); return; }
-  if (e.key === 'F12') { e.preventDefault(); alternarDevtools(); return; }
-  if (e.key === 'F11') { e.preventDefault(); window.cobalt.toggleFullscreen(); return; }
-  if (soloCtrl && (k === '+' || k === '=' || e.key === 'Add')) { e.preventDefault(); zoom(1); return; }
-  if (soloCtrl && (k === '-' || e.key === 'Subtract')) { e.preventDefault(); zoom(-1); return; }
-  if (soloCtrl && k === '0') { e.preventDefault(); zoom(0); return; }
-  if (soloCtrl && k === 'p') { e.preventDefault(); try { activeWv()?.print(); } catch { /* nada */ } return; }
-  // --- Buscar en la página ---
-  if ((soloCtrl && k === 'f') || e.key === 'F3') { e.preventDefault(); abrirBuscar(); return; }
-  if (soloCtrl && k === 'd') { e.preventDefault(); els.navStar.click(); return; }
-
-  // --- Paneles ---
-  if (soloCtrl && k === 'j') { e.preventDefault(); toggleDownloadsPage(); return; }   // lo mismo que con el foco en la web
-  if (soloCtrl && k === 'h') { e.preventDefault(); toggleHistory(); return; }
-
+  const cmd = window.naviAtajos.comandoDe({ key: e.key, control: e.ctrlKey, shift: e.shiftKey, alt: e.altKey });
+  if (cmd) {
+    // Alt+S es de los addons: si ninguno lo reclama, la tecla sigue su camino.
+    if (cmd.startsWith('addon-') && !atajosAddon.has(cmd.slice(6))) return;
+    e.preventDefault();
+    ejecutaAtajo(cmd);
+    return;
+  }
   // --- Addons --- (al final: los atajos del core mandan sobre los de un addon)
   if (e.altKey && !e.ctrlKey && !e.shiftKey && k.length === 1 && lanzaAtajoAddon(k)) { e.preventDefault(); }
 });
-// Los mismos atajos, pero llegados desde una página con el foco dentro (el main
-// los intercepta con before-input-event y los reenvía por IPC).
 /* Minireproductor (picture-in-picture). Coge el vídeo que se ve más grande y lo
    saca a la ventanita del sistema, que queda por encima de cualquier otra app;
    volver a pulsarlo lo devuelve. El segundo argumento de executeJavaScript es
@@ -6784,36 +6819,66 @@ async function miniReproductor() {
   } catch { toast('No se pudo abrir el minireproductor'); }
 }
 
-window.cobalt.onShortcut((cmd) => {
-  const i = tabs.findIndex((t) => t.id === activeId);
+/* Lo que hace cada atajo, venga de la interfaz o de una página con el foco
+   dentro (main lo intercepta con before-input-event y lo reenvía por IPC). */
+function siguientePestana(paso) {
+  const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId);
+  const n = v[(j + paso + v.length) % v.length]; if (n) activateTab(n.id);
+}
+// Ctrl+Mayús+RePág/AvPág: mueve la activa un puesto, sin saltar entre fijadas y sueltas.
+function muevePestana(paso) {
+  const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId);
+  const vecina = v[j + paso];
+  if (j === -1 || !vecina || !mueveA(activeId, vecina.id, paso < 0)) return;
+  renderTabs(true); saveSession();
+}
+function ejecutaAtajo(cmd) {
   if (cmd === 'reload') recargar(false);
   else if (cmd === 'reload-hard') recargar(true);
   else if (cmd === 'back') irAtras();
   else if (cmd === 'forward') irAdelante();
+  else if (cmd === 'home') els.sbHome.click();
   else if (cmd === 'new-tab') createTab();
-  else if (cmd === 'close-tab') { if (activeId) closeTab(activeId); }
+  else if (cmd === 'new-window') window.cobalt.newWindow();
+  else if (cmd === 'new-private') window.cobalt.newPrivateWindow();
+  // Ctrl+W y Ctrl+F4 no cierran las fijadas (decisión de Dosa): se cierran desde su menú.
+  else if (cmd === 'close-tab') { const t = activeTab(); if (window.naviAtajos.cierraConAtajo(t)) closeTab(t.id); }
   else if (cmd === 'reopen-tab') reabrirCerrada();
   else if (cmd === 'focus-url') { els.urlbar.focus(); els.urlbar.select(); }
+  // Ctrl+K / Ctrl+E: la barra vacía, lista para buscar (Esc devuelve la dirección).
+  else if (cmd === 'focus-search') { els.urlbar.focus(); els.urlbar.value = ''; renderSuggest(); }
   else if (cmd === 'pip') miniReproductor();
   else if (cmd.startsWith('addon-')) lanzaAtajoAddon(cmd.slice(6));
   else if (cmd === 'find') abrirBuscar();
+  // F3, Ctrl+G y sus Mayús: siguiente y anterior; sin búsqueda abierta, la abren.
+  else if (cmd === 'find-next' || cmd === 'find-prev') {
+    if (els.findBar.classList.contains('hidden') || !buscaTexto) abrirBuscar();
+    else buscar(cmd === 'find-next', true);
+  }
   else if (cmd === 'downloads') toggleDownloadsPage();
   else if (cmd === 'history') toggleHistory();
   else if (cmd === 'bookmark') els.navStar.click();
+  else if (cmd === 'print') { try { activeWv()?.print(); } catch { /* nada */ } }
+  else if (cmd === 'save-page') { const wv = activeWv(); if (wv) { try { window.cobalt.guardaPagina(wv.getWebContentsId()); } catch { /* aún sin montar */ } } }
+  else if (cmd === 'view-source') { const t = activeTab(); if (t?.kind === 'web' && /^https?:/i.test(t.url)) createTab('view-source:' + t.url, true, t.contenedor, t.id); }
+  else if (cmd === 'clear-data') abreBorrarDatos();
   else if (cmd === 'fullscreen') window.cobalt.toggleFullscreen();
   else if (cmd === 'zoom-in') zoom(1);
   else if (cmd === 'zoom-out') zoom(-1);
   else if (cmd === 'zoom-reset') zoom(0);
   else if (cmd.startsWith('rueda-')) zoomRueda(cmd.startsWith('rueda-in:') ? 1 : -1, Number(cmd.slice(cmd.indexOf(':') + 1)));
   else if (cmd === 'devtools') alternarDevtools();
-  else if (cmd === 'next-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + 1) % v.length]; if (n) activateTab(n.id); }
-  else if (cmd === 'prev-tab') { const v = tabsVisibles(), j = v.findIndex((t) => t.id === activeId); const n = v[(j + v.length - 1) % v.length]; if (n) activateTab(n.id); }
+  else if (cmd === 'next-tab') siguientePestana(1);
+  else if (cmd === 'prev-tab') siguientePestana(-1);
+  else if (cmd === 'move-tab-right') muevePestana(1);
+  else if (cmd === 'move-tab-left') muevePestana(-1);
   else if (cmd.startsWith('tab-')) {
-    const d = cmd.slice(4), v = tabsVisibles();   // como Ctrl+1…9 con el foco en la interfaz
+    const d = cmd.slice(4), v = tabsVisibles();   // Ctrl+1…8 y Ctrl+9 = la última
     const n = d === '9' ? v[v.length - 1] : v[parseInt(d, 10) - 1];
     if (n) activateTab(n.id);
   }
-});
+}
+window.cobalt.onShortcut(ejecutaAtajo);
 // Botones 4 y 5 del ratón: atrás y adelante (el estándar de Windows). Los manda
 // el propio Chromium como 'mouseup' con button 3/4; también llegan del webview.
 window.addEventListener('mouseup', (e) => {
@@ -6830,7 +6895,7 @@ window.cobalt.onTabstripMenu(({ x, y }) => {
     { label: 'Nueva pestaña', icon: 'plus', action: () => createTab() },
     { label: 'Reabrir última pestaña cerrada', icon: 'clock', action: reabrirCerrada },
     { sep: true },
-    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabsVisibles().forEach((t) => { if (t.kind === 'web' && !t.asleep) { try { t.webview?.reload(); } catch {} } }) }
+    { label: 'Recargar todas las páginas', icon: 'arrow-path', action: () => tabsVisibles().forEach((t) => { if (t.kind === 'web' && !t.asleep) recargaWv(t.webview); }) }
   ]);
 });
 /* `origen` es el id de webContents del webview que abrio el enlace. Se
@@ -6856,6 +6921,116 @@ window.cobalt.onBucle((p) => {
   if (!pestanaDeWebContents(p.wc)) return;
   let host = p.url; try { host = new URL(p.url).hostname.replace(/^www\./, ''); } catch { /* nada */ }
   toast(host + ' se recargaba sin parar y lo he detenido', { label: 'Reintentar', alPulsar: () => window.cobalt.reintentaBucle(p.wc) });
+});
+// Una página que no contesta (bucle de JavaScript): se avisa con la salida.
+// Esperar es no hacer nada; si vuelve a responder, el aviso ya no vale.
+window.cobalt.onColgada(({ wc, colgada }) => {
+  const tab = pestanaDeWebContents(wc);
+  if (!tab || !colgada) return;
+  toast((hostOf(tab.url) || 'La página') + ' no responde', { label: 'Cerrar pestaña', alPulsar: () => { if (tabs.includes(tab)) closeTab(tab.id); } });
+});
+
+/* ===== DIÁLOGOS DE LA PÁGINA, DENTRO DE SU PESTAÑA (2026-11-03) =====
+   alert, confirm y prompt (y «abrir con otra aplicación» de un mailto: o un
+   magnet:) llegan de main con el id de su webview. Se pintan encima de SU
+   pestaña y solo cuando es la que se ve: cambiar de pestaña lo esconde y
+   volver lo enseña, como en Chrome. El resto de la ventana sigue funcionando.
+   Mientras está abierto, esa página está parada esperando la respuesta. */
+function dialogoDe(tab) { return tab && tab.dialogos && tab.dialogos[0]; }
+function pintaDialogo() {
+  const tab = activeTab(), d = dialogoDe(tab), caja = els.tabDialogo;
+  caja.classList.toggle('hidden', !d);
+  if (!d) return;
+  if (caja.dataset.id === d.id) return;   // ya pintado: no se pisa lo que se esté escribiendo
+  caja.dataset.id = d.id;
+  const host = hostOf(d.origen) || d.origen || 'Esta página';
+  const externo = d.tipo === 'externo';
+  els.tdTit.textContent = externo ? '¿Abrir ' + d.aplicacion + '?' : host + ' dice';
+  els.tdTexto.textContent = externo ? host + ' quiere abrir este enlace fuera de Naviris.' : d.texto;
+  els.tdTexto.classList.toggle('hidden', !externo && !d.texto);
+  els.tdUrl.textContent = externo ? d.texto : '';
+  els.tdUrl.classList.toggle('hidden', !externo);
+  els.tdValor.classList.toggle('hidden', d.tipo !== 'prompt');
+  els.tdValor.value = d.tipo === 'prompt' ? (d.valor || '') : '';
+  // Como Chrome: la casilla sale a partir del segundo aviso del mismo documento.
+  els.tdSilenciar.checked = false;
+  els.tdSilencio.classList.toggle('hidden', externo || (tab.avisos || 0) < 2);
+  els.tdCancelar.classList.toggle('hidden', d.tipo === 'alert');
+  els.tdAceptar.textContent = externo ? 'Abrir' : 'Aceptar';
+  const foco = d.tipo === 'prompt' ? els.tdValor : els.tdAceptar;
+  requestAnimationFrame(() => { foco.focus(); if (d.tipo === 'prompt') els.tdValor.select(); });
+}
+function quitaDialogo(id) {
+  for (const t of tabs) {
+    if (!t.dialogos) continue;
+    const i = t.dialogos.findIndex((x) => x.id === id);
+    if (i !== -1) { t.dialogos.splice(i, 1); break; }
+  }
+  if (els.tabDialogo.dataset.id === id) delete els.tabDialogo.dataset.id;
+  pintaDialogo();
+}
+function respondeDialogo(ok) {
+  const d = dialogoDe(activeTab()); if (!d) return;
+  window.cobalt.respondeDialogo({ id: d.id, ok, valor: d.tipo === 'prompt' ? els.tdValor.value : null, silenciar: els.tdSilenciar.checked });
+  quitaDialogo(d.id);
+  try { activeWv()?.focus(); } catch { /* nada */ }
+}
+window.cobalt.onDialogo((d) => {
+  const tab = pestanaDeWebContents(d.wc);
+  if (!tab) { window.cobalt.respondeDialogo({ id: d.id, ok: false }); return; }
+  if (d.tipo !== 'externo') tab.avisos = (tab.avisos || 0) + 1;
+  (tab.dialogos || (tab.dialogos = [])).push(d);
+  if (tab.id === activeId) pintaDialogo();
+});
+window.cobalt.onDialogoFin(quitaDialogo);
+els.tdAceptar.addEventListener('click', () => respondeDialogo(true));
+els.tdCancelar.addEventListener('click', () => respondeDialogo(false));
+els.tabDialogo.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); respondeDialogo(dialogoDe(activeTab())?.tipo === 'alert'); }
+  else if (e.key === 'Enter' && e.target !== els.tdCancelar) { e.preventDefault(); e.stopPropagation(); respondeDialogo(true); }
+});
+
+/* Clic derecho en un campo de texto de la interfaz (barra de direcciones,
+   buscar en la página, filtros, ajustes): el menú nativo de editar. La barra
+   añade «Pegar e ir». Ver 'ui:menu-campo' en main.js. */
+document.addEventListener('contextmenu', (e) => {
+  if (e.defaultPrevented) return;
+  const el = e.target;
+  const texto = el instanceof HTMLInputElement ? /^(text|search|url|email|password|number|tel)$/.test(el.type) : el instanceof HTMLTextAreaElement;
+  if (!texto && !(el instanceof HTMLElement && el.isContentEditable)) return;
+  e.preventDefault();
+  if (document.activeElement !== el) el.focus();
+  const valor = texto ? el.value : el.textContent;
+  const seleccion = texto ? el.selectionStart !== el.selectionEnd : !!String(getSelection() || '');
+  window.cobalt.menuCampo({ urlbar: el === els.urlbar, seleccion, vacio: !valor });
+});
+window.cobalt.onPegarEIr((texto) => { els.urlbar.value = texto; navigateActive(texto); hideSuggest(); els.urlbar.blur(); });
+
+/* ===== BORRAR DATOS DE NAVEGACIÓN (Ctrl+Mayús+Supr) =====
+   El historial se borra por periodo; cookies y caché siempre enteras, porque
+   Electron no deja borrarlas por fechas (lo dice el propio cuadro). */
+function abreBorrarDatos() {
+  els.menuPop.classList.add('hidden');
+  els.datosModal.classList.remove('hidden');
+  els.datosBorrar.focus();
+}
+els.datosCancelar.addEventListener('click', () => els.datosModal.classList.add('hidden'));
+els.datosBorrar.addEventListener('click', async () => {
+  const hist = els.datosHistorial.checked, cookies = els.datosCookies.checked, cache = els.datosCache.checked;
+  if (!hist && !cookies && !cache) { toast('Elige qué quieres borrar'); return; }
+  els.datosBorrar.disabled = true;
+  try {
+    // La privada no tiene historial (y su guardado pisaría el de la normal).
+    if (hist && !IS_PRIVATE) {
+      const desde = Number(els.datosPeriodo.value) ? Date.now() - Number(els.datosPeriodo.value) : 0;
+      history = desde ? history.filter((h) => h.ts < desde) : [];
+      guardaHistorial();
+      if (!els.historyPanel.classList.contains('hidden')) renderHistory();
+    }
+    if (cookies || cache) await window.cobalt.borraDatos({ cookies, cache });
+    els.datosModal.classList.add('hidden');
+    toast('Datos de navegación borrados');
+  } finally { els.datosBorrar.disabled = false; }
 });
 /* ===== Buscar la imagen con Google Lens (2026-08-12) =====
    Lens ya no acepta que le pasen la URL de la imagen (ver el comentario de
@@ -6933,6 +7108,7 @@ window.cobalt.onContextAction(({ tipo, datos }) => {
   settings = await window.cobalt.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode; els.optUpdauto.checked = settings.updatesAuto !== false;
   els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
+  els.optPreguntarDescargas.checked = !!settings.preguntarDescargas; pintaBuscador();
   els.optSonidos.checked = settings.sonidos !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);
   contenedores = Array.isArray(settings.contenedores) ? settings.contenedores : [];

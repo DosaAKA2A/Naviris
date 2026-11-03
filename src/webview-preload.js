@@ -44,6 +44,36 @@ if (ARRANQUE.scriptlets) {
   try { webFrame.executeJavaScript(ARRANQUE.scriptlets).catch(() => {}); } catch (e) { /* nada */ }
 }
 
+// --- alert, confirm y prompt con el diálogo de Naviris (2026-11-03) ---
+// Los nativos están apagados (disableDialogs) porque congelaban la ventana
+// entera. Estos preguntan a main con una llamada síncrona: la página espera la
+// respuesta como con los de verdad, pero solo se para ESTA pestaña (ver
+// 'wv:dialogo' en main.js). La función se pasa como argumento y no como global
+// para no dejar nada nuevo en window. Van como Proxy de la función original:
+// conservan su nombre y su longitud, y toString sigue diciendo [native code].
+try {
+  const pregunta = (tipo, texto, valor) => {
+    try { return ipcRenderer.sendSync('wv:dialogo', { tipo, texto, valor }) || { ok: false }; } catch (e) { return { ok: false }; }
+  };
+  contextBridge.executeInMainWorld({
+    args: [pregunta],
+    func: function (pregunta) {
+      var texto = function (v) { return v === undefined ? '' : String(v); };
+      var cambia = function (nombre, fn) {
+        var original = window[nombre];
+        if (typeof original !== 'function') return;
+        window[nombre] = new Proxy(original, { apply: function (_f, _esto, args) { return fn(args); } });
+      };
+      cambia('alert', function (a) { pregunta('alert', texto(a[0])); });
+      cambia('confirm', function (a) { return !!pregunta('confirm', texto(a[0])).ok; });
+      cambia('prompt', function (a) {
+        var r = pregunta('prompt', texto(a[0]), a.length > 1 ? texto(a[1]) : '');
+        return r.ok ? String(r.valor == null ? '' : r.valor) : null;
+      });
+    }
+  });
+} catch (e) { /* nada */ }
+
 // --- Ocultado genérico por clase e id (`##.anuncio`, ver genericosPara en adblock.js) ---
 // Como uBlock y Brave: se apuntan las clases e ids que van apareciendo y se
 // pregunta a main, en tandas de 100 ms y solo por los NUEVOS, qué reglas les
