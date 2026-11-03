@@ -544,9 +544,10 @@ function recordDlHistory(p) {
   try { escribeSeguro(dlHistoryPath(), JSON.stringify(dlHistory)); } catch {}
 }
 
-// Solo anuncios/telemetría puros. NO se tocan rutas del reproductor
-// (/youtubei/v1/player, /get_midroll_info, videoplayback…): bloquearlas hacía
-// que el vídeo no cargara o disparaba el anti-adblock. El salto real es en cliente.
+// Rutas de anuncios de YouTube que se cortan mientras el motor no está listo
+// (con motor decide él, ver onBeforeRequest). Solo anuncios/telemetría puros:
+// NO van rutas del reproductor (/youtubei/v1/player, /get_midroll_info,
+// videoplayback…), que hacían que el vídeo no cargara o disparaban el anti-adblock.
 const YT_AD_PATHS = ['/pagead/', '/api/stats/ads', '/ptracking'];
 
 /* ===== Identidad del navegador, en un solo sitio =====
@@ -642,13 +643,18 @@ function idiomasLista() {
      diálogo de Naviris no llegaba a salir nunca y la persona no podía conceder
      notificaciones aunque quisiera. El preload usa esto para contar la verdad.
    - scriptlets: los `##+js(...)` de las listas para ESTE documento, ya listos
-     para ejecutarse en el mundo principal (braveAdblock.scriptletsFor). Van
+     para ejecutarse en el mundo principal (braveAdblock.arranqueDe). Van
      aquí y no en dom-ready porque json-prune, set o trusted-replace-xhr-response
      tienen que estar puestos ANTES de que corra el primer script de la página,
      como los pone uBlock (document_start): en dom-ready YouTube ya había leído
      su respuesta del reproductor con los anuncios dentro. Respeta el
      interruptor del adblock y la lista blanca, igual que el resto del bloqueo.
-     La URL es la del marco que pregunta según main, no la que diga la página. */
+     La URL es la del marco que pregunta según main, no la que diga la página.
+   - bloqueo: si el bloqueador actúa en este documento (interruptor y lista
+     blanca). Lo usa el bloque de YouTube del preload; antes lo preguntaba con
+     otra llamada síncrona ('yt-adblock-on') en cada documento de YouTube.
+   - genericos: si el preload tiene que juntar clases e ids para el ocultado
+     genérico ('adblock:genericos', más abajo). */
 ipcMain.on('preload:arranque', (e, permisos) => {
   let origen = '';
   let url = '';
@@ -659,8 +665,22 @@ ipcMain.on('preload:arranque', (e, permisos) => {
     const guardado = origen ? settings.permissions[origen + '|' + permiso] : undefined;
     estados[permiso] = guardado === 'allow' ? 'allow' : guardado === 'block' ? 'block' : 'prompt';
   }
-  const scriptlets = settings.adblockEnabled && /^https?:/i.test(url) && !isWhitelisted(url) ? braveAdblock.scriptletsFor(url) : '';
-  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados, scriptlets };
+  const bloqueo = !!settings.adblockEnabled && /^https?:/i.test(url) && !isWhitelisted(url);
+  const { scriptlets, genericos } = bloqueo ? braveAdblock.arranqueDe(url) : { scriptlets: '', genericos: false };
+  e.returnValue = { hints: UA_CH, idiomas: idiomasLista(), passkeys: !!settings.blockPasskeys, permisos: estados, bloqueo, scriptlets, genericos };
+});
+
+/* Ocultado genérico por clase e id (ver genericosPara en adblock.js). El
+   preload manda las clases e ids NUEVOS que ve en la página, en tandas, y
+   recibe los selectores que las listas mandan ocultar. La URL y el permiso
+   salen de main (el marco que pregunta), no de lo que diga la página, y se
+   acota lo que puede llegar: es una petición de una web. */
+ipcMain.handle('adblock:genericos', (e, clases, ids) => {
+  let url = '';
+  try { url = e.senderFrame.url || ''; } catch { /* nada */ }
+  if (!settings.adblockEnabled || !/^https?:/i.test(url) || isWhitelisted(url)) return [];
+  const limpia = (a) => (Array.isArray(a) ? a : []).filter((x) => typeof x === 'string' && x.length && x.length < 200).slice(0, 5000);
+  return braveAdblock.genericosPara(url, limpia(clases), limpia(ids));
 });
 
 /* Dominios de verificación anti-robot. NO se bloquean nunca: bloquearlos no
@@ -764,16 +784,15 @@ function setupSession(ses) {
       return callback({});
     }
     const u = details.url;
+    let hostPagina = '';
+    try { hostPagina = new URL(pagina).hostname; } catch { /* sin página válida */ }
     // No romper Spotify: su reproductor exige que el hueco publicitario cargue
     // (metadatos y audio del anuncio); si el motor le corta esas peticiones se
     // queda esperando una respuesta que nunca llega y se congela TODO el player
     // al tocar anuncio. Mismo criterio que con YouTube: por red no se le
     // bloquea nada, el anuncio se quita en cliente (el addon Blockify lo salta
     // o lo silencia).
-    try {
-      const refHost = new URL(pagina).hostname;
-      if (hostMatches(refHost, 'spotify.com') || hostMatches(refHost, 'open.spotify.com')) return callback({});
-    } catch { /* sin referrer válido */ }
+    if (hostMatches(hostPagina, 'spotify.com')) return callback({});
     /* EL INICIO DE SESIÓN DE GOOGLE no se toca por red (2026-10-11). Usuarios
        sin poder entrar en YouTube. Medido con perfil nuevo en la página de
        accounts.google.com: Naviris cortaba accounts.google.com/generate_204
@@ -783,39 +802,16 @@ function setupSession(ses) {
        verificaciones de ES_VERIFICACION, y Google ya rechaza a los navegadores
        que no le parecen normales ("este navegador no es seguro"). Cualquier
        diferencia con Brave en esa página es una papeleta más. */
-    try {
-      const hostPagina = new URL(pagina).hostname;
-      if (hostPagina === 'accounts.google.com' || hostPagina === 'accounts.youtube.com') return callback({});
-    } catch { /* sin página válida */ }
-    // (el vídeo de googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr,
-    // /youtubei/). Bloquearlos rompe la reproducción —sobre todo Shorts— y provoca
-    // cargas lentas por reintentos. Los anuncios de YouTube se quitan con el pruning del
-    // player (webview-preload.js), no bloqueando red. Verificado: era lo que rompía Shorts.
+    if (hostPagina === 'accounts.google.com' || hostPagina === 'accounts.youtube.com') return callback({});
+    // Lo que necesita el reproductor de YouTube no pasa por el motor: el vídeo de
+    // googlevideo, y youtube.com/generate_204, /api/stats/qoe|watchtime|atr y
+    // /youtubei/. Bloquearlos rompe la reproducción —sobre todo Shorts— y provoca
+    // cargas lentas por reintentos. Los anuncios de YouTube se quitan en la
+    // respuesta del reproductor (los scriptlets de las listas), no cortando red.
     // `[/.]` y no `(^|\.)`: se mira la URL entera, y en https://youtube.com/…
     // (sin www) lo que va delante del dominio es una barra.
     if (/\.googlevideo\.com\//i.test(u) || /[/.]youtube(-nocookie)?\.com\/(generate_204|api\/stats\/(qoe|watchtime|atr|playback)|youtubei\/)/i.test(u)) {
       return callback({});
-    }
-    // Rutas de anuncios/seguimiento de YouTube (no toca 'videoplayback', así que no ralentiza)
-    if (YT_AD_PATHS.some((p) => u.includes(p))) {
-      /* Decide el motor, como con el resto de la web: corta lo que las listas
-         bloquean (con su SUSTITUTO si lo traen) y deja pasar lo que exceptúan
-         con `@@`. '/pagead/' casa también con
-         googlesyndication.com/pagead/js/adsbygoogle.js, y para ese script hay
-         decenas de reglas `$redirect=noopjs` en las webs que comprueban si
-         cargó: cortarlo a pelo es justo lo que les delata el bloqueador.
-         Antes se cortaban TODAS aunque las listas tuvieran una excepción, en
-         cualquier web: una diferencia más con Brave y uBlock que el muro
-         anti-bloqueador de YouTube puede usar. Solo si el motor aún no está
-         listo se cortan a ciegas, como antes. */
-      const v = braveAdblock.check(details, pagina);
-      if (v && !v.bloquear) {
-        if (v.reescrita && v.reescrita !== u) return callback({ redirectURL: v.reescrita });
-        return callback({});
-      }
-      blockedCount++;
-      if (v && v.sustituto) return callback({ redirectURL: v.sustituto });
-      return callback({ cancel: true });
     }
     /* VERIFICACIONES DE "no soy un robot". Nunca se bloquean, aunque las listas
        lo pidan y aunque sus rutas se llamen /telemetry o /report.
@@ -832,8 +828,13 @@ function setupSession(ses) {
        es la propia verificación, no un identificador para seguirte por la web.
        Bloquearlos no protege de nada y rompe el sitio entero. */
     if (ES_VERIFICACION.test(u)) return callback({});
-    // Motor de Brave (adblock-rust + listas de Brave). Si aún no está listo,
-    // decide el fallback clásico por dominios.
+    /* Motor de Brave (adblock-rust + listas de Brave). Decide también las
+       rutas de anuncios de YouTube (YT_AD_PATHS): corta lo que las listas
+       bloquean, con su SUSTITUTO si lo traen, y deja pasar lo que exceptúan con
+       `@@`. '/pagead/' casa también con googlesyndication.com/pagead/js/adsbygoogle.js,
+       y para ese script hay decenas de reglas `$redirect=noopjs` en las webs que
+       comprueban si cargó: cortarlo a pelo es justo lo que les delata el
+       bloqueador. Si el motor aún no está listo, decide el respaldo de abajo. */
     const brave = braveAdblock.check(details, pagina);
     if (brave !== null) {
       if (brave.bloquear) {
@@ -852,6 +853,12 @@ function setupSession(ses) {
       // `$removeparam`: la misma petición sin los parámetros de rastreo.
       if (brave.reescrita && brave.reescrita !== u) return callback({ redirectURL: brave.reescrita });
       return callback({});
+    }
+    // Respaldo sin motor (primer arranque, antes de tener listas): rutas de
+    // anuncios de YouTube y dominios de publicidad conocidos, a ciegas.
+    if (YT_AD_PATHS.some((p) => u.includes(p))) {
+      blockedCount++;
+      return callback({ cancel: true });
     }
     try {
       const host = new URL(u).hostname;
@@ -2185,13 +2192,6 @@ ipcMain.handle('settings:set', soloUI((_e, patch) => {
 // de edad de X. Síncrono porque a esas alturas no da tiempo a un ida y vuelta
 // asíncrono; solo devuelve un booleano, sin datos sensibles.
 ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive; });
-// Lo pregunta el preload antes de parchear el player de YouTube. Respeta el
-// interruptor del adblock Y la lista blanca: antes el bloque de YouTube del preload
-// no miraba ninguno de los dos, así que meter youtube.com en la lista blanca porque
-// se te rompía el vídeo no servía absolutamente de nada.
-ipcMain.on('yt-adblock-on', (e, url) => {
-  e.returnValue = !!settings.adblockEnabled && !isWhitelisted(url || '');
-});
 /* PUENTE, A QUITAR. Desde 2.7.10-dev.4 el preload YA NO PIDE ni el pase ni la
    clave de la app: MOOVIN entra por el vinculo de mas abajo. Estos dos
    manejadores se quedan solo por si hay que volver atras deprisa, y se van
