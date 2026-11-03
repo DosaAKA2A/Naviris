@@ -1374,6 +1374,9 @@ async function ytDownload({ url, mode, quality }) {
    direcciones y src/sonidos.js para el sonido. */
 // CAMBIAR DE SPLASH = cambiar esta línea: 'apertura' | 'firma' | 'icono'
 const SPLASH_VARIANTE = 'apertura';
+/* Cómo se abre la lente en 'apertura' (splash.js): 'clasica' (escalado rígido)
+   o las líquidas 'gota' | 'muelle' | 'menisco' | 'marea'. Las otras variantes no la usan. */
+const SPLASH_LENTE = 'clasica';
 // Tamaño de cada una: la tarjeta más el margen de su sombra (la ventana es transparente)
 const SPLASH_TAMANO = { apertura: [288, 288], firma: [460, 220], icono: [240, 300] };
 const SPLASH_MINIMO = 1050; // ms en pantalla: la animación entera (~0,9 s) y un respiro
@@ -1409,7 +1412,7 @@ function crearSplash() {
     }
   });
   splashWin.loadFile(path.join(__dirname, 'splash.html'), {
-    query: { v: SPLASH_VARIANTE, tema: settings.lightMode ? 'claro' : 'oscuro', sonido: settings.sonidos === false ? '0' : '1' }
+    query: { v: SPLASH_VARIANTE, lente: SPLASH_LENTE, tema: settings.lightMode ? 'claro' : 'oscuro', sonido: settings.sonidos === false ? '0' : '1' }
   });
   splashWin.once('ready-to-show', () => {
     if (!splashWin || splashWin.isDestroyed()) return;

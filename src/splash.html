@@ -69,7 +69,8 @@
       transform: rotate(45deg) scaleY(.035) rotate(-45deg); }
     .anda[data-v="apertura"] .tarjeta { animation: aparece .3s var(--frena) both; }
     .anda[data-v="apertura"] .logo { animation: asienta .9s var(--frena) both; }
-    .anda[data-v="apertura"] .lente { animation: abre .72s cubic-bezier(.7,0,.2,1) .1s both; }
+    /* Solo la lente 'clasica' va por CSS; las líquidas las mueve splash.js */
+    .anda[data-v="apertura"][data-lente="clasica"] .lente { animation: abre .72s cubic-bezier(.7,0,.2,1) .1s both; }
     @keyframes abre { to { transform: rotate(45deg) scaleY(1) rotate(-45deg); } }
 
     /* ---------- FIRMA ---------- */

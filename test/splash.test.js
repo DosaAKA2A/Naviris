@@ -21,6 +21,15 @@ test('la variante elegida en main.js existe en las tres piezas del splash', () =
   for (const v of tamanos) assert.ok(html.includes(`[data-v="${v}"] .tarjeta`), 'falta el CSS de ' + v);
 });
 
+test('el estilo de lente elegido en main.js existe en splash.js y le llega por la URL', () => {
+  const elegido = main.match(/\nconst SPLASH_LENTE = '([a-z]+)';/)[1];
+  const enJs = eval(js.match(/const LENTES = (\[[^\]]+\])/)[1]);
+  assert.ok(enJs.includes(elegido));
+  assert.match(main, /lente: SPLASH_LENTE/);
+  // La clásica es la única que va por CSS; las líquidas no deben heredar su animación
+  assert.ok(html.includes('[data-lente="clasica"] .lente { animation: abre'));
+});
+
 test('la paleta elegida existe y cada paleta trae los cuatro sonidos en Ogg Opus', () => {
   const elegida = sonidos.match(/const PALETA = '([a-z]+)';/)[1];
   assert.ok(PALETAS.includes(elegida));
