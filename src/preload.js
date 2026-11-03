@@ -86,7 +86,7 @@ contextBridge.exposeInMainWorld('navirisApp', {
   onColgada: (cb) => ipcRenderer.on('tab:colgada', (_e, p) => cb(p)),
   guardaPagina: (wcId) => ipcRenderer.send('tab:guardar', wcId),
   onEmergenteBloqueada: (cb) => ipcRenderer.on('tab:emergente-bloqueada', (_e, p) => cb(p)),
-  permitirEmergentes: (origen) => ipcRenderer.send('emergentes:permitir', origen),
+  permitirEmergentes: (origen, wc) => ipcRenderer.send('emergentes:permitir', origen, wc),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 

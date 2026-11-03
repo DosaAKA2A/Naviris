@@ -435,25 +435,55 @@ describe('Bloqueo general y sitios grandes', { timeout: 10 * 60 * 1000 }, () => 
     assert.ok(r.puntos >= 0.85 * r.de, `puntuación baja: ${r.puntos}/${r.de}`);
   });
 
-  /* Los scriptlets llegan también a los iframes (did-frame-navigate en main). El
-     aviso de consentimiento de Sourcepoint vive en un iframe y las listas de
-     cookies lo cierran con un clic DENTRO de él: sin eso la página se quedaba
-     tapada y sin scroll (Brave no lo enseña). */
-  for (const [nombre, url] of [['spiegel', 'https://www.spiegel.de/'], ['bild', 'https://www.bild.de/']]) {
-    it('aviso de consentimiento en un iframe: se cierra y la página se desplaza: ' + nombre, async () => {
+  /* Avisos de consentimiento de cookies: los contesta la persona (decisión de
+     Dosa, 03/11/2026; ver LISTAS_FUERA en src/adblock.js). En estas webs el
+     aviso es de Sourcepoint y vive en un iframe del mismo sitio: tiene que
+     verse, sin consentimiento puesto por el bloqueador, y al pulsar uno de sus
+     botones (clic de verdad, dentro del iframe) la web queda usable. */
+  const AVISOS = [
+    ['spiegel', 'https://www.spiegel.de/', 'aceptar'], ['bild', 'https://www.bild.de/', 'aceptar'],
+    ['t-online', 'https://www.t-online.de/', 'aceptar'], ['chip', 'https://www.chip.de/', 'aceptar'],
+    ['independent', 'https://www.independent.co.uk/', 'rechazar']
+  ];
+  const BOTON_SP = { aceptar: '.sp_choice_type_11', rechazar: '.sp_choice_type_13' };
+  const ESTADO_SP = `
+    const c = document.querySelector('[id^="sp_message_container"]');
+    const visible = !!c && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().height > 0;
+    const y0 = scrollY; scrollBy(0, 600); const baja = scrollY - y0; scrollTo(0, y0);
+    return { aviso: visible, abierto: document.documentElement.classList.contains('sp-message-open'), baja, cookie: /consentUUID=/.test(document.cookie) };`;
+  // Pulsa el botón dentro del iframe del aviso; devuelve su texto o null.
+  async function contestaSP(p, sel) {
+    const planos = [];
+    (function rec(t) { planos.push(t.frame); for (const h of t.childFrames || []) rec(h); })((await p.cdp.envia('Page.getFrameTree')).frameTree);
+    const contexto = (fid) => p.eventos.filter((d) => d.method === 'Runtime.executionContextCreated' && d.params.context.auxData?.frameId === fid && d.params.context.auxData.isDefault).pop()?.params.context.id;
+    for (const fr of planos.filter((x) => x.parentId && /[?&]message_id=/.test(x.url))) {
+      const r = await p.cdp.envia('Runtime.evaluate', { contextId: contexto(fr.id), returnByValue: true, expression: `(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find((x) => x.getBoundingClientRect().width > 0); if (!b) return null; b.scrollIntoView({ block: 'center' }); const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2, t: b.textContent.trim() }; })()` }).catch(() => null);
+      const boton = r && r.result.value;
+      if (!boton) continue;
+      const { backendNodeId } = await p.cdp.envia('DOM.getFrameOwner', { frameId: fr.id });
+      const [x, y] = (await p.cdp.envia('DOM.getBoxModel', { backendNodeId })).model.content;
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await p.cdp.envia('Input.dispatchMouseEvent', { type, x: x + boton.x, y: y + boton.y, button: 'left', clickCount: 1 });
+      return boton.t;
+    }
+    return null;
+  }
+  for (const [nombre, url, accion] of AVISOS) {
+    it(`aviso de cookies a la vista y se puede ${accion} a mano: ${nombre}`, async () => {
       const p = await n.abrePestana(app, url);
       await n.espera(15000);
-      const r = await n.enPestana(p, `
-        const c = document.querySelector('[id^="sp_message_container"]');
-        const visible = !!c && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().height > 0;
-        const y0 = scrollY; scrollBy(0, 600); const baja = scrollY - y0; scrollTo(0, y0);
-        return { aviso: visible, abierto: document.documentElement.classList.contains('sp-message-open'), baja, cookie: /consentUUID=/.test(document.cookie) };`);
+      const antes = await n.enPestana(p, ESTADO_SP);
       await n.captura(p, 'web-consentimiento-' + nombre);
-      apunta('web-consentimiento-' + nombre, r);
+      const boton = await contestaSP(p, BOTON_SP[accion]);
+      await n.espera(5000);
+      const despues = await n.enPestana(p, ESTADO_SP);
+      await n.captura(p, 'web-consentimiento-' + nombre + '-' + accion);
+      apunta('web-consentimiento-' + nombre, { antes, boton, despues });
       await n.cierraPestana(app, p);
-      assert.equal(r.aviso, false, 'el aviso de consentimiento sigue a la vista');
-      assert.equal(r.abierto, false, 'la página sigue marcada con el aviso abierto');
-      assert.ok(r.baja > 0, 'la página no se desplaza');
+      assert.deepEqual({ aviso: antes.aviso, abierto: antes.abierto, cookie: antes.cookie }, { aviso: true, abierto: true, cookie: false }, 'el aviso no está a la vista o lo contestó el bloqueador');
+      assert.ok(boton, 'no está el botón para ' + accion);
+      assert.equal(despues.aviso, false, 'el aviso sigue a la vista tras ' + accion);
+      assert.equal(despues.abierto, false, 'la página sigue marcada con el aviso abierto');
+      assert.ok(despues.baja > 0, 'la página no se desplaza');
     });
   }
 
@@ -552,18 +582,20 @@ describe('Service workers y ventanas emergentes', { timeout: 6 * 60 * 1000 }, ()
   // Sin clic no se abre nada, como en Chrome (src/emergentes.js); el resto de
   // casos, con clic y con permiso, en test/e2e/rendimiento.e2e.js.
   it('ventanas emergentes: sin gesto no se abre ninguna', async () => {
-    const pestanas = () => n.evalua(app.ui, 'return tabs.length;');
-    const ventanas = async () => (await (await fetch(`http://127.0.0.1:${n.PUERTO}/json/list`)).json()).filter((t) => t.type === 'page' || t.type === 'webview').length;
-    const t0 = await pestanas(), v0 = await ventanas();
+    // Se cuentan por su dirección (pestañas y ventanas son destinos CDP): contar
+    // todos los destinos fallaba con números negativos, porque el splash y las
+    // pestañas de las pruebas anteriores se cierran mientras tanto.
+    const abiertas = async () => (await (await fetch(`http://127.0.0.1:${n.PUERTO}/json/list`)).json())
+      .filter((t) => (t.type === 'page' || t.type === 'webview') && /taboola\.com|example\.(com|org)/.test(t.url)).map((t) => t.url);
     const p = await n.abrePestana(app, base + '/emergentes');
     await n.espera(4000);
-    const sinGesto = { pestanas: (await pestanas()) - t0 - 1, marcos: (await ventanas()) - v0 - 1 };
+    const sinGesto = await abiertas();
     await n.clic(p, '#b');
-    await n.espera(3000);
-    const conGesto = { pestanas: (await pestanas()) - t0 - 1, marcos: (await ventanas()) - v0 - 1 };
+    const conGesto = await n.hasta(async () => { const a = await abiertas(); return a.length && a; }, { tope: 8000, que: 'la ventana del clic' }).catch(() => []);
     await n.captura(p, 'emergentes');
     apunta('ventanas-emergentes', { sinGesto, conGesto });
-    assert.equal(sinGesto.pestanas + sinGesto.marcos, 0, 'se abrieron ventanas sin que la persona hiciera clic');
+    assert.deepEqual(sinGesto, [], 'se abrieron ventanas sin que la persona hiciera clic');
+    assert.deepEqual(conGesto, ['https://example.org/'], 'con el clic se abre la suya');
   });
 });
 

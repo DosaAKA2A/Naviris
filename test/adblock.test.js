@@ -30,12 +30,6 @@ const CONFIANZA = [
   'site.example##.consent-banner',
   'site.example##+js(set, miBandera, 1)',
   'confianza.example##+js(trusted-set, otraBandera, 1)',
-  // Las reglas de clic automático en el aviso de cookies de YouTube que
-  // Naviris quita (ver REGLAS_FUERA): tal cual vienen en las listas.
-  'www.youtube.com##+js(trusted-click-element, ytd-button-renderer.ytd-consent-bump-v2-lightbox + ytd-button-renderer.ytd-consent-bump-v2-lightbox button[aria-label], , 1000)',
-  'www.youtube.com##+js(trusted-click-element, .ytd-consent-bump-v2-lightbox > yt-button-shape > button[aria-label="Accept the use of cookies and other data for the purposes described"], , 1000)',
-  'www.youtube.com,m.youtube.com##+js(trusted-click-element, button[aria-label*="Accept the use of cookie"], , 1500)',
-  'www.youtube.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)',
   // Ocultado genérico por clase e id, con una excepción y un sitio sin genéricos.
   '##.banner-publi',
   '###caja-anuncio',
@@ -86,29 +80,46 @@ test('$third-party se evalúa contra la página cuando la petición no trae refe
   assert.equal(adblock.check(pide('https://tracker.example/t.js', 'script', { referrer: 'https://tracker.example/x' }), 'https://site.example/').bloquear, false);
 });
 
-test('cosméticos: fuera de YouTube oculta también los avisos de cookies, como Brave', () => {
+test('cosméticos: oculta los anuncios del sitio y los genéricos', () => {
   const c = adblock.cosmeticsFor('https://site.example/');
   assert.match(c.css, /\.anuncio/);
-  assert.match(c.css, /\.consent-banner/);
-  assert.match(c.css, /\[data-consent-aviso\]/);
+  assert.match(c.css, /\[data-publi-generica\]/);
 });
 
-// Los avisos de cookies solo se dejan a la vista en YouTube: allí el aviso
-// escondido pero montado pausa el reproductor (ver sinAvisoDeCookies).
-const EN_YOUTUBE = ['https://www.youtube.com/watch?v=x', 'https://youtube.com/', 'https://m.youtube.com/', 'https://music.youtube.com/',
-  'https://www.youtube-nocookie.com/embed/x', 'https://youtube-nocookie.com/embed/x'];
-const FUERA_DE_YOUTUBE = ['https://site.example/', 'https://www.spiegel.de/', 'https://notyoutube.com/', 'https://youtube.com.example/', 'https://www.youtube.co/'];
-test('avisos de cookies: se dejan a la vista solo en YouTube y sus subdominios', () => {
-  for (const url of EN_YOUTUBE) {
+// Los avisos de consentimiento de cookies los contesta la persona: no se
+// esconden en ninguna web (en YouTube, además, escondido pero montado pausa
+// el reproductor; ver sinAvisoDeCookies).
+const WEBS = ['https://site.example/', 'https://www.spiegel.de/', 'https://www.youtube.com/watch?v=x', 'https://m.youtube.com/',
+  'https://music.youtube.com/', 'https://www.youtube-nocookie.com/embed/x'];
+test('avisos de cookies: no se esconden en ninguna web', () => {
+  for (const url of WEBS) {
     const css = adblock.cosmeticsFor(url).css;
     assert.doesNotMatch(css, /consent/i, url + ': CSS');
     assert.match(css, /\[data-publi-generica\]/, url + ': el resto del CSS sigue');
     assert.deepEqual(adblock.genericosPara(url, ['consent-generico', 'banner-publi'], []), ['.banner-publi'], url + ': genérico');
   }
-  for (const url of FUERA_DE_YOUTUBE) {
-    assert.match(adblock.cosmeticsFor(url).css, /\[data-consent-aviso\]/, url + ': CSS');
-    assert.deepEqual(adblock.genericosPara(url, ['consent-generico'], []), ['.consent-generico'], url + ': genérico');
-  }
+});
+
+// Un trozo del catálogo de Brave (filter_lists/list_catalog.json) tal como viene.
+const CATALOGO = [
+  { uuid: 'default', title: 'Brave Default Adblock Filters', default_enabled: true, permission_mask: 1,
+    sources: [{ url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt' }, { url: 'https://easylist.to/easylist/easylist.txt' }] },
+  { uuid: '9F38E77A-64AA-4C5F-AF37-727CAE1266FF', title: 'Brave IOS-Specific Filters', default_enabled: true, permission_mask: 1, platforms: ['IOS'],
+    sources: [{ url: 'https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/brave-ios-specific.txt' }] },
+  { uuid: 'AC023D22-AE88-4060-A978-4FEEEC4221693', title: 'Cookie notice blocker', desc: 'EasyList Cookie', default_enabled: true, permission_mask: 1,
+    sources: [{ url: 'https://secure.fanboy.co.nz/fanboy-cookiemonster_ubo.txt' },
+      { url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt' },
+      { url: 'https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/brave-cookie-specific.txt' }] },
+  { uuid: '2F3DCE16-A19A-493C-A88F-2E110FBD37D6', title: 'Mobile app promo blocker', default_enabled: true, permission_mask: 1,
+    sources: [{ url: 'https://secure.fanboy.co.nz/fanboy-mobile-notifications.txt' }] },
+  { uuid: 'otra', title: 'Fanboy Annoyances', default_enabled: false, sources: [{ url: 'https://secure.fanboy.co.nz/fanboy-annoyance_ubo.txt' }] }
+];
+test('listas: la de avisos de cookies no se baja; las demás por defecto sí, con su máscara', () => {
+  const f = adblock.fuentesDe(CATALOGO);
+  assert.deepEqual(f.map((x) => x.url.split('/').pop()), ['filters.txt', 'easylist.txt', 'fanboy-mobile-notifications.txt',
+    'serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext']);
+  assert.deepEqual(f.map((x) => x.mascara), [1, 1, 1, 0]);
+  assert.ok(!f.some((x) => /cookie/i.test(x.url)), 'se cuela una lista de cookies');
 });
 
 test('scriptlets: envueltos con scriptletGlobals y JavaScript válido', () => {
@@ -123,15 +134,6 @@ test('los trusted-* solo se inyectan desde una lista con permiso de confianza', 
   const otra = adblock.arranqueDe('https://otra.example/').scriptlets;
   assert.match(otra, /banderaNormal/);
   assert.doesNotMatch(otra, /banderaSinPermiso/);
-});
-
-test('YouTube: ninguna regla pulsa sola el aviso de cookies (bucle de recargas)', () => {
-  const s = adblock.arranqueDe('https://www.youtube.com/watch?v=x').scriptlets;
-  assert.match(s, /ytInitialPlayerResponse\.adPlacements/, 'el resto de scriptlets de YouTube sigue');
-  // Se busca la llamada (trustedClickElement("…")), no el texto de las
-  // funciones de apoyo, que se incluyen igual por otras reglas.
-  const clics = s.split('\n').filter((l) => l.startsWith('trustedClickElement('));
-  assert.deepEqual(clics, [], 'quedan clics automáticos en YouTube');
 });
 
 test('ocultado genérico: solo lo que casa y con excepciones', () => {
@@ -161,7 +163,6 @@ test('motor montado en un hilo aparte y serializado: decide igual que el montado
   const s = (u) => e.urlCosmeticResources(u).injected_script;
   assert.match(s('https://confianza.example/'), /otraBandera/, 'el permiso de confianza sobrevive');
   assert.doesNotMatch(s('https://otra.example/'), /banderaSinPermiso/);
-  assert.doesNotMatch(s('https://www.youtube.com/'), /Accept the use of cookie/, 'REGLAS_FUERA también en el hilo');
 });
 
 // Va la última: deja montado un motor distinto del de las pruebas de arriba.
