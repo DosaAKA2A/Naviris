@@ -2495,3 +2495,26 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
      (el renderer lo mide y pone la clase, ver medidasMalla). */
   #hub.dock-sube #hub-dock { bottom: 56px; }
 }
+
+/* ===== Diálogos de la página dentro de su pestaña (2026-11-03) =====
+   alert/confirm/prompt y «abrir con otra aplicación». Tapa solo el área de la
+   pestaña (no el navegador), arriba y centrado como en Chrome, con la misma
+   tarjeta de los modales de Naviris. El velo es más ligero que el de un modal:
+   dice «esta página espera», no «todo está bloqueado». */
+#tab-dialogo { position: absolute; inset: 0; z-index: 6; display: flex; justify-content: center; align-items: flex-start; padding: 28px 16px; background: color-mix(in srgb, var(--backdrop) 55%, transparent); }
+#content.dividido #tab-dialogo { right: auto; width: calc(50% - 3px); }
+.td-card { width: min(440px, 100%); max-height: calc(100% - 8px); }
+#td-tit { overflow-wrap: anywhere; }
+.modal-card #td-texto { color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow-y: auto; }
+.modal-card #td-url { font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; max-height: 4.5em; overflow: hidden; }
+.td-silencio, .datos-op { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--text-dim); cursor: pointer; }
+.modal-card .td-silencio input, .modal-card .datos-op input { width: 15px; height: 15px; padding: 0; margin: 2px 0 0; flex-shrink: 0; box-shadow: none; accent-color: var(--accent); cursor: pointer; }
+
+/* Borrar datos de navegación */
+.datos-op { padding: 6px 0; color: var(--text); font-size: 13px; }
+.datos-op small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--text-dim); }
+.datos-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+
+/* Desplegables del menú de ajustes y del cuadro de borrar datos */
+.menu-select select, .datos-fila select { height: 30px; border-radius: var(--r-s); border: 1px solid var(--line-3); background: var(--bg); color: var(--text); padding: 0 8px; font-size: 12.5px; outline: none; cursor: pointer; flex-shrink: 0; }
+.menu-select select:focus-visible, .datos-fila select:focus-visible { border-color: var(--focus); }

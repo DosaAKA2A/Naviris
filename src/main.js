@@ -8,6 +8,9 @@ const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
 const { migraPerfil } = require('./migraciones');
 const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binarios (se prueba en test/)
+const atajos = require('./atajos');             // tabla única de atajos (también la lee el renderer)
+const { crearFreno } = require('./freno-recargas');
+const { aplicacionPara } = require('./externos');
 
 const PART_NORMAL = 'persist:cobalt';
 const PART_PRIVATE = 'cobalt-private'; // sin "persist:" → solo en memoria
@@ -357,6 +360,8 @@ const DEFAULT_SETTINGS = {
   agentMode: false,
   updatesAuto: true,        // las actualizaciones se bajan solas; apagado = avisa y el usuario decide
   smartSearch: true,        // autocompletado inteligente de la barra
+  buscador: 'google',       // motor de la barra: google | duckduckgo | bing | brave (src/buscadores.js)
+  preguntarDescargas: false, // true = cada descarga pregunta dónde guardarse
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
   moovinPase: '',             // pase de la biblioteca privada de iris.it.com/moovin
   atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
@@ -598,9 +603,31 @@ function broadcast(channel, payload) {
 
 // ---------- Descargas ----------
 let downloadSeq = 0;
-const downloads = new Map(); // id → { item, meta }
+const downloads = new Map(); // id → { item, meta, ses }
 
-function registerDownloadItem(item, sourceUrl, enHistorial = true) {
+/* «Guardar el destino como…» y «Guardar la imagen como…» (2026-11-03) guardaban
+   directo en Descargas, sin preguntar, a pesar de los puntos suspensivos. Se
+   apunta la dirección y, cuando llega su will-download, se abre el diálogo de
+   Guardar en vez de fijar la ruta. El ajuste «Preguntar dónde guardar» hace lo
+   mismo con todas. */
+const preguntaDonde = new Map();   // url -> ts de la petición
+function descargaPreguntando(contents, url) {
+  for (const [u, ts] of preguntaDonde) if (Date.now() - ts > 60000) preguntaDonde.delete(u);   // las que nunca llegaron
+  preguntaDonde.set(url, Date.now());
+  contents.downloadURL(url);
+}
+function debePreguntar(item) {
+  if (settings.preguntarDescargas) return true;
+  let cadena = [];
+  try { cadena = item.getURLChain(); } catch { /* nada */ }
+  const url = [item.getURL(), ...cadena].find((u) => preguntaDonde.has(u));
+  if (!url) return false;
+  const ts = preguntaDonde.get(url);
+  preguntaDonde.delete(url);
+  return Date.now() - ts < 60000;
+}
+
+function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null) {
   const dir = app.getPath('downloads');
   let name = item.getFilename() || 'descarga';
   let candidate = path.join(dir, name);
@@ -612,7 +639,8 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true) {
   for (let i = 1; ocupado(candidate); i++) {
     candidate = path.join(dir, `${base} (${i})${ext}`);
   }
-  item.setSavePath(candidate);
+  if (debePreguntar(item)) item.setSaveDialogOptions({ defaultPath: candidate });
+  else item.setSavePath(candidate);
 
   const id = 'dl' + (++downloadSeq);
   const meta = {
@@ -622,13 +650,21 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true) {
     total: item.getTotalBytes(),
     received: 0,
     state: 'progressing',
+    paused: false,
     kind: 'file',
     source: sourceUrl || item.getURL()
   };
-  downloads.set(id, { item, meta });
+  downloads.set(id, { item, meta, ses });
   broadcast('download:new', meta);
+  // Con el diálogo de Guardar, la ruta buena llega después de elegirla.
+  const rutaElegida = () => {
+    const p = item.getSavePath();
+    if (p && p !== meta.path) { meta.path = p; meta.name = path.basename(p); }
+  };
 
   item.on('updated', (_e, state) => {
+    rutaElegida();
+    meta.paused = item.isPaused();
     meta.received = item.getReceivedBytes();
     meta.total = item.getTotalBytes();
     meta.state = state === 'interrupted' ? 'interrupted' : 'progressing';
@@ -636,6 +672,8 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true) {
   });
   item.once('done', (_e, state) => {
     meta.state = state; // completed | cancelled | interrupted
+    meta.paused = false;
+    rutaElegida();
     meta.received = item.getReceivedBytes();
     if (state === 'completed' && enHistorial) recordDlHistory(meta.path);
     broadcast('download:update', meta);
@@ -1101,7 +1139,7 @@ function setupSession(ses) {
   }
 
   // Lo bajado en la sesión privada (en memoria) no entra en el historial de descargas.
-  ses.on('will-download', (_e, item) => registerDownloadItem(item, undefined, ses.isPersistent()));
+  ses.on('will-download', (_e, item) => registerDownloadItem(item, undefined, ses.isPersistent(), ses));
   /* SESIONES QUE NO SE PIERDEN (2026-08-13). Chromium guarda las cookies en
      memoria y las vuelca al disco cuando le parece: si el proceso muere de
      golpe (cierre forzado, cuelgue, corte de luz) se pierde lo escrito desde
@@ -1142,6 +1180,7 @@ function setupPermissions(ses) {
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const origin = originOf(details.requestingUrl || (wc && wc.getURL && wc.getURL()) || '');
     if (!origin) return callback(false);
+    if (permission === 'openExternal') return pideAbrirFuera(wc, details && details.externalURL, callback);
     if (AUTO_ALLOW.has(permission)) return callback(true);
     const key = origin + '|' + permission;
     const saved = settings.permissions[key];
@@ -1469,6 +1508,11 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
+    // Corrector ortográfico (2026-11-03). La ventana de la interfaz se crea con
+    // spellcheck:false y el webview lo heredaba: en ninguna web salía la línea
+    // roja ni las sugerencias del clic derecho. Las webs lo llevan encendido,
+    // como en Chrome; la interfaz sigue sin él.
+    webPreferences.spellcheck = true;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
     webPreferences.backgroundThrottling = false; // AutoLoot: NO frenar timers/vídeo en segundo plano (el tiempo de drops debe seguir contando)
     /* NADA DE alert/confirm/prompt EN LAS WEBS (2026-08-13). Esos diálogos son
@@ -1479,10 +1523,11 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
        abrir enlaces desde X, que suelen acabar en páginas basura que abusan de
        alert(). Con esto la web se queda sin ellos: alert no hace nada, confirm
        devuelve false y prompt null.
-       PRECIO: una web legítima que pregunte "¿seguro que quieres borrar?" se
-       comporta como si dijeras que no, y al cerrar una pestaña ya no salta el
-       aviso de "puede que los cambios no se guarden". A cambio, ninguna página
-       puede volver a bloquear el navegador. */
+       Desde 2026-11-03 los tres vuelven, pero como diálogo PROPIO dentro de la
+       pestaña (ver 'wv:dialogo' más abajo y webview-preload.js): solo espera
+       la página que preguntó; el navegador y las demás pestañas siguen
+       respondiendo. disableDialogs se queda para que el modal nativo no
+       vuelva a salir por ningún otro camino. */
     webPreferences.disableDialogs = true;
     // Pestaña que despierta con su atrás y adelante guardados (ver 'wv:historial'):
     // el webview nace sin cargar la URL y restaura su historial al montarse.
@@ -1560,44 +1605,6 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   return win;
 }
 
-// Atajos con el foco DENTRO de la página: cuando el usuario ha hecho clic en la
-// web, las teclas van al webview y el listener del renderer no las ve nunca (de
-// ahí el "F5 funciona a veces sí y a veces no"). Aquí se interceptan antes de
-// que lleguen a la página y se reenvían a la interfaz.
-const ATAJOS_UI = [
-  { k: 'F5', mod: (i) => !i.control && !i.shift, cmd: 'reload' },
-  { k: 'F5', mod: (i) => i.shift || i.control, cmd: 'reload-hard' },
-  { k: 'r', mod: (i) => i.control && !i.shift, cmd: 'reload' },
-  { k: 'r', mod: (i) => i.control && i.shift, cmd: 'reload-hard' },
-  { k: 'F11', mod: () => true, cmd: 'fullscreen' },
-  { k: 'F6', mod: () => true, cmd: 'focus-url' },
-  { k: 'l', mod: (i) => i.control, cmd: 'focus-url' },
-  { k: 't', mod: (i) => i.control && !i.shift, cmd: 'new-tab' },
-  { k: 't', mod: (i) => i.control && i.shift, cmd: 'reopen-tab' },
-  { k: 'w', mod: (i) => i.control && !i.shift, cmd: 'close-tab' },
-  { k: 'p', mod: (i) => i.alt && !i.control, cmd: 'pip' },
-  // Reservado para los addons (ver naviris.onAtajo en el renderer). Sin esto un
-  // atajo de addon solo respondería con el foco en la interfaz, nunca leyendo
-  // una página, que es justo cuando hace falta.
-  { k: 's', mod: (i) => i.alt && !i.control && !i.shift, cmd: 'addon-s' },
-  // Buscar en la pagina. Tiene que estar AQUI y no solo en el renderer: con el
-  // foco dentro de una web las teclas no llegan a la ventana de Naviris, y
-  // leyendo una pagina es justo cuando se usa Ctrl+F.
-  { k: 'f', mod: (i) => i.control && !i.shift && !i.alt, cmd: 'find' },
-  { k: 'F3', mod: () => true, cmd: 'find' },
-  { k: 'j', mod: (i) => i.control, cmd: 'downloads' },
-  { k: 'h', mod: (i) => i.control, cmd: 'history' },
-  { k: 'd', mod: (i) => i.control && !i.shift, cmd: 'bookmark' },
-  { k: 'ArrowLeft', mod: (i) => i.alt, cmd: 'back' },
-  { k: 'ArrowRight', mod: (i) => i.alt, cmd: 'forward' },
-  { k: 'Tab', mod: (i) => i.control && !i.shift, cmd: 'next-tab' },
-  { k: 'Tab', mod: (i) => i.control && i.shift, cmd: 'prev-tab' },
-  { k: '+', mod: (i) => i.control, cmd: 'zoom-in' },
-  { k: '=', mod: (i) => i.control, cmd: 'zoom-in' },
-  { k: '-', mod: (i) => i.control, cmd: 'zoom-out' },
-  { k: '0', mod: (i) => i.control, cmd: 'zoom-reset' },
-  { k: 'F12', mod: () => true, cmd: 'devtools' }
-];
 /* ---------- Menú contextual de las páginas ----------
    Un <webview> de Electron no trae ninguno: hasta ahora el clic derecho en una
    página no hacía absolutamente nada. Se arma con el Menu nativo porque se
@@ -1631,6 +1638,12 @@ async function guardarComo(contents, pdf) {
   }
 }
 
+// Ctrl+S desde la interfaz: el mismo «Guardar la página como…» del clic derecho.
+ipcMain.on('tab:guardar', soloUI((e, id) => {
+  const wc = webContents.fromId(Number(id));
+  if (wc && !wc.isDestroyed() && wc.getType() === 'webview' && wc.hostWebContents?.id === e.sender.id) guardarComo(wc, false);
+}));
+
 function menuContextual(contents) {
   contents.on('context-menu', (_e, p) => {
     const host = contents.hostWebContents;
@@ -1646,16 +1659,42 @@ function menuContextual(contents) {
       sep();
     }
     if (p.isEditable) {
-      items.push({ label: 'Cortar', accelerator: 'Ctrl+X', enabled: !!p.selectionText, click: () => contents.cut() });
-      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', enabled: !!p.selectionText, click: () => contents.copy() });
-      items.push({ label: 'Pegar', accelerator: 'Ctrl+V', enabled: p.editFlags?.canPaste !== false, click: () => contents.paste() });
-      items.push({ label: 'Seleccionar todo', accelerator: 'Ctrl+A', click: () => contents.selectAll() });
+      // Corrector: sugerencias para la palabra subrayada, como en Chrome.
+      if (p.misspelledWord) {
+        const sugerencias = (p.dictionarySuggestions || []).slice(0, 5);
+        for (const s of sugerencias) items.push({ label: s, click: () => contents.replaceMisspelling(s) });
+        if (!sugerencias.length) items.push({ label: 'Sin sugerencias', enabled: false });
+        items.push({ label: 'Añadir al diccionario', click: () => contents.session.addWordToSpellCheckerDictionary(p.misspelledWord) });
+        sep();
+      }
+      const f = p.editFlags || {};
+      items.push({ label: 'Deshacer', accelerator: 'Ctrl+Z', enabled: f.canUndo !== false, click: () => contents.undo() });
+      items.push({ label: 'Rehacer', accelerator: 'Ctrl+Y', enabled: f.canRedo !== false, click: () => contents.redo() });
+      sep();
+      items.push({ label: 'Cortar', accelerator: 'Ctrl+X', enabled: f.canCut !== false && !!p.selectionText, click: () => contents.cut() });
+      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', enabled: f.canCopy !== false && !!p.selectionText, click: () => contents.copy() });
+      items.push({ label: 'Pegar', accelerator: 'Ctrl+V', enabled: f.canPaste !== false, click: () => contents.paste() });
+      // Solo donde hay formato que perder (contenteditable): en un campo de texto plano es lo mismo que Pegar.
+      if (f.canEditRichly) items.push({ label: 'Pegar como texto sin formato', accelerator: 'Ctrl+Shift+V', enabled: f.canPaste !== false, click: () => contents.pasteAndMatchStyle() });
+      items.push({ label: 'Eliminar', enabled: f.canDelete !== false && !!p.selectionText, click: () => contents.delete() });
+      sep();
+      items.push({ label: 'Seleccionar todo', accelerator: 'Ctrl+A', enabled: f.canSelectAll !== false, click: () => contents.selectAll() });
+      items.push({ label: 'Emojis', accelerator: 'Super+.', click: () => app.showEmojiPanel() });
       sep();
     }
     if (p.linkURL) {
+      const web = /^https?:/i.test(p.linkURL);
+      const privada = host ? esVentanaPrivada(host) : false;
       items.push({ label: 'Abrir el enlace en una pestaña nueva', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
+      if (web) {
+        items.push({ label: 'Abrir el enlace en una ventana nueva', click: () => ventanaConUrl(p.linkURL, privada) });
+        if (!privada) items.push({ label: 'Abrir el enlace en una ventana privada', click: () => ventanaConUrl(p.linkURL, true) });
+      }
+      sep();
       items.push({ label: 'Copiar el enlace', click: () => clipboard.writeText(p.linkURL) });
-      items.push({ label: 'Guardar el destino como…', click: () => contents.downloadURL(p.linkURL) });
+      const texto = (p.linkText || '').trim();
+      if (texto) items.push({ label: 'Copiar el texto del enlace', click: () => clipboard.writeText(texto) });
+      if (web) items.push({ label: 'Guardar el destino como…', click: () => descargaPreguntando(contents, p.linkURL) });
       sep();
     }
     if (p.mediaType === 'image' && p.srcURL) {
@@ -1669,7 +1708,7 @@ function menuContextual(contents) {
       }
       items.push({ label: 'Copiar la imagen', click: () => contents.copyImageAt(p.x, p.y) });
       items.push({ label: 'Copiar la dirección de la imagen', click: () => clipboard.writeText(p.srcURL) });
-      items.push({ label: 'Guardar la imagen como…', click: () => contents.downloadURL(p.srcURL) });
+      items.push({ label: 'Guardar la imagen como…', click: () => descargaPreguntando(contents, p.srcURL) });
       sep();
     }
     if (p.mediaType === 'video' || p.mediaType === 'audio') {
@@ -1689,7 +1728,7 @@ function menuContextual(contents) {
 
     items.push({ label: 'Atrás', accelerator: 'Alt+Left', enabled: puedeAtras(contents), click: () => irAtras(contents) });
     items.push({ label: 'Adelante', accelerator: 'Alt+Right', enabled: puedeAdelante(contents), click: () => irAdelante(contents) });
-    items.push({ label: 'Recargar', accelerator: 'F5', click: () => contents.reload() });
+    items.push({ label: 'Recargar', accelerator: 'F5', click: () => { navegacionDelUsuario(contents); contents.reload(); } });
     sep();
     items.push({ label: 'Añadir al acceso rápido', click: () => aRenderer('acceso', { url: contents.getURL(), titulo: contents.getTitle() }) });
     items.push({ label: 'Añadir a marcadores', accelerator: 'Ctrl+D', click: () => aRenderer('marcador', { url: contents.getURL(), titulo: contents.getTitle() }) });
@@ -1709,27 +1748,19 @@ function menuContextual(contents) {
   });
 }
 
+/* Atajos con el foco DENTRO de la página: cuando el usuario ha hecho clic en la
+   web, las teclas van al webview y el listener del renderer no las ve nunca (de
+   ahí el "F5 funciona a veces sí y a veces no"). Aquí se cortan las RESERVADAS
+   antes de que lleguen a la página y se reenvían a la interfaz; las demás las
+   ve primero la web y, si no las usa, el webview se las pasa a la interfaz
+   (ver src/atajos.js). Con los atajos desactivados solo quedan F11 y F12. */
 function atajosDeWebview(contents) {
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
-    const tecla = input.key;
-    // Mismo criterio que el listener del renderer: con los atajos desactivados
-    // solo quedan los de ventana (F11, F12). Antes este camino no miraba el
-    // ajuste, así que con el foco dentro de una web Ctrl+W o Ctrl+T seguían
-    // actuando aunque el usuario los hubiera apagado.
-    if (settings.atajos === false && tecla !== 'F11' && tecla !== 'F12') return;
-    for (const a of ATAJOS_UI) {
-      if (tecla !== a.k && tecla.toLowerCase() !== a.k.toLowerCase()) continue;
-      if (!a.mod(input)) continue;
-      event.preventDefault();
-      contents.hostWebContents?.send('ui:shortcut', a.cmd);
-      return;
-    }
-    // Ctrl+1..9 para saltar de pestaña
-    if (input.control && !input.shift && /^[1-9]$/.test(tecla)) {
-      event.preventDefault();
-      contents.hostWebContents?.send('ui:shortcut', 'tab-' + tecla);
-    }
+    const cmd = atajos.comandoDe(input, { soloReservados: true, activos: settings.atajos !== false });
+    if (!cmd) return;
+    event.preventDefault();
+    contents.hostWebContents?.send('ui:shortcut', cmd);
   });
 
   /* Ctrl+rueda = zoom, como en Chrome (2026-09-26, Dosa: "el control + scroll
@@ -1802,6 +1833,7 @@ function atajosDeWebview(contents) {
       contents.removeListener('did-fail-load', alFallar);
       if (response !== 0) return;
       saltaAviso = true;
+      navegacionDelUsuario(contents);   // la pidió la persona: el freno no la cuenta
       if (fallida && fallida !== contents.getURL()) contents.loadURL(fallida).catch(() => {});
       else contents.reload();
     }).catch(() => { avisoAbierto = false; });
@@ -1879,45 +1911,149 @@ function apuntaHistorial(e, url, h) {
 ipcMain.on('wv:historial', (e, id) => { e.returnValue = historialDe(e, id); });
 ipcMain.on('wv:historial-pendiente', (e, url, h) => { e.returnValue = apuntaHistorial(e, url, h); });
 
-/* ===== FRENO CONTRA LOS BUCLES DE RECARGAS (2026-10-22) =====
-   A Dosa, y a usuarios, YouTube se les quedaba en blanco "cargando". Medido por
-   CDP: la portada se pedía, llegaba bien (servida por su service worker) y,
-   antes de terminar de cargar, se volvía a pedir, dos veces por segundo durante
-   minutos. Brave sufre lo mismo con Shields y sin causa conocida
-   (brave-browser #49663 y #57995). Sea cual sea el origen, una pestaña que carga
-   la misma página una y otra vez no le sirve a nadie: si pasa más de FRENO_MAX
-   veces en FRENO_VENTANA, se detiene, se cortan las repeticiones durante
-   FRENO_PAUSA y la interfaz avisa con un botón para reintentar.
-   Cuenta origen + ruta sin la query: el bucle de tema de YouTube alterna `/` y
-   `/?themeRefresh=1`. Las navegaciones dentro del documento (las de una SPA) no
-   cuentan, y una carga normal de YouTube con sus dos recargas propias (tema y
-   consentimiento) se queda en tres, por debajo del tope. */
-const FRENO_VENTANA = 10000;
-const FRENO_MAX = 4;
-const FRENO_PAUSA = 30000;
-const frenos = new Map(); // id del webContents -> quita el freno y recarga
+/* ===== FRENO CONTRA LOS BUCLES DE RECARGAS =====
+   La cuenta vive en freno-recargas.js (con sus pruebas). Aquí solo se engancha
+   a cada pestaña: lo que el freno corta se para con stop() y, al pasarse del
+   tope, la interfaz avisa con «Reintentar». Las navegaciones que pide el
+   usuario llegan antes por 'tab:nav-usuario' y no cuentan. */
+const frenos = new Map(); // id del webContents -> { freno, contents }
 function frenoDeRecargas(contents) {
-  let clave = '', marcas = [], frenadoHasta = 0;
+  const freno = crearFreno();
   const para = () => setImmediate(() => { if (!contents.isDestroyed()) contents.stop(); });
   contents.on('did-start-navigation', (_e, url, enDocumento, principal) => {
-    if (!principal || enDocumento || !/^https?:/.test(url)) return;
-    let k; try { const u = new URL(url); k = u.origin + u.pathname; } catch { return; }
-    const ahora = Date.now();
-    if (k === clave && ahora < frenadoHasta) { para(); return; }
-    if (k !== clave) { clave = k; marcas = []; frenadoHasta = 0; }
-    marcas = marcas.filter((t) => ahora - t < FRENO_VENTANA);
-    marcas.push(ahora);
-    if (marcas.length <= FRENO_MAX) return;
-    marcas = []; frenadoHasta = ahora + FRENO_PAUSA;
+    if (!principal || enDocumento) return;
+    const r = freno.navega(url, Date.now());
+    if (r === 'sigue') return;
     para();
+    if (r !== 'frena') return;
+    let k = url; try { const u = new URL(url); k = u.origin + u.pathname; } catch { /* nada */ }
     console.log('[Naviris] Bucle de recargas detenido en', k);
     contents.hostWebContents?.send('tab:bucle', { wc: contents.id, url: k });
   });
   const id = contents.id;
-  frenos.set(id, () => { marcas = []; frenadoHasta = 0; if (!contents.isDestroyed()) contents.reload(); });
+  frenos.set(id, { freno, contents });
   contents.once('destroyed', () => frenos.delete(id));
 }
-ipcMain.on('tab:reintenta-bucle', (e, id) => { if (esUI(e)) frenos.get(id)?.(); });
+const navegacionDelUsuario = (contents) => frenos.get(contents.id)?.freno.usuario(Date.now());
+ipcMain.on('tab:reintenta-bucle', (e, id) => {
+  if (!esUI(e)) return;
+  const f = frenos.get(id);
+  if (!f || f.contents.isDestroyed()) return;
+  f.freno.reintenta();
+  navegacionDelUsuario(f.contents);
+  f.contents.reload();
+});
+// Síncrono a propósito: la interfaz lo manda justo antes de reload()/src y
+// tiene que estar apuntado cuando main vea esa navegación.
+ipcMain.on('tab:nav-usuario', (e, id) => {
+  e.returnValue = true;
+  if (!esUI(e)) return;
+  const f = frenos.get(Number(id));
+  if (f && !f.contents.isDestroyed() && f.contents.hostWebContents?.id === e.sender.id) navegacionDelUsuario(f.contents);
+});
+
+/* ===== ALERT, CONFIRM Y PROMPT DENTRO DE LA PESTAÑA (2026-11-03) =====
+   Los modales nativos colgaban la ventana entera (ver disableDialogs). Ahora
+   webview-preload.js cambia window.alert/confirm/prompt de la página por unos
+   que preguntan aquí con una llamada SÍNCRONA: así la página espera la
+   respuesta como con los de verdad (confirm devuelve lo que elijas), pero lo
+   único que se para es el proceso de ESA página. La interfaz pinta el diálogo
+   encima de su pestaña, sin tapar el resto del navegador, y el proceso
+   principal sigue libre porque la respuesta se da cuando llega, sin esperar.
+   Se cierra solo si la pestaña se cierra o navega a otra página. Con «No dejar
+   que esta página muestre más avisos», el resto de avisos de ese documento
+   contestan al momento sin preguntar (alert nada, confirm false, prompt null).
+   Lo mismo sirve para preguntar antes de abrir un mailto: o un magnet: con una
+   aplicación del equipo (ver 'openExternal' en los permisos). */
+const dialogos = new Map();     // id -> { host, fin }
+const silenciadas = new Set();  // webContents cuyo documento ya no puede preguntar
+let dialogoSeq = 0;
+function preguntaEnPestana(wc, datos) {
+  return new Promise((resuelve) => {
+    const host = wc.hostWebContents;
+    if (!host || host.isDestroyed()) { resuelve({ ok: false }); return; }
+    const id = 'dlg' + (++dialogoSeq);
+    let hecho = false;
+    const alNavegar = (_e, _url, enDocumento, principal) => { if (principal && !enDocumento) fin({ ok: false }); };
+    const alCerrar = () => fin({ ok: false });
+    function fin(r) {
+      if (hecho) return;
+      hecho = true;
+      dialogos.delete(id);
+      if (!wc.isDestroyed()) { wc.removeListener('did-start-navigation', alNavegar); wc.removeListener('destroyed', alCerrar); }
+      if (!host.isDestroyed()) host.send('tab:dialogo-fin', id);
+      resuelve(r);
+    }
+    wc.on('did-start-navigation', alNavegar);
+    wc.once('destroyed', alCerrar);
+    dialogos.set(id, { host, fin, wcId: wc.id });
+    host.send('tab:dialogo', { id, wc: wc.id, origen: originOf(wc.getURL()), ...datos });
+  });
+}
+function silencia(wc) {
+  if (silenciadas.has(wc.id)) return;
+  const id = wc.id;
+  silenciadas.add(id);
+  // Vale para el documento: al cargar otra página (o recargar) vuelve a poder preguntar.
+  wc.once('did-navigate', () => silenciadas.delete(id));
+  wc.once('destroyed', () => silenciadas.delete(id));
+}
+ipcMain.on('wv:dialogo', (e, d) => {
+  const wc = e.sender;
+  const tipo = d && d.tipo;
+  if (wc.getType() !== 'webview' || !['alert', 'confirm', 'prompt'].includes(tipo) || silenciadas.has(wc.id)) { e.returnValue = { ok: false }; return; }
+  const texto = String(d.texto ?? '').slice(0, 3000);
+  const valor = tipo === 'prompt' ? String(d.valor ?? '').slice(0, 3000) : undefined;
+  preguntaEnPestana(wc, { tipo, texto, valor }).then((r) => {
+    if (r.silenciar && !wc.isDestroyed()) silencia(wc);
+    try { e.returnValue = { ok: !!r.ok, valor: typeof r.valor === 'string' ? r.valor : null }; } catch { /* la página ya no está */ }
+  });
+});
+ipcMain.on('tab:dialogo-respuesta', (e, r) => {
+  const d = r && dialogos.get(r.id);
+  if (!d || d.host !== e.sender || !esUI(e)) return;
+  d.fin({ ok: !!r.ok, valor: typeof r.valor === 'string' ? r.valor.slice(0, 10000) : null, silenciar: !!r.silenciar });
+});
+// mailto:, tel:, magnet:… (ver externos.js). Solo desde una pestaña y solo los esquemas de la lista.
+function pideAbrirFuera(wc, url, callback) {
+  const aplicacion = aplicacionPara(url);
+  if (!aplicacion || !wc || wc.isDestroyed() || wc.getType() !== 'webview') { callback(false); return; }
+  preguntaEnPestana(wc, { tipo: 'externo', texto: url, aplicacion }).then((r) => callback(!!r.ok));
+}
+
+/* ===== MENÚ DE LOS CAMPOS DE LA INTERFAZ (2026-11-03) =====
+   El clic derecho en la barra de direcciones, en buscar en la página o en
+   cualquier campo de Naviris no sacaba nada: ni Copiar ni Pegar. Lo pide el
+   renderer (sabe si es la barra y si hay selección) y se arma con el Menu
+   nativo, como el de las páginas. En la barra se añade «Pegar e ir» o «Pegar
+   y buscar» según lo que haya en el portapapeles, como en Chrome. */
+const pareceDireccion = (t) => !/\s/.test(t) && (/^[a-z][a-z0-9+.-]*:/i.test(t) || /^[^/?#]+\.[^/?#]+/.test(t) || /^localhost(?=[:/?#]|$)/i.test(t));
+ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
+  const wc = e.sender;
+  const win = BrowserWindow.fromWebContents(wc);
+  const conSeleccion = !!d.seleccion;
+  const items = [
+    { label: 'Deshacer', accelerator: 'Ctrl+Z', role: 'undo' },
+    { label: 'Rehacer', accelerator: 'Ctrl+Y', role: 'redo' },
+    { type: 'separator' },
+    { label: 'Cortar', accelerator: 'Ctrl+X', role: 'cut', enabled: conSeleccion },
+    { label: 'Copiar', accelerator: 'Ctrl+C', role: 'copy', enabled: conSeleccion },
+    { label: 'Pegar', accelerator: 'Ctrl+V', role: 'paste' }
+  ];
+  if (d.urlbar) {
+    let texto = '';
+    try { texto = clipboard.readText().trim(); } catch { /* nada */ }
+    if (texto && texto.length <= 2000) {
+      items.push({ label: pareceDireccion(texto) ? 'Pegar e ir' : 'Pegar y buscar', click: () => { if (!wc.isDestroyed()) wc.send('ui:pegar-e-ir', texto); } });
+    }
+  }
+  items.push(
+    { label: 'Eliminar', role: 'delete', enabled: conSeleccion },
+    { type: 'separator' },
+    { label: 'Seleccionar todo', accelerator: 'Ctrl+A', role: 'selectAll', enabled: !d.vacio }
+  );
+  Menu.buildFromTemplate(items).popup({ window: win || undefined });
+}));
 
 /* ===== VENTANAS EMERGENTES CON window.opener (2026-11-03) =====
    Todo window.open acababa en una pestaña nueva abierta desde la interfaz, sin
@@ -1977,6 +2113,13 @@ app.on('web-contents-created', (_event, contents) => {
     }
     suppressWebAuthn(contents);
     atajosDeWebview(contents);
+    // Página que no contesta (un bucle de JavaScript): la interfaz ofrece cerrarla.
+    // Con un diálogo suyo abierto no cuenta: está esperando la respuesta, no colgada.
+    contents.on('unresponsive', () => {
+      if ([...dialogos.values()].some((d) => d.wcId === contents.id)) return;
+      contents.hostWebContents?.send('tab:colgada', { wc: contents.id, colgada: true });
+    });
+    contents.on('responsive', () => contents.hostWebContents?.send('tab:colgada', { wc: contents.id, colgada: false }));
     menuContextual(contents);
     ventanasDe(contents, contents.hostWebContents);
     // Inyecta el saltador de anuncios de YouTube y el revelado de X
@@ -2062,23 +2205,30 @@ ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen
 ipcMain.on('win:new-private', () => createWindow(true));
 /* Sacar una pestaña de la barra abre una ventana nueva con esa direccion.
    La ventana tarda en montar su interfaz, asi que la URL se guarda y se le
-   manda cuando ella avisa de que ya esta lista ('ui:listo'). */
+   manda cuando ella avisa de que ya esta lista ('ui:listo'). Con url null la
+   ventana abre el hub (Ctrl+N). Nace como «sacada»: no restaura ni pisa la
+   sesión de la principal. */
 const urlPendiente = new Map();   // id de ventana -> { url, contenedor } que tiene que abrir
+function ventanaConUrl(url, privada, contenedor = null) {
+  const win = createWindow(privada, false, true);
+  if (!win) return null;
+  urlPendiente.set(win.id, { url, contenedor });
+  const id = win.id;
+  win.once('closed', () => urlPendiente.delete(id));   // cerrada antes de montarse
+  return win;
+}
+const esVentanaPrivada = (wc) => { try { return new URL(wc.getURL()).searchParams.get('private') === '1'; } catch { return false; } };
 ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
   if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
   // La pestaña sale con su contenedor (su id; la ventana nueva lo busca en los ajustes).
   if (typeof contenedor !== 'string' || !/^[a-z0-9]{1,24}$/.test(contenedor)) contenedor = null;
   // Si sale de una ventana privada, la nueva tambien lo es: no se saca una
   // pestaña privada a una ventana normal, que dejaria rastro.
-  const dueno = BrowserWindow.fromWebContents(e.sender);
-  let privada = false;
-  try { privada = new URL(dueno.webContents.getURL()).searchParams.get('private') === '1'; } catch { /* nada */ }
-  const win = createWindow(privada, false, true);
-  if (!win) return;
-  urlPendiente.set(win.id, { url, contenedor });
-  const id = win.id;
-  win.once('closed', () => urlPendiente.delete(id));   // cerrada antes de montarse
+  ventanaConUrl(url, esVentanaPrivada(e.sender), contenedor);
 });
+// Ctrl+N y «Nueva ventana» del menú: una ventana normal con el hub, como Chrome
+// (también desde una privada).
+ipcMain.on('win:nueva', soloUI(() => ventanaConUrl(null, false)));
 
 ipcMain.handle('settings:get', soloUI(() => settings));
 // ---------- Información del sitio (popover del candado) ----------
@@ -2374,6 +2524,30 @@ ipcMain.handle('site:clear', soloUI(async (_e, { url, partition }) => {
     await ses.clearStorageData({ origin: u.origin }).catch(() => {});
     return { ok: true, cleared: cookies.length };
   } catch { return { ok: false }; }
+}));
+
+/* ===== BORRAR DATOS DE NAVEGACIÓN (2026-11-03) =====
+   Antes solo había «borrar las cookies de este sitio» y «borrar el historial».
+   Aquí: cookies y datos de los sitios (almacenamiento, service workers y
+   contraseñas HTTP en caché) y la caché de archivos, en la sesión normal y en
+   la de cada contenedor; desde una ventana privada, solo en la privada. Los
+   espacios protegidos no se tocan: se borran con su contraseña al borrar el
+   espacio. Electron no deja borrar cookies ni caché por fechas, así que eso
+   es siempre todo; el periodo lo aplica la interfaz al historial. */
+ipcMain.handle('datos:borra', soloUI(async (e, { cookies, cache } = {}) => {
+  const particiones = esVentanaPrivada(e.sender) ? [PART_PRIVATE] : [PART_NORMAL, ...contenedoresGuardados()];
+  for (const p of particiones) {
+    const ses = session.fromPartition(p);
+    if (cookies) {
+      await ses.clearStorageData().catch(() => {});
+      await ses.clearAuthCache().catch(() => {});
+    }
+    if (cache) {
+      await ses.clearCache().catch(() => {});
+      await ses.clearCodeCaches({}).catch(() => {});
+    }
+  }
+  return { ok: true };
 }));
 
 ipcMain.handle('settings:set', soloUI((_e, patch) => {
@@ -3002,6 +3176,27 @@ ipcMain.handle('yt:formats', soloUI(async (_e, url) => {
   const cookies = await cookiesParaYtDlp(url);
   return cookies ? (await lee(cookies)).calidades : [];
 }));
+/* Pausar, reanudar y reintentar (2026-11-03). Solo las descargas del navegador:
+   las del Rat Tool son yt-dlp y no se pueden pausar. Reintentar una que falló
+   o se canceló la pide de nuevo en su misma sesión (contenedor o privada). */
+ipcMain.on('download:pause', soloUI((_e, id) => {
+  const d = downloads.get(id);
+  if (!d?.item || d.meta.state !== 'progressing') return;
+  try { d.item.pause(); } catch { /* ya terminó */ }
+  d.meta.paused = true; broadcast('download:update', d.meta);
+}));
+ipcMain.on('download:resume', soloUI((_e, id) => {
+  const d = downloads.get(id);
+  if (!d?.item || d.meta.state !== 'progressing') return;
+  try { if (d.item.canResume()) d.item.resume(); } catch { /* ya terminó */ }
+  d.meta.paused = false; broadcast('download:update', d.meta);
+}));
+ipcMain.on('download:retry', soloUI((_e, id) => {
+  const d = downloads.get(id);
+  if (!d?.item || !d.ses || !/^https?:/i.test(d.meta.source || '') || d.meta.state === 'progressing' || d.meta.state === 'completed') return;
+  downloads.delete(id);
+  try { d.ses.downloadURL(d.meta.source); } catch { /* sesión cerrada */ }
+}));
 ipcMain.on('download:cancel', (_e, id) => {
   const d = downloads.get(id);
   if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }
@@ -3472,6 +3667,13 @@ app.whenReady().then(async () => {
   for (const p of contenedoresGuardados()) preparaContenedor(p);
   for (const e of (settings.espacios || [])) if (e.particion) preparaContenedor(e.particion);
   splashProgreso(74);
+  /* Sin el menú de aplicación por defecto de Electron (2026-11-03). Estaba vivo
+     aunque oculto (File/Edit/View/Window) y sus aceleradores actuaban cuando la
+     interfaz no se quedaba la tecla: Ctrl+M minimizaba, Ctrl+R recargaba la
+     INTERFAZ entera y Ctrl+Mayús+I le abría DevTools. Los atajos de Naviris
+     están todos en atajos.js; en Windows copiar y pegar en los campos no
+     dependen del menú. */
+  Menu.setApplicationMenu(null);
   createWindow(false, true); // la primera ventana es la que releva al splash
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('cobalt', {
   maximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close'),
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
+  newWindow: () => ipcRenderer.send('win:nueva'),
   // Sacar una pestaña de la barra a su propia ventana, con su contenedor.
   sacarPestana: (url, contenedorId) => ipcRenderer.send('win:sacar-pestana', url, contenedorId || null),
   // Atrás y adelante de una pestaña que se duerme: se leen antes de quitar su
@@ -40,6 +41,9 @@ contextBridge.exposeInMainWorld('cobalt', {
   importAvailable: () => ipcRenderer.invoke('import:available'),
   importBookmarks: (key) => ipcRenderer.invoke('import:bookmarks', key),
   cancelDownload: (id) => ipcRenderer.send('download:cancel', id),
+  pauseDownload: (id) => ipcRenderer.send('download:pause', id),
+  resumeDownload: (id) => ipcRenderer.send('download:resume', id),
+  retryDownload: (id) => ipcRenderer.send('download:retry', id),
   openDownload: (id) => ipcRenderer.send('download:open', id),
   revealDownload: (id) => ipcRenderer.send('download:reveal', id),
   downloadPath: (id) => ipcRenderer.invoke('download:path', id),
@@ -68,6 +72,19 @@ contextBridge.exposeInMainWorld('cobalt', {
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
   onBucle: (cb) => ipcRenderer.on('tab:bucle', (_e, p) => cb(p)),
   reintentaBucle: (id) => ipcRenderer.send('tab:reintenta-bucle', id),
+  // Antes de cada recarga o navegación que pide el usuario: el freno de bucles
+  // no la cuenta. Síncrono para que llegue antes que la navegación.
+  navUsuario: (wcId) => { try { ipcRenderer.sendSync('tab:nav-usuario', wcId); } catch { /* nada */ } },
+  // Diálogos de las páginas (alert/confirm/prompt) y de abrir con otra aplicación
+  onDialogo: (cb) => ipcRenderer.on('tab:dialogo', (_e, d) => cb(d)),
+  onDialogoFin: (cb) => ipcRenderer.on('tab:dialogo-fin', (_e, id) => cb(id)),
+  respondeDialogo: (r) => ipcRenderer.send('tab:dialogo-respuesta', r),
+  // Clic derecho en un campo de la interfaz y «Pegar e ir» de la barra
+  menuCampo: (d) => ipcRenderer.send('ui:menu-campo', d),
+  onPegarEIr: (cb) => ipcRenderer.on('ui:pegar-e-ir', (_e, t) => cb(t)),
+  borraDatos: (opciones) => ipcRenderer.invoke('datos:borra', opciones),
+  onColgada: (cb) => ipcRenderer.on('tab:colgada', (_e, p) => cb(p)),
+  guardaPagina: (wcId) => ipcRenderer.send('tab:guardar', wcId),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
