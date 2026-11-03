@@ -1619,12 +1619,44 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
 }
 
 /* ---------- Menú contextual de las páginas ----------
-   Un <webview> de Electron no trae ninguno: hasta ahora el clic derecho en una
-   página no hacía absolutamente nada. Se arma con el Menu nativo porque se
-   encarga solo del teclado, de cerrarse al perder el foco y del tema del
-   sistema; replicarlo en HTML sobre el webview era mucho más código y peor.
-   El menú es sensible a lo que hay debajo: selección, campo de texto, enlace,
-   imagen y —lo que pidió Dosa— vídeo, donde ofrece bajarlo con el Rat Tool. */
+   Un <webview> de Electron no trae ninguno: el clic derecho en una página no
+   hacía absolutamente nada. El menú es sensible a lo que hay debajo:
+   selección, campo de texto, enlace, imagen y —lo que pidió Dosa— vídeo, donde
+   ofrece bajarlo con el Rat Tool.
+
+   Naviris 3: lo arma el main (es quien sabe qué hay bajo el ratón y quien
+   ejecuta cada acción), pero lo PINTA la interfaz con el estilo de Naviris
+   (propuesta aprobada el 2026-11-03), encima de la página. Solo viajan el
+   texto, el icono, el atajo y si está activo; al elegir, la interfaz devuelve
+   el número y aquí se ejecuta el click de siempre. Una ventana sin interfaz
+   de Naviris (las ventanitas de inicio de sesión) sigue con el Menu nativo. */
+const menusAbiertos = new Map();   // id del webContents de la interfaz -> { id, clicks, antes }
+let ultimoMenu = 0;
+const TECLAS_VISIBLES = { Left: '←', Right: '→', Shift: 'Mayús', Super: 'Win' };
+const teclaVisible = (a) => (a ? a.split('+').map((k) => TECLAS_VISIBLES[k] || k).join('+') : '');
+// `donde` dice dónde abrirlo: { wc, x, y } en una página o { x, y } en la interfaz.
+// `antes` corre antes de la acción elegida (devolverle el foco a la página).
+function muestraMenu(host, items, donde, antes) {
+  if (!host || host.isDestroyed()) {
+    Menu.buildFromTemplate(items.map(({ icon, ...resto }) => resto)).popup();
+    return;
+  }
+  const id = ++ultimoMenu, clicks = [];
+  const lista = items.map((it) => {
+    if (it.type === 'separator') return { sep: true };
+    clicks.push(it.click);
+    return { n: clicks.length - 1, label: it.label, icon: it.icon || '', kbd: teclaVisible(it.accelerator), disabled: it.enabled === false };
+  });
+  menusAbiertos.set(host.id, { id, clicks, antes });
+  host.send('ctx:menu', { id, items: lista, ...donde });
+}
+ipcMain.on('ctx:elige', soloUI((e, id, n) => {
+  const m = menusAbiertos.get(e.sender.id);
+  if (!m || m.id !== id || typeof m.clicks[n] !== 'function') return;
+  menusAbiertos.delete(e.sender.id);
+  // La pestaña puede haberse cerrado con el menú abierto: sin cuadros de error.
+  try { m.antes?.(); m.clicks[n](); } catch (err) { console.warn('[Naviris] acción del menú:', err.message); }
+}));
 
 const puedeAtras = (c) => { try { return c.navigationHistory ? c.navigationHistory.canGoBack() : c.canGoBack(); } catch { return false; } };
 const puedeAdelante = (c) => { try { return c.navigationHistory ? c.navigationHistory.canGoForward() : c.canGoForward(); } catch { return false; } };
@@ -1667,47 +1699,47 @@ function menuContextual(contents) {
     if (p.selectionText && !p.isEditable) {
       const limpio = p.selectionText.trim().replace(/\s+/g, ' ');
       const corto = limpio.length > 24 ? limpio.slice(0, 24).trimEnd() + '…' : limpio;
-      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', click: () => contents.copy() });
-      items.push({ label: 'Buscar "' + corto + '" en una pestaña nueva', click: () => aRenderer('buscar', p.selectionText.trim()) });
+      items.push({ label: 'Copiar', icon: 'copy', accelerator: 'Ctrl+C', click: () => contents.copy() });
+      items.push({ label: 'Buscar "' + corto + '" en una pestaña nueva', icon: 'magnifying-glass', click: () => aRenderer('buscar', p.selectionText.trim()) });
       sep();
     }
     if (p.isEditable) {
       // Corrector: sugerencias para la palabra subrayada, como en Chrome.
       if (p.misspelledWord) {
         const sugerencias = (p.dictionarySuggestions || []).slice(0, 5);
-        for (const s of sugerencias) items.push({ label: s, click: () => contents.replaceMisspelling(s) });
-        if (!sugerencias.length) items.push({ label: 'Sin sugerencias', enabled: false });
-        items.push({ label: 'Añadir al diccionario', click: () => contents.session.addWordToSpellCheckerDictionary(p.misspelledWord) });
+        for (const s of sugerencias) items.push({ label: s, icon: 'spell-check', click: () => contents.replaceMisspelling(s) });
+        if (!sugerencias.length) items.push({ label: 'Sin sugerencias', icon: 'spell-check', enabled: false });
+        items.push({ label: 'Añadir al diccionario', icon: 'book-plus', click: () => contents.session.addWordToSpellCheckerDictionary(p.misspelledWord) });
         sep();
       }
       const f = p.editFlags || {};
-      items.push({ label: 'Deshacer', accelerator: 'Ctrl+Z', enabled: f.canUndo !== false, click: () => contents.undo() });
-      items.push({ label: 'Rehacer', accelerator: 'Ctrl+Y', enabled: f.canRedo !== false, click: () => contents.redo() });
+      items.push({ label: 'Deshacer', icon: 'undo-2', accelerator: 'Ctrl+Z', enabled: f.canUndo !== false, click: () => contents.undo() });
+      items.push({ label: 'Rehacer', icon: 'redo-2', accelerator: 'Ctrl+Y', enabled: f.canRedo !== false, click: () => contents.redo() });
       sep();
-      items.push({ label: 'Cortar', accelerator: 'Ctrl+X', enabled: f.canCut !== false && !!p.selectionText, click: () => contents.cut() });
-      items.push({ label: 'Copiar', accelerator: 'Ctrl+C', enabled: f.canCopy !== false && !!p.selectionText, click: () => contents.copy() });
-      items.push({ label: 'Pegar', accelerator: 'Ctrl+V', enabled: f.canPaste !== false, click: () => contents.paste() });
+      items.push({ label: 'Cortar', icon: 'scissors', accelerator: 'Ctrl+X', enabled: f.canCut !== false && !!p.selectionText, click: () => contents.cut() });
+      items.push({ label: 'Copiar', icon: 'copy', accelerator: 'Ctrl+C', enabled: f.canCopy !== false && !!p.selectionText, click: () => contents.copy() });
+      items.push({ label: 'Pegar', icon: 'clipboard', accelerator: 'Ctrl+V', enabled: f.canPaste !== false, click: () => contents.paste() });
       // Solo donde hay formato que perder (contenteditable): en un campo de texto plano es lo mismo que Pegar.
-      if (f.canEditRichly) items.push({ label: 'Pegar como texto sin formato', accelerator: 'Ctrl+Shift+V', enabled: f.canPaste !== false, click: () => contents.pasteAndMatchStyle() });
-      items.push({ label: 'Eliminar', enabled: f.canDelete !== false && !!p.selectionText, click: () => contents.delete() });
+      if (f.canEditRichly) items.push({ label: 'Pegar como texto sin formato', icon: 'clipboard', accelerator: 'Ctrl+Shift+V', enabled: f.canPaste !== false, click: () => contents.pasteAndMatchStyle() });
+      items.push({ label: 'Eliminar', icon: 'trash', enabled: f.canDelete !== false && !!p.selectionText, click: () => contents.delete() });
       sep();
-      items.push({ label: 'Seleccionar todo', accelerator: 'Ctrl+A', enabled: f.canSelectAll !== false, click: () => contents.selectAll() });
-      items.push({ label: 'Emojis', accelerator: 'Super+.', click: () => app.showEmojiPanel() });
+      items.push({ label: 'Seleccionar todo', icon: 'text-cursor', accelerator: 'Ctrl+A', enabled: f.canSelectAll !== false, click: () => contents.selectAll() });
+      items.push({ label: 'Emojis', icon: 'smile', accelerator: 'Super+.', click: () => app.showEmojiPanel() });
       sep();
     }
     if (p.linkURL) {
       const web = /^https?:/i.test(p.linkURL);
       const privada = host ? esVentanaPrivada(host) : false;
-      items.push({ label: 'Abrir el enlace en una pestaña nueva', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
+      items.push({ label: 'Abrir el enlace en una pestaña nueva', icon: 'plus', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
       if (web) {
-        items.push({ label: 'Abrir el enlace en una ventana nueva', click: () => ventanaConUrl(p.linkURL, privada) });
-        if (!privada) items.push({ label: 'Abrir el enlace en una ventana privada', click: () => ventanaConUrl(p.linkURL, true) });
+        items.push({ label: 'Abrir el enlace en una ventana nueva', icon: 'app-window', click: () => ventanaConUrl(p.linkURL, privada) });
+        if (!privada) items.push({ label: 'Abrir el enlace en una ventana privada', icon: 'venetian-mask', click: () => ventanaConUrl(p.linkURL, true) });
       }
       sep();
-      items.push({ label: 'Copiar el enlace', click: () => clipboard.writeText(p.linkURL) });
+      items.push({ label: 'Copiar el enlace', icon: 'link', click: () => clipboard.writeText(p.linkURL) });
       const texto = (p.linkText || '').trim();
-      if (texto) items.push({ label: 'Copiar el texto del enlace', click: () => clipboard.writeText(texto) });
-      if (web) items.push({ label: 'Guardar el destino como…', click: () => descargaPreguntando(contents, p.linkURL) });
+      if (texto) items.push({ label: 'Copiar el texto del enlace', icon: 'copy', click: () => clipboard.writeText(texto) });
+      if (web) items.push({ label: 'Guardar el destino como…', icon: 'download', click: () => descargaPreguntando(contents, p.linkURL) });
       sep();
     }
     if (p.mediaType === 'image' && p.srcURL) {
@@ -1715,49 +1747,50 @@ function menuContextual(contents) {
       // quedan fuera: viven solo dentro de la página y aquí no se pueden leer.
       if (/^(https?|data):/i.test(p.srcURL)) {
         items.push({
-          label: 'Buscar la imagen con Google Lens',
+          label: 'Buscar la imagen con Google Lens', icon: 'scan-search',
           click: () => aRenderer('lens', { src: p.srcURL, pagina: contents.getURL() })
         });
       }
-      items.push({ label: 'Copiar la imagen', click: () => contents.copyImageAt(p.x, p.y) });
-      items.push({ label: 'Copiar la dirección de la imagen', click: () => clipboard.writeText(p.srcURL) });
-      items.push({ label: 'Guardar la imagen como…', click: () => descargaPreguntando(contents, p.srcURL) });
+      items.push({ label: 'Copiar la imagen', icon: 'copy', click: () => contents.copyImageAt(p.x, p.y) });
+      items.push({ label: 'Copiar la dirección de la imagen', icon: 'link', click: () => clipboard.writeText(p.srcURL) });
+      items.push({ label: 'Guardar la imagen como…', icon: 'download', click: () => descargaPreguntando(contents, p.srcURL) });
       sep();
     }
     if (p.mediaType === 'video' || p.mediaType === 'audio') {
       const esVideo = p.mediaType === 'video';
       items.push({
-        label: 'Descargar ' + (esVideo ? 'el video' : 'el audio') + ' con Rat Tool',
+        label: 'Descargar ' + (esVideo ? 'el video' : 'el audio') + ' con Rat Tool', icon: 'mouse',
         click: () => aRenderer('rat', { pagina: contents.getURL(), src: p.srcURL || '' })
       });
       if (esVideo) {
-        items.push({ label: 'Ver en miniatura', accelerator: 'Alt+P', click: () => aRenderer('pip') });
+        items.push({ label: 'Ver en miniatura', icon: 'pip', accelerator: 'Alt+P', click: () => aRenderer('pip') });
       }
       if (p.srcURL && /^https?:/.test(p.srcURL)) {
-        items.push({ label: 'Copiar la dirección ' + (esVideo ? 'del video' : 'del audio'), click: () => clipboard.writeText(p.srcURL) });
+        items.push({ label: 'Copiar la dirección ' + (esVideo ? 'del video' : 'del audio'), icon: 'link', click: () => clipboard.writeText(p.srcURL) });
       }
       sep();
     }
 
-    items.push({ label: 'Atrás', accelerator: 'Alt+Left', enabled: puedeAtras(contents), click: () => irAtras(contents) });
-    items.push({ label: 'Adelante', accelerator: 'Alt+Right', enabled: puedeAdelante(contents), click: () => irAdelante(contents) });
-    items.push({ label: 'Recargar', accelerator: 'F5', click: () => { navegacionDelUsuario(contents); contents.reload(); } });
+    items.push({ label: 'Atrás', icon: 'arrow-left', accelerator: 'Alt+Left', enabled: puedeAtras(contents), click: () => irAtras(contents) });
+    items.push({ label: 'Adelante', icon: 'arrow-right', accelerator: 'Alt+Right', enabled: puedeAdelante(contents), click: () => irAdelante(contents) });
+    items.push({ label: 'Recargar', icon: 'arrow-path', accelerator: 'F5', click: () => { navegacionDelUsuario(contents); contents.reload(); } });
     sep();
-    items.push({ label: 'Añadir al acceso rápido', click: () => aRenderer('acceso', { url: contents.getURL(), titulo: contents.getTitle() }) });
-    items.push({ label: 'Añadir a marcadores', accelerator: 'Ctrl+D', click: () => aRenderer('marcador', { url: contents.getURL(), titulo: contents.getTitle() }) });
+    items.push({ label: 'Añadir al acceso rápido', icon: 'square-plus', click: () => aRenderer('acceso', { url: contents.getURL(), titulo: contents.getTitle() }) });
+    items.push({ label: 'Añadir a marcadores', icon: 'bookmark-add', accelerator: 'Ctrl+D', click: () => aRenderer('marcador', { url: contents.getURL(), titulo: contents.getTitle() }) });
     sep();
-    items.push({ label: 'Pantalla completa', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
-    items.push({ label: 'Copiar la dirección de la página', click: () => clipboard.writeText(contents.getURL()) });
+    items.push({ label: 'Pantalla completa', icon: 'arrows-pointing-out', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
+    items.push({ label: 'Copiar la dirección de la página', icon: 'link', click: () => clipboard.writeText(contents.getURL()) });
     sep();
-    // Sin atajo a la vista donde ningún atajo hace eso (Ctrl+S, Ctrl+U e Inspeccionar no existen).
-    items.push({ label: 'Guardar la página como…', click: () => guardarComo(contents, false) });
-    items.push({ label: 'Guardar como PDF…', click: () => guardarComo(contents, true) });
-    items.push({ label: 'Imprimir…', accelerator: 'Ctrl+P', click: () => contents.print() });
+    // Con el atajo que hace lo mismo desde el teclado (los tres existen desde la parte «huecos»).
+    items.push({ label: 'Guardar la página como…', icon: 'download', accelerator: 'Ctrl+S', click: () => guardarComo(contents, false) });
+    items.push({ label: 'Guardar como PDF…', icon: 'file-text', click: () => guardarComo(contents, true) });
+    items.push({ label: 'Imprimir…', icon: 'printer', accelerator: 'Ctrl+P', click: () => contents.print() });
     sep();
-    items.push({ label: 'Código fuente de la página', click: () => host?.send('tab:open-url', { url: 'view-source:' + contents.getURL(), background: false }) });
-    items.push({ label: 'Inspeccionar', click: () => contents.inspectElement(p.x, p.y) });
+    items.push({ label: 'Código fuente de la página', icon: 'code', accelerator: 'Ctrl+U', click: () => host?.send('tab:open-url', { url: 'view-source:' + contents.getURL(), background: false }) });
+    items.push({ label: 'Inspeccionar', icon: 'scan-search', accelerator: 'Ctrl+Shift+I', click: () => contents.inspectElement(p.x, p.y) });
 
-    Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(host) || undefined });
+    // Al elegir, el foco vuelve a la página (lo tenía el menú para el teclado).
+    muestraMenu(host, items, { wc: contents.id, x: p.x, y: p.y, teclado: p.menuSourceType === 'keyboard' }, () => { if (!contents.isDestroyed()) contents.focus(); });
   });
 }
 
@@ -2043,35 +2076,36 @@ function pideAbrirFuera(wc, url, callback) {
 /* ===== MENÚ DE LOS CAMPOS DE LA INTERFAZ (2026-11-03) =====
    El clic derecho en la barra de direcciones, en buscar en la página o en
    cualquier campo de Naviris no sacaba nada: ni Copiar ni Pegar. Lo pide el
-   renderer (sabe si es la barra y si hay selección) y se arma con el Menu
-   nativo, como el de las páginas. En la barra se añade «Pegar e ir» o «Pegar
-   y buscar» según lo que haya en el portapapeles, como en Chrome. */
+   renderer (sabe si es la barra, si hay selección y dónde se hizo el clic) y
+   se pinta como el de las páginas (muestraMenu). En la barra se añade «Pegar e
+   ir» o «Pegar y buscar» según lo que haya en el portapapeles, como en
+   Chrome. Las acciones van sobre el campo con el foco: la interfaz se lo
+   devuelve antes de pedir la acción. */
 const pareceDireccion = (t) => !/\s/.test(t) && (/^[a-z][a-z0-9+.-]*:/i.test(t) || /^[^/?#]+\.[^/?#]+/.test(t) || /^localhost(?=[:/?#]|$)/i.test(t));
 ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
   const wc = e.sender;
-  const win = BrowserWindow.fromWebContents(wc);
   const conSeleccion = !!d.seleccion;
   const items = [
-    { label: 'Deshacer', accelerator: 'Ctrl+Z', role: 'undo' },
-    { label: 'Rehacer', accelerator: 'Ctrl+Y', role: 'redo' },
+    { label: 'Deshacer', icon: 'undo-2', accelerator: 'Ctrl+Z', click: () => wc.undo() },
+    { label: 'Rehacer', icon: 'redo-2', accelerator: 'Ctrl+Y', click: () => wc.redo() },
     { type: 'separator' },
-    { label: 'Cortar', accelerator: 'Ctrl+X', role: 'cut', enabled: conSeleccion },
-    { label: 'Copiar', accelerator: 'Ctrl+C', role: 'copy', enabled: conSeleccion },
-    { label: 'Pegar', accelerator: 'Ctrl+V', role: 'paste' }
+    { label: 'Cortar', icon: 'scissors', accelerator: 'Ctrl+X', enabled: conSeleccion, click: () => wc.cut() },
+    { label: 'Copiar', icon: 'copy', accelerator: 'Ctrl+C', enabled: conSeleccion, click: () => wc.copy() },
+    { label: 'Pegar', icon: 'clipboard', accelerator: 'Ctrl+V', click: () => wc.paste() }
   ];
   if (d.urlbar) {
     let texto = '';
     try { texto = clipboard.readText().trim(); } catch { /* nada */ }
     if (texto && texto.length <= 2000) {
-      items.push({ label: pareceDireccion(texto) ? 'Pegar e ir' : 'Pegar y buscar', click: () => { if (!wc.isDestroyed()) wc.send('ui:pegar-e-ir', texto); } });
+      items.push({ label: pareceDireccion(texto) ? 'Pegar e ir' : 'Pegar y buscar', icon: pareceDireccion(texto) ? 'arrow-right' : 'magnifying-glass', click: () => wc.send('ui:pegar-e-ir', texto) });
     }
   }
   items.push(
-    { label: 'Eliminar', role: 'delete', enabled: conSeleccion },
+    { label: 'Eliminar', icon: 'trash', enabled: conSeleccion, click: () => wc.delete() },
     { type: 'separator' },
-    { label: 'Seleccionar todo', accelerator: 'Ctrl+A', role: 'selectAll', enabled: !d.vacio }
+    { label: 'Seleccionar todo', icon: 'text-cursor', accelerator: 'Ctrl+A', enabled: !d.vacio, click: () => wc.selectAll() }
   );
-  Menu.buildFromTemplate(items).popup({ window: win || undefined });
+  muestraMenu(wc, items, { x: Number(d.x) || 0, y: Number(d.y) || 0, teclado: !!d.teclado });
 }));
 
 /* ===== VENTANAS EMERGENTES CON window.opener (2026-11-03) =====

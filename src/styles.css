@@ -29,7 +29,7 @@
   --mono: "Cascadia Mono", ui-monospace, Consolas, monospace;
   /* Riel estrecho: la cápsula ciñe el círculo de 34 px (2026-08-11, "demasiado
      ancho"); el margen lateral aporta el aire, no el ancho del riel */
-  --danger: #e5484d; --ok: #7fd39b; --titlebar-h: 40px; --navbar-h: 46px; --sidebar-w: 44px;
+  --danger: #e5484d; --ok: #7fd39b; --titlebar-h: 48px; --navbar-h: 52px; --sidebar-w: 44px;
   /* ===== Plantilla de estructura: forma y movimiento (dev.18) =====
      Radios, duraciones, curvas y elevación en tokens: cambiar el carácter de
      la interfaz (más seca, más suave, más lenta) es tocar SOLO estas líneas,
@@ -59,14 +59,12 @@
   /* Texto sobre superficies de acento (botón primario, chip activo) y blanco de énfasis */
   --accent-fg: #10130a; --accent-hover: #eaff77; --text-strong: #ffffff;
   /* Pestañas del titlebar */
-  --tab-hover-bg: #1c1c1c; --tab-hover-fg: #e6e6e6;
   --tab-asleep-fg: #7f7f7f; --fav-dot: #616161;
-  --tab-active-bg: #2c2c30; --tab-active-line: #3f3f44;
   /* Controles de ventana, sidebar y navbar (cada zona con su gris de reposo) */
   --winctl-fg: #c2c2c2; --winctl-hover: #242424; --winctl-active: #2c2c2c;
   --sb-border: #121212; --sb-fg: #999999; --sb-hover: #222222; --sb-open: #212121; --sb-sep: #1a1a1a; --sb-div: #272727;
   --sb-capsule: #151515;
-  --nav-fg: #b8b8b8; --nav-hover: #1f1f1f; --bm-fg: #c3c3c3;
+  --nav-fg: #b8b8b8; --bm-fg: #c3c3c3;
   /* Pastillas translúcidas (antes rgba blancas sueltas: invisibles en claro) */
   --chip: rgba(255,255,255,.09); --chip-hover: rgba(255,255,255,.15); --chip-dim: rgba(255,255,255,.05);
   /* Interruptores: encendidos en LIMA con la bolita oscura (como los chips
@@ -92,6 +90,18 @@
   /* Controles nativos (desplegables, selector de hora, casillas) en el estilo del tema */
   color-scheme: dark;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* ===== Chrome de Naviris 3 (propuestas aprobadas el 2026-11-03) =====
+     El marco es el fondo de la ventana; la HOJA es la superficie donde viven
+     la barra de herramientas y la página, y la pestaña activa se funde con
+     ella. Campos sin borde, un solo gris de hover y menús propios. Cada tema
+     pone sus valores; aquí, los del oscuro (Acid). */
+  --marco: var(--bg); --hoja: var(--bg-2);
+  --campo: rgba(255,255,255,.055); --campo-hover: rgba(255,255,255,.08);
+  --roce: rgba(255,255,255,.055); --roce-2: rgba(255,255,255,.085); --hilo: rgba(255,255,255,.07);
+  --menu-fondo: #1c1f1d; --menu-aro: rgba(255,255,255,.07); --sombra-pop: 0 14px 36px rgba(0,0,0,.55);
+  /* Las dos curvas del arranque nuevo: «frena» para lo que entra y «acelera»
+     para lo que sale (sección Movimiento de las propuestas). */
+  --frena: cubic-bezier(.16,1,.3,1); --acelera: cubic-bezier(.5,0,.75,0);
 }
 /* ===== Tema Rosa =====
    Rosa CLARO y pastel (petición 2026-08-10: "cuando digo rosa debe ser rosa
@@ -113,13 +123,11 @@
   --grad-realce: linear-gradient(135deg, #b9a8f0 0%, #f2a0cd 55%, #f9917c 100%);
   --grad-medida: linear-gradient(90deg, #c9bcf7 0%, #f2a0cd 55%, #e0674f 100%);
   --grad-fg: #47203c;
-  --tab-hover-bg: #f4d8e5; --tab-hover-fg: #46243a;
   --tab-asleep-fg: #bb8aa4; --fav-dot: #cf9fba;
-  --tab-active-bg: #ffffff; --tab-active-line: #e2b7cc;
   --winctl-fg: #7c4a66; --winctl-hover: #f3d6e4; --winctl-active: #ebc6d9;
   --sb-border: #f2d8e5; --sb-fg: #8a5674; --sb-hover: #f4d8e5; --sb-open: #ecc9db; --sb-sep: #f0d4e2; --sb-div: #ddb0c9;
   --sb-capsule: #ffffff;
-  --nav-fg: #7c4a66; --nav-hover: #f4d8e5; --bm-fg: #6d3c58;
+  --nav-fg: #7c4a66; --bm-fg: #6d3c58;
   --chip: rgba(216,79,150,.10); --chip-hover: rgba(216,79,150,.18); --chip-dim: rgba(216,79,150,.06);
   --track-knob: #ffffff; --track-on: #d84f96; --track-knob-on: #ffffff;
   --bar-from: #e879b2; --bar-to: #d84f96; --backdrop: rgba(90,35,66,.35);
@@ -135,6 +143,10 @@
   --tile-letter: #46243a; --tile-mono: #5c2f4a; --dial-add-line: #dfb4ca;
   --wx-ic: #8a4a6b;
   --fav-filter: grayscale(1) brightness(.45);
+  --marco: #f1e6f3; --hoja: #fdfafe;
+  --campo: rgba(120,40,84,.06); --campo-hover: rgba(120,40,84,.09);
+  --roce: rgba(120,40,84,.055); --roce-2: rgba(120,40,84,.09); --hilo: rgba(120,40,84,.10);
+  --menu-fondo: #ffffff; --menu-aro: rgba(120,40,84,.10); --sombra-pop: 0 14px 36px rgba(120,40,84,.16);
   color-scheme: light;
 }
 /* El acento del tema rosa brilla un poco: el botón primario y los realces lucen
@@ -169,13 +181,11 @@
   --muted: #5d5f66; --dim: #8b8d95; --violet: #6e46c8;
   --danger: #d02f34; --ok: #1e8e4f;
   --accent-fg: #f6f7f9; --accent-hover: #1b1c20; --text-strong: #23252b;
-  --tab-hover-bg: #e2e4e9; --tab-hover-fg: #2e3038;
   --tab-asleep-fg: #84868e; --fav-dot: #a3a6ad;
-  --tab-active-bg: #ffffff; --tab-active-line: #b8bcc6;
   --winctl-fg: #4a4c53; --winctl-hover: #e0e2e7; --winctl-active: #d4d7dd;
   --sb-border: #e2e4e8; --sb-fg: #5d5f66; --sb-hover: #e2e4e9; --sb-open: #d8dbe1; --sb-sep: #dcdee3; --sb-div: #c9ccd3;
   --sb-capsule: #ffffff;
-  --nav-fg: #4a4c53; --nav-hover: #e2e4e9; --bm-fg: #43454c;
+  --nav-fg: #4a4c53; --bm-fg: #43454c;
   --chip: rgba(20,22,28,.08); --chip-hover: rgba(20,22,28,.14); --chip-dim: rgba(20,22,28,.05);
   --track-knob: #f9fafb; --track-on: var(--realce); --track-knob-on: #f6f7f9;
   --bar-from: #6a6d75; --bar-to: #3a3d45; --backdrop: rgba(35,39,46,.4);
@@ -200,6 +210,10 @@
   --grad-realce: linear-gradient(135deg, #d93a2b 0%, #ea6a2c 55%, #f59a35 100%);
   --grad-medida: linear-gradient(90deg, #f7a53a 0%, #ea6a2c 55%, #b52d1f 100%);
   --grad-fg: #ffffff;
+  --marco: #e1e3e8; --hoja: #f4f5f7;
+  --campo: rgba(20,22,28,.055); --campo-hover: rgba(20,22,28,.08);
+  --roce: rgba(20,22,28,.05); --roce-2: rgba(20,22,28,.08); --hilo: rgba(18,20,26,.09);
+  --menu-fondo: #ffffff; --menu-aro: rgba(18,20,26,.09); --sombra-pop: 0 14px 36px rgba(24,28,36,.16);
   color-scheme: light;
 }
 /* Colores que en claro necesitan su propio valor (no salen de un token) */
@@ -245,13 +259,11 @@
   --grad-realce: linear-gradient(135deg, #ffffff 0%, #c9c9c9 55%, #8f8f8f 100%);
   --grad-medida: #ffffff;   /* la barra del monitor, BLANCA y sin degradado */
   --grad-fg: #131313;
-  --tab-hover-bg: #262626; --tab-hover-fg: #f0f0f0;
   --tab-asleep-fg: #7d7d7d; --fav-dot: #666666;
-  --tab-active-bg: #343436; --tab-active-line: #4a4a4d;
   --winctl-fg: #c8c8c8; --winctl-hover: #2a2a2a; --winctl-active: #343434;
   --sb-border: #1d1d1d; --sb-fg: #9a9a9a; --sb-hover: #262626; --sb-open: #262626; --sb-sep: #202020; --sb-div: #2f2f2f;
   --sb-capsule: #1b1b1b;
-  --nav-fg: #bcbcbc; --nav-hover: #242424; --bm-fg: #c8c8c8;
+  --nav-fg: #bcbcbc; --bm-fg: #c8c8c8;
   --track-knob: #7a7a7a; --track-on: #ffffff; --track-knob-on: #131313;
   --bar-from: #8a8a8a; --bar-to: #ffffff; --backdrop: rgba(8,8,8,.66);
   --shadow-pop: rgba(0,0,0,.62); --shadow-panel: rgba(0,0,0,.55);
@@ -266,6 +278,7 @@
   --tile-letter: #ffffff; --tile-mono: #ffffff; --dial-add-line: #3a3a3a;
   --wx-ic: #d0d0d0;
   --fav-filter: grayscale(1) brightness(1.6);
+  --marco: #0b0b0b; --hoja: #161617; --menu-fondo: #1f1f1f;
   color-scheme: dark;
 }
 /* Lo cromatico que NO sale de un token y hay que apagar a mano */
@@ -293,15 +306,47 @@
    Los accesos dejan la rejilla y viven en un dock abajo al centro, como en un
    escritorio: tiles de 66 px sin nombre (el nombre va en el tooltip), la misma
    magnificación al pasar el ratón (armaDock) y el mismo arrastre para reordenar
-   en modo Editar. El "+" añade un acceso. */
-#hub-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 26px; background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-fab-line); }
+   en modo Editar. El "+" añade un acceso.
+   Medidas en variables (Naviris 3): cada tamaño de pantalla pone las suyas y
+   el tile ENCOGE solo si con tus accesos el dock no cabe en el hub (antes, con
+   muchos accesos, se salía por los lados). --dk-n lo pone renderDock. */
+#hub-dock { --dk-base: 66px; --dk-gap: 8px; --dk-pad: 10px; --dk-r: 18px; --dk-ic: 30px; --dk-le: 24px; --dk-sep: 9px;
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: var(--dk-gap); padding: var(--dk-pad); border-radius: 26px; background: color-mix(in srgb, var(--hub-card) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--hub-fab-line); }
 #hub-dock .dial { gap: 0; }
-#hub-dock .d-tile { width: 66px; height: 66px; border-radius: 18px; background: color-mix(in srgb, var(--tile-default) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--tile-line); }
-#hub-dock .d-tile img { --icon-sz: 30px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 30px; height: 30px; } #hub-dock .d-tile .d-letter { font-size: 24px; }
+#hub-dock .d-tile { --dk-t: max(32px, min(var(--dk-base), (100cqw - 34px - 2 * var(--dk-pad) - var(--dk-sep) - var(--dk-n, 10) * var(--dk-gap)) / var(--dk-n, 10)));
+  width: var(--dk-t); height: var(--dk-t); border-radius: min(var(--dk-r), var(--dk-t) * .28); background: color-mix(in srgb, var(--tile-default) calc(var(--hub-op, 1) * 100%), transparent); border: 1px solid var(--tile-line); }
+#hub-dock .d-tile img { --icon-sz: min(var(--dk-ic), var(--dk-t) * .5); } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: min(var(--dk-ic), var(--dk-t) * .5); height: min(var(--dk-ic), var(--dk-t) * .5); } #hub-dock .d-tile .d-letter { font-size: min(var(--dk-le), var(--dk-t) * .4); }
 #hub-dock .d-name { display: none; }
 #hub-dock .dial.add .d-tile { background: transparent; border: 1.5px dashed var(--dial-add-line); color: var(--dim); }
 #hub-dock .dial.add .d-tile svg { width: 20px; height: 20px; }
 #hub-dock .dk-sep { width: 1px; height: 44px; background: var(--hub-hairline); margin: 0 4px; }
+/* ===== Repisa de vidrio tenue (Naviris 3) =====
+   La variante 3 de las propuestas, a elegir en «Aspecto del hub»: una sola
+   repisa translúcida con los iconos encima, sin baldosas ni separador. Sobre
+   un fondo claro (tema claro o rosa, o una foto clara) usa su juego claro.
+   Al pasar el ratón el icono sube 2 px en 200 ms (frena) y su nombre aparece
+   encima en 160 ms; la magnificación del dock de siempre no se usa aquí. */
+#hub-dock.repisa { --dk-base: 58px; --dk-gap: 4px; --dk-pad: 8px; --dk-r: 15px; --dk-sep: 0px;
+  --repisa: rgba(18,18,20,.46); --repisa-aro: rgba(255,255,255,.09); --repisa-tinta: #f4f4f4; --repisa-hov: rgba(255,255,255,.14);
+  border: none; border-radius: 24px; background: var(--repisa); box-shadow: inset 0 0 0 1px var(--repisa-aro);
+  -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); }
+:root.light #hub-dock.repisa, :root.rosa #hub-dock.repisa, #hub.bg-claro #hub-dock.repisa {
+  --repisa: rgba(255,255,255,.55); --repisa-aro: rgba(18,20,26,.08); --repisa-tinta: #26272c; --repisa-hov: rgba(20,22,28,.08); }
+#hub-dock.repisa .dk-sep { display: none; }
+#hub-dock.repisa .dial { transform: none; }
+#hub-dock.repisa .d-tile, #hub-dock.repisa .dial.add .d-tile { background: transparent; border: none; box-shadow: none; transform: none; color: var(--repisa-tinta); --tile-mono: var(--repisa-tinta); --tile-letter: var(--repisa-tinta);
+  transition: background-color 160ms ease, transform 200ms var(--frena); }
+#hub-dock.repisa .dial:hover .d-tile, #hub-dock.repisa .dial:focus-visible .d-tile { background: var(--repisa-hov); transform: translateY(-2px); box-shadow: none; }
+#hub-dock.repisa .dial:active .d-tile { transform: translateY(-1px) scale(.96); }
+#hub-dock.repisa .dial.add .d-tile { opacity: .7; }
+#hub-dock.repisa .dial.add .d-tile svg { width: 22px; height: 22px; }
+#hub-dock.repisa .d-name { display: block; position: absolute; bottom: calc(100% + 8px); left: 50%; max-width: none; padding: 5px 9px; border-radius: 7px; background: var(--menu-fondo); color: var(--text); font-size: 12px; line-height: normal; font-weight: 500; white-space: nowrap; box-shadow: var(--sombra-pop), 0 0 0 1px var(--menu-aro); pointer-events: none;
+  opacity: 0; transform: translate(-50%, 4px); transition: opacity 120ms ease, transform 160ms var(--frena); }
+#hub-dock.repisa .dial:hover .d-name, #hub-dock.repisa .dial:focus-visible .d-name { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-transparency: reduce) {
+  #hub-dock.repisa { -webkit-backdrop-filter: none; backdrop-filter: none; --repisa: #18181a; }
+  :root.light #hub-dock.repisa, :root.rosa #hub-dock.repisa, #hub.bg-claro #hub-dock.repisa { --repisa: #ffffff; }
+}
 #hub.estrenando #hub-dock { animation: sp-sube .5s ease-out .34s both; }
 #hub.editing #hub-dock .dial { animation: none; }
 /* ===== SIN SOLAPES (Dosa, 2026-09-09: "veo cómo elementos se superponen") =====
@@ -337,6 +382,12 @@
 /* Deslizador del panel de aspecto */
 .hp-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 2px 6px; font-size: 12px; color: var(--text); }
 .hp-fila b { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+/* Selector de dos opciones del panel (estilo del dock) */
+.hp-seg { display: flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--roce); }
+.hp-seg button { flex: 1; height: 30px; border: none; border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12.5px; font-weight: 520; cursor: pointer; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease, transform 100ms ease; }
+.hp-seg button:hover { color: var(--text); }
+.hp-seg button:active { transform: scale(.97); }
+.hp-seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-fg); }
 #op-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; cursor: pointer; }
 #op-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--track); }
 #op-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%;
@@ -359,15 +410,13 @@
   #hub-dock { bottom: 74px; }
 }
 @container (max-width: 1100px) {
-  #hub-dock { gap: 6px; padding: 8px; border-radius: 22px; }
-  #hub-dock .d-tile { width: 54px; height: 54px; border-radius: 15px; }
-  #hub-dock .d-tile img { --icon-sz: 26px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 26px; height: 26px; } #hub-dock .d-tile .d-letter { font-size: 20px; }
+  #hub-dock { --dk-base: 54px; --dk-gap: 6px; --dk-pad: 8px; --dk-r: 15px; --dk-ic: 26px; --dk-le: 20px; border-radius: 22px; }
+  #hub-dock.repisa { --dk-base: 50px; --dk-gap: 4px; --dk-pad: 7px; --dk-r: 13px; }
   #hub-dock .dk-sep { height: 36px; }
 }
 @container (max-width: 800px) {
-  #hub-dock { gap: 5px; padding: 6px; border-radius: 18px; }
-  #hub-dock .d-tile { width: 44px; height: 44px; border-radius: 12px; }
-  #hub-dock .d-tile img { --icon-sz: 22px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 22px; height: 22px; } #hub-dock .d-tile .d-letter { font-size: 17px; }
+  #hub-dock { --dk-base: 44px; --dk-gap: 5px; --dk-pad: 6px; --dk-r: 12px; --dk-ic: 22px; --dk-le: 17px; border-radius: 18px; }
+  #hub-dock.repisa { --dk-base: 42px; --dk-gap: 3px; --dk-pad: 6px; --dk-r: 11px; }
   #hub-dock .dk-sep { height: 30px; }
 }
 
@@ -378,7 +427,7 @@
 :root.mono #sb-loot.on-twitch { color: var(--realce); }
 :root.mono .loot-go:not(.off) { background: linear-gradient(120deg, #ffffff, #b5b5b5); color: var(--accent-fg); }
 :root.mono .ctx-item.danger, :root.mono .ctx-item.danger .ctx-ic { color: #ffffff; }
-:root.mono .ctx-item.danger:hover { background: rgba(255,255,255,.12); }
+:root.mono .ctx-item.danger:focus { background: rgba(255,255,255,.12); }
 :root.mono #win-close:active { background: #d0d0d0; color: #131313; }
 /* Modo agente: sin ambar ni verde. Activo = contorno, conectado = relleno. */
 :root.mono #agent-badge { color: #e0e0e0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.32); }
@@ -407,7 +456,7 @@
 :root.mono .iris-slot .iris-logo stop.i-b { stop-color: #ededed; }
 :root.mono .iris-slot .iris-logo stop.i-c { stop-color: #b4b4b4; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+body { font-family: "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; background: var(--marco); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
 button { font-family: inherit; }
 /* Foco por teclado propio (auditoría 2026-10): sin esto salía el anillo ámbar
    de Chromium, que toma el color de acento de Windows. Con el ratón no aparece.
@@ -444,10 +493,11 @@ button { font-family: inherit; }
 @keyframes hub-in { 0% { transform: translateY(26px) scale(.965); opacity: 0; } 100% { transform: none; opacity: 1; } }
 #hub.estrenando .hub-fab, #hub.estrenando .hub-pill, #hub.estrenando #hub-addons { animation: sp-sube .5s ease-out .34s both; }
 
-/* Titlebar */
-/* Titlebar píldora flotante (las pestañas viven dentro) */
-#titlebar { height: var(--titlebar-h); display: flex; align-items: center; background: var(--bg-2); padding-left: 14px; flex-shrink: 0; margin: 8px 10px 4px; border-radius: 16px; overflow: hidden; }
-.tb-logo { display: flex; align-items: center; justify-content: center; width: calc(var(--sidebar-w) + 12px); margin: 0 0 0 -14px; flex: none; -webkit-app-region: drag; }
+/* Titlebar (Naviris 3): sin cápsula. Las pestañas van sobre el marco y la
+   activa baja hasta la hoja y se funde con ella con dos curvas. El logo ocupa
+   el ancho exacto del riel (44 + 8 + 4), así la hoja empieza bajo él. */
+#titlebar { height: var(--titlebar-h); display: flex; align-items: center; flex-shrink: 0; }
+.tb-logo { display: flex; align-items: center; justify-content: center; width: calc(var(--sidebar-w) + 12px); flex: none; -webkit-app-region: drag; }
 /* El hueco de arrastre va DESPUÉS del botón + y se come todo lo que sobre, así
    el + queda siempre pegado a la última pestaña. Cede su espacio a las pestañas
    cuando la barra se llena (por eso shrink alto y un mínimo pequeño). */
@@ -469,7 +519,9 @@ button { font-family: inherit; }
    `flex-basis`. Sigue con shrink 1: cuando de verdad se llena, encogen todas
    juntas. Y el + se queda pegado a la ultima, que era el motivo de no dejar
    crecer la barra sin mas. */
-#tabstrip { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; height: 100%; -webkit-app-region: drag; }
+/* Las pestañas se apoyan abajo (la activa toca la hoja) y el relleno lateral
+   deja sitio a las curvas de la primera y de la última. */
+#tabstrip { position: relative; display: flex; align-items: flex-end; gap: 2px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; height: 100%; padding: 0 10px; -webkit-app-region: drag; }
 #tabstrip::-webkit-scrollbar { display: none; }
 #tabstrip > * { -webkit-app-region: no-drag; }
 /* Al llenarse la barra las pestañas encogen hasta quedarse en el favicon, como
@@ -486,26 +538,15 @@ button { font-family: inherit; }
    entre sí SIN que ninguna desaparezca. */
 /* Ancha de salida (240) y encogiendo segun se llena la barra, como Brave: el
    200 de antes dejaba titulos cortados teniendo sitio de sobra.
-   Y el TEXTO NO SE APAGA. Antes la inactiva iba en --tab-fg (#a6a6a6) y
-   costaba leerla; ahora todas llevan el mismo color y lo que distingue a la
-   activa es el FONDO, no la letra. Es lo que hace Brave y se lee mejor. */
-.tab { position: relative; display: flex; align-items: center; gap: 8px; height: 29px; min-width: 33px; max-width: 240px; padding: 0 6px 0 10px; border-radius: var(--r-s); background: transparent; color: var(--tab-hover-fg, var(--text)); font-size: 12.5px; cursor: pointer; flex: 0 1 240px; transition: background var(--dur-2) var(--ease); }
-/* Una linea fina entre pestañas, como en Brave. Se apaga en cuanto una de
-   las dos vecinas esta activa o tiene el raton encima: si no, el fondo
-   claro del hover queda partido por la mitad. */
-.tab + .tab::before {
-  content: ''; position: absolute; left: -2.5px; top: 50%; transform: translateY(-50%);
-  width: 1px; height: 15px; background: var(--line-2); opacity: .7;
-  transition: opacity var(--dur-2) var(--ease);
-}
-.tab:hover::before, .tab.active::before,
-.tab:hover + .tab::before, .tab.active + .tab::before { opacity: 0; }
+   Naviris 3 (propuesta aprobada el 2026-11-03): las inactivas sin fondo ni
+   separadores y con el texto en gris (pasa de 7:1 en los temas oscuros y de
+   4,5:1 en los claros); la activa es del color de la hoja y baja hasta ella. */
+.tab { position: relative; display: flex; align-items: center; gap: 8px; height: 30px; margin-bottom: 5px; min-width: 33px; max-width: 240px; padding: 0 6px 0 10px; border-radius: 9px; background: transparent; color: var(--tab-hover-fg, var(--text)); font-size: 12.5px; cursor: pointer; flex: 0 1 240px; transition: background-color 120ms ease, color 120ms ease; }
 .tab.dragging { opacity: .5; }
 /* Mientras se arrastra: la pestaña que viaja se atenua y el resto no reacciona
    al raton, que si no la barra parpadea al pasar por encima de cada una. */
 body.arrastrando-pestana .tab { transition: none; }
 body.arrastrando-pestana .tab:hover:not(.active) { background: transparent; }
-body.arrastrando-pestana .tab::before { opacity: 0; }
 /* Bastante abajo como para sacarla: se avisa antes de soltar. */
 body.sacando-pestana .tab.dragging { opacity: .32; box-shadow: inset 0 0 0 1px var(--realce); }
 body.sacando-pestana { cursor: copy; }
@@ -513,16 +554,21 @@ body.sacando-pestana { cursor: copy; }
 .tab.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 34px; padding: 0; justify-content: center; gap: 0; }
 /* Al pasar por encima se ACLARA EL FONDO y nada mas. Teñir el texto de
    --realce hacia que la pestaña saltara mas que la activa. */
-.tab:hover:not(.active) { background: var(--tab-hover-bg); }
+.tab:hover:not(.active) { background: var(--roce); color: var(--text); }
 /* La activa se distingue por el FONDO, no por un filo de color arriba
-   (peticion de Dosa, 2026-08-30: Brave la aclara y ya). El filo de realce se
-   retiro: con el separador nuevo y el fondo mas claro sobra, y con muchas
-   pestañas era una fila de rayas de colores. */
-/* Contraste de la ACTIVA (Dosa, 2026-09-09: "me es muy difícil identificar cuál
-   tengo activa"): fondo claramente más claro que la barra, por token de tema. El
-   texto de las demás no se apaga (decisión del 30-08). */
-.tab.active { background: var(--tab-active-bg, var(--bg-3)); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--tab-active-line, var(--line-2)); }
-.tab.active:hover { background: var(--tab-active-bg, var(--hover)); }
+   (peticion de Dosa, 2026-08-30: Brave la aclara y ya). En Naviris 3 ese fondo
+   es el de la hoja y la pestaña baja hasta ella: las dos curvas de abajo
+   (radial-gradient, sin imágenes) la funden con la barra de herramientas. */
+.tab.active { background: var(--hoja); color: var(--text-strong); height: 35px; margin-bottom: 0; border-radius: 10px 10px 0 0; font-weight: 520; }
+.tab.active::before, .tab.active::after, #tab-lengueta::before, #tab-lengueta::after { content: ""; position: absolute; bottom: 0; width: 10px; height: 10px; pointer-events: none; }
+.tab.active::before, #tab-lengueta::before { left: -10px; background: radial-gradient(circle at 0 0, transparent 9.5px, var(--hoja) 10px); }
+.tab.active::after, #tab-lengueta::after { right: -10px; background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--hoja) 10px); }
+/* Cambiar de pestaña con el ratón: una lengüeta de la hoja se desliza de la
+   que se deja a la nueva (220 ms, frena) y, mientras viaja, la activa no pinta
+   la suya. Solo transform; con el teclado no hay viaje (ver deslizaLengueta). */
+#tab-lengueta { position: absolute; left: 0; bottom: 0; height: 35px; background: var(--hoja); border-radius: 10px 10px 0 0; pointer-events: none; }
+#tabstrip.deslizando .tab.active { background: transparent; }
+#tabstrip.deslizando .tab.active::before, #tabstrip.deslizando .tab.active::after { display: none; }
 /* 17px y SIN redondear. El `border-radius: 4px` sobre 15px de icono le comia
    las esquinas a cualquier logo cuadrado, que es lo que se veia deforme; y
    15px era mas pequeño que en cualquier otro navegador. */
@@ -541,9 +587,9 @@ body.sacando-pestana { cursor: copy; }
    pasar por encima: habia que adivinar donde estaba y afinar el raton en 18
    px. Ahora va tenue de serie, en 21 px de zona pinchable, y se enciende al
    apuntarla. */
-.tab .t-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 6px; width: 21px; height: 21px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .75; transition: background var(--dur-1), color var(--dur-1), opacity var(--dur-1); }
+.tab .t-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 6px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .6; transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease; }
 .tab:hover .t-close, .tab.active .t-close { opacity: 1; }
-.tab .t-close:hover { background: var(--btn-hover); color: var(--text-strong); opacity: 1; }
+.tab .t-close:hover { background: var(--roce-2); color: var(--text-strong); opacity: 1; }
 /* Pestaña de grupo AutoLoot (colapsa todos los canales en autoloot) */
 /* Mini-pestañas del grupo AutoLoot al desplegarse (a la derecha de la cabecera) */
 .tab.mini { max-width: 150px; background: rgba(120,90,190,.06); border: 1px solid rgba(145,112,214,.22); animation: loot-slide .18s cubic-bezier(.2,.8,.3,1) both; }
@@ -559,24 +605,36 @@ body.sacando-pestana { cursor: copy; }
 
 /* Fondo del hub transparente: deja ver el escritorio (acrílico de Windows) */
 /* Botón de silencio de pestaña */
-.tab .t-mute { border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background var(--dur-1), color var(--dur-1); }
-.tab .t-mute svg { width: 13px; height: 13px; }
-.tab .t-mute:hover { background: var(--btn-hover); color: var(--text); }
-.tab .t-mute.muted { color: var(--accent-2); }
+.tab .t-mute { border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 6px; width: 22px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background-color 120ms ease, color 120ms ease; }
+.tab .t-mute svg { width: 14px; height: 14px; }
+.tab .t-mute:hover { background: var(--roce-2); }
+.tab .t-mute.muted { color: var(--text-dim); }
 
-/* Menú contextual */
-.ctx-menu { position: fixed; z-index: 590; min-width: 190px; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-1) var(--spring) both; }
-.ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 8px 10px; border-radius: var(--r-s); cursor: pointer; }
-.ctx-item:hover { background: var(--wash); }
+/* Menú contextual de Naviris (propuesta aprobada): superficie propia con un
+   aro fino y sombra suave, opciones de 32 px con icono, texto y atajo. Abre
+   en 200 ms (frena) desde la esquina del clic y cierra en 110 ms (acelera);
+   abierto con el teclado aparece sin animar. La opción marcada (ratón o
+   teclado) es la que tiene el foco. */
+.ctx-menu { position: fixed; z-index: 590; min-width: 248px; max-width: min(400px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--menu-fondo); border-radius: 12px; padding: 6px; box-shadow: var(--sombra-pop), 0 0 0 1px var(--menu-aro); outline: none; font-size: 13px; color: var(--text);
+  opacity: 0; transform: scale(.96); transition: opacity 110ms ease, transform 110ms var(--acelera); }
+.ctx-menu.abierto { opacity: 1; transform: none; transition: opacity 160ms ease, transform 200ms var(--frena); }
+.ctx-menu.sin-mov { transition: none; }
+.ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; flex: none; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; padding: 0 10px; border-radius: 8px; cursor: pointer; outline: none; }
+.ctx-item:focus { background: var(--roce-2); }
+.ctx-item:disabled { color: var(--dim); cursor: default; }
+.ctx-tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-item kbd { margin-left: auto; padding-left: 24px; font: inherit; font-size: 12px; color: var(--text-dim); flex: none; }
 .ctx-item.danger { color: #e57373; }
-.ctx-item.danger:hover { background: rgba(229,115,115,.12); }
-.ctx-ic { display: flex; color: var(--text-dim); }
+.ctx-item.danger:focus { background: rgba(229,115,115,.12); }
+.ctx-ic { display: flex; width: 16px; height: 16px; flex: none; color: var(--text-dim); }
+.ctx-item:disabled .ctx-ic, .ctx-item:disabled kbd { color: var(--dim); }
 .ctx-item.danger .ctx-ic { color: #e57373; }
-.ctx-ic svg { width: 15px; height: 15px; }
-.ctx-sep { height: 1px; background: var(--line); margin: 4px 6px; }
+.ctx-ic svg { width: 16px; height: 16px; }
+.ctx-sep { height: 1px; background: var(--hilo); margin: 5px 6px; }
 /* El + tambien era pequeño y tenue de mas para lo que se usa. */
-#newtab-btn { width: 30px; height: 30px; margin: 0 4px; border: none; border-radius: 8px; background: transparent; color: var(--text); opacity: .8; cursor: pointer; transition: background var(--dur-1), opacity var(--dur-1); }
-#newtab-btn:hover { background: var(--hover); opacity: 1; }
+#newtab-btn { width: 30px; height: 30px; margin: 0 0 5px -4px; align-self: flex-end; border: none; border-radius: 9px; background: transparent; color: var(--text-dim); cursor: pointer; transition: background-color 120ms ease, color 120ms ease, transform 100ms ease; }
+#newtab-btn:hover { background: var(--roce); color: var(--text); }
+#newtab-btn:active { transform: scale(.92); }
 /* Controles de ventana al estilo de Windows 11: iconos nítidos, superficie
    completa al pasar por encima y el de cerrar en rojo. */
 .win-controls { display: flex; height: 100%; }
@@ -588,7 +646,10 @@ body.sacando-pestana { cursor: copy; }
 
 /* Fila principal */
 #app-row { flex: 1; display: flex; min-height: 0; }
-#main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+/* La HOJA (Naviris 3): barra de herramientas, barras de aviso y página en una
+   sola superficie redondeada sobre el marco. Sin overflow: hidden, porque las
+   sugerencias de la barra y los menús salen por encima de ella. */
+#main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--hoja); border-radius: 14px; margin: 0 8px 8px 0; }
 
 /* Sidebar */
 /* Sidebar CÁPSULA FLOTANTE (referencia bee_ui 2026-08-11: el riel despegado
@@ -640,33 +701,41 @@ body.sacando-pestana { cursor: copy; }
 
 /* Panel web lateral */
 
-/* Navbar */
-/* Navbar píldora flotante */
-#navbar { height: var(--navbar-h); display: flex; align-items: center; gap: 3px; padding: 0 8px; background: var(--bg-2); border-radius: 999px; flex-shrink: 0; margin: 2px 10px 6px 4px; }
-/* Botones de la navbar: más presencia. Antes quedaban apagados (gris tenue sobre
-   fondo oscuro y sin forma propia); ahora tienen color legible en reposo, una
-   superficie definida al pasar por encima y un estado activo con marca. */
-#navbar > button { width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--nav-fg); cursor: pointer; transition: background var(--dur-2) ease, color var(--dur-2) ease, transform .09s ease; }
-#navbar > button svg { width: 18px; height: 18px; }
-#navbar > button:active:not(:disabled) { transform: scale(.93); }
-#navbar > button:hover:not(:disabled) { background: var(--wash); color: var(--realce); }
-#navbar > button:disabled { opacity: .28; cursor: default; }
+/* Navbar: la parte de arriba de la hoja. Botones cuadrados de esquinas suaves
+   con un solo gris de hover y la presión a 0,94. */
+#navbar { height: var(--navbar-h); display: flex; align-items: center; gap: 2px; padding: 0 10px; flex-shrink: 0; }
+#navbar > button { width: 32px; height: 32px; border: none; border-radius: 9px; background: transparent; color: var(--nav-fg); cursor: pointer; transition: background-color 120ms ease, color 120ms ease, transform 100ms ease; }
+#navbar > button svg { width: 17px; height: 17px; }
+#navbar > button:active:not(:disabled) { transform: scale(.94); }
+#navbar > button:hover:not(:disabled) { background: var(--roce); color: var(--text-strong); }
+#navbar > button:disabled { opacity: .35; cursor: default; }
 /* Marcador guardado en el color de realce del tema (lima en oscuro) */
 #nav-star.starred { color: var(--realce); }
 /* Con el marcador guardado, el hover ofrece quitarlo: cinta con menos en rojo */
 #nav-star.removing { color: var(--danger); }
 #nav-shield.off { color: var(--dim); }
-#nav-shield.open { background: var(--bg-3); color: var(--text); }
-#urlbox { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 8px; padding: 0 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); transition: border-color var(--dur-2), box-shadow var(--dur-2); }
-/* Foco de la barra: SIN borde de color (cantaba mucho con el lima). Solo un
-   halo tenue del realce y el borde a su gris de siempre. */
-/* El halo es del campo: el candado (un botón) también toma el foco y no debe encenderlo */
-#urlbox:has(#urlbar:focus) { border-color: var(--line-3); box-shadow: 0 0 0 3px var(--wash); }
-/* El lima vive en los HOVER: la barra se tiñe al pasar el ratón */
-#urlbox:hover:not(:has(#urlbar:focus)) { border-color: color-mix(in srgb, var(--realce) 30%, var(--line)); }
+#nav-shield.open { background: var(--roce-2); color: var(--text); }
+/* Barra de direcciones SIN BORDE (propuesta aprobada): un campo apenas más
+   claro que la hoja. Sin foco enseña el dominio en blanco y la ruta en gris
+   (#url-vista); al hacer clic aparece la dirección entera ya seleccionada.
+   El foco no anima colores: la hoja de debajo (::before) y el anillo (::after)
+   solo cambian de opacidad, 120 y 160 ms. */
+#urlbox { flex: 1; position: relative; isolation: isolate; display: flex; align-items: center; gap: 9px; height: 34px; margin: 0 8px; padding: 0 12px; border-radius: 10px; background: var(--campo); cursor: text; transition: background-color 120ms ease; }
+#urlbox::before, #urlbox::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; }
+#urlbox::before { z-index: -1; background: var(--hoja); transition: opacity 120ms ease; }
+#urlbox::after { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 30%, transparent); transition: opacity 160ms ease; }
+#urlbox:hover { background: var(--campo-hover); }
+/* El anillo es del campo: el candado (un botón) también toma el foco y no debe encenderlo */
+#urlbox:has(#urlbar:focus)::before, #urlbox:has(#urlbar:focus)::after { opacity: 1; }
 #url-secure { color: var(--text-dim); }
-#urlbar { flex: 1; border: none; outline: none; background: transparent; color: var(--text); font-size: 13px; }
-#urlbar::placeholder { color: var(--dim); }
+#urlbar { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--text); font-size: 13.5px; transition: opacity 120ms ease; }
+#urlbar::placeholder { color: var(--text-dim); }
+#urlbar::selection { background: color-mix(in srgb, var(--text) 22%, transparent); color: var(--text-strong); }
+#url-vista { position: absolute; left: 37px; right: 12px; top: 0; bottom: 0; display: flex; align-items: center; min-width: 0; font-size: 13.5px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 120ms ease; }
+#url-vista .uv-dom { color: var(--text-strong); font-weight: 500; flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+#url-vista .uv-ruta { color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#urlbox.vista #url-vista { opacity: 1; }
+#urlbox.vista #urlbar { opacity: 0; }
 
 #suggest { position: absolute; top: calc(100% + 6px); left: -1px; right: -1px; z-index: 550; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; box-shadow: var(--elev-pop); max-height: 340px; overflow-y: auto; animation: fade-in var(--dur-1) var(--ease) both; }
 .sug { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-s); cursor: pointer; font-size: 13px; }
@@ -682,7 +751,7 @@ body.sacando-pestana { cursor: copy; }
 .sug.sel { background: linear-gradient(100deg, var(--wash-2), var(--wash)); }
 
 /* Barra de marcadores */
-#bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 3px 12px; background: var(--bg-2); min-height: 32px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-radius: 999px; margin: 0 10px 6px 4px; }
+#bookmarks-bar { display: flex; align-items: center; gap: 2px; padding: 0 8px; min-height: 30px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; margin: -4px 10px 4px; }
 #bookmarks-bar::-webkit-scrollbar { display: none; }
 #bookmarks-bar.hidden, #bookmarks-bar.empty { display: none !important; }
 .bookmark, .bm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--bm-fg); cursor: pointer; white-space: nowrap; border: none; background: transparent; transition: background var(--dur-1), color var(--dur-1); }
@@ -692,7 +761,7 @@ body.sacando-pestana { cursor: copy; }
    Y el borde derecho se desvanece en vez de cortar un marcador a medias: el
    velo es pegajoso y, si todo cabe, cae sobre el hueco vacío del final. */
 #bookmarks-bar .bookmark span, #bookmarks-bar .bm-folder span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-#bookmarks-bar::after { content: ""; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: auto; background: linear-gradient(to right, transparent, var(--bg-2)); pointer-events: none; }
+#bookmarks-bar::after { content: ""; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: auto; background: linear-gradient(to right, transparent, var(--hoja)); pointer-events: none; }
 .bm-folder svg { width: 14px; height: 14px; color: var(--text-dim); }
 .bm-folder-pop { position: fixed; z-index: 560; background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-m); padding: 5px; min-width: 200px; box-shadow: var(--elev-pop); animation: pop-in var(--dur-2) var(--spring) both; overflow-y: auto; overscroll-behavior: contain; }
 .bm-folder-pop .bookmark { width: 100%; }
@@ -705,8 +774,8 @@ body.sacando-pestana { cursor: copy; }
    salia por abajo y lo de mas abajo —incluido BUSCAR ACTUALIZACIONES— no habia
    forma de tocarlo: el usuario se quedaba sin poder actualizar. Ahora se limita
    al alto disponible y hace scroll dentro. */
-#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column;
-  max-height: calc(100vh - var(--titlebar-h) - var(--navbar-h) - 34px); overflow-y: auto; overscroll-behavior: contain; }
+#menu-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 8px); right: 10px; width: 270px; padding: 6px; display: flex; flex-direction: column;
+  max-height: calc(100vh - var(--titlebar-h) - var(--navbar-h) - 20px); overflow-y: auto; overscroll-behavior: contain; }
 #menu-pop button { display: flex; justify-content: space-between; border: none; background: transparent; color: var(--text); font-size: 13px; text-align: left; padding: 9px 10px; border-radius: var(--r-s); cursor: pointer; }
 #menu-pop button:hover { background: var(--wash); }
 #menu-pop hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
@@ -731,9 +800,9 @@ body.sacando-pestana { cursor: copy; }
 .menu-toggle input:checked { background: var(--track-on); }
 .menu-toggle input:checked::after { transform: translateX(16px); background: var(--track-knob-on); }
 
-#shield-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 84px; width: 292px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#shield-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 8px); right: 84px; width: 292px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 /* Información del sitio: se despliega desde el candado de la barra */
-#site-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); left: calc(var(--sidebar-w) + 158px); width: 310px; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+#site-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 8px); left: calc(var(--sidebar-w) + 158px); width: 310px; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .stp-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; color: var(--text); }
 .stp-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 12.5px; color: var(--text); }
 .stp-row .stp-ic { color: var(--nav-fg); display: inline-flex; }
@@ -748,7 +817,7 @@ body.sacando-pestana { cursor: copy; }
 .stp-act { border: 1px solid var(--line-3); background: var(--btn); color: var(--text); font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-family: inherit; }
 .stp-act:hover { background: var(--btn-hover); }
 #url-secure { cursor: pointer; border-radius: 6px; padding: 2px; border: none; background: none; }
-#url-secure:hover { background: var(--nav-hover); }
+#url-secure:hover { background: var(--roce-2); }
 .sp-head { display: flex; justify-content: space-between; align-items: center; }
 .sp-title { font-size: 13.5px; font-weight: 600; }
 .sp-count { font-size: 12px; color: var(--text-dim); }
@@ -808,8 +877,13 @@ body.sacando-pestana { cursor: copy; }
 
 /* Paneles laterales derechos */
 /* Panel lateral como cápsula flotante, a juego con el sidebar */
-.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 24px); right: 16px; bottom: 16px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel); animation: panel-in var(--dur-3) var(--spring) both; }
-@keyframes panel-in { from { transform: translateX(44px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
+.side-panel { position: fixed; top: calc(var(--titlebar-h) + var(--navbar-h) + 10px); right: 16px; bottom: 16px; width: 384px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: -18px 0 50px var(--shadow-panel);
+  transform-origin: right center; transition: opacity 180ms ease, transform 240ms var(--frena), display 240ms allow-discrete; }
+/* Panel lateral (sección Movimiento de las propuestas): entra desde su lado en
+   240 ms (frena) y sale por el mismo camino en 160 ms (acelera). Se interrumpe
+   sin saltos: son transiciones, no fotogramas clave. */
+.side-panel.hidden { opacity: 0; transform: translateX(12px) scale(.985); transition: opacity 120ms ease, transform 160ms var(--acelera), display 160ms allow-discrete; }
+@starting-style { .side-panel { opacity: 0; transform: translateX(12px) scale(.985); } }
 .mp-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 12px; font-size: 15px; font-weight: 650; letter-spacing: .2px; }
 .mp-tools { display: flex; gap: 4px; }
 .mp-tools button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 26px; height: 26px; border-radius: 7px; transition: background var(--dur-1), color var(--dur-1); }
@@ -842,39 +916,31 @@ body.sacando-pestana { cursor: copy; }
 .primary-btn:active { transform: scale(.98); }
 .primary-btn svg { width: 15px; height: 15px; }
 
-/* Barra de permisos */
-#perm-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
-@keyframes perm-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-#perm-bar .perm-ic { color: var(--text-dim); display: flex; }
-#perm-bar .perm-ic svg { width: 15px; height: 15px; }
-#perm-text { flex: 1; }
-#perm-text b { color: var(--text-strong); }
-.perm-remember { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12px; cursor: pointer; }
-.perm-remember input { accent-color: var(--track-on); width: 14px; height: 14px; }
-#perm-bar button { border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: var(--btn); color: var(--text); }
-#perm-bar button:hover { background: var(--btn-hover); }
-#perm-bar button.primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
-#perm-bar button.primary:hover { background: var(--accent-hover); }
-/* Aviso de ventana emergente bloqueada: el mismo estilo que #perm-bar */
-#emerg-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
-#emerg-bar .perm-ic { color: var(--text-dim); display: flex; }
-#emerg-bar .perm-ic svg { width: 15px; height: 15px; }
-#emerg-text { flex: 1; }
-#emerg-text b { color: var(--text-strong); }
-#emerg-bar button { border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: var(--btn); color: var(--text); }
-#emerg-bar button:hover { background: var(--btn-hover); }
-#emerg-bar button.primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
-#emerg-bar button.primary:hover { background: var(--accent-hover); }
-/* Barra de contraseñas (guardar / autorrellenar) — reutiliza el estilo de #perm-bar */
-#pw-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); font-size: 13px; animation: perm-in .2s ease both; }
-#pw-bar .perm-ic { color: var(--text-dim); display: flex; }
-#pw-bar .perm-ic svg { width: 15px; height: 15px; }
-#pw-text { flex: 1; }
-#pw-text b { color: var(--text-strong); }
-#pw-bar button { border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; cursor: pointer; background: var(--btn); color: var(--text); }
-#pw-bar button:hover { background: var(--btn-hover); }
-#pw-bar button.primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
-#pw-bar button.primary:hover { background: var(--accent-hover); }
+/* Barras de aviso: permisos, ventana emergente bloqueada y contraseñas
+   (Naviris 3). Salen de debajo de la barra de direcciones, dentro de la misma
+   hoja y sin banda de color: icono, qué pide quién y «Permitir» como único
+   botón lleno. Entran en 260 ms (frena) bajando 6 px y salen en 180 ms
+   (acelera); el hueco que ocupan cambia de golpe, no se anima su alto (sería
+   redimensionar la página en cada fotograma). */
+#perm-bar, #emerg-bar, #pw-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 2px 16px 12px 20px; font-size: 13.5px; color: var(--text-dim);
+  transition: opacity 200ms ease, transform 260ms var(--frena), display 260ms allow-discrete; }
+#perm-bar.hidden, #emerg-bar.hidden, #pw-bar.hidden { opacity: 0; transform: translateY(-6px); transition: opacity 140ms ease, transform 180ms var(--acelera), display 180ms allow-discrete; }
+@starting-style { #perm-bar, #emerg-bar, #pw-bar { opacity: 0; transform: translateY(-6px); } }
+#perm-bar .perm-ic, #emerg-bar .perm-ic, #pw-bar .perm-ic { color: var(--nav-fg); display: flex; }
+#perm-bar .perm-ic svg, #emerg-bar .perm-ic svg, #pw-bar .perm-ic svg { width: 17px; height: 17px; }
+#perm-text, #emerg-text, #pw-text { flex: 1; min-width: 200px; }
+#perm-text b, #emerg-text b, #pw-text b { color: var(--text-strong); font-weight: 560; }
+/* «Recordar» como interruptor: es la casilla de siempre con otra piel */
+.perm-remember { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; cursor: pointer; margin-right: 8px; }
+.perm-remember input { appearance: none; position: relative; width: 30px; height: 18px; margin: 0; border-radius: 9px; background: var(--roce-2); cursor: pointer; transition: background-color 160ms ease; }
+.perm-remember input::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-dim); transition: transform 200ms var(--frena), background-color 160ms ease; }
+.perm-remember input:checked { background: var(--accent); }
+.perm-remember input:checked::after { transform: translateX(12px); background: var(--accent-fg); }
+#perm-bar button, #emerg-bar button, #pw-bar button { height: 32px; border: none; border-radius: 9px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 560; cursor: pointer; background: transparent; color: var(--text); transition: background-color 120ms ease, transform 100ms ease; }
+#perm-bar button:hover, #emerg-bar button:hover, #pw-bar button:hover { background: var(--roce-2); }
+#perm-bar button:active, #emerg-bar button:active, #pw-bar button:active { transform: scale(.97); }
+#perm-bar button.primary, #emerg-bar button.primary, #pw-bar button.primary { background: var(--accent); color: var(--accent-fg); }
+#perm-bar button.primary:hover, #emerg-bar button.primary:hover, #pw-bar button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--hoja)); }
 #perm-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 #perm-list:not(:has(> :not(.nvs-bar)))::after { content: "No hay permisos guardados."; color: var(--dim); font-size: 12.5px; padding: 12px 4px; display: block; }
 .perm-row { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 8px; }
@@ -964,7 +1030,7 @@ body.sacando-pestana { cursor: copy; }
 .dl-act:hover { background: var(--bg-2); color: var(--text); }
 .dl-act svg { width: 14px; height: 14px; }
 .dl-bar { height: 4px; border-radius: 2px; background: var(--active); overflow: hidden; }
-.dl-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--bar-from), var(--bar-to)); transition: width .2s; }
+.dl-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--bar-from), var(--bar-to)); transform-origin: 0 50%; transform: scaleX(0); transition: transform 300ms linear; }
 .dl-item.done .dl-bar { display: none; }
 .dl-item.done .dl-kind { color: var(--ok); }
 .dl-item.error .dl-kind { color: var(--danger); }
@@ -979,12 +1045,15 @@ body.sacando-pestana { cursor: copy; }
    redondeada lo revela como un trazo claro en las cuatro esquinas. El
    contenedor va del color del lienzo (costura invisible) y el suelo blanco
    de página lo pone el PROPIO webview, dentro del recorte. */
-#content { flex: 1; position: relative; background: var(--bg); min-height: 0; margin: 0 10px 10px 4px; border-radius: 18px; overflow: hidden; }
-/* El suelo blanco se redondea a 20 px, un poco más que el recorte de #content
-   (18): así su antialiasing queda debajo de la página y no asoma como un arco
+/* Naviris 3: la página va dentro de la hoja, pegada a la barra de herramientas
+   y redondeada solo abajo, con el radio de la hoja. El recorte es del color de
+   la hoja (costura invisible, ver arriba). */
+#content { flex: 1; position: relative; background: var(--hoja); min-height: 0; border-radius: 0 0 14px 14px; overflow: hidden; }
+/* El suelo blanco se redondea a 16 px, un poco más que el recorte de #content
+   (14): así su antialiasing queda debajo de la página y no asoma como un arco
    claro en las esquinas cuando la web es oscura (auditoría 2026-10). Sin suelo
    no vale: una web que no declara fondo saldría con el texto sobre el lienzo. */
-#content webview.active { border-radius: 20px; background: #fff; }
+#content webview.active { border-radius: 0 0 16px 16px; background: #fff; }
 #content webview { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 #content webview.active { display: flex; }
 /* Pestañas de AutoLoot inactivas: se mantienen RENDERIZADAS fuera de pantalla
@@ -1316,27 +1385,49 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .bm-chev { transition: transform var(--dur-2); }
 .bm-folder-row.collapsed .bm-chev { transform: rotate(-90deg); }
 
-/* Página de descargas: archivos de la carpeta real, por tipo y fecha */
-.dlp-filters { padding: 0 0 16px; flex-wrap: wrap; }
-.dlp-day { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); padding: 16px 4px 8px; }
-.dlp-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); cursor: pointer; transition: border-color var(--dur-1), background var(--dur-1); }
-.dlp-row:hover { border-color: var(--line-3); background: var(--bg-3); }
-.dlp-ic { width: 34px; height: 34px; border-radius: 9px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex-shrink: 0; }
-.dlp-ic svg { width: 16px; height: 16px; }
+/* Página de descargas: archivos de la carpeta real, por tipo y fecha.
+   Naviris 3 (propuesta aprobada): sobre la hoja, icono por tipo de archivo,
+   filas sin borde, el progreso dentro de la fila y pausar o reanudar a mano.
+   Los días siguen en versalitas. */
+#dl-page { background: var(--hoja); }
+#dl-page .bmp-head { margin-bottom: 14px; }
+#dl-page .bmp-head h2 { font-size: 22px; font-weight: 650; letter-spacing: -.016em; }
+#dlp-folder { border-color: transparent; background: transparent; color: var(--text-dim); transition: background-color 120ms ease, color 120ms ease; }
+#dlp-folder:hover { background: var(--roce); color: var(--text); }
+.dlp-filters { display: flex; gap: 18px; padding: 0; margin: 0 0 6px; overflow-x: auto; scrollbar-width: none; }
+.dlp-filtro { position: relative; padding: 6px 0; border: none; background: none; color: var(--text-dim); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; transition: color 120ms ease; }
+.dlp-filtro:hover { color: var(--text); }
+.dlp-filtro span { margin-left: 4px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.dlp-filtro.on { color: var(--text-strong); font-weight: 560; }
+.dlp-filtro.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; border-radius: 2px; background: var(--text-strong); }
+.dlp-day { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); padding: 18px 0 6px; font-weight: 560; }
+.dlp-row { display: flex; align-items: center; gap: 14px; padding: 9px 10px; margin: 0 -10px; border-radius: 10px; cursor: pointer; transition: background-color 120ms ease; }
+.dlp-row:hover { background: var(--roce); }
+/* Icono del tipo y, al terminar, la marca de hecho en su sitio (240 ms, frena) */
+.dlp-ic { position: relative; width: 36px; height: 36px; display: grid; place-items: center; color: var(--nav-fg); flex-shrink: 0; }
+.dlp-ic > span { grid-area: 1 / 1; display: flex; transition: opacity 200ms ease, transform 240ms var(--frena); }
+.dlp-ic svg { width: 22px; height: 22px; }
+.dlp-ic .dlp-ok { opacity: 0; transform: scale(.8); }
+.dlp-row.fin .dlp-ic .dlp-base { opacity: 0; transform: scale(.8); }
+.dlp-row.fin .dlp-ic .dlp-ok { opacity: 1; transform: none; }
 .dlp-info { flex: 1; min-width: 0; }
-.dlp-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dlp-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.dlp-acts { display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-1); }
-.dlp-row:hover .dlp-acts, .dlp-row:focus-within .dlp-acts { opacity: 1; }
-.dlp-acts button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
-.dlp-acts button:hover { background: var(--bg); color: var(--text); }
-.dlp-acts button svg { width: 14px; height: 14px; }
-.dlp-empty { color: var(--dim); font-size: 13px; padding: 30px 4px; }
-/* Descarga en curso: fila con barra de progreso dentro de la página */
-.dlp-row.live { cursor: default; border-color: var(--line-3); }
-.dlp-bar { height: 4px; border-radius: 2px; background: var(--active); overflow: hidden; margin-top: 7px; }
-.dlp-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--bar-from), var(--bar-to)); transition: width .2s; }
-.dlp-bar.indet > i { opacity: .35; }
+.dlp-name { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dlp-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; font-variant-numeric: tabular-nums; }
+.dlp-acts { display: flex; gap: 2px; opacity: 0; transition: opacity 120ms ease; }
+.dlp-row:hover .dlp-acts, .dlp-row:focus-within .dlp-acts, .dlp-row.live .dlp-acts { opacity: 1; }
+.dlp-acts button { border: none; background: transparent; color: var(--text-dim); cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background-color 120ms ease, transform 100ms ease; }
+.dlp-acts button:hover { background: var(--roce-2); color: var(--text); }
+.dlp-acts button:active { transform: scale(.92); }
+.dlp-acts button svg { width: 16px; height: 16px; }
+.dlp-empty { color: var(--dim); font-size: 13px; padding: 30px 0; }
+/* Descarga en curso: el progreso es una línea de 2 px que crece con transform
+   (escala en X, lineal, 300 ms entre aviso y aviso); en pausa se apaga y al
+   terminar se desvanece. */
+.dlp-row.live { cursor: default; }
+.dlp-bar { height: 2px; border-radius: 2px; background: var(--hilo); overflow: hidden; margin-top: 7px; transition: opacity 200ms ease; }
+.dlp-bar > i { display: block; height: 100%; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); transition: transform 300ms linear, opacity 160ms ease; }
+.dlp-bar.indet > i, .dlp-row.pausa .dlp-bar > i { opacity: .4; }
+.dlp-row.fin .dlp-bar { opacity: 0; }
 .dlp-row.failed .dlp-ic { color: var(--danger); }
 .dlp-row.failed .dlp-sub { color: var(--danger); }
 
@@ -1401,7 +1492,18 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #toast button { flex: 0 0 auto; border: none; border-radius: var(--r-full); padding: 7px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: var(--accent); color: var(--accent-fg); }
 #toast button:hover { background: var(--accent-hover); }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } #hub.editing .dial { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  #hub.editing .dial { animation: none; }
+  /* Naviris 3: lo que aparece y desaparece (menús, barras de aviso, paneles,
+     diálogo de la página, foco de la barra, descargas, nombres de la repisa)
+     no se desplaza ni crece, pero se sigue fundiendo: menos movimiento no es
+     ningún movimiento. Las pestañas lo miran en JS (movReducido). */
+  .ctx-menu, #perm-bar, #emerg-bar, #pw-bar, .side-panel, .side-panel-left, #tab-dialogo, .td-card, #url-vista, #urlbar, #urlbox::before, #urlbox::after, .dlp-ic > span, .dlp-bar {
+    transform: none !important; transition-property: opacity, display !important; transition-duration: 160ms !important; transition-timing-function: ease !important; transition-behavior: allow-discrete !important; }
+  #hub-dock.repisa .d-name { transform: translate(-50%, 0) !important; transition-property: opacity !important; transition-duration: 120ms !important; }
+  #hub-dock.repisa .d-tile { transform: none !important; }
+}
 
 /* ===== Addons ===== */
 .adp-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; max-width: 70ch; }
@@ -1458,7 +1560,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 
 
 /* AutoLoot: botón propio en la topbar (solo visible en Twitch) */
-#loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 22px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#loot-pop { top: calc(var(--titlebar-h) + var(--navbar-h) + 8px); right: 120px; width: 300px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 #loot-pop .sp-count { line-height: 1.5; }
 
 /* ===== AutoLoot: botón del sidebar + panel izquierdo ===== */
@@ -1474,8 +1576,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    sistema se queda los clics ANTES de que lleguen a la página — la X del
    encabezado dejaba de funcionar sin dar ni un error. Mismo motivo por el que
    `#tabstrip > *` y `#agent-badge` ya lo llevan. */
-.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in var(--dur-3) var(--spring) both; -webkit-app-region: no-drag; }
-@keyframes lp-in { from { transform: translateX(-26px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
+.side-panel-left { position: fixed; left: var(--sidebar-w, 48px); top: 8px; width: 300px; max-height: 460px; z-index: 400; background: var(--bg-2); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); -webkit-app-region: no-drag; transform-origin: left center; transition: opacity 180ms ease, transform 240ms var(--frena), display 240ms allow-discrete; }
+.side-panel-left.hidden { opacity: 0; transform: translateX(-12px) scale(.985); transition: opacity 120ms ease, transform 160ms var(--acelera), display 160ms allow-discrete; }
+@starting-style { .side-panel-left { opacity: 0; transform: translateX(-12px) scale(.985); } }
 .lp-head { display: flex; align-items: center; padding: 12px 14px 8px; }
 .lp-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text); }
 .lp-title span[data-ico] svg { width: 15px; height: 15px; color: var(--violet, #b98cff); }
@@ -1776,7 +1879,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    Cápsula flotante junto al sidebar, bajo el home. Cerrarla oculta el webview
    pero NO lo destruye: el audio sigue (mismo comportamiento probado de los
    webviews ocultos de las pestañas). Entra con el muelle de los paneles. */
-#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h) + 14px); width: 720px; height: min(78vh, 760px); z-index: 400; background: transparent; border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in var(--dur-3) var(--spring) both; }
+#sp-panel { position: fixed; left: calc(var(--sidebar-w, 48px) + 10px); top: calc(var(--titlebar-h) + var(--navbar-h)); width: 720px; height: min(78vh, 760px); z-index: 400; background: transparent; border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 50px var(--shadow-panel); animation: lp-in var(--dur-3) var(--spring) both; }
 /* Tirador del canto derecho (mismo gesto que los paneles web laterales) */
 #sp-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 3; }
 #sp-grip:hover { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--realce) 45%, transparent)); }
@@ -2387,7 +2490,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
    No se duplica la lista: el propio #tabstrip se muda a esta columna y aquí
    pasa a apilarse. Así renderTabs, el arrastre y los menús siguen valiendo
    igual y no hay dos verdades sobre qué pestañas hay. */
-#vtabs-col { display: flex; flex-direction: column; width: 232px; flex: none; background: var(--bg-2); border-right: 1px solid var(--sb-border); padding: 6px; gap: 4px; }
+#vtabs-col { display: flex; flex-direction: column; width: 232px; flex: none; padding: 6px 6px 8px 8px; gap: 4px; }
 #vtabs-col.hidden { display: none; }
 #vtabs-slot { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 #vtabs-new { display: flex; align-items: center; gap: 8px; border: none; border-radius: var(--r-s); background: transparent; color: var(--text-dim); cursor: pointer; padding: 8px 10px; font: inherit; font-size: 12.5px; }
@@ -2398,7 +2501,10 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 html.vtabs #titlebar #tabstrip,
 html.vtabs #titlebar #newtab-btn { display: none; }
 html.vtabs #vtabs-slot #tabstrip { display: flex; flex-direction: column; align-items: stretch; gap: 2px; height: auto; overflow-x: hidden; overflow-y: auto; width: 100%; -webkit-app-region: no-drag; }
-html.vtabs #vtabs-slot .tab { width: 100% !important; max-width: none !important; min-width: 0 !important; height: 34px; border-radius: var(--r-s); flex: none; }
+html.vtabs #vtabs-slot .tab { width: 100% !important; max-width: none !important; min-width: 0 !important; height: 34px; margin: 0; border-radius: 9px; flex: none; }
+/* En la columna la activa no se funde con nada: pastilla de la hoja, sin curvas */
+html.vtabs #vtabs-slot .tab.active::before, html.vtabs #vtabs-slot .tab.active::after { display: none; }
+html.vtabs #vtabs-slot #tabstrip { padding: 0; }
 html.vtabs #vtabs-slot .tab.mini { height: 28px; padding-left: 22px; }
 /* En vertical hay ancho de sobra: el título va entero y la X siempre visible. */
 html.vtabs #vtabs-slot .tab .t-title { display: block !important; }
@@ -2477,15 +2583,14 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
    los botones van solo con icono, y su nombre sigue en el tooltip; si aun así
    no cabe, sube encima como en las ventanas estrechas). */
 @media (max-height: 760px) {
-  :root { --titlebar-h: 34px; --navbar-h: 38px; }
-  #titlebar { margin: 6px 8px 3px; border-radius: 14px; }
-  .tab { height: 26px; }
-  #newtab-btn { width: 26px; height: 26px; }
-  #navbar { margin: 1px 8px 5px 4px; }
+  :root { --titlebar-h: 40px; --navbar-h: 44px; }
+  .tab { height: 27px; margin-bottom: 4px; }
+  .tab.active, #tab-lengueta { height: 31px; }
+  #newtab-btn { width: 27px; height: 27px; margin-bottom: 4px; }
   #navbar > button { width: 30px; height: 30px; }
   #navbar > button svg { width: 16px; height: 16px; }
-  #urlbox { height: 28px; }
-  #bookmarks-bar { min-height: 28px; padding: 2px 12px; margin-bottom: 5px; }
+  #urlbox { height: 30px; }
+  #bookmarks-bar { min-height: 28px; margin-bottom: 3px; }
   #sidebar { margin: 6px 4px 8px 8px; padding: 8px 0; }
   .sb-btn { width: 32px; height: 32px; }
   .hub-corner { top: 10px; right: 14px; gap: 6px; }
@@ -2493,9 +2598,8 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
   .hub-actions { left: 14px; bottom: 12px; }
   .hub-fab { padding: 7px 11px; }
   #hub-version { right: 14px; bottom: 12px; }
-  #hub-dock { bottom: 12px; gap: 6px; padding: 7px; border-radius: 22px; }
-  #hub-dock .d-tile { width: 50px; height: 50px; border-radius: 14px; }
-  #hub-dock .d-tile img { --icon-sz: 24px; } #hub-dock .d-tile .d-mono, #hub-dock .d-tile .d-mono svg { width: 24px; height: 24px; } #hub-dock .d-tile .d-letter { font-size: 19px; }
+  #hub-dock { bottom: 12px; --dk-base: 50px; --dk-gap: 6px; --dk-pad: 7px; --dk-r: 14px; --dk-ic: 24px; --dk-le: 19px; border-radius: 22px; }
+  #hub-dock.repisa { --dk-base: 48px; --dk-gap: 3px; --dk-pad: 6px; --dk-r: 13px; }
   #hub-dock .dk-sep { height: 32px; }
   @container (max-width: 1500px) {
     #hub-dock { bottom: 12px; }
@@ -2511,9 +2615,23 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
    pestaña (no el navegador), arriba y centrado como en Chrome, con la misma
    tarjeta de los modales de Naviris. El velo es más ligero que el de un modal:
    dice «esta página espera», no «todo está bloqueado». */
-#tab-dialogo { position: absolute; inset: 0; z-index: 6; display: flex; justify-content: center; align-items: flex-start; padding: 28px 16px; background: color-mix(in srgb, var(--backdrop) 55%, transparent); }
+/* Naviris 3: con el estilo de la barra de permisos. La tarjeta es la superficie
+   de los menús (aro fino, sombra suave) y los botones, los de la barra; entra
+   bajando 6 px en 260 ms (frena) con el velo en fundido y sale en 180 ms. */
+#tab-dialogo { position: absolute; inset: 0; z-index: 6; display: flex; justify-content: center; align-items: flex-start; padding: 28px 16px; background: color-mix(in srgb, var(--backdrop) 55%, transparent);
+  transition: opacity 200ms ease, display 260ms allow-discrete; }
+#tab-dialogo.hidden { opacity: 0; transition: opacity 140ms ease, display 180ms allow-discrete; }
+@starting-style { #tab-dialogo { opacity: 0; } }
 #content.dividido #tab-dialogo { right: auto; width: calc(50% - 3px); }
-.td-card { width: min(440px, 100%); max-height: calc(100% - 8px); }
+.modal-card.td-card { width: min(440px, 100%); max-height: calc(100% - 8px); background: var(--menu-fondo); border: none; border-radius: 14px; padding: 20px; box-shadow: var(--sombra-pop), 0 0 0 1px var(--menu-aro); animation: none;
+  transition: opacity 200ms ease, transform 260ms var(--frena); }
+#tab-dialogo.hidden .td-card { opacity: 0; transform: translateY(-6px); transition: opacity 140ms ease, transform 180ms var(--acelera); }
+@starting-style { .modal-card.td-card { opacity: 0; transform: translateY(-6px); } }
+.td-card h3 { font-size: 15px; font-weight: 600; letter-spacing: -.005em; color: var(--text-strong); }
+.td-card .modal-actions button { height: 32px; padding: 0 14px; border-radius: 9px; font-weight: 560; background: transparent; }
+.td-card .modal-actions button:hover { background: var(--roce-2); }
+.td-card .modal-actions .primary { background: var(--accent); color: var(--accent-fg); }
+.td-card .modal-actions .primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--hoja)); }
 #td-tit { overflow-wrap: anywhere; }
 .modal-card #td-texto { color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow-y: auto; }
 .modal-card #td-url { font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; max-height: 4.5em; overflow: hidden; }

@@ -81,6 +81,9 @@ contextBridge.exposeInMainWorld('navirisApp', {
   respondeDialogo: (r) => ipcRenderer.send('tab:dialogo-respuesta', r),
   // Clic derecho en un campo de la interfaz y «Pegar e ir» de la barra
   menuCampo: (d) => ipcRenderer.send('ui:menu-campo', d),
+  // Menús que arma el main (página y campos) y pinta la interfaz: abrir y elegir
+  onMenu: (cb) => ipcRenderer.on('ctx:menu', (_e, m) => cb(m)),
+  eligeMenu: (id, n) => ipcRenderer.send('ctx:elige', id, n),
   onPegarEIr: (cb) => ipcRenderer.on('ui:pegar-e-ir', (_e, t) => cb(t)),
   borraDatos: (opciones) => ipcRenderer.invoke('datos:borra', opciones),
   onColgada: (cb) => ipcRenderer.on('tab:colgada', (_e, p) => cb(p)),
