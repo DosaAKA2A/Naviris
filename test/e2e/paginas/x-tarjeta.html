@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Imitación del post con "video website card" del cliente nuevo de x.com
+     (copiado del DOM real el 2026-11-03, sin clases de estilo que no hacen falta):
+     el enlace a la web del anunciante va ENCIMA del video, ocupándolo entero, y
+     debajo está el "De sitio.com" con el mismo enlace. Más abajo, un enlace normal. -->
+<html><head><meta charset="utf-8"><title>Post</title>
+<style>
+  body { margin: 0; font: 15px sans-serif; }
+  article { width: 568px; margin: 20px; }
+  .reproductor { position: relative; width: 568px; height: 320px; background: #000; }
+  .reproductor video { width: 100%; height: 100%; }
+  .capa { position: absolute; inset: 0; display: flex; }
+  .capa > a { position: absolute; inset: 0; z-index: 0; }
+  .controles { position: absolute; right: 12px; bottom: 12px; z-index: 1; }
+  .vanidad, .normal { display: inline-block; margin-top: 8px; padding: 4px 0; }
+</style></head>
+<body>
+<article>
+  <div>WATCH: Sean Marks' full media session</div>
+  <div class="tarjeta">
+    <div class="reproductor">
+      <video playsinline muted></video>
+      <div class="capa">
+        <a id="tapa" href="https://example.com/naviris-prueba-tarjeta" aria-label="Sean Marks Media Session 1.14" rel="noopener noreferrer" target="_blank"></a>
+      </div>
+      <div class="controles"><button id="silencio" type="button" aria-label="Dejar de silenciar">S</button></div>
+    </div>
+    <a id="vanidad" class="vanidad" href="https://example.com/naviris-prueba-tarjeta" rel="noopener noreferrer" target="_blank">De example.com</a>
+  </div>
+  <div><a id="normal" class="normal" href="https://example.com/naviris-prueba-normal" target="_blank">un enlace normal</a></div>
+</article>
+<script>
+  window.__registro = [];
+  document.getElementById('silencio').addEventListener('click', () => window.__registro.push('silencio'));
+</script>
+</body></html>
