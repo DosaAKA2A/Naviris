@@ -44,8 +44,9 @@ test('la paleta elegida existe y cada paleta trae los cuatro sonidos en Ogg Opus
 
 test('los sonidos que se piden desde la interfaz son los que hay', () => {
   const pedidos = new Set();
-  for (const f of ['renderer.js', 'splash.js']) for (const m of lee(f).matchAll(/(?:suena|navSonido)\('([a-z]+)'\)/g)) pedidos.add(m[1]);
-  for (const m of lee('renderer.js').matchAll(/'(descarga|error)'/g)) pedidos.add(m[1]);
+  const interfaz = fs.readdirSync(path.join(SRC, 'renderer')).filter((f) => f.endsWith('.js')).map((f) => lee('renderer/' + f)).join('\n');
+  for (const texto of [interfaz, lee('splash.js')]) for (const m of texto.matchAll(/(?:suena|navSonido)\('([a-z]+)'\)/g)) pedidos.add(m[1]);
+  for (const m of interfaz.matchAll(/'(descarga|error)'/g)) pedidos.add(m[1]);
   assert.deepStrictEqual([...pedidos].sort(), [...SONIDOS].sort());
 });
 

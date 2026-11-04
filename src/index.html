@@ -16,9 +16,6 @@
 </head>
 <body>
 
-  <!-- La refracción del liquid glass la genera el motor de lentes de
-       renderer.js (lgAplicar): filtros SVG por forma en un <defs> propio. -->
-
   <!-- El arranque ya NO vive aquí (2026-08-17): era una placa pequeña flotando
        dentro de una ventana de 1280×800, así que lo que se veía era la ventana
        enorme. Ahora es una ventana propia y cuadrada (src/splash.html) y esta
@@ -561,6 +558,38 @@
   <script src="atajos.js"></script>
   <script src="buscadores.js"></script>
   <script src="migra-claves.js"></script>
-  <script src="renderer.js"></script>
+  <!-- La interfaz: scripts clásicos que comparten el ámbito global (lo que uno declara lo ven
+       los demás, y los addons también). El orden importa: lo que se ejecuta al cargar un módulo
+       solo puede usar lo de los anteriores, y entre un módulo y el siguiente pueden correr
+       temporizadores y respuestas de IPC. -->
+  <script src="renderer/nucleo.js" defer></script>
+  <script src="renderer/espacios.js" defer></script>
+  <script src="renderer/menu-contextual.js" defer></script>
+  <script src="renderer/iconos-sitios.js" defer></script>
+  <script src="renderer/pestanas.js" defer></script>
+  <script src="renderer/barra-pestanas.js" defer></script>
+  <script src="renderer/barra-direcciones.js" defer></script>
+  <script src="renderer/marcadores.js" defer></script>
+  <script src="renderer/accesos.js" defer></script>
+  <script src="renderer/hub-maqueta.js" defer></script>
+  <script src="renderer/widget-spotify.js" defer></script>
+  <script src="renderer/widgets.js" defer></script>
+  <script src="renderer/widgets-personales.js" defer></script>
+  <script src="renderer/hub.js" defer></script>
+  <script src="renderer/cuenta.js" defer></script>
+  <script src="renderer/hub-aspecto.js" defer></script>
+  <script src="renderer/descargas.js" defer></script>
+  <script src="renderer/paneles.js" defer></script>
+  <script src="renderer/contrasenas.js" defer></script>
+  <script src="renderer/herramientas.js" defer></script>
+  <script src="renderer/menu-principal.js" defer></script>
+  <script src="renderer/mensajes-paginas.js" defer></script>
+  <script src="renderer/avisos.js" defer></script>
+  <script src="renderer/addons.js" defer></script>
+  <script src="renderer/actualizaciones.js" defer></script>
+  <script src="renderer/buscar.js" defer></script>
+  <script src="renderer/atajos-teclado.js" defer></script>
+  <script src="renderer/arranque.js" defer></script>
+  <script src="renderer/scroll.js" defer></script>
 </body>
 </html>

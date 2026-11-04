@@ -1,6 +1,6 @@
 /* Rat Tool: la parte que no depende de Electron. La usan el proceso principal
    (main.js: argumentos de yt-dlp, lectura de su salida, errores, binarios), el
-   panel (renderer.js, como <script>: qué plataforma es y si el enlace es de un
+   panel (renderer/herramientas.js, como <script>: qué plataforma es y si el enlace es de un
    video) y build/fetch-bin.js. Así se prueba con node:test sin abrir la app
    (test/rat.test.js) y las reglas no se repiten en tres sitios. */
 (function (raiz) {
