@@ -2,7 +2,7 @@
    Hasta la 3.0 todo lo que la interfaz guarda en su localStorage (marcadores,
    historial, widgets, cuenta, temas…) iba en claves "cobalt.*", el nombre que
    tuvo Naviris. Ahora va en "naviris.*". Esto copia cada clave vieja a la
-   nueva una sola vez, antes de que renderer.js lea nada. Lo demás del cambio
+   nueva una sola vez, antes de que la interfaz (src/renderer/) lea nada. Lo demás del cambio
    de nombre (la sesión de las webs y los archivos del perfil) está en
    migraciones.js.
 

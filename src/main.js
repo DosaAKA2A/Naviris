@@ -2554,7 +2554,7 @@ ipcMain.handle('gmail:feed', soloUI(async () => {
 }));
 /* ---------- Google Lens (2026-08-12) ----------
    Aquí SOLO se consiguen los bytes de la imagen; la subida la hace el
-   renderer desde una página de Google (ver buscarConLens en renderer.js).
+   renderer desde una página de Google (ver buscarConLens en renderer/buscar.js).
 
    Por qué así, que costó averiguarlo:
    · Pasarle la URL a Lens (lens.google.com/uploadbyurl) YA NO FUNCIONA:
