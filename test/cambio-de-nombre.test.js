@@ -172,16 +172,20 @@ test('sin sitio para la copia, la clave se mueve en vez de copiarse', () => {
   assert.equal(ls.getItem('naviris.clavesMigradas'), '1');
 });
 
-test('si una clave no cabe ni moviéndola, no se pierde, no se apunta y se reintenta sin pisar lo copiado', () => {
+test('si una clave no cabe ni moviéndola, no se pierde, no se apunta y se reintenta sin pisar lo copiado', (t) => {
+  t.mock.method(console, 'warn', () => {});
   const ls = almacen({ 'cobalt.a': '1', 'cobalt.b': '2' });
   const setItem = ls.setItem;
   ls.setItem = (k, v) => { if (k === 'naviris.b') throw new Error('QuotaExceededError'); return setItem(k, v); };
-  assert.throws(() => migraClaves(ls));
+  assert.equal(migraClaves(ls), 1, 'la otra sí se copia y no lanza');
   assert.equal(ls.getItem('cobalt.b'), '2', 'la vieja sigue ahí');
   assert.equal(ls.getItem('naviris.clavesMigradas'), null);
   ls.setItem = setItem;
   ls.setItem('naviris.a', '"cambiada"');
+  ls.setItem('naviris.b', '"por defecto"');   // lo que escribe la interfaz al arrancar sin la clave
   assert.equal(migraClaves(ls), 1);
   assert.equal(ls.getItem('naviris.a'), '"cambiada"');
-  assert.equal(ls.getItem('naviris.b'), '2');
+  assert.equal(ls.getItem('naviris.b'), '2', 'gana el dato viejo, no el valor por defecto');
+  assert.equal(ls.getItem('naviris.clavesPendientes'), null);
+  assert.equal(ls.getItem('naviris.clavesMigradas'), '1');
 });

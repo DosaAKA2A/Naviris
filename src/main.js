@@ -8,6 +8,8 @@ const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
 const { migraPerfil, migraCarpetaV1, migraNombre, PART_NAVIRIS } = require('./migraciones');
 const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
+const archivosLocales = require('./archivos-locales'); // lo que puede cargar una página file:// (se prueba en test/)
+const { creaDownloadTo } = require('./descarga-binarios');
 const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binarios (se prueba en test/)
 const atajos = require('./atajos');             // tabla única de atajos (también la lee el renderer)
 const { crearFreno } = require('./freno-recargas');
@@ -58,38 +60,7 @@ const denoPath = () => path.join(binDir(), 'deno.exe');
 // búsqueda ni del PATH del usuario.
 const denoSiHay = () => (fs.existsSync(denoPath()) ? denoPath() : null);
 
-/* Descargas de los binarios, con lo que faltaba para fiarse de ellas:
-   · se escribe en "<destino>.descarga" y solo se renombra al final: antes un
-     corte a medias dejaba un yt-dlp.exe truncado que ensureBins daba por bueno
-     (existía) y el Rat Tool no volvía a funcionar;
-   · si en 60 s no llega nada se aborta (net.request no tiene plazo propio);
-   · se comprueba el tamaño y, quien llama, la huella SHA-256 publicada. */
-function downloadTo(url, dest, onProgress) {
-  return new Promise((resolve, reject) => {
-    const tmp = dest + '.descarga';
-    const req = net.request(url);
-    let plazo = null, acabado = false;
-    const fin = (err) => {
-      if (acabado) return; acabado = true; clearTimeout(plazo);
-      if (err) { try { req.abort(); } catch { /* ya cerrada */ } fs.rmSync(tmp, { force: true }); reject(err); return; }
-      try { fs.renameSync(tmp, dest); resolve(); } catch (e) { fs.rmSync(tmp, { force: true }); reject(e); }
-    };
-    const vigila = () => { clearTimeout(plazo); plazo = setTimeout(() => fin(new Error('la descarga se quedó parada')), 60000); };
-    vigila();
-    req.on('response', (res) => {
-      if (res.statusCode !== 200) { fin(new Error('HTTP ' + res.statusCode)); return; }
-      const total = parseInt(res.headers['content-length'] || '0', 10);
-      let got = 0;
-      const file = fs.createWriteStream(tmp);
-      file.on('error', fin);
-      res.on('data', (c) => { vigila(); got += c.length; file.write(c); if (total && onProgress) onProgress(got / total); });
-      res.on('end', () => file.end(() => fin(total && got !== total ? new Error('descarga incompleta') : null)));
-      res.on('error', fin);
-    });
-    req.on('error', fin);
-    req.end();
-  });
-}
+const downloadTo = creaDownloadTo((url) => net.request(url));   // ver descarga-binarios.js
 // Texto corto (listas de huellas). Con `sinRedireccion` devuelve a dónde
 // redirige: así se sabe la última versión de yt-dlp sin bajar nada.
 function pideTexto(url, { sinRedireccion = false } = {}) {
@@ -946,6 +917,8 @@ function setupSession(ses) {
     });
   } catch (e) { console.log('[Naviris] Sin esquema de sustitutos en esta sesión:', e.message); }
   ses.webRequest.onBeforeRequest((details, callback) => {
+    // Va antes que nada: no depende del bloqueador (ver archivos-locales.js).
+    if (archivosLocales.corta(details)) return callback({ cancel: true });
     // La lista blanca (y Spotify, abajo) miran la PÁGINA de la pestaña, no el
     // referrer: con "no-referrer", o desde un iframe de terceros, el referrer
     // no es el sitio y se seguía bloqueando en un sitio que el usuario permitió.
@@ -1336,7 +1309,8 @@ async function ytDownload({ url, mode, quality }) {
       // error, y lo que quedó a medias está en la carpeta temporal.
       if (meta.state === 'cancelled') { borraCarpeta(dir); return; }
       try {
-        for (const f of finales.filter((x) => fs.existsSync(x))) {
+        // Solo lo de su carpeta: esas líneas salen de yt-dlp, que repite textos del sitio.
+        for (const f of finales.filter((x) => rat.dentroDeCarpeta(dir, x) && fs.existsSync(x))) {
           meta.path = mueveADescargas(f, outDir);
           meta.name = path.basename(meta.path);
           recordDlHistory(meta.path);
@@ -1643,8 +1617,8 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   } else {
     win.once('ready-to-show', () => win.show());
   }
-  const id = win.id;
-  win.once('closed', () => { uiMontada.delete(id); urlPendiente.delete(id); normales.delete(win); });
+  const id = win.id, wcId = win.webContents.id;
+  win.once('closed', () => { uiMontada.delete(id); urlPendiente.delete(id); normales.delete(win); menusAbiertos.delete(wcId); });
   if (!isPrivate) { normales.add(win); win.on('focus', () => { normales.delete(win); normales.add(win); }); }
   win.on('maximize', () => win.webContents.send('win:maximized', true));
   win.on('unmaximize', () => win.webContents.send('win:maximized', false));
@@ -1790,7 +1764,7 @@ function menuContextual(contents) {
       const privada = host ? esVentanaPrivada(host) : false;
       items.push({ label: 'Abrir el enlace en una pestaña nueva', icon: 'plus', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
       if (web) {
-        items.push({ label: 'Abrir el enlace en una ventana nueva', icon: 'app-window', click: () => ventanaConUrl(p.linkURL, privada) });
+        items.push({ label: 'Abrir el enlace en una ventana nueva', icon: 'app-window', click: () => ventanaConUrl(p.linkURL, privada, contenedorDe(contents)) });
         if (!privada) items.push({ label: 'Abrir el enlace en una ventana privada', icon: 'venetian-mask', click: () => ventanaConUrl(p.linkURL, true) });
       }
       sep();
@@ -2181,11 +2155,19 @@ ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
    también, porque muchas abren la ventana vacía y la dirigen después. Los
    enlaces y el window.open sin características siguen yendo a una pestaña.
    La ventana lleva el mismo preload y las mismas restricciones que una
-   pestaña, y sus propias emergentes siguen esta misma regla.
+   pestaña, y sus propias emergentes siguen esta misma regla. Cómo es la ventana
+   no lo decide la página, solo el tamaño y el sitio que pide si caben en la
+   pantalla (ver opcionesDeVentana en src/emergentes.js).
    Sin un gesto reciente de la persona no se abre nada (ver src/emergentes.js);
    `pestana` es el id del webview de la pestaña de la que sale todo, para el aviso.
    Lo bloqueado queda en `emergPendientes` para abrirlo si se permite el sitio. */
 const emergPendientes = emergentes.creaPendientes();
+// Zona útil de la pantalla: la del punto pedido o, sin punto, la de la ventana que abre.
+function zonaUtil(host, punto) {
+  if (punto) return screen.getDisplayNearestPoint(punto).workArea;
+  const win = host && !host.isDestroyed() ? BrowserWindow.fromWebContents(host) : null;
+  return (win ? screen.getDisplayMatching(win.getBounds()) : screen.getPrimaryDisplay()).workArea;
+}
 function ventanasDe(contents, host, pestana = contents.id) {
   const gestos = emergentes.creaGestos();
   // 'input-event' no ve lo que cae en un iframe de otro sitio (medido): el ratón y
@@ -2213,7 +2195,7 @@ function ventanasDe(contents, host, pestana = contents.id) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          backgroundColor: '#ffffff',
+          ...emergentes.opcionesDeVentana(detalles.features, (punto) => zonaUtil(host, punto)),
           webPreferences: {
             preload: path.join(__dirname, 'webview-preload.js'),
             sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: false,
@@ -2379,6 +2361,8 @@ function ventanaConUrl(url, privada, contenedor = null) {
   urlPendiente.set(win.id, [{ url, contenedor }]);
   return win;
 }
+// El contenedor (su id) de la pestaña, para que un enlace salga con su misma cuenta.
+const contenedorDe = (wc) => (settings.contenedores || []).find((c) => session.fromPartition(c.particion) === wc.session)?.id || null;
 const esVentanaPrivada = (wc) => { try { return new URL(wc.getURL()).searchParams.get('private') === '1'; } catch { return false; } };
 ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
   if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
