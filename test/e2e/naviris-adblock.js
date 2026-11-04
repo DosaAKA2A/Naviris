@@ -5,7 +5,7 @@
 // Variables de entorno:
 //   NAVIRIS_E2E_DIR     carpeta de trabajo (perfiles, capturas, registros).
 //                       Por defecto <tmp>/naviris-e2e. Nunca dentro del repo.
-//   NAVIRIS_E2E_PORT    puerto CDP (por defecto 9403).
+//   NAVIRIS_E2E_PUERTO  puerto CDP (por defecto 9403); también vale NAVIRIS_E2E_PORT.
 //   NAVIRIS_E2E_LISTAS  carpeta con brave-rules*.txt + meta.json para sembrar
 //                       el perfil y no esperar a la descarga de las listas.
 //   NAVIRIS_E2E_APP     carpeta de la app a probar (por defecto este repo); sirve
@@ -19,7 +19,7 @@ const { spawn } = require('child_process');
 
 const REPO = process.env.NAVIRIS_E2E_APP || path.join(__dirname, '..', '..');
 const DIR = process.env.NAVIRIS_E2E_DIR || path.join(os.tmpdir(), 'naviris-e2e');
-const PUERTO = Number(process.env.NAVIRIS_E2E_PORT || 9403);
+const PUERTO = Number(process.env.NAVIRIS_E2E_PUERTO || process.env.NAVIRIS_E2E_PORT || 9403);
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- Cliente CDP (modo plano: una conexión, varias sesiones) ---------- */
@@ -97,7 +97,8 @@ async function arranca(nombre, ajustes) {
   const log = fs.openSync(path.join(DIR, 'registros', nombre + '.log'), 'w');
   const proc = spawn(exe, ['.', '--user-data-dir=' + perfil, '--remote-debugging-port=' + PUERTO], { cwd: REPO, stdio: ['ignore', log, log], windowsHide: false });
   const app = { proc, perfil, nombre, log: path.join(DIR, 'registros', nombre + '.log') };
-  const version = await hasta(async () => (await fetch(`http://127.0.0.1:${PUERTO}/json/version`)).json(), { tope: 30000, que: 'el puerto CDP de Naviris' });
+  // Visto una vez con otra instancia a la vez: /json/version sin esa dirección y la prueba reventaba con «Invalid URL».
+  const version = await hasta(async () => { const v = await (await fetch(`http://127.0.0.1:${PUERTO}/json/version`)).json(); return v.webSocketDebuggerUrl ? v : null; }, { tope: 30000, que: 'el puerto CDP de Naviris' });
   app.navegador = await CDP.conecta(version.webSocketDebuggerUrl);
   const ui = await hasta(async () => (await lista()).find((t) => t.type === 'page' && /index\.html/.test(t.url) && !/private=1/.test(t.url)), { que: 'la ventana de Naviris' });
   app.ui = await CDP.conecta(ui.webSocketDebuggerUrl);
@@ -126,16 +127,19 @@ async function cierra(app) {
 // Abre una pestaña nueva y devuelve su sesión CDP (target webview). La pestaña
 // nace en about:blank y se navega a la URL con la red ya escuchada, para no
 // perder las primeras peticiones del documento.
+const abiertas = new Set();
 async function abrePestana(app, url, { tope = 45000 } = {}) {
   const antes = new Set((await lista()).filter((t) => t.type === 'webview').map((t) => t.id));
   const tabId = await evalua(app.ui, 'return createTab("about:blank", true).id;');
   const t = await hasta(async () => (await lista()).find((x) => x.type === 'webview' && !antes.has(x.id)), { tope, que: 'el webview de ' + url });
   const cdp = await CDP.conecta(t.webSocketDebuggerUrl);
   const pestana = { cdp, tabId, targetId: t.id, eventos: [], app };
-  cdp.on((d) => pestana.eventos.push(d));
+  abiertas.add(pestana);
+  cdp.on((d) => { d.cuando = Date.now(); pestana.eventos.push(d); });
   await cdp.envia('Page.enable');
   await cdp.envia('Runtime.enable');
   await cdp.envia('Network.enable');
+  await cdp.envia('Log.enable');
   if (url) await navega(pestana, url);
   return pestana;
 }
@@ -170,6 +174,7 @@ async function cpuPagina(p) {
 
 async function cierraPestana(app, p) {
   if (!p) return;
+  abiertas.delete(p);
   p.cdp.cierra();
   await evalua(app.ui, `const t = tabs.find((x) => x.id === ${p.tabId}); if (t) closeTab(t.id); return true;`).catch(() => {});
 }
@@ -188,12 +193,22 @@ async function clic(p, selector) {
 
 // El aviso de cookies de YouTube (sale en la UE sin sesión): se rechaza a mano,
 // como lo haría la persona. Mientras está, el reproductor se queda en pausa.
-// Devuelve true si había aviso y se rechazó (YouTube recarga la página después).
-const RECHAZAR_YT = 'button[aria-label^="Rechazar el uso de cookies"], button[aria-label^="Reject the use of cookies"]';
+// Tiene dos formas y YouTube elige cuál: diálogo encima de la página, o página
+// entera en consent.youtube.com (sin reproductor), la que dio en las mediciones a
+// /shorts, a los canales y a Music. Sin contestar, las pruebas de después fallan
+// con «no avanza» y parece culpa del bloqueador.
+// Devuelve true si había aviso y se rechazó; false si no hay aviso y el video está
+// listo (fuera de la UE). Si no hay ni aviso ni reproductor, lanza diciendo qué se ve.
+const RECHAZAR_YT = 'button[aria-label^="Rechazar el uso de cookies"], button[aria-label^="Reject the use of cookies"], form[action*="consent.youtube.com/save"] button[aria-label^="Rechazar"], form[action*="consent.youtube.com/save"] button[aria-label^="Reject"]';
 const visibleYT = `const b = [...document.querySelectorAll(${JSON.stringify(RECHAZAR_YT)})].find((x) => x.offsetParent);`;
 async function quitaAvisoCookiesYT(p, tope = 15000) {
   const hay = await hasta(() => enPestana(p, visibleYT + ' return !!b;'), { tope, que: 'el aviso de cookies' }).catch(() => false);
-  if (!hay) return false;
+  if (!hay) {
+    const foto = await fotoDeFallo(p, 'sin-aviso-' + Date.now());
+    const d = diagnosticoYouTube(foto.pagina);
+    if (d.tipo !== 'ok') throw new Error('YouTube no está listo para probar: ' + d.resumen);
+    return false;
+  }
   // El botón suele quedar fuera de la ventana (diálogo con su propio scroll):
   // el clic del DOM es lo mismo que haría la persona al pulsarlo.
   await enPestana(p, visibleYT + ' if (b) b.click(); return true;');
@@ -232,4 +247,86 @@ function documentos(p) {
   return p.eventos.filter((d) => d.method === 'Page.frameNavigated' && !d.params.frame.parentId).map((d) => d.params.frame.url);
 }
 
-module.exports = { CDP, evalua, hasta, espera, arranca, cierra, esperaMotor, abrePestana, navega, marcos, cpuPagina, cierraPestana, enPestana, clic, quitaAvisoCookiesYT, captura, red, documentos, DIR, PUERTO, REPO };
+/* ---------- Pruebas de lo que ve la página cuando algo falla ---------- */
+const FOTO_PAGINA = `
+  const p = document.getElementById('movie_player');
+  const v = (p && p.querySelector('video')) || document.querySelector('video');
+  const pa = (x) => x && x.playabilityStatus ? { status: x.playabilityStatus.status, reason: x.playabilityStatus.reason || null } : null;
+  let pr = null; try { pr = p && p.getPlayerResponse && p.getPlayerResponse(); } catch (e) {}
+  const visible = (e) => !!e && e.offsetParent !== null;
+  return {
+    url: location.href, listo: document.readyState, titulo: document.title,
+    visibilidad: document.visibilityState, foco: document.hasFocus(),
+    playabilityInicial: pa(window.ytInitialPlayerResponse), playabilityReproductor: pa(pr),
+    hayMoviePlayer: !!p, hayVideo: !!v, estadoReproductor: p && p.getPlayerState ? p.getPlayerState() : null,
+    video: v ? { t: v.currentTime, duracion: v.duration, pausado: v.paused, readyState: v.readyState, networkState: v.networkState, error: v.error ? v.error.code : null, src: (v.currentSrc || '').slice(0, 60) } : null,
+    avisoCookies: [...document.querySelectorAll('button[aria-label*="cookies"]')].filter(visible).map((b) => b.getAttribute('aria-label').slice(0, 50)),
+    pantallaError: (() => { const e = document.querySelector('#error-screen'); return e && !e.hidden ? (e.innerText || '').trim().slice(0, 200) : null; })(),
+    estadoHttp: performance.getEntriesByType('navigation')[0]?.responseStatus ?? null
+  };`;
+
+// Qué está viendo la página, a partir de lo que recoge FOTO_PAGINA. Separa lo que es
+// de YouTube (aviso sin contestar, reto de bot a esta IP) de un reproductor que falla.
+function diagnosticoYouTube(pagina) {
+  if (!pagina || pagina.errorAlMirar) return { tipo: 'sin-respuesta', resumen: 'la página no responde' + (pagina ? ' (' + pagina.errorAlMirar + ')' : '') };
+  const estado = pagina.playabilityReproductor || pagina.playabilityInicial;
+  const dato = 'estado ' + (estado ? estado.status : 'ninguno') + (estado && estado.reason ? ' «' + estado.reason + '»' : '') + ', ' + pagina.url.slice(0, 70);
+  if (/consent\.youtube\.com/.test(pagina.url) || pagina.avisoCookies.length) return { tipo: 'aviso-cookies', resumen: 'aviso de cookies sin contestar (' + dato + ')' };
+  if (/google\.[a-z.]+\/sorry\//.test(pagina.url) || pagina.estadoHttp === 429 || /not a bot|no eres un bot/i.test((estado && estado.reason) + ' ' + pagina.pantallaError)) {
+    return { tipo: 'limite-ip', resumen: 'YouTube limita a esta IP, el reproductor no se ha podido probar (' + dato + ')' };
+  }
+  if (estado && estado.status !== 'OK') return { tipo: 'no-reproducible', resumen: 'YouTube no da este video (' + dato + ')' };
+  if (!pagina.hayVideo) return { tipo: 'sin-reproductor', resumen: 'la página no tiene reproductor (' + dato + ')' };
+  return { tipo: 'ok', resumen: 'reproductor presente (' + dato + (pagina.video ? ', t=' + pagina.video.t + (pagina.video.pausado ? ', en pausa' : '') : '') + ')' };
+}
+
+// Deja en <DIR>/fallos/<nombre>.{json,png} todo lo que distingue por qué un video
+// no arranca: la página, la red del reproductor, la interfaz y la pestaña activa.
+async function fotoDeFallo(p, nombre) {
+  const seguro = (prom) => prom.catch((e) => ({ errorAlMirar: e.message }));
+  const pagina = await seguro(evalua(p.cdp, FOTO_PAGINA));
+  const ui = await seguro(evalua(p.app.ui, `
+    const a = await window.navirisApp.adblockGet();
+    return { pestanaActiva: activeId, visibilidad: document.visibilityState, foco: document.hasFocus(), motor: a.brave && a.brave.engine };`));
+  const pedidas = new Map();
+  const reproductor = [], errores = [];
+  const videoplayback = { pedidas: 0, porEstado: {} };
+  for (const d of p.eventos) {
+    if (d.method === 'Network.requestWillBeSent') {
+      pedidas.set(d.params.requestId, d.params.request.url);
+      if (/googlevideo\.com\/videoplayback/.test(d.params.request.url)) videoplayback.pedidas++;
+    } else if (d.method === 'Network.responseReceived') {
+      const u = d.params.response.url;
+      if (/googlevideo\.com\/videoplayback/.test(u)) videoplayback.porEstado[d.params.response.status] = (videoplayback.porEstado[d.params.response.status] || 0) + 1;
+      else if (/youtubei\/v1\/player|\/base\.js/.test(u)) reproductor.push({ cuando: d.cuando, estado: d.params.response.status, url: u.slice(0, 90) });
+    } else if (d.method === 'Network.loadingFailed' && /youtube\.com\/(youtubei|s\/player)|googlevideo/.test(pedidas.get(d.params.requestId) || '')) {
+      reproductor.push({ cuando: d.cuando, fallo: d.params.errorText, url: (pedidas.get(d.params.requestId) || '').slice(0, 90) });
+    } else if (d.method === 'Runtime.exceptionThrown') {
+      errores.push({ cuando: d.cuando, texto: (d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text || '').slice(0, 200) });
+    } else if (d.method === 'Log.entryAdded' && d.params.entry.level === 'error') {
+      errores.push({ cuando: d.cuando, texto: d.params.entry.text.slice(0, 200) });
+    }
+  }
+  const foto = {
+    nombre, hora: new Date().toISOString(), tabId: p.tabId, pagina, ui,
+    documentos: p.eventos.filter((d) => d.method === 'Page.frameNavigated' && !d.params.frame.parentId).map((d) => ({ cuando: d.cuando, url: d.params.frame.url.slice(0, 90) })),
+    red: { videoplayback, reproductor: reproductor.slice(-30), bloqueadas: red(p).bloqueadas.filter((u) => /youtubei|s\/player|googlevideo/.test(u)).slice(-30) },
+    errores: errores.slice(-30)
+  };
+  const carpeta = path.join(DIR, 'fallos');
+  fs.mkdirSync(carpeta, { recursive: true });
+  fs.writeFileSync(path.join(carpeta, nombre + '.json'), JSON.stringify(foto, null, 2), 'utf8');
+  try {
+    const r = await p.cdp.envia('Page.captureScreenshot', { format: 'png' }, undefined, 10000);
+    fs.writeFileSync(path.join(carpeta, nombre + '.png'), Buffer.from(r.data, 'base64'));
+  } catch { /* la pestaña ya no responde: queda el json */ }
+  return foto;
+}
+
+async function fotosDeFallo(nombre) {
+  const fotos = [];
+  for (const p of abiertas) if (p.cdp.ws.readyState === WebSocket.OPEN) fotos.push(await fotoDeFallo(p, nombre + '-' + fotos.length));
+  return fotos;
+}
+
+module.exports = { fotoDeFallo, fotosDeFallo, diagnosticoYouTube, CDP, evalua, hasta, espera, arranca, cierra, esperaMotor, abrePestana, navega, marcos, cpuPagina, cierraPestana, enPestana, clic, quitaAvisoCookiesYT, captura, red, documentos, DIR, PUERTO, REPO };
