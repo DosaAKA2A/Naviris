@@ -387,7 +387,7 @@ test('abrir y ver archivos locales sigue funcionando: imagen, svg, texto, audio 
   const pantallazo = await hasta(async () => (await lista()).find((x) => x.type === 'webview' && /doc\.pdf/.test(x.url)));
   const s = await conecta(pantallazo.webSocketDebuggerUrl);
   const { data } = await s.envia('Page.captureScreenshot', { format: 'png' });
-  if (process.env.NAVIRIS_E2E_DIR) fs.writeFileSync(path.join(process.env.NAVIRIS_E2E_DIR, 'pdf-local.png'), Buffer.from(data, 'base64'));
+  if (process.env.NAVIRIS_E2E_DIR) { fs.mkdirSync(process.env.NAVIRIS_E2E_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.NAVIRIS_E2E_DIR, 'pdf-local.png'), Buffer.from(data, 'base64')); }
   assert.ok(Buffer.from(data, 'base64').length > 3000, 'el visor pintó algo');
   s.cierra(); c.cierra();
 });
