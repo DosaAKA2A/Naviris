@@ -11,7 +11,7 @@
 // la página (prueba "muro simulado"), que es lo que lee el preload.
 'use strict';
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it: prueba, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const http = require('http');
@@ -20,6 +20,21 @@ const n = require('./naviris-adblock');
 
 const ETIQUETA = process.env.NAVIRIS_E2E_ETIQUETA || 'ultima';
 const RESULTADOS = path.join(n.DIR, 'resultados-' + ETIQUETA + '.json');
+// Si una prueba falla, deja en <NAVIRIS_E2E_DIR>/fallos lo que veían sus pestañas y
+// añade al error qué era: un aviso sin contestar o un límite de YouTube a la IP no
+// se confunden con un reproductor roto. La prueba sigue fallando igual.
+const it = (nombre, ...resto) => {
+  const fn = resto.pop();
+  return prueba(nombre, ...resto, async (t) => {
+    try { await fn(t); } catch (e) {
+      const corto = nombre.split(':')[0].replace(/[^\wáéíóúñ-]+/gi, '-').slice(0, 40);
+      const fotos = await n.fotosDeFallo(corto + '-' + Date.now()).catch(() => []);
+      e.message += fotos.map((f) => ' | ' + n.diagnosticoYouTube(f.pagina).resumen).join('');
+      throw e;
+    }
+  });
+};
+
 const resultados = {};
 function apunta(prueba, datos) {
   resultados[prueba] = datos;
@@ -205,10 +220,11 @@ describe('YouTube con el bloqueador', { timeout: 15 * 60 * 1000 }, () => {
     await n.enPestana(m, 'const v = document.querySelector("video"); if (v && v.paused) { const b = document.querySelector("#play-pause-button"); if (b) b.click(); } return true;');
     const r = await muestrea(m, 12);
     await n.captura(m, 'yt-music');
+    const foto = r.avanza < 5 ? await n.fotoDeFallo(m, 'music-' + Date.now()) : null;
     await n.cierraPestana(app, m);
     apunta('yt-music', r);
     assert.equal(r.anuncio, false, 'anuncio en Music');
-    assert.ok(r.avanza >= 5, 'Music no avanza');
+    assert.ok(r.avanza >= 5, 'Music no avanza' + (foto ? ' | ' + n.diagnosticoYouTube(foto.pagina).resumen : ''));
   });
 
   it('huellas: lo que la página puede ver del bloqueador', async () => {
@@ -311,6 +327,30 @@ describe('YouTube: aviso de cookies y recargas', { timeout: 5 * 60 * 1000 }, () 
     assert.equal(socs, undefined, 'el bloqueador aceptó/rechazó el aviso de cookies solo');
     assert.equal(aviso, true, 'el aviso de cookies no está a la vista');
     assert.ok(docs.length <= 3, 'demasiadas cargas de documento: ' + docs.length);
+    await n.cierraPestana(app, p);
+  });
+
+  // La otra forma del aviso: página entera en consent.youtube.com, sin reproductor.
+  it('el aviso en página aparte también se contesta y lleva a donde ibas', async () => {
+    const p = await n.abrePestana(app, 'https://www.youtube.com/shorts/');
+    await n.hasta(() => n.enPestana(p, 'return location.hostname === "consent.youtube.com";'), { tope: 15000, que: 'la página del aviso (solo sale en la UE)' });
+    assert.equal(await n.quitaAvisoCookiesYT(p), true, 'no encontró el botón de rechazar');
+    const destino = await n.hasta(() => n.enPestana(p, 'return location.hostname === "www.youtube.com" ? location.pathname : "";'), { tope: 15000, que: 'volver a YouTube' });
+    assert.match(destino, /^\/shorts/);
+    await n.cierraPestana(app, p);
+  });
+
+  it('sin aviso ni reproductor no sigue adelante y dice qué ve: reto de bot', async () => {
+    const srv = http.createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end('<!doctype html><title>Reto</title><script>window.ytInitialPlayerResponse = { playabilityStatus: { status: "LOGIN_REQUIRED", reason: "Sign in to confirm you’re not a bot" } };</script>');
+    }).listen(0);
+    await new Promise((r) => srv.once('listening', r));
+    const p = await n.abrePestana(app, 'http://127.0.0.1:' + srv.address().port + '/');
+    await n.espera(500);
+    await assert.rejects(n.quitaAvisoCookiesYT(p, 1000), /limita a esta IP.*LOGIN_REQUIRED/);
+    await n.cierraPestana(app, p);
+    srv.close();
   });
 });
 
