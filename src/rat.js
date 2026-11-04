@@ -339,6 +339,13 @@
   const PREFIJO_TEMPORAL = 'naviris-rat-descarga-';
   const RX_RESTO_CARPETA = /^naviris-rat-descarga-[A-Za-z0-9]{6}$/;
   const RX_RESTO_COOKIES = /^naviris-cookies-\d+-[a-z0-9]{1,8}\.txt$/;
+  // ¿Esa ruta de Windows cae dentro de la carpeta? Sin .. de por medio.
+  function dentroDeCarpeta(carpeta, ruta) {
+    const limpia = (p) => String(p).replace(/\//g, '\\').toLowerCase();
+    const r = limpia(ruta);
+    return r.startsWith(limpia(carpeta).replace(/\\+$/, '') + '\\') && !r.split('\\').includes('..');
+  }
+
   const restosTemporales = (entradas, ahora) => entradas.filter((e) => ahora - e.mtimeMs > 60 * 60 * 1000
     && (e.carpeta ? RX_RESTO_CARPETA.test(e.nombre) : RX_RESTO_COOKIES.test(e.nombre))).map((e) => e.nombre);
 
@@ -350,7 +357,7 @@
   const api = {
     PLATAFORMAS, plataforma, esVideo, esLista, esDirecto, mensajeDirecto, urlParaYtDlp, formatoVideo, ordenFormatos,
     argsDescarga, argsFormatos, calidades, leeLinea, creaLector, errorDeYtDlp, pideActualizar,
-    dominiosCookies, ficheroCookies, cookiesDeEntrada, reintentaConCookies, PREFIJO_TEMPORAL, restosTemporales,
+    dominiosCookies, ficheroCookies, cookiesDeEntrada, reintentaConCookies, PREFIJO_TEMPORAL, restosTemporales, dentroDeCarpeta,
     VERSION_MINIMA_YTDLP, BINARIOS, comparaVersiones, esVersionYtDlp, versionDeRedireccion, huellaEnSumas, tocaRevisar,
     literalPs
   };

@@ -2,7 +2,7 @@
 // Se ejecuta con: npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { creaGestos, activa, clavePermiso, creaPendientes, codigoAbrir, VIGENCIA, TOPE_PENDIENTES } = require('../src/emergentes');
+const { creaGestos, activa, clavePermiso, creaPendientes, codigoAbrir, opcionesDeVentana, VIGENCIA, TOPE_PENDIENTES } = require('../src/emergentes');
 
 // Reloj de mentira para mover el tiempo a mano
 function reloj() { let t = 1000; const f = () => t; f.pasa = (ms) => { t += ms; }; return f; }
@@ -122,4 +122,53 @@ test('el window.open que se repite lleva la misma dirección, nombre y caracter�
   assert.deepEqual(llamada, [A + '/login?x="1"&y=\'2\'', 'login', 'width=480,height=600']);
   ejecuta(codigoAbrir({ url: A + '/</script>', nombre: '', rasgos: '' }));
   assert.deepEqual(llamada, [A + '/</script>', '_blank', ''], 'sin nombre, _blank');
+});
+
+// La pantalla de mentira: 1920x1040 de zona útil, y otra a la izquierda.
+const ZONAS = { principal: { x: 0, y: 0, width: 1920, height: 1040 }, izquierda: { x: -1280, y: 0, width: 1280, height: 720 } };
+const zonaDe = (p) => (p && p.x < 0 ? ZONAS.izquierda : ZONAS.principal);
+
+test('la página no decide cómo es la ventana: gana lo fijo en todo lo que deja pasar parseFeatures', () => {
+  const o = opcionesDeVentana('popup,frame=no,thickFrame=no,titleBarStyle=hidden,alwaysOnTop=yes,closable=no,minimizable=no,maximizable=no,movable=no,resizable=no,skipTaskbar=yes,focusable=no,opacity=0,show=no,transparent=yes,fullscreen=yes,kiosk=yes,modal=yes,enableLargerThanScreen=yes,hasShadow=no,minWidth=3000,minHeight=3000,maxWidth=1,maxHeight=1,useContentSize=yes,center=yes,title=Soporte,backgroundColor=#f00,backgroundMaterial=mica', zonaDe);
+  // Lo que el parser de Electron deja pasar a la ventana y no es solo de Mac (leído en su binario).
+  const CLAVES = ['x', 'y', 'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'opacity', 'show', 'center', 'useContentSize', 'frame', 'transparent', 'hasShadow', 'movable', 'closable', 'focusable', 'minimizable', 'maximizable', 'fullscreenable', 'alwaysOnTop', 'skipTaskbar', 'modal', 'autoHideMenuBar', 'enableLargerThanScreen', 'paintWhenInitiallyHidden', 'roundedCorners', 'thickFrame', 'title', 'backgroundColor', 'titleBarStyle', 'backgroundMaterial'];
+  for (const k of CLAVES) assert.ok(o[k] !== undefined, 'falta fijar ' + k);
+  assert.deepEqual(
+    [o.frame, o.thickFrame, o.alwaysOnTop, o.closable, o.minimizable, o.maximizable, o.movable, o.resizable, o.skipTaskbar, o.focusable, o.opacity, o.show, o.transparent, o.fullscreen, o.kiosk, o.modal, o.enableLargerThanScreen],
+    [true, true, false, true, true, true, true, true, false, true, 1, true, false, false, false, false, false]);
+  assert.equal(o.fullscreenable, false);
+  assert.equal(o.titleBarStyle, 'default');
+  assert.equal(o.backgroundColor, '#ffffff');
+  assert.equal(o.title, 'Naviris');
+  assert.deepEqual([o.minWidth, o.minHeight, o.maxWidth, o.maxHeight], [0, 0, 0, 0]);
+});
+
+test('la ventanita de un inicio de sesión sale con el tamaño y el sitio que pide', () => {
+  const o = opcionesDeVentana('width=500,height=600,left=100,top=50,scrollbars=yes,resizable=yes', zonaDe);
+  assert.deepEqual([o.width, o.height, o.x, o.y], [500, 600, 100, 50]);
+  const x = opcionesDeVentana('popup=1, width = 480 , height = 640 , x=10, y=20', zonaDe);
+  assert.deepEqual([x.width, x.height, x.x, x.y], [480, 640, 10, 20]);
+  const otra = opcionesDeVentana('width=500,height=600,left=-1000,top=10', zonaDe);
+  assert.deepEqual([otra.x, otra.y], [-1000, 10], 'también en la otra pantalla');
+});
+
+test('sin tamaño ni sitio, 800x600 y centrada en la pantalla de quien abre', () => {
+  const o = opcionesDeVentana('popup', zonaDe);
+  assert.deepEqual([o.width, o.height, o.x, o.y], [800, 600, 560, 220]);
+  const vacio = opcionesDeVentana(undefined, zonaDe);
+  assert.deepEqual([vacio.width, vacio.height], [800, 600]);
+  const raro = opcionesDeVentana('width=abc,height=,left=xx', zonaDe);
+  assert.deepEqual([raro.width, raro.height, raro.x], [800, 600, 560]);
+});
+
+test('el tamaño y el sitio se quedan siempre dentro de la pantalla', () => {
+  const grande = opcionesDeVentana('x=-5000,y=-5000,width=4000,height=3000,enableLargerThanScreen=yes', zonaDe);
+  assert.deepEqual([grande.width, grande.height, grande.x, grande.y], [1280, 720, -1280, 0]);
+  const fuera = opcionesDeVentana('left=9000,top=9000,width=500,height=400', zonaDe);
+  assert.deepEqual([fuera.x, fuera.y], [1420, 640]);
+  const enana = opcionesDeVentana('width=1,height=1,left=-1,top=5', (p) => (p ? ZONAS.principal : ZONAS.principal));
+  assert.deepEqual([enana.width, enana.height, enana.x, enana.y], [200, 150, 0, 5]);
+  const solo = opcionesDeVentana('left=100', zonaDe);
+  assert.equal(solo.x, 100);
+  assert.equal(solo.y, 220, 'sin top, centrada en vertical');
 });

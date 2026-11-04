@@ -6,6 +6,16 @@ const rat = require('../src/rat');
 
 const id = (u) => rat.plataforma(u)?.id || null;
 
+test('solo cuenta como final lo que cae dentro de la carpeta de la descarga', () => {
+  const dir = 'C:\\Temp\\naviris-rat-descarga-ab';
+  assert.equal(rat.dentroDeCarpeta(dir, dir + '\\video.mp4'), true);
+  assert.equal(rat.dentroDeCarpeta(dir, 'c:/temp/NAVIRIS-rat-descarga-ab/sub/video.mp4'), true);
+  assert.equal(rat.dentroDeCarpeta(dir + '\\', dir + '\\video.mp4'), true);
+  assert.equal(rat.dentroDeCarpeta(dir, 'C:\\Users\\Dosa\\Documents\\tesis.docx'), false);
+  assert.equal(rat.dentroDeCarpeta(dir, dir + '\\..\\otra.txt'), false);
+  assert.equal(rat.dentroDeCarpeta(dir, dir + '-otra\\video.mp4'), false);
+});
+
 test('detecta la plataforma por dominio, con subdominios y sin dejarse engañar', () => {
   const casos = {
     'https://www.youtube.com/watch?v=jNQXAC9IVRw': 'youtube',
