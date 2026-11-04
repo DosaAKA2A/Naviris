@@ -12,6 +12,7 @@ const rat = require('./rat'); // Rat Tool: argumentos de yt-dlp, errores, binari
 const atajos = require('./atajos');             // tabla única de atajos (también la lee el renderer)
 const { crearFreno } = require('./freno-recargas');
 const { aplicacionPara } = require('./externos');
+const abrirDesdeFuera = require('./abrir-desde-fuera'); // enlaces y archivos que llegan de Windows (se prueba en test/)
 
 // Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
 // con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
@@ -501,8 +502,24 @@ function saveSettings(s) {
 // Perfil alternativo por CLI (dev/pruebas): --user-data-dir=<carpeta> corre una
 // segunda instancia totalmente aislada sin tocar el perfil real del usuario.
 // Electron NO honra ese switch de Chromium por sí solo; hay que redirigir userData.
-const perfilCli = process.argv.find((a) => a.startsWith('--user-data-dir='));
+// Solo cuenta si va antes de --single-argument: lo de detrás es un enlace, no una opción.
+const perfilCli = abrirDesdeFuera.opcionesPropias(process.argv, process.defaultApp).find((a) => a.startsWith('--user-data-dir='));
 if (perfilCli) app.setPath('userData', perfilCli.slice('--user-data-dir='.length));
+
+/* UNA SOLA INSTANCIA POR PERFIL (2026-11-04). Abrir Naviris otra vez, o un
+   enlace o un archivo desde fuera, lleva a la ventana que ya está abierta y
+   abre ahí una pestaña, en vez de arrancar otro Naviris sobre el mismo perfil.
+   La cerradura es de la carpeta de userData (medido): las instancias con
+   --user-data-dir propio (las pruebas, los agentes) siguen arrancando a la vez.
+   Lo que hay que abrir viaja ya interpretado por la instancia que lo recibió,
+   que es la que conoce su carpeta de trabajo: el argv que Electron entrega en
+   'second-instance' llega reordenado y con opciones que añade Chromium.
+   Esta instancia sobra: no se ejecuta nada más de este archivo. */
+const DESTINOS_AL_ARRANCAR = abrirDesdeFuera.destinosDeArgumentos(process.argv, { defaultApp: process.defaultApp });
+if (!app.requestSingleInstanceLock({ destinos: DESTINOS_AL_ARRANCAR })) {
+  app.quit();
+  return;
+}
 
 /* Los nombres del perfil: naviris-*.json y la sesión persist:naviris. Los de
    antes (con el nombre viejo del navegador) se copian aquí, antes de leer los
@@ -1470,15 +1487,53 @@ async function cerrarSplash(win) {
 
 // La ventana principal que está esperando a que su interfaz termine de montarse
 let ventanaEsperandoUI = null;
+const uiMontada = new Set();   // ids de las ventanas cuya interfaz ya avisó con 'ui:listo'
+const normales = new Set();    // ventanas no privadas, de la menos a la más reciente en usarse
+// Lo que hay que abrir en la primera ventana; deja de usarse (null) en cuanto existe.
+let paraLaPrimera = [...DESTINOS_AL_ARRANCAR];
+
+/* Lo que llega de fuera (enlaces, archivos) se abre en pestañas nuevas de la
+   última ventana normal que se usó, como en Chrome; nunca en una privada. Si
+   solo hay privadas, en una ventana normal nueva. */
+function abreDestinos(destinos) {
+  if (!destinos.length) return;
+  const win = [...normales].pop();
+  if (!win) {
+    const nueva = ventanaConUrl(destinos[0], false);
+    if (nueva) urlPendiente.get(nueva.id).push(...destinos.slice(1).map((url) => ({ url, contenedor: null })));
+    return;
+  }
+  if (uiMontada.has(win.id)) for (const url of destinos) win.webContents.send('tab:open-url', { url, background: false });
+  else urlPendiente.set(win.id, [...(urlPendiente.get(win.id) || []), ...destinos.map((url) => ({ url, contenedor: null }))]);
+  // Durante el splash la ventana aún no se ve: se enseñará ella sola al montarse.
+  if (win.isVisible()) { if (win.isMinimized()) win.restore(); win.focus(); }
+}
+
+app.on('second-instance', (_e, _argv, _cwd, datos) => {
+  // Solo direcciones web y de archivo, aunque las mande otra instancia de Naviris.
+  const destinos = (Array.isArray(datos && datos.destinos) ? datos.destinos : [])
+    .filter((u) => typeof u === 'string' && /^(https?|file):/i.test(u));
+  // Esta instancia ya se está cerrando: se relanza al acabar con lo que traía la otra.
+  if (saliendo) { app.relaunch({ args: abrirDesdeFuera.argumentosParaRelanzar(process.argv, process.defaultApp, destinos) }); return; }
+  // Aún arrancando (el splash, Widevine): la primera ventana lo abrirá al montarse.
+  if (paraLaPrimera) { paraLaPrimera.push(...destinos.filter((u) => !paraLaPrimera.includes(u))); return; }
+  if (destinos.length) { abreDestinos(destinos); return; }
+  // Abrir Naviris sin nada que abrir trae al frente la ventana que ya está
+  // abierta; si solo quedan privadas, abre una normal.
+  const win = [...normales].pop();
+  if (!win) createWindow();
+  else if (win.isVisible()) { if (win.isMinimized()) win.restore(); win.focus(); }
+});
 // El renderer avisa cuando la interfaz ya está en pantalla (pestañas, hub y
 // tema aplicados). Es el único hito que sabe de verdad que "ya se puede ver".
 ipcMain.on('ui:listo', (e) => {
-  // La ventana que acaba de montarse puede traer una pestaña sacada de otra.
+  // La ventana que acaba de montarse puede traer una pestaña sacada de otra
+  // o lo que llegó de fuera mientras arrancaba.
   const suya = BrowserWindow.fromWebContents(e.sender);
-  if (suya && urlPendiente.has(suya.id)) {
-    const { url, contenedor } = urlPendiente.get(suya.id);
+  if (suya) {
+    uiMontada.add(suya.id);
+    for (const { url, contenedor } of urlPendiente.get(suya.id) || []) e.sender.send('tab:open-url', { url, background: false, contenedor });
     urlPendiente.delete(suya.id);
-    e.sender.send('tab:open-url', { url, background: false, contenedor });
   }
   const win = ventanaEsperandoUI;
   if (!win) return;
@@ -1588,6 +1643,9 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   } else {
     win.once('ready-to-show', () => win.show());
   }
+  const id = win.id;
+  win.once('closed', () => { uiMontada.delete(id); urlPendiente.delete(id); normales.delete(win); });
+  if (!isPrivate) { normales.add(win); win.on('focus', () => { normales.delete(win); normales.add(win); }); }
   win.on('maximize', () => win.webContents.send('win:maximized', true));
   win.on('unmaximize', () => win.webContents.send('win:maximized', false));
   // Botones laterales del ratón (4 y 5). En Windows llegan como WM_APPCOMMAND ->
@@ -2314,13 +2372,11 @@ ipcMain.on('win:new-private', () => createWindow(true));
    manda cuando ella avisa de que ya esta lista ('ui:listo'). Con url null la
    ventana abre el hub (Ctrl+N). Nace como «sacada»: no restaura ni pisa la
    sesión de la principal. */
-const urlPendiente = new Map();   // id de ventana -> { url, contenedor } que tiene que abrir
+const urlPendiente = new Map();   // id de ventana -> [{ url, contenedor }] que tiene que abrir al montarse
 function ventanaConUrl(url, privada, contenedor = null) {
   const win = createWindow(privada, false, true);
   if (!win) return null;
-  urlPendiente.set(win.id, { url, contenedor });
-  const id = win.id;
-  win.once('closed', () => urlPendiente.delete(id));   // cerrada antes de montarse
+  urlPendiente.set(win.id, [{ url, contenedor }]);
   return win;
 }
 const esVentanaPrivada = (wc) => { try { return new URL(wc.getURL()).searchParams.get('private') === '1'; } catch { return false; } };
@@ -2740,6 +2796,25 @@ ipcMain.handle('moovin:identidad', async (e) => {
 // de Ajustes (aceleración por hardware, modo agente) perdía las cookies de sesión.
 ipcMain.on('app:restart', () => { app.relaunch(); app.quit(); });
 ipcMain.handle('app:version', () => app.getVersion());
+/* Navegador predeterminado. Windows 10 y 11 no dejan que un programa se ponga
+   solo: el instalador (build/installer.nsh) registra Naviris como navegador y
+   aquí se abre su página de Configuración, donde lo elige la persona.
+   «registrado»: solo la versión instalada está en el registro (ni la portable
+   ni «npm start»). «predeterminado»: lo que Windows abre de verdad con un
+   enlace, leído de su asociación (respeta la elección del usuario). */
+const esLaApp = (ruta) => !!ruta && path.resolve(ruta).toLowerCase() === path.resolve(process.execPath).toLowerCase();
+ipcMain.handle('navegador:estado', soloUI(async () => {
+  const registrado = app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR;
+  let predeterminado = false;
+  try {
+    const [https, http] = await Promise.all([app.getApplicationInfoForProtocol('https://'), app.getApplicationInfoForProtocol('http://')]);
+    predeterminado = esLaApp(https.path) && esLaApp(http.path);
+  } catch { /* sin asociación para ese esquema */ }
+  return { registrado, predeterminado };
+}));
+// La página de Naviris dentro de Aplicaciones predeterminadas (Windows 11; en
+// Windows 10 se queda en la lista general). El nombre es el de RegisteredApplications.
+ipcMain.handle('navegador:hacer-predeterminado', soloUI(() => shell.openExternal('ms-settings:defaultapps?registeredAppUser=Naviris').then(() => true, () => false)));
 ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
 ipcMain.handle('clipboard:read', soloUI(() => { try { return clipboard.readText(); } catch { return ''; } }));
 
@@ -3780,7 +3855,10 @@ app.whenReady().then(async () => {
      están todos en atajos.js; en Windows copiar y pegar en los campos no
      dependen del menú. */
   Menu.setApplicationMenu(null);
-  createWindow(false, true); // la primera ventana es la que releva al splash
+  const principal = createWindow(false, true); // la primera ventana es la que releva al splash
+  // Lo que traía el arranque (o llegó mientras): pestañas nuevas detrás de la sesión restaurada.
+  if (paraLaPrimera.length) urlPendiente.set(principal.id, paraLaPrimera.map((url) => ({ url, contenedor: null })));
+  paraLaPrimera = null;
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

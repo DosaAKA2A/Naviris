@@ -53,9 +53,10 @@ async function conecta(urlWs) {
   return { envia, evalua, clic, en: (fn) => oyentes.push(fn), cierra: () => ws.close() };
 }
 
-async function arranca() {
+// `extra`: más argumentos de línea de comandos (un enlace o un archivo que abrir al arrancar).
+async function arranca(extra = []) {
   const perfil = fs.mkdtempSync(path.join(os.tmpdir(), 'naviris-e2e-'));
-  const proc = spawn(require('electron'), ['.', `--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`], { cwd: RAIZ, stdio: 'ignore' });
+  const proc = spawn(require('electron'), ['.', `--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, ...extra], { cwd: RAIZ, stdio: 'ignore' });
   const t = await hasta(async () => (await lista()).find((x) => x.type === 'page' && /index\.html/.test(x.url)), 40000);
   const ui = await conecta(t.webSocketDebuggerUrl);
   await hasta(() => ui.evalua('typeof createTab === "function" && Array.isArray(tabs)'));
@@ -99,7 +100,7 @@ async function arranca() {
     await espera(500);
     fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   }
-  return { ui, abre, cierra };
+  return { ui, abre, cierra, perfil };
 }
 
 module.exports = { arranca, conecta, lista, hasta, espera, RAIZ, PUERTO };

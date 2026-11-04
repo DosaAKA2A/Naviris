@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('navirisApp', {
   updateNovedades: () => ipcRenderer.invoke('update:novedades'),
   version: () => ipcRenderer.invoke('app:version'),
   gpuStatus: () => ipcRenderer.invoke('gpu:status'),
+  // Navegador predeterminado: { registrado, predeterminado } y abrir su página de Configuración de Windows
+  navegadorEstado: () => ipcRenderer.invoke('navegador:estado'),
+  hacerPredeterminado: () => ipcRenderer.invoke('navegador:hacer-predeterminado'),
 
   adblockGet: () => ipcRenderer.invoke('adblock:get'),
   adblockSetEnabled: (v) => ipcRenderer.invoke('adblock:set-enabled', v),

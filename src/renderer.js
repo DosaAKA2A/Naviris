@@ -5862,6 +5862,7 @@ els.menuPop.addEventListener('click', (e) => {
   const a = e.target.closest('button')?.dataset.action; if (!a) return; els.menuPop.classList.add('hidden');
   if (a === 'newtab') createTab(); if (a === 'newwindow') window.navirisApp.newWindow(); if (a === 'private') window.navirisApp.newPrivateWindow(); if (a === 'bookmarks') showBookmarkPage();
   if (a === 'borrar-datos') abreBorrarDatos();
+  if (a === 'predeterminado') hacerPredeterminado();
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   // Con la estable ya descargada, la entrada del menú instala directamente: el
   // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
@@ -5923,6 +5924,22 @@ els.optUpdauto.addEventListener('change', async () => { settings = await window.
 const gpuTxt = (v) => !v ? '—' : /^enabled/.test(v) ? 'activado' : /software/.test(v) ? 'por software' : /^unavailable/.test(v) ? 'no disponible' : 'desactivado';
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.navirisApp.version()); const gpu = await window.navirisApp.gpuStatus(); const sec = await window.navirisApp.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: <b>${gpuTxt(gpu['2d_canvas'])}</b> · WebGL: <b>${gpuTxt(gpu.webgl)}</b><br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b><br>HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
+/* Navegador predeterminado (menú). Windows no deja ponerlo desde la app: se
+   abre su página de Configuración. El estado se mira al arrancar y cada vez
+   que se vuelve a la ventana, que es lo que pasa al cerrar Configuración. */
+let predet = { registrado: false, predeterminado: false };
+async function pintaPredeterminado() {
+  try { predet = await window.navirisApp.navegadorEstado(); } catch { return; }
+  $('#menu-predet-estado').textContent = !predet.registrado ? 'Solo en la versión instalada'
+    : predet.predeterminado ? 'Ya es tu navegador predeterminado' : 'Se elige en Configuración de Windows';
+}
+async function hacerPredeterminado() {
+  if (!predet.registrado) { toast('Instala Naviris para elegirlo como navegador predeterminado'); return; }
+  if (predet.predeterminado) { toast('Naviris ya es tu navegador predeterminado'); return; }
+  toast(await window.navirisApp.hacerPredeterminado() ? 'Elige Naviris en Configuración de Windows' : 'No se pudo abrir Configuración de Windows');
+}
+pintaPredeterminado();
+window.addEventListener('focus', pintaPredeterminado);
 
 /* ============ Contraseñas: guardar y autorrellenar en sitios ============ */
 // cuenta → última contraseña ofrecida: no se vuelve a preguntar por la misma,
