@@ -6,8 +6,10 @@
 
    npm run test:e2e
    Variables: WP_E2E_PUERTOS (por defecto "9402,9412"), WP_E2E_DIR (carpeta
-   de los perfiles temporales; por defecto la temporal del sistema). Hace
-   falta red: YouTube y wss://naviris-party.studio-iris2026.workers.dev.
+   de los perfiles temporales; por defecto la temporal del sistema) y
+   WP_E2E_RELAY (otro relay, p. ej. ws://127.0.0.1:8792 con `wrangler dev` o
+   `node watchparty/server.js`). Hace falta red: YouTube y, sin WP_E2E_RELAY,
+   wss://naviris-party.studio-iris2026.workers.dev.
    Sin dependencias: CDP con el WebSocket de Node 22+. */
 'use strict';
 const { test, before, after } = require('node:test');
@@ -23,6 +25,7 @@ const ADDON = fs.readFileSync(path.join(REPO, 'addons', 'watch-party.js'), 'utf8
 const VIDEO = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ'; // Big Buck Bunny, Blender Foundation (CC BY)
 const [PA, PB] = (process.env.WP_E2E_PUERTOS || '9402,9412').split(',');
 const DIR = process.env.WP_E2E_DIR || os.tmpdir();
+const RELAY = process.env.WP_E2E_RELAY || '';
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- Instancia de Naviris controlada por CDP ---------- */
@@ -64,9 +67,21 @@ async function lanza(puerto) {
     try { fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); } catch { /* lo limpia Windows */ }
   };
   // La interfaz sale en /json/list antes de terminar de cargar: se espera a la API de addons.
-  for (let i = 0; i < 60; i++) {
-    try { if (await ev("document.readyState === 'complete' && typeof naviris === 'object' && !!document.getElementById('addon-tools')")) break; } catch { /* aún cargando */ }
-    await dormir(500);
+  const lista = async () => {
+    for (let i = 0; i < 60; i++) {
+      try { if (await ev("document.readyState === 'complete' && typeof naviris === 'object' && !!document.getElementById('addon-tools')")) return; } catch { /* aún cargando */ }
+      await dormir(500);
+    }
+  };
+  await lista();
+  // Relay local: el CSP de la interfaz solo deja el de producción, así que esta
+  // interfaz se recarga sin CSP y con el relay apuntado (lo lee el addon).
+  if (RELAY) {
+    await cdp('Page.setBypassCSP', { enabled: true });
+    await ev(`localStorage.__navPartyServer = ${JSON.stringify(RELAY)}`);
+    await cdp('Page.reload', { ignoreCache: true });
+    await dormir(1000);
+    await lista();
   }
   return { puerto, ev, pagina, video, cierra };
 }
@@ -129,6 +144,9 @@ test('dos Naviris en la misma sala sincronizan play, pausa y salto en YouTube', 
     return document.querySelector('#nvp-panel .nvp-code').innerText.trim();
   })()`);
   assert.match(codigo, /^[A-Z0-9]{6}$/);
+  assert.match(await A.ev("document.querySelector('#nvp-panel .nvp-status').innerText"), /eres el anfitrión · En la sala/);
+  // El relay con clave de anfitrión se la da a quien crea la sala, y el addon la guarda.
+  if (RELAY) assert.equal(await A.ev("(JSON.parse(localStorage.__navPartyClave || 'null') || {}).code"), codigo);
 
   // 3. El invitado entra desde el hub, solo con el código
   await B.ev(`(async()=>{

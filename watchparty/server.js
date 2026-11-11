@@ -7,7 +7,8 @@
    Implementación sin dependencias externas: hace el handshake y el framing de
    WebSocket (solo texto) con módulos nativos de Node. Salas efímeras en memoria.
    Mismo protocolo que worker/worker.js (el relay de producción): join / ev /
-   beat / chat / perfil / ping; cualquier cambio va en los DOS.
+   beat / chat / perfil / ping; cualquier cambio va en los DOS. Quién es el
+   anfitrión lo decide el relay (clave de anfitrión y sid): ver worker.js.
 
    Uso:  node server.js            (escucha en el puerto 8787 por defecto)
          PORT=9000 node server.js
@@ -23,14 +24,30 @@ const MAX_MSG = 64 * 1024; // 64 KB por mensaje: de sobra para señales y chat
 
 /* ---------- Salas en memoria ---------- */
 const rooms = new Map(); // code -> Set<socket>
+const salas = new Map(); // code -> { clave, hostSid, tuvo, lock, nlock } (ver worker.js)
 function roomOf(code) { let s = rooms.get(code); if (!s) { s = new Set(); rooms.set(code, s); } return s; }
+// Mismas reglas que worker.js: el anfitrión lo decide el relay.
+function nuevaClave() { return crypto.randomBytes(24).toString('hex'); }
+function mismaClave(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a) return false;
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+function urlVetada(u) {
+  try { return /(^|\.)iris\.it\.com$/i.test(new URL(String(u)).hostname); } catch (e) { return false; }
+}
+function paraTodos(m, sala) {
+  if (m.kind === 'play' || m.kind === 'pause' || m.kind === 'seek') return !sala.lock;
+  if (m.kind === 'nav') return !sala.nlock;
+  return false;
+}
 function leave(sock) {
   // Se llama al recibir el frame de cierre Y al cerrarse el socket: solo la
   // primera vez cuenta (antes la sala oía "salió" dos veces).
   const code = sock._room; if (!code) return;
   sock._room = null;
   const s = rooms.get(code); if (!s || !s.delete(sock)) return;
-  if (s.size === 0) rooms.delete(code);
+  if (s.size === 0) { rooms.delete(code); salas.delete(code); }
   else broadcast(code, { t: 'peers', n: s.size, who: sock._name, left: true }, null);
 }
 
@@ -49,10 +66,10 @@ function sendJSON(sock, obj) { sendFrame(sock, JSON.stringify(obj)); }
 function sendClose(sock, code) {
   try { sock.end(Buffer.from([0x88, 2, code >> 8, code & 0xff])); } catch (e) { /* socket muerto */ }
 }
-function broadcast(code, obj, except) {
+function broadcast(code, obj, except, soloHost) {
   const s = rooms.get(code); if (!s) return;
   const str = JSON.stringify(obj);
-  for (const c of s) if (c !== except) sendFrame(c, str);
+  for (const c of s) if (c !== except && (!soloHost || c._host)) sendFrame(c, str);
 }
 
 /* ---------- Manejo de mensajes de aplicación ---------- */
@@ -75,9 +92,18 @@ function onMessage(sock, str) {
         if (c !== sock && c._sid === sid) { s.delete(c); c._room = null; try { c.end(); } catch (e) { /* muerto */ } again = true; }
       }
     }
-    sock._room = code; sock._name = String(m.name || 'anon').slice(0, 32); sock._host = !!m.host; sock._sid = sid;
+    let sala = (s.size && salas.get(code)) || { clave: nuevaClave(), hostSid: '', tuvo: false, lock: false, nlock: true };
+    const host = !!m.host && (!s.size || !sala.tuvo || mismaClave(m.clave, sala.clave) || (!!sid && sid === sala.hostSid));
+    if (host) {
+      sala = { ...sala, hostSid: sid, tuvo: true };
+      for (const c of s) if (c._host) { c._host = false; sendJSON(c, { t: 'rol', host: false }); }
+    }
+    salas.set(code, sala);
+    sock._room = code; sock._name = String(m.name || 'anon').slice(0, 32); sock._host = host; sock._sid = sid;
     s.add(sock);
-    sendJSON(sock, { t: 'joined', room: code, n: s.size, host: sock._host });
+    const joined = { t: 'joined', room: code, n: s.size, host };
+    if (host) joined.clave = sala.clave;
+    sendJSON(sock, joined);
     broadcast(code, { t: 'peers', n: s.size, who: sock._name, joined: true, again }, sock);
     return;
   }
@@ -92,7 +118,13 @@ function onMessage(sock, str) {
     delete m.who;
     m.from = sock._name;
     m.host = !!sock._host;
-    broadcast(sock._room, m, sock);
+    const sala = salas.get(sock._room);
+    if ((m.t === 'beat' || m.kind === 'nav') && urlVetada(m.url)) return;
+    if (m.t === 'beat') {
+      if (!sock._host) return;
+      sala.lock = !!m.lock; sala.nlock = m.nlock !== false;
+    }
+    broadcast(sock._room, m, sock, m.t === 'ev' && !sock._host && !paraTodos(m, sala));
   }
 }
 

@@ -1,4 +1,4 @@
-/* Naviris addon: Watch Party v2.8.3
+/* Naviris addon: Watch Party v2.9.0
    Ver video a la vez con amigos en Crunchyroll, Netflix, Disney+, YouTube y
    MOOVIN (moovin.live).
    NO transmite video: cada quien reproduce su propia copia con su propia
@@ -23,6 +23,13 @@
    La identidad de un video de MOOVIN es su ?v= (iris:<url>); la página vacía
    es iris:moovin. Esos identificadores son protocolo compartido: no cambiar.
 
+   v2.9.0 (2026-11-11): el anfitrión lo decide el relay, no el addon: antes
+   cualquiera con el código podía entrar diciendo ser el anfitrión y mover a
+   toda la sala. Quien crea la sala recibe una clave (solo él) y con ella
+   vuelve a ser el anfitrión si recarga y entra con el código. Con el control
+   exclusivo o el cambio de video cerrados, el anfitrión tampoco obedece las
+   órdenes de los invitados. iris.it.com (caducado) ya no cuenta como MOOVIN.
+   Con el relay anterior funciona como la 2.8.3.
    v2.8.3 (2026-11-03): una conexión muerta en silencio (suspensión, cambio
    de red) ya no deja la sala en "En la sala" sin sincronizar: ping/pong con
    el relay y reconexión sola. Aplicar una pausa remota ya no salta si no hay
@@ -283,15 +290,14 @@
   var SITIOS = { netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube', iris: 'MOOVIN' };
   var LISTA_SITIOS = 'Crunchyroll, Netflix, Disney+, YouTube o MOOVIN';
   function siteOf(url) {
-    var h = '', p = ''; try { var u = new URL(url); h = u.hostname; p = u.pathname; } catch (e) { return null; }
+    var h = ''; try { h = new URL(url).hostname; } catch (e) { return null; }
     if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
-    // MOOVIN: en moovin.live es todo el dominio; en iris.it.com (que sigue vivo
-    // por la tele) solo la ruta /moovin, el resto del estudio no reproduce.
+    // MOOVIN: solo moovin.live. iris.it.com caducó y hoy es un aparcado: lo
+    // que llegue de la sala apuntando ahí no se abre.
     if (/(^|\.)moovin\.live$/.test(h)) return 'iris';
-    if (/(^|\.)iris\.it\.com$/.test(h) && /^\/moovin(\/|$)/.test(p)) return 'iris';
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
@@ -312,9 +318,9 @@
     // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él, la
     // página vacía cuenta como "el mismo sitio" para no forzar navegación
     // cuando el anfitrión reproduce un archivo local.
-    m = /(?:moovin\.live|iris\.it\.com\/moovin)[^#]*[?&]v=([^&#]+)/i.exec(url || '');
+    m = /moovin\.live[^#]*[?&]v=([^&#]+)/i.exec(url || '');
     if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
-    if (/moovin\.live(\/|$|\?)|iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
+    if (/moovin\.live(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
     return null;
   }
   /* La URL que se manda a la sala, limpia. La de Netflix lleva trackId y tctx
@@ -487,9 +493,10 @@
     if (!party) return;
     var who = m.from || 'Alguien';
     if (m.kind === 'nav') {
-      // Sala cerrada: solo se sigue al anfitrión. `m.host` lo pone el servidor
-      // al reenviar (del attachment del join), así que es de fiar.
-      if (party.navLock && !m.host && !party.host) return;
+      // Sala cerrada: solo se sigue al anfitrión, y el anfitrión tampoco sigue a
+      // nadie (el relay le pasa lo que no permite a los invitados para que
+      // decida él). `m.host` lo pone el servidor al reenviar, así que es de fiar.
+      if (party.navLock && !m.host) return;
       if (!urlSegura(m.url)) return;
       var want = epIdOf(m.url); if (!want) return;
       if (epIdOf(wvUrl()) === want) return;
@@ -499,6 +506,7 @@
       return;
     }
     if (m.kind !== 'play' && m.kind !== 'pause' && m.kind !== 'seek') return;   // órdenes de otros clientes (el mando de MOOVIN)
+    if (party.lock && !m.host) return;   // control exclusivo: solo cuenta el anfitrión
     narrate(m.kind, who, m.time);
     if (!party.wv || !enSintonia()) return;
     try { party.wv.executeJavaScript('window.__navPartyApply&&__navPartyApply(' + JSON.stringify({ kind: m.kind, time: m.time }) + ')').catch(function () {}); } catch (e) { /* nada */ }
@@ -559,6 +567,19 @@
   // socket viejo con el mismo sid en silencio (sin "salió" fantasma ni contar
   // dos veces a la misma persona).
   function nuevoSid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+  /* Quién es el anfitrión lo decide el relay: al que crea la sala le da una
+     clave que no ve nadie más, y con ella se vuelve a ser el anfitrión tras
+     recargar (entrando con el código). Se guarda la de la última sala creada. */
+  function claveDe(code) {
+    try { var g = JSON.parse(localStorage.__navPartyClave || 'null'); return g && g.code === code && typeof g.clave === 'string' ? g.clave : ''; } catch (e) { return ''; }
+  }
+  function guardaClave(code, clave) { try { localStorage.__navPartyClave = JSON.stringify({ code: code, clave: clave }); } catch (e) { /* sin guardar */ } }
+  // El papel que da el relay manda sobre el pedido: el anfitrión late y tiene
+  // los permisos en el panel; si cambia, el panel se rehace al pintarse.
+  function ponRol(host) {
+    if (party.host !== host) { party.host = host; modoActual = null; }
+    if (host) beatStart(); else beatStop();
+  }
 
   function start(code, asHost) {
     var wv = naviris.activeWebview();
@@ -641,7 +662,9 @@
            kilobytes por latido). El relay no reenvía el join: a los demás les
            llega por el `perfil` que se manda al recibir `joined`. */
         var yo = miCuenta();
-        var join = { t: 'join', room: code, name: name, host: asHost, sid: party.sid };
+        var clave = claveDe(code);
+        var join = { t: 'join', room: code, name: name, host: asHost || !!clave, sid: party.sid };
+        if (clave) join.clave = clave;
         if (volvia) join.again = true;
         if (yo.foto) join.foto = yo.foto;
         send(join);
@@ -663,13 +686,24 @@
         if (m.t === 'joined') {
           var volvia = party.everOk;
           party.ok = true; party.everOk = true; party.n = m.n; party.status = 'En la sala';
+          // Un relay anterior a la clave no la manda y repite el `host` pedido.
+          if (m.host && typeof m.clave === 'string' && m.clave) guardaClave(code, m.clave);
           if (volvia) logSys('Conexión recuperada');
-          else {
-            logAct(party.name, asHost ? 'creó la sala' : 'se unió a la sala');
-            logSys(asHost ? 'Toca el código para copiarlo y compartirlo' : 'El anfitrión marca el ritmo');
+          else if (asHost && m.host) {
+            logAct(party.name, 'creó la sala');
+            logSys('Toca el código para copiarlo y compartirlo');
+          } else {
+            logAct(party.name, 'se unió a la sala');
+            logSys(m.host ? 'Vuelves a ser el anfitrión de esta sala'
+              : asHost ? 'Esta sala ya tiene anfitrión: entras como invitado' : 'El anfitrión marca el ritmo');
           }
-          if (asHost) beatStart();
+          ponRol(!!m.host);
           mandaPerfil();
+        }
+        else if (m.t === 'rol' && !m.host && party.host) {
+          // Volviste como anfitrión desde otro sitio con la clave: aquí ya no lo eres.
+          ponRol(false);
+          logSys('Volviste a la sala como anfitrión desde otro sitio: aquí sigues como invitado');
         }
         else if (m.t === 'peers') {
           party.n = m.n;

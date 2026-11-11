@@ -43,7 +43,7 @@ vuelve a cargar la página por su cuenta.
 
 | mensaje | quién | contenido |
 |---|---|---|
-| `join` | todos | `room`, `name`, `host`, `sid` (sesión del cliente), `again` al reconectar, `foto` opcional (una vez) |
+| `join` | todos | `room`, `name`, `host` (lo pide; lo decide el relay), `clave` (la de anfitrión, si se tiene), `sid` (sesión del cliente), `again` al reconectar, `foto` opcional (una vez) |
 | `beat` | anfitrión, cada 2 s | `url` (canónica), `tit`, `time`, `paused`, `lock`, `nlock` |
 | `ev` | quien actúa | `kind`: `play` / `pause` / `seek` (+ `time`) o `nav` (+ `url`) |
 | `chat` | todos | `msg` |
@@ -63,6 +63,23 @@ el que se puede confiar) y borrando el `who` que mande el cliente. Responde `joi
 con `peers` (`n`, `who`, `joined` / `left`, `again`). Con `sid`, un socket
 viejo de la misma sesión se cierra en silencio al reconectar: sin eso la sala
 contaba a la misma persona dos veces y anunciaba un "salió" fantasma.
+
+**Quién es el anfitrión lo decide el relay**, no el `host` del join (antes
+cualquiera con el código entraba como anfitrión y movía a toda la sala). Es
+anfitrión quien crea la sala (entra el primero pidiéndolo), quien presenta la
+`clave` de la sala, quien repite el `sid` del anfitrión (así reconectan los
+clientes viejos, que no conocen la clave; el sid nunca se reenvía) o quien lo
+pide en una sala que aún no ha tenido anfitrión. Los demás son invitados
+aunque lo pidan. La `clave` va solo en el `joined` del anfitrión; si otra
+sesión vuelve con ella, la anterior pasa a invitado y recibe `rol`
+(`host: false`). Una sala vacía se olvida: el siguiente que entra la crea.
+
+Con eso el relay filtra: el `beat` solo se reenvía si es del anfitrión (y de
+él toma `lock`/`nlock`); el `ev` de un invitado llega a todos si el
+anfitrión lo permite (play/pausa/salto sin control exclusivo, `nav` con el
+cambio de video abierto) y si no, solo al anfitrión, que decide (la pantalla
+de MOOVIN obedece así a su mando, que entra como invitado). Ningún `beat` ni
+`nav` que apunte a iris.it.com (caducado) se reenvía.
 
 Reglas del cliente: anfitrión-autoritativo (los demás corrigen si se desvían
 más de 1,5 s); ventana anti-eco de 900 ms tras aplicar un remoto; el salto se
@@ -90,7 +107,8 @@ addon contra un relay local hay que añadirlo al `connect-src` de `src/index.htm
 ## Probar
 
 ```bash
-npm test           # test/watchparty-relay.test.js contra server.js
+npm test           # test/watchparty-relay.test.js contra server.js y
+                   # test/watchparty-worker.test.js (el worker con un Durable Object simulado)
 npm run test:e2e   # test/e2e/watch-party.test.js: dos Naviris reales en YouTube
 ```
 
@@ -107,7 +125,8 @@ El e2e abre dos Naviris desde el repo (perfiles temporales, puertos CDP
 `WP_E2E_PUERTOS`, por defecto 9402 y 9412), carga el addon del repo en la
 interfaz por CDP, crea la sala en uno, entra con el código desde el hub del
 otro y comprueba play, pausa, salto y chat en los dos sentidos contra el relay
-de producción. Necesita red. Un perfil nuevo en la UE ve el aviso de cookies
+de producción (o el de `WP_E2E_RELAY`, p. ej. `ws://127.0.0.1:8792` con
+`wrangler dev`: recarga la interfaz sin CSP para poder conectar). Necesita red. Un perfil nuevo en la UE ve el aviso de cookies
 de YouTube, que pausa el video hasta que se responde: el test lo rechaza.
 
 ## Reproducción con DRM

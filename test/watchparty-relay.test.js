@@ -133,13 +133,121 @@ test('quién manda lo dice el relay: un invitado no se hace pasar por el anfitri
   await entra(A, sala, 'Ana', true);
   await entra(B, sala, 'Beto', false);
   B.send({ t: 'beat', time: 1, paused: true, host: true, from: 'Ana' });
+  B.send({ t: 'ev', kind: 'pause', time: 1, host: true, from: 'Ana' });
   B.send({ t: 'chat', msg: 'soy Ana', who: 'Ana' });
-  const beat = await A.espera((m) => m.t === 'beat');
-  assert.equal(beat.host, false);
-  assert.equal(beat.from, 'Beto');
+  const ev = await A.espera((m) => m.t === 'ev');
+  assert.equal(ev.host, false);
+  assert.equal(ev.from, 'Beto');
   const chat = await A.espera((m) => m.t === 'chat');
   assert.equal(chat.from, 'Beto');
   assert.equal('who' in chat, false, 'el who del cliente se borra');
+  assert.equal(A.inbox.some((m) => m.t === 'beat'), false, 'el latido de un invitado no llega');
+  A.cerrar(); B.cerrar();
+});
+
+test('anfitrión: lo es quien crea la sala, solo él recibe la clave y un impostor con host:true entra como invitado', async () => {
+  const sala = salaNueva();
+  const A = cliente(), B = cliente(), X = cliente();
+  const ja = await entra(A, sala, 'Ana', true);
+  assert.equal(ja.host, true);
+  assert.match(ja.clave, /^[0-9a-f]{48}$/);
+  const jb = await entra(B, sala, 'Beto', false);
+  assert.equal('clave' in jb, false);
+  const jx = await entra(X, sala, 'Xavi', true, { clave: 'f'.repeat(48) });
+  assert.equal(jx.host, false);
+  assert.equal('clave' in jx, false);
+  X.send({ t: 'beat', time: 999, paused: true, url: 'https://www.youtube.com/watch?v=otro1234' });
+  X.send({ t: 'ev', kind: 'nav', url: 'https://www.youtube.com/watch?v=otro1234' });
+  X.send({ t: 'chat', msg: 'hola' });
+  assert.equal((await B.espera((m) => m.t === 'chat')).from, 'Xavi');
+  const nav = await A.espera((m) => m.t === 'ev');
+  assert.equal(nav.host, false, 'el nav del impostor solo le llega al anfitrión, marcado como de invitado');
+  await dormir(200);
+  assert.equal(B.inbox.some((m) => m.t === 'beat' || m.t === 'ev'), false, 'a los invitados no les llega nada de eso');
+  assert.equal(A.inbox.some((m) => m.t === 'beat'), false);
+  A.cerrar(); B.cerrar(); X.cerrar();
+});
+
+test('órdenes de invitados: a todos solo si el anfitrión lo permite; si no, solo al anfitrión', async () => {
+  const sala = salaNueva();
+  const A = cliente(), B = cliente(), C = cliente();
+  await entra(A, sala, 'Ana', true);
+  await entra(B, sala, 'Beto', false);
+  await entra(C, sala, 'Caro', false);
+  await A.espera((m) => m.t === 'peers' && m.who === 'Caro');
+  // Por defecto: reproducción abierta, cambio de video cerrado.
+  B.send({ t: 'ev', kind: 'nav', url: 'https://www.youtube.com/watch?v=otro1234' });
+  B.send({ t: 'ev', kind: 'pause', time: 10 });
+  assert.equal((await C.espera((m) => m.t === 'ev')).kind, 'pause');
+  await A.espera((m) => m.t === 'ev' && m.kind === 'pause');
+  assert.equal(A.inbox.some((m) => m.t === 'ev' && m.kind === 'nav'), true);
+  // Control exclusivo y cambio de video abierto, anunciados en el latido.
+  A.send({ t: 'beat', time: 11, lock: true, nlock: false });
+  await B.espera((m) => m.t === 'beat');
+  B.send({ t: 'ev', kind: 'play', time: 11 });
+  B.send({ t: 'ev', kind: 'nav', url: 'https://www.youtube.com/watch?v=nuevo123' });
+  assert.equal((await C.espera((m) => m.t === 'ev' && m.kind === 'nav')).host, false);
+  await A.espera((m) => m.t === 'ev' && m.kind === 'play');
+  await dormir(200);
+  assert.equal(C.inbox.some((m) => m.t === 'ev' && m.kind === 'play'), false, 'el play prohibido no llega a los invitados');
+  A.cerrar(); B.cerrar(); C.cerrar();
+});
+
+test('reconexión del anfitrión: con la clave tras recargar; el viejo, con su sid; sin nada, invitado', async () => {
+  const sala = salaNueva();
+  const A = cliente(), B = cliente();
+  const { clave } = await entra(A, sala, 'Ana', true);
+  await entra(B, sala, 'Beto', false);
+  // Addon 2.x en un bache de red: socket nuevo con el MISMO sid y sin clave.
+  const A2 = cliente();
+  assert.equal((await entra(A2, sala, 'Ana', true, { again: true })).host, true);
+  await A.cerrado;
+  A2.send({ t: 'beat', time: 5 });
+  assert.equal((await B.espera((m) => m.t === 'beat')).host, true);
+  // Recarga: sid nuevo. Sin clave entra como invitado; con ella, anfitrión.
+  A2.cerrar();
+  await B.espera((m) => m.t === 'peers' && m.left);
+  const A3 = cliente();
+  assert.equal((await entra(A3, sala, 'Ana', true, { sid: 'recarga-1' })).host, false);
+  const A4 = cliente();
+  const j4 = await entra(A4, sala, 'Ana', true, { sid: 'recarga-2', clave });
+  assert.deepEqual({ host: j4.host, clave: j4.clave }, { host: true, clave });
+  A4.send({ t: 'beat', time: 6 });
+  assert.equal((await B.espera((m) => m.t === 'beat' && m.time === 6)).host, true);
+  // Con la clave desde otra pestaña: el anfitrión anterior pasa a invitado y se le avisa.
+  const A5 = cliente();
+  assert.equal((await entra(A5, sala, 'Ana', true, { sid: 'otra-pestana', clave })).host, true);
+  assert.deepEqual(await A4.espera((m) => m.t === 'rol'), { t: 'rol', host: false });
+  A4.send({ t: 'beat', time: 7 });
+  await dormir(200);
+  assert.equal(B.inbox.some((m) => m.t === 'beat' && m.time === 7), false);
+  B.cerrar(); A3.cerrar(); A4.cerrar(); A5.cerrar();
+});
+
+test('sala vacía = sala nueva: el primero que la pide es anfitrión con otra clave', async () => {
+  const sala = salaNueva();
+  const A = cliente();
+  const { clave } = await entra(A, sala, 'Ana', true);
+  A.cerrar();
+  await dormir(300);
+  const X = cliente();
+  const jx = await entra(X, sala, 'Xavi', true);
+  assert.equal(jx.host, true);
+  assert.notEqual(jx.clave, clave);
+  X.cerrar();
+});
+
+test('iris.it.com: no se reenvía ningún latido ni cambio de video que apunte ahí', async () => {
+  const sala = salaNueva();
+  const A = cliente(), B = cliente();
+  await entra(A, sala, 'Ana', true);
+  await entra(B, sala, 'Beto', false);
+  A.send({ t: 'beat', time: 1, url: 'https://iris.it.com/moovin/?v=x' });
+  A.send({ t: 'ev', kind: 'nav', url: 'https://iris.it.com/moovin/' });
+  A.send({ t: 'ev', kind: 'nav', url: 'https://moovin.live/?v=x' });
+  assert.equal((await B.espera((m) => m.t === 'ev')).url, 'https://moovin.live/?v=x');
+  await dormir(200);
+  assert.equal(B.inbox.filter((m) => m.t === 'ev' || m.t === 'beat').length, 1);
   A.cerrar(); B.cerrar();
 });
 
@@ -184,10 +292,15 @@ test('el anfitrión se va: los demás lo saben una sola vez y siguen conectados'
   assert.deepEqual({ n: p.n, who: p.who }, { n: 2, who: 'Ana' });
   await dormir(400);
   assert.equal(B.inbox.filter((m) => m.t === 'peers' && m.left).length, 1, 'un solo "salió"');
-  // Sin anfitrión nadie manda: el latido de un invitado llega marcado como de invitado.
+  // Sin anfitrión nadie ocupa su puesto: un invitado que lo pide sigue siéndolo
+  // y su latido no llega.
+  const X = cliente();
+  assert.equal((await entra(X, sala, 'Xavi', true)).host, false);
   B.send({ t: 'beat', time: 5, paused: false });
-  assert.equal((await C.espera((m) => m.t === 'beat')).host, false);
-  B.cerrar(); C.cerrar();
+  B.send({ t: 'chat', msg: 'seguimos' });
+  await C.espera((m) => m.t === 'chat');
+  assert.equal(C.inbox.some((m) => m.t === 'beat'), false);
+  B.cerrar(); C.cerrar(); X.cerrar();
 });
 
 test('vigía de la conexión: ping recibe pong solo para quien lo manda', async () => {
