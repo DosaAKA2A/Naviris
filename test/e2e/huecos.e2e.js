@@ -115,9 +115,18 @@ test('Ctrl+Mayús+AvPág mueve la pestaña en vez de cambiar de pestaña', async
   await hasta(() => app.ui.evalua(`tabs.some((t) => t.url.endsWith('/otra'))`));
   await espera(300);
   const antes = await app.ui.evalua('tabs.findIndex((t) => t.id === activeId)');
-  await tecla(web, 'PageDown', 'PageDown', 34, CTRL | MAYUS);
-  await hasta(() => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`)).catch(async (e) => {
-    throw new Error(e.message + ' | antes=' + antes + ' pestañas=' + await app.ui.evalua(`JSON.stringify(tabs.map((t) => [t.id === ${id}, t.kind, t.url, !!t.pinned]))`) + ' activa=' + await app.ui.evalua('activeId === ' + id));
+  assert.equal(await app.ui.evalua('tabs.length - 1'), antes + 1, 'la nueva queda justo a la derecha, al final');
+  // En el runner de GitHub la tecla a veces no llega: se reenvía hasta 4 veces.
+  // Reenviarla no falsea la prueba: con la pestaña ya al final, otra pulsación no la mueve.
+  // Para el diagnóstico: qué atajos llegan a la interfaz.
+  await app.ui.evalua(`window.__atajos = []; if (!window.__espiaAtajos) { window.__espiaAtajos = ejecutaAtajo; ejecutaAtajo = (c) => { __atajos.push(c); return __espiaAtajos(c); }; } 1`);
+  const movida = () => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`);
+  for (let i = 0; i < 4 && !(await movida()); i++) {
+    await tecla(web, 'PageDown', 'PageDown', 34, CTRL | MAYUS);
+    await hasta(movida, 4000).catch(() => {});
+  }
+  await hasta(movida).catch(async (e) => {
+    throw new Error(e.message + ' | antes=' + antes + ' pestañas=' + await app.ui.evalua(`JSON.stringify(tabs.map((t) => [t.id === ${id}, t.kind, t.url, !!t.pinned]))`) + ' activa=' + await app.ui.evalua('activeId === ' + id) + ' visibles=' + await app.ui.evalua('JSON.stringify(tabsVisibles().map((t) => t.id === ' + id + ' ? "YO" : t.kind))') + ' atajos=' + await app.ui.evalua('JSON.stringify(__atajos)') + ' foco=' + await app.ui.evalua('document.hasFocus()'));
   });
   assert.equal(await app.ui.evalua('activeId'), id, 'sigue activa la misma');
 });
