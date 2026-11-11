@@ -69,7 +69,7 @@ async function conecta(url) {
 const lista = async () => (await fetch(`http://127.0.0.1:${PUERTO}/json/list`)).json();
 async function hasta(f, ms = 15000) {
   const t0 = Date.now();
-  while (Date.now() - t0 < ms) { try { const v = await f(); if (v) return v; } catch { /* aún no */ } await espera(150); }
+  while (Date.now() - t0 < ms) { try { const v = await Promise.race([f(), espera(5000).then(() => { throw new Error('sin respuesta'); })]); if (v) return v; } catch { /* aún no */ } await espera(150); }
   throw new Error('tiempo agotado');
 }
 
@@ -122,7 +122,7 @@ test.after(() => {
   for (const p of perfiles) { try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* algún proceso aún suelta archivos */ } }
 });
 
-test('window.open con tamaño abre ventana con opener: el login en ventanita contesta', async () => {
+test('window.open con tamaño abre ventana con opener: el login en ventanita contesta', { timeout: 120000 }, async () => {
   const app = await abreNaviris(perfilNuevo());
   try {
     const c = await pestana(app, `http://127.0.0.1:${WEB}/popup`);
@@ -133,7 +133,7 @@ test('window.open con tamaño abre ventana con opener: el login en ventanita con
   } finally { await cierraNaviris(app); }
 });
 
-test('el aviso de beforeunload no congela el proceso principal y al aceptar recarga', { skip: process.platform !== 'win32' }, async () => {
+test('el aviso de beforeunload no congela el proceso principal y al aceptar recarga', { skip: process.platform !== 'win32', timeout: 120000 }, async () => {
   const app = await abreNaviris(perfilNuevo());
   try {
     const otra = await pestana(app, `http://127.0.0.1:${WEB}/`);
@@ -155,7 +155,7 @@ test('el aviso de beforeunload no congela el proceso principal y al aceptar reca
   } finally { await cierraNaviris(app); }
 });
 
-test('al cerrar, una cookie particionada de un iframe no pasa a ser cookie normal de su sitio', async () => {
+test('al cerrar, una cookie particionada de un iframe no pasa a ser cookie normal de su sitio', { timeout: 120000 }, async () => {
   const perfil = perfilNuevo();
   let app = await abreNaviris(perfil);
   try {
