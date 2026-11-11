@@ -1,0 +1,87 @@
+name: Benchmark
+
+# Solo a mano (Actions → Benchmark → Run workflow). Corre la parte del benchmark que tiene sentido en
+# una máquina virtual compartida:
+#   1. el arranque de Naviris frente al Chrome que trae el runner, con pasadas intercaladas;
+#   2. el coste del motor del bloqueador por consulta, en Node, con las listas recién bajadas.
+# Sirve para ver si un cambio empeora el arranque o el bloqueador frente a la misma máquina y la
+# misma pasada. Las cifras NO se comparan con las de PERFORMANCE.md: el runner cambia de hardware
+# y de carga de una vez a otra. Los resultados comparativos oficiales (memoria, carga de páginas,
+# YouTube y benchmarks, con Brave) se miden en un equipo fijo con `node benchmark/corre.mjs`.
+#
+# La instalación es la misma que en "Pruebas" (ver allí por qué cada paso).
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeticiones:
+        description: Pasadas del arranque por navegador
+        default: '5'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      electron_config_cache: ${{ github.workspace }}\.cache-electron
+      NAVIRIS_BENCH_TRABAJO: ${{ github.workspace }}\benchmark\trabajo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependencias de GitHub por https (sin clave ssh)
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Caché del binario de Electron (castlabs)
+        uses: actions/cache@v4
+        with:
+          path: .cache-electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Bajar el binario de Electron (castlabs)
+        run: node node_modules/electron/install.js
+
+      - name: Arranque, Naviris frente a Chrome
+        shell: pwsh
+        env:
+          REPETICIONES: ${{ inputs.repeticiones }}
+        run: node benchmark/arranque.mjs "$env:REPETICIONES" ci naviris,chrome
+
+      - name: Semilla de Naviris (listas del bloqueador)
+        run: node benchmark/semillas.mjs naviris
+
+      - name: Coste del motor del bloqueador
+        shell: pwsh
+        run: node benchmark/micro-adblock.cjs benchmark/trabajo/semillas/naviris/adblock | Tee-Object benchmark/trabajo/micro-adblock.txt
+
+      - name: Resumen
+        shell: pwsh
+        run: |
+          "## Arranque en el runner (solo vale dentro de esta pasada)" >> $env:GITHUB_STEP_SUMMARY
+          node benchmark/resumen.mjs ci >> $env:GITHUB_STEP_SUMMARY
+          "`n## Motor del bloqueador`n" >> $env:GITHUB_STEP_SUMMARY
+          '```' >> $env:GITHUB_STEP_SUMMARY
+          Get-Content benchmark/trabajo/micro-adblock.txt >> $env:GITHUB_STEP_SUMMARY
+          '```' >> $env:GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-${{ github.run_number }}
+          path: |
+            benchmark/trabajo/resultados-ci.json
+            benchmark/trabajo/medidas/
+            benchmark/trabajo/micro-adblock.txt
+            benchmark/trabajo/logs/
+          if-no-files-found: warn

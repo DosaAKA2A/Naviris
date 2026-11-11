@@ -1,0 +1,4399 @@
+{
+ "fecha": "2026-11-11",
+ "equipo": "AMD Ryzen 7 9800X3D (8 núcleos, 16 hilos), 32 GB, Windows 11 Pro 26200",
+ "versiones": {
+  "naviris": "3.0.0-dev f1b6bd2, Electron 45.2.1+wvcus (Chromium 156.0.8078.75)",
+  "chrome": "157.0.8103.40",
+  "brave": "1.99.56 (Chromium 157)",
+  "electron": "Electron 45.2.1+wvcus sin Naviris (control)"
+ },
+ "navegadores": {
+  "naviris": "Naviris con el bloqueador activado (de serie)",
+  "naviris-sin": "Naviris con el bloqueador apagado; comparación justa con Chrome",
+  "chrome": "Chrome sin bloqueo",
+  "brave": "Brave con Shields (de serie); comparación justa con Naviris con bloqueador",
+  "electron": "El mismo Electron de Naviris con una ventana en blanco; control para los benchmarks"
+ },
+ "unidades": {
+  "arranque": "ms desde el lanzamiento; frio = carpeta de perfil vacía, caliente = segundo arranque del mismo perfil",
+  "consumo": "MB de todo el árbol de procesos; cpuMsEn40s = ms de CPU de todo el árbol en 40 s",
+  "cargas": "ms; loadMs = navigationStart→loadEventEnd; caché vacía",
+  "youtube": "ventana de 60 s",
+  "bench": "puntos, más es mejor"
+ },
+ "estadistica": "cada cifra: mediana, min, max, n y valores sueltos",
+ "medidas": {
+  "arranque": {
+   "naviris": {
+    "frio.ventanaMs": {
+     "mediana": 1405,
+     "min": 1381,
+     "max": 1413,
+     "n": 5,
+     "valores": [
+      1413,
+      1410,
+      1405,
+      1381,
+      1404
+     ]
+    },
+    "frio.navegableMs": {
+     "mediana": 901,
+     "min": 808,
+     "max": 1060,
+     "n": 5,
+     "valores": [
+      843,
+      916,
+      901,
+      1060,
+      808
+     ]
+    },
+    "caliente.ventanaMs": {
+     "mediana": 1287,
+     "min": 1279,
+     "max": 1306,
+     "n": 5,
+     "valores": [
+      1287,
+      1294,
+      1306,
+      1279,
+      1287
+     ]
+    },
+    "caliente.navegableMs": {
+     "mediana": 369,
+     "min": 344,
+     "max": 389,
+     "n": 5,
+     "valores": [
+      344,
+      347,
+      389,
+      371,
+      369
+     ]
+    }
+   },
+   "chrome": {
+    "frio.ventanaMs": {
+     "mediana": 169,
+     "min": 165,
+     "max": 176,
+     "n": 5,
+     "valores": [
+      169,
+      166,
+      176,
+      165,
+      176
+     ]
+    },
+    "frio.navegableMs": {
+     "mediana": 242,
+     "min": 241,
+     "max": 248,
+     "n": 5,
+     "valores": [
+      245,
+      242,
+      241,
+      242,
+      248
+     ]
+    },
+    "caliente.ventanaMs": {
+     "mediana": 170,
+     "min": 158,
+     "max": 172,
+     "n": 5,
+     "valores": [
+      171,
+      170,
+      158,
+      159,
+      172
+     ]
+    },
+    "caliente.navegableMs": {
+     "mediana": 202,
+     "min": 200,
+     "max": 211,
+     "n": 5,
+     "valores": [
+      206,
+      202,
+      202,
+      200,
+      211
+     ]
+    }
+   },
+   "brave": {
+    "frio.ventanaMs": {
+     "mediana": 211,
+     "min": 202,
+     "max": 217,
+     "n": 5,
+     "valores": [
+      212,
+      204,
+      202,
+      217,
+      211
+     ]
+    },
+    "frio.navegableMs": {
+     "mediana": 266,
+     "min": 250,
+     "max": 276,
+     "n": 5,
+     "valores": [
+      258,
+      270,
+      250,
+      276,
+      266
+     ]
+    },
+    "caliente.ventanaMs": {
+     "mediana": 192,
+     "min": 186,
+     "max": 194,
+     "n": 5,
+     "valores": [
+      194,
+      193,
+      189,
+      186,
+      192
+     ]
+    },
+    "caliente.navegableMs": {
+     "mediana": 263,
+     "min": 261,
+     "max": 291,
+     "n": 5,
+     "valores": [
+      261,
+      261,
+      281,
+      263,
+      291
+     ]
+    }
+   }
+  },
+  "consumo": {
+   "naviris": {
+    "reposo": {
+     "wsMB": {
+      "mediana": 524.5,
+      "min": 523.8,
+      "max": 783.2,
+      "n": 3,
+      "valores": [
+       524.5,
+       783.2,
+       523.8
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 347.3,
+      "min": 343.5,
+      "max": 442.4,
+      "n": 3,
+      "valores": [
+       347.3,
+       442.4,
+       343.5
+      ]
+     },
+     "privWsMB": {
+      "mediana": 207.8,
+      "min": 207.4,
+      "max": 240.4,
+      "n": 3,
+      "valores": [
+       207.8,
+       240.4,
+       207.4
+      ]
+     },
+     "procesos": {
+      "mediana": 4,
+      "min": 4,
+      "max": 6,
+      "n": 3,
+      "valores": [
+       4,
+       6,
+       4
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 297,
+      "min": 250,
+      "max": 329,
+      "n": 3,
+      "valores": [
+       297,
+       329,
+       250
+      ]
+     }
+    },
+    "unoDelante": {
+     "wsMB": {
+      "mediana": 680.1,
+      "min": 677.7,
+      "max": 950.9,
+      "n": 3,
+      "valores": [
+       680.1,
+       950.9,
+       677.7
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 411.8,
+      "min": 406,
+      "max": 524.1,
+      "n": 3,
+      "valores": [
+       411.8,
+       524.1,
+       406
+      ]
+     },
+     "privWsMB": {
+      "mediana": 263.9,
+      "min": 261.4,
+      "max": 300.4,
+      "n": 3,
+      "valores": [
+       263.9,
+       300.4,
+       261.4
+      ]
+     },
+     "procesos": {
+      "mediana": 5,
+      "min": 5,
+      "max": 7,
+      "n": 3,
+      "valores": [
+       5,
+       7,
+       5
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 4125,
+      "min": 3859,
+      "max": 4265,
+      "n": 3,
+      "valores": [
+       3859,
+       4125,
+       4265
+      ]
+     }
+    },
+    "cincoDelante": {
+     "wsMB": {
+      "mediana": 2080,
+      "min": 2070.6,
+      "max": 2112.4,
+      "n": 3,
+      "valores": [
+       2070.6,
+       2112.4,
+       2080
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1116.6,
+      "min": 1109.9,
+      "max": 1133.2,
+      "n": 3,
+      "valores": [
+       1109.9,
+       1133.2,
+       1116.6
+      ]
+     },
+     "privWsMB": {
+      "mediana": 766.6,
+      "min": 757.1,
+      "max": 774.3,
+      "n": 3,
+      "valores": [
+       757.1,
+       774.3,
+       766.6
+      ]
+     },
+     "procesos": {
+      "mediana": 13,
+      "min": 13,
+      "max": 13,
+      "n": 3,
+      "valores": [
+       13,
+       13,
+       13
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 407,
+      "min": 314,
+      "max": 921,
+      "n": 3,
+      "valores": [
+       314,
+       407,
+       921
+      ]
+     }
+    },
+    "cincoFondo": {
+     "wsMB": {
+      "mediana": 2061.2,
+      "min": 2052.2,
+      "max": 2096.9,
+      "n": 3,
+      "valores": [
+       2052.2,
+       2096.9,
+       2061.2
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1080.7,
+      "min": 1067.4,
+      "max": 1101.7,
+      "n": 3,
+      "valores": [
+       1067.4,
+       1101.7,
+       1080.7
+      ]
+     },
+     "privWsMB": {
+      "mediana": 747.6,
+      "min": 738.4,
+      "max": 758.6,
+      "n": 3,
+      "valores": [
+       738.4,
+       758.6,
+       747.6
+      ]
+     },
+     "procesos": {
+      "mediana": 13,
+      "min": 13,
+      "max": 13,
+      "n": 3,
+      "valores": [
+       13,
+       13,
+       13
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 282,
+      "min": 125,
+      "max": 344,
+      "n": 3,
+      "valores": [
+       344,
+       125,
+       282
+      ]
+     }
+    },
+    "diezDelante": {
+     "wsMB": {
+      "mediana": 3479.3,
+      "min": 3461.5,
+      "max": 3515.8,
+      "n": 3,
+      "valores": [
+       3479.3,
+       3515.8,
+       3461.5
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1889.8,
+      "min": 1887,
+      "max": 1894.5,
+      "n": 3,
+      "valores": [
+       1894.5,
+       1887,
+       1889.8
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1428.9,
+      "min": 1424.9,
+      "max": 1436.2,
+      "n": 3,
+      "valores": [
+       1436.2,
+       1428.9,
+       1424.9
+      ]
+     },
+     "procesos": {
+      "mediana": 19,
+      "min": 19,
+      "max": 19,
+      "n": 3,
+      "valores": [
+       19,
+       19,
+       19
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 14469,
+      "min": 14453,
+      "max": 14939,
+      "n": 3,
+      "valores": [
+       14469,
+       14939,
+       14453
+      ]
+     }
+    },
+    "diezFondo": {
+     "wsMB": {
+      "mediana": 3392.2,
+      "min": 3368.6,
+      "max": 3429,
+      "n": 3,
+      "valores": [
+       3392.2,
+       3429,
+       3368.6
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1802.9,
+      "min": 1795.9,
+      "max": 1808.4,
+      "n": 3,
+      "valores": [
+       1808.4,
+       1802.9,
+       1795.9
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1350,
+      "min": 1339.8,
+      "max": 1357.1,
+      "n": 3,
+      "valores": [
+       1357.1,
+       1350,
+       1339.8
+      ]
+     },
+     "procesos": {
+      "mediana": 19,
+      "min": 19,
+      "max": 19,
+      "n": 3,
+      "valores": [
+       19,
+       19,
+       19
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 407,
+      "min": 282,
+      "max": 453,
+      "n": 3,
+      "valores": [
+       407,
+       282,
+       453
+      ]
+     }
+    }
+   },
+   "chrome": {
+    "reposo": {
+     "wsMB": {
+      "mediana": 535.2,
+      "min": 532.9,
+      "max": 539.1,
+      "n": 3,
+      "valores": [
+       532.9,
+       535.2,
+       539.1
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 261.1,
+      "min": 257.6,
+      "max": 263.6,
+      "n": 3,
+      "valores": [
+       257.6,
+       263.6,
+       261.1
+      ]
+     },
+     "privWsMB": {
+      "mediana": 161.1,
+      "min": 156.8,
+      "max": 161.5,
+      "n": 3,
+      "valores": [
+       156.8,
+       161.5,
+       161.1
+      ]
+     },
+     "procesos": {
+      "mediana": 12,
+      "min": 12,
+      "max": 12,
+      "n": 3,
+      "valores": [
+       12,
+       12,
+       12
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 297,
+      "min": 219,
+      "max": 531,
+      "n": 3,
+      "valores": [
+       531,
+       219,
+       297
+      ]
+     }
+    },
+    "unoDelante": {
+     "wsMB": {
+      "mediana": 680.7,
+      "min": 679.8,
+      "max": 682.6,
+      "n": 3,
+      "valores": [
+       679.8,
+       682.6,
+       680.7
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 336.7,
+      "min": 333.7,
+      "max": 337.2,
+      "n": 3,
+      "valores": [
+       333.7,
+       336.7,
+       337.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 213.3,
+      "min": 211,
+      "max": 213.6,
+      "n": 3,
+      "valores": [
+       211,
+       213.6,
+       213.3
+      ]
+     },
+     "procesos": {
+      "mediana": 10,
+      "min": 10,
+      "max": 10,
+      "n": 3,
+      "valores": [
+       10,
+       10,
+       10
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 4001,
+      "min": 3470,
+      "max": 4078,
+      "n": 3,
+      "valores": [
+       3470,
+       4078,
+       4001
+      ]
+     }
+    },
+    "cincoDelante": {
+     "wsMB": {
+      "mediana": 1684,
+      "min": 1678.4,
+      "max": 1685.4,
+      "n": 3,
+      "valores": [
+       1678.4,
+       1684,
+       1685.4
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1074,
+      "min": 1066.6,
+      "max": 1083.2,
+      "n": 3,
+      "valores": [
+       1066.6,
+       1074,
+       1083.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 720.3,
+      "min": 714.5,
+      "max": 720.6,
+      "n": 3,
+      "valores": [
+       714.5,
+       720.3,
+       720.6
+      ]
+     },
+     "procesos": {
+      "mediana": 18,
+      "min": 18,
+      "max": 18,
+      "n": 3,
+      "valores": [
+       18,
+       18,
+       18
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 344,
+      "min": 266,
+      "max": 360,
+      "n": 3,
+      "valores": [
+       266,
+       360,
+       344
+      ]
+     }
+    },
+    "cincoFondo": {
+     "wsMB": {
+      "mediana": 1681.4,
+      "min": 1680.2,
+      "max": 1700,
+      "n": 3,
+      "valores": [
+       1700,
+       1681.4,
+       1680.2
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1036.6,
+      "min": 1031.2,
+      "max": 1053.6,
+      "n": 3,
+      "valores": [
+       1053.6,
+       1036.6,
+       1031.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 711.1,
+      "min": 709.1,
+      "max": 731.4,
+      "n": 3,
+      "valores": [
+       731.4,
+       711.1,
+       709.1
+      ]
+     },
+     "procesos": {
+      "mediana": 18,
+      "min": 18,
+      "max": 18,
+      "n": 3,
+      "valores": [
+       18,
+       18,
+       18
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 470,
+      "min": 312,
+      "max": 531,
+      "n": 3,
+      "valores": [
+       312,
+       531,
+       470
+      ]
+     }
+    },
+    "diezDelante": {
+     "wsMB": {
+      "mediana": 3108.2,
+      "min": 3050,
+      "max": 3123.5,
+      "n": 3,
+      "valores": [
+       3108.2,
+       3123.5,
+       3050
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1985.8,
+      "min": 1962,
+      "max": 2033.1,
+      "n": 3,
+      "valores": [
+       1985.8,
+       2033.1,
+       1962
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1483.6,
+      "min": 1421,
+      "max": 1492.2,
+      "n": 3,
+      "valores": [
+       1483.6,
+       1492.2,
+       1421
+      ]
+     },
+     "procesos": {
+      "mediana": 29,
+      "min": 29,
+      "max": 30,
+      "n": 3,
+      "valores": [
+       29,
+       30,
+       29
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 13939,
+      "min": 13703,
+      "max": 15032,
+      "n": 3,
+      "valores": [
+       13939,
+       15032,
+       13703
+      ]
+     }
+    },
+    "diezFondo": {
+     "wsMB": {
+      "mediana": 3070.4,
+      "min": 3056.6,
+      "max": 3105.8,
+      "n": 3,
+      "valores": [
+       3056.6,
+       3105.8,
+       3070.4
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1939.2,
+      "min": 1906.4,
+      "max": 1961.1,
+      "n": 3,
+      "valores": [
+       1906.4,
+       1961.1,
+       1939.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1425.4,
+      "min": 1413.1,
+      "max": 1458.2,
+      "n": 3,
+      "valores": [
+       1413.1,
+       1458.2,
+       1425.4
+      ]
+     },
+     "procesos": {
+      "mediana": 29,
+      "min": 28,
+      "max": 29,
+      "n": 3,
+      "valores": [
+       29,
+       28,
+       29
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 454,
+      "min": 376,
+      "max": 484,
+      "n": 3,
+      "valores": [
+       376,
+       484,
+       454
+      ]
+     }
+    }
+   },
+   "brave": {
+    "reposo": {
+     "wsMB": {
+      "mediana": 453.8,
+      "min": 452,
+      "max": 458,
+      "n": 3,
+      "valores": [
+       458,
+       453.8,
+       452
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 252.7,
+      "min": 249.9,
+      "max": 253.5,
+      "n": 3,
+      "valores": [
+       253.5,
+       252.7,
+       249.9
+      ]
+     },
+     "privWsMB": {
+      "mediana": 154.5,
+      "min": 152.6,
+      "max": 155.9,
+      "n": 3,
+      "valores": [
+       155.9,
+       154.5,
+       152.6
+      ]
+     },
+     "procesos": {
+      "mediana": 7,
+      "min": 7,
+      "max": 7,
+      "n": 3,
+      "valores": [
+       7,
+       7,
+       7
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 422,
+      "min": 391,
+      "max": 547,
+      "n": 3,
+      "valores": [
+       547,
+       391,
+       422
+      ]
+     }
+    },
+    "unoDelante": {
+     "wsMB": {
+      "mediana": 611.2,
+      "min": 596.8,
+      "max": 620.9,
+      "n": 3,
+      "valores": [
+       620.9,
+       611.2,
+       596.8
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 331.8,
+      "min": 330.4,
+      "max": 335.5,
+      "n": 3,
+      "valores": [
+       335.5,
+       330.4,
+       331.8
+      ]
+     },
+     "privWsMB": {
+      "mediana": 215.4,
+      "min": 213.8,
+      "max": 218.9,
+      "n": 3,
+      "valores": [
+       218.9,
+       213.8,
+       215.4
+      ]
+     },
+     "procesos": {
+      "mediana": 8,
+      "min": 8,
+      "max": 8,
+      "n": 3,
+      "valores": [
+       8,
+       8,
+       8
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 3781,
+      "min": 3563,
+      "max": 3890,
+      "n": 3,
+      "valores": [
+       3890,
+       3781,
+       3563
+      ]
+     }
+    },
+    "cincoDelante": {
+     "wsMB": {
+      "mediana": 1624.4,
+      "min": 1589.9,
+      "max": 1648.7,
+      "n": 3,
+      "valores": [
+       1648.7,
+       1624.4,
+       1589.9
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1096.5,
+      "min": 1065.7,
+      "max": 1103.4,
+      "n": 3,
+      "valores": [
+       1103.4,
+       1096.5,
+       1065.7
+      ]
+     },
+     "privWsMB": {
+      "mediana": 787,
+      "min": 749,
+      "max": 788.6,
+      "n": 3,
+      "valores": [
+       788.6,
+       787,
+       749
+      ]
+     },
+     "procesos": {
+      "mediana": 15,
+      "min": 15,
+      "max": 15,
+      "n": 3,
+      "valores": [
+       15,
+       15,
+       15
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 703,
+      "min": 657,
+      "max": 1047,
+      "n": 3,
+      "valores": [
+       1047,
+       703,
+       657
+      ]
+     }
+    },
+    "cincoFondo": {
+     "wsMB": {
+      "mediana": 1593.4,
+      "min": 1578.8,
+      "max": 1618.1,
+      "n": 3,
+      "valores": [
+       1593.4,
+       1618.1,
+       1578.8
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1045.2,
+      "min": 1039.2,
+      "max": 1075.8,
+      "n": 3,
+      "valores": [
+       1045.2,
+       1075.8,
+       1039.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 740.2,
+      "min": 728.9,
+      "max": 773.5,
+      "n": 3,
+      "valores": [
+       740.2,
+       773.5,
+       728.9
+      ]
+     },
+     "procesos": {
+      "mediana": 15,
+      "min": 15,
+      "max": 15,
+      "n": 3,
+      "valores": [
+       15,
+       15,
+       15
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 485,
+      "min": 453,
+      "max": 797,
+      "n": 3,
+      "valores": [
+       797,
+       485,
+       453
+      ]
+     }
+    },
+    "diezDelante": {
+     "wsMB": {
+      "mediana": 2907.7,
+      "min": 2810.2,
+      "max": 2911.4,
+      "n": 3,
+      "valores": [
+       2911.4,
+       2907.7,
+       2810.2
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1916.4,
+      "min": 1847.6,
+      "max": 1928.4,
+      "n": 3,
+      "valores": [
+       1916.4,
+       1928.4,
+       1847.6
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1489.4,
+      "min": 1415.7,
+      "max": 1500.1,
+      "n": 3,
+      "valores": [
+       1489.4,
+       1500.1,
+       1415.7
+      ]
+     },
+     "procesos": {
+      "mediana": 23,
+      "min": 23,
+      "max": 23,
+      "n": 3,
+      "valores": [
+       23,
+       23,
+       23
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 15281,
+      "min": 14530,
+      "max": 15453,
+      "n": 3,
+      "valores": [
+       15453,
+       15281,
+       14530
+      ]
+     }
+    },
+    "diezFondo": {
+     "wsMB": {
+      "mediana": 2798.6,
+      "min": 2701.9,
+      "max": 2822.3,
+      "n": 3,
+      "valores": [
+       2822.3,
+       2798.6,
+       2701.9
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1820.7,
+      "min": 1740.3,
+      "max": 1828.2,
+      "n": 3,
+      "valores": [
+       1828.2,
+       1820.7,
+       1740.3
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1386,
+      "min": 1302.4,
+      "max": 1395.7,
+      "n": 3,
+      "valores": [
+       1395.7,
+       1386,
+       1302.4
+      ]
+     },
+     "procesos": {
+      "mediana": 23,
+      "min": 23,
+      "max": 23,
+      "n": 3,
+      "valores": [
+       23,
+       23,
+       23
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 390,
+      "min": 298,
+      "max": 548,
+      "n": 3,
+      "valores": [
+       548,
+       390,
+       298
+      ]
+     }
+    }
+   },
+   "naviris-sin": {
+    "reposo": {
+     "wsMB": {
+      "mediana": 785.6,
+      "min": 782.2,
+      "max": 785.7,
+      "n": 3,
+      "valores": [
+       785.7,
+       782.2,
+       785.6
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 443.7,
+      "min": 442.3,
+      "max": 446.8,
+      "n": 3,
+      "valores": [
+       443.7,
+       446.8,
+       442.3
+      ]
+     },
+     "privWsMB": {
+      "mediana": 242.3,
+      "min": 239.1,
+      "max": 242.9,
+      "n": 3,
+      "valores": [
+       242.3,
+       239.1,
+       242.9
+      ]
+     },
+     "procesos": {
+      "mediana": 6,
+      "min": 6,
+      "max": 6,
+      "n": 3,
+      "valores": [
+       6,
+       6,
+       6
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 281,
+      "min": 265,
+      "max": 422,
+      "n": 3,
+      "valores": [
+       265,
+       422,
+       281
+      ]
+     }
+    },
+    "unoDelante": {
+     "wsMB": {
+      "mediana": 953.8,
+      "min": 952.3,
+      "max": 955.8,
+      "n": 3,
+      "valores": [
+       953.8,
+       952.3,
+       955.8
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 529,
+      "min": 526,
+      "max": 529.2,
+      "n": 3,
+      "valores": [
+       526,
+       529.2,
+       529
+      ]
+     },
+     "privWsMB": {
+      "mediana": 301.3,
+      "min": 300,
+      "max": 303.8,
+      "n": 3,
+      "valores": [
+       301.3,
+       300,
+       303.8
+      ]
+     },
+     "procesos": {
+      "mediana": 7,
+      "min": 7,
+      "max": 7,
+      "n": 3,
+      "valores": [
+       7,
+       7,
+       7
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 4188,
+      "min": 4141,
+      "max": 4391,
+      "n": 3,
+      "valores": [
+       4141,
+       4188,
+       4391
+      ]
+     }
+    },
+    "cincoDelante": {
+     "wsMB": {
+      "mediana": 2113.2,
+      "min": 2109,
+      "max": 2122,
+      "n": 3,
+      "valores": [
+       2113.2,
+       2109,
+       2122
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1137.5,
+      "min": 1133.6,
+      "max": 1140.8,
+      "n": 3,
+      "valores": [
+       1137.5,
+       1133.6,
+       1140.8
+      ]
+     },
+     "privWsMB": {
+      "mediana": 770.7,
+      "min": 766.7,
+      "max": 780.6,
+      "n": 3,
+      "valores": [
+       770.7,
+       766.7,
+       780.6
+      ]
+     },
+     "procesos": {
+      "mediana": 13,
+      "min": 13,
+      "max": 13,
+      "n": 3,
+      "valores": [
+       13,
+       13,
+       13
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 314,
+      "min": 204,
+      "max": 344,
+      "n": 3,
+      "valores": [
+       314,
+       204,
+       344
+      ]
+     }
+    },
+    "cincoFondo": {
+     "wsMB": {
+      "mediana": 2095,
+      "min": 2090.6,
+      "max": 2098,
+      "n": 3,
+      "valores": [
+       2095,
+       2090.6,
+       2098
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1100.1,
+      "min": 1096,
+      "max": 1101.4,
+      "n": 3,
+      "valores": [
+       1100.1,
+       1096,
+       1101.4
+      ]
+     },
+     "privWsMB": {
+      "mediana": 752.1,
+      "min": 747.8,
+      "max": 756.5,
+      "n": 3,
+      "valores": [
+       752.1,
+       747.8,
+       756.5
+      ]
+     },
+     "procesos": {
+      "mediana": 13,
+      "min": 13,
+      "max": 13,
+      "n": 3,
+      "valores": [
+       13,
+       13,
+       13
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 501,
+      "min": 314,
+      "max": 531,
+      "n": 3,
+      "valores": [
+       314,
+       531,
+       501
+      ]
+     }
+    },
+    "diezDelante": {
+     "wsMB": {
+      "mediana": 4090.9,
+      "min": 4087,
+      "max": 4095.6,
+      "n": 3,
+      "valores": [
+       4087,
+       4095.6,
+       4090.9
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 2010.2,
+      "min": 2002.5,
+      "max": 2014.4,
+      "n": 3,
+      "valores": [
+       2002.5,
+       2014.4,
+       2010.2
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1512.4,
+      "min": 1506.5,
+      "max": 1516.8,
+      "n": 3,
+      "valores": [
+       1506.5,
+       1516.8,
+       1512.4
+      ]
+     },
+     "procesos": {
+      "mediana": 23,
+      "min": 23,
+      "max": 23,
+      "n": 3,
+      "valores": [
+       23,
+       23,
+       23
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 14703,
+      "min": 14142,
+      "max": 14845,
+      "n": 3,
+      "valores": [
+       14142,
+       14845,
+       14703
+      ]
+     }
+    },
+    "diezFondo": {
+     "wsMB": {
+      "mediana": 4044.1,
+      "min": 4039.6,
+      "max": 4052.6,
+      "n": 3,
+      "valores": [
+       4039.6,
+       4052.6,
+       4044.1
+      ]
+     },
+     "privateBytesMB": {
+      "mediana": 1960.1,
+      "min": 1952.8,
+      "max": 1976,
+      "n": 3,
+      "valores": [
+       1952.8,
+       1976,
+       1960.1
+      ]
+     },
+     "privWsMB": {
+      "mediana": 1473.4,
+      "min": 1467.3,
+      "max": 1481.6,
+      "n": 3,
+      "valores": [
+       1467.3,
+       1481.6,
+       1473.4
+      ]
+     },
+     "procesos": {
+      "mediana": 23,
+      "min": 23,
+      "max": 23,
+      "n": 3,
+      "valores": [
+       23,
+       23,
+       23
+      ]
+     },
+     "cpuMsEn40s": {
+      "mediana": 484,
+      "min": 453,
+      "max": 548,
+      "n": 3,
+      "valores": [
+       548,
+       453,
+       484
+      ]
+     }
+    }
+   }
+  },
+  "cargas": {
+   "naviris": {
+    "https://es.wikipedia.org/wiki/Navegador_web": {
+     "loadMs": {
+      "mediana": 341,
+      "min": 334,
+      "max": 384,
+      "n": 5,
+      "valores": [
+       342,
+       384,
+       341,
+       334,
+       335
+      ]
+     },
+     "lcpMs": {
+      "mediana": 324,
+      "min": 320,
+      "max": 332,
+      "n": 5,
+      "valores": [
+       332,
+       320,
+       324,
+       324,
+       324
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 350,
+      "min": 342,
+      "max": 392,
+      "n": 5,
+      "valores": [
+       351,
+       392,
+       350,
+       342,
+       343
+      ]
+     },
+     "recursos": {
+      "mediana": 41,
+      "min": 41,
+      "max": 41,
+      "n": 5,
+      "valores": [
+       41,
+       41,
+       41,
+       41,
+       41
+      ]
+     }
+    },
+    "https://github.com/electron/electron": {
+     "loadMs": {
+      "mediana": 948,
+      "min": 932,
+      "max": 1014,
+      "n": 5,
+      "valores": [
+       948,
+       1014,
+       932,
+       966,
+       940
+      ]
+     },
+     "lcpMs": {
+      "mediana": 848,
+      "min": 760,
+      "max": 884,
+      "n": 5,
+      "valores": [
+       760,
+       848,
+       872,
+       828,
+       884
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 957,
+      "min": 941,
+      "max": 1021,
+      "n": 5,
+      "valores": [
+       957,
+       1021,
+       941,
+       974,
+       948
+      ]
+     },
+     "recursos": {
+      "mediana": 152,
+      "min": 151,
+      "max": 153,
+      "n": 5,
+      "valores": [
+       151,
+       152,
+       152,
+       152,
+       153
+      ]
+     }
+    },
+    "https://www.youtube.com/": {
+     "loadMs": {
+      "mediana": 678,
+      "min": 557,
+      "max": 758,
+      "n": 5,
+      "valores": [
+       758,
+       557,
+       678,
+       710,
+       575
+      ]
+     },
+     "lcpMs": {
+      "mediana": 704,
+      "min": 680,
+      "max": 748,
+      "n": 5,
+      "valores": [
+       748,
+       704,
+       680,
+       700,
+       716
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1217,
+      "min": 1056,
+      "max": 1309,
+      "n": 5,
+      "valores": [
+       1309,
+       1056,
+       1230,
+       1217,
+       1094
+      ]
+     },
+     "recursos": {
+      "mediana": 130,
+      "min": 127,
+      "max": 136,
+      "n": 5,
+      "valores": [
+       130,
+       136,
+       127,
+       127,
+       130
+      ]
+     }
+    },
+    "https://developer.mozilla.org/es/": {
+     "loadMs": {
+      "mediana": 88,
+      "min": 86,
+      "max": 102,
+      "n": 5,
+      "valores": [
+       102,
+       88,
+       86,
+       88,
+       89
+      ]
+     },
+     "lcpMs": {
+      "mediana": 156,
+      "min": 156,
+      "max": 176,
+      "n": 5,
+      "valores": [
+       176,
+       156,
+       156,
+       156,
+       160
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 95,
+      "min": 93,
+      "max": 110,
+      "n": 5,
+      "valores": [
+       110,
+       95,
+       93,
+       95,
+       98
+      ]
+     },
+     "recursos": {
+      "mediana": 65,
+      "min": 65,
+      "max": 65,
+      "n": 5,
+      "valores": [
+       65,
+       65,
+       65,
+       65,
+       65
+      ]
+     }
+    },
+    "https://www.bbc.com/mundo": {
+     "loadMs": {
+      "mediana": 284,
+      "min": 281,
+      "max": 337,
+      "n": 5,
+      "valores": [
+       281,
+       283,
+       337,
+       284,
+       290
+      ]
+     },
+     "lcpMs": {
+      "mediana": 268,
+      "min": 264,
+      "max": 292,
+      "n": 5,
+      "valores": [
+       264,
+       268,
+       292,
+       268,
+       272
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 291,
+      "min": 289,
+      "max": 344,
+      "n": 5,
+      "valores": [
+       289,
+       291,
+       344,
+       291,
+       297
+      ]
+     },
+     "recursos": {
+      "mediana": 89,
+      "min": 89,
+      "max": 89,
+      "n": 5,
+      "valores": [
+       89,
+       89,
+       89,
+       89,
+       89
+      ]
+     }
+    },
+    "https://news.ycombinator.com/": {
+     "loadMs": {
+      "mediana": 756,
+      "min": 755,
+      "max": 810,
+      "n": 5,
+      "valores": [
+       756,
+       755,
+       810,
+       756,
+       759
+      ]
+     },
+     "lcpMs": {
+      "mediana": 628,
+      "min": 624,
+      "max": 668,
+      "n": 5,
+      "valores": [
+       624,
+       628,
+       668,
+       628,
+       632
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 764,
+      "min": 761,
+      "max": 817,
+      "n": 5,
+      "valores": [
+       764,
+       761,
+       817,
+       763,
+       766
+      ]
+     },
+     "recursos": {
+      "mediana": 5,
+      "min": 5,
+      "max": 5,
+      "n": 5,
+      "valores": [
+       5,
+       5,
+       5,
+       5,
+       5
+      ]
+     }
+    },
+    "https://www.reddit.com/r/programming/": {
+     "loadMs": {
+      "mediana": 206,
+      "min": 202,
+      "max": 211,
+      "n": 5,
+      "valores": [
+       206,
+       205,
+       208,
+       211,
+       202
+      ]
+     },
+     "lcpMs": {
+      "mediana": 136,
+      "min": 132,
+      "max": 140,
+      "n": 5,
+      "valores": [
+       140,
+       132,
+       136,
+       132,
+       136
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 213,
+      "min": 210,
+      "max": 218,
+      "n": 5,
+      "valores": [
+       213,
+       212,
+       215,
+       218,
+       210
+      ]
+     },
+     "recursos": {
+      "mediana": 4,
+      "min": 4,
+      "max": 4,
+      "n": 5,
+      "valores": [
+       4,
+       4,
+       4,
+       4,
+       4
+      ]
+     }
+    },
+    "https://www.amazon.com/": {
+     "loadMs": {
+      "mediana": 775,
+      "min": 682,
+      "max": 812,
+      "n": 5,
+      "valores": [
+       812,
+       757,
+       775,
+       790,
+       682
+      ]
+     },
+     "lcpMs": {
+      "mediana": 536,
+      "min": 520,
+      "max": 552,
+      "n": 5,
+      "valores": [
+       540,
+       536,
+       552,
+       528,
+       520
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1039,
+      "min": 857,
+      "max": 1187,
+      "n": 5,
+      "valores": [
+       1187,
+       951,
+       857,
+       1143,
+       1039
+      ]
+     },
+     "recursos": {
+      "mediana": 114,
+      "min": 99,
+      "max": 120,
+      "n": 5,
+      "valores": [
+       113,
+       120,
+       99,
+       117,
+       114
+      ]
+     }
+    },
+    "https://www.nytimes.com/": {
+     "loadMs": {
+      "mediana": 1972,
+      "min": 1731,
+      "max": 2017,
+      "n": 5,
+      "valores": [
+       1731,
+       2017,
+       2015,
+       1960,
+       1972
+      ]
+     },
+     "lcpMs": {
+      "mediana": 2616,
+      "min": 2488,
+      "max": 2660,
+      "n": 5,
+      "valores": [
+       2660,
+       2536,
+       2652,
+       2616,
+       2488
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1978,
+      "min": 1740,
+      "max": 2025,
+      "n": 5,
+      "valores": [
+       1740,
+       2025,
+       2022,
+       1967,
+       1978
+      ]
+     },
+     "recursos": {
+      "mediana": 250,
+      "min": 250,
+      "max": 250,
+      "n": 5,
+      "valores": [
+       250,
+       250,
+       250,
+       250,
+       250
+      ]
+     }
+    },
+    "https://elcomercio.pe/": {
+     "loadMs": {
+      "mediana": 326,
+      "min": 295,
+      "max": 347,
+      "n": 5,
+      "valores": [
+       328,
+       326,
+       347,
+       295,
+       324
+      ]
+     },
+     "lcpMs": {
+      "mediana": 208,
+      "min": 188,
+      "max": 216,
+      "n": 5,
+      "valores": [
+       188,
+       212,
+       200,
+       216,
+       208
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 334,
+      "min": 302,
+      "max": 353,
+      "n": 5,
+      "valores": [
+       337,
+       334,
+       353,
+       302,
+       331
+      ]
+     },
+     "recursos": {
+      "mediana": 55,
+      "min": 55,
+      "max": 55,
+      "n": 5,
+      "valores": [
+       55,
+       55,
+       55,
+       55,
+       55
+      ]
+     }
+    },
+    "_suma": {
+     "loadMs": 6374,
+     "lcpMs": 6424,
+     "ordenLoadMs": 7238
+    }
+   },
+   "chrome": {
+    "https://es.wikipedia.org/wiki/Navegador_web": {
+     "loadMs": {
+      "mediana": 375,
+      "min": 375,
+      "max": 380,
+      "n": 5,
+      "valores": [
+       378,
+       380,
+       375,
+       375,
+       375
+      ]
+     },
+     "lcpMs": {
+      "mediana": 524,
+      "min": 520,
+      "max": 528,
+      "n": 5,
+      "valores": [
+       520,
+       524,
+       524,
+       528,
+       520
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 378,
+      "min": 377,
+      "max": 383,
+      "n": 5,
+      "valores": [
+       381,
+       383,
+       378,
+       377,
+       378
+      ]
+     },
+     "recursos": {
+      "mediana": 42,
+      "min": 42,
+      "max": 44,
+      "n": 5,
+      "valores": [
+       44,
+       42,
+       42,
+       42,
+       42
+      ]
+     }
+    },
+    "https://github.com/electron/electron": {
+     "loadMs": {
+      "mediana": 990,
+      "min": 948,
+      "max": 1323,
+      "n": 5,
+      "valores": [
+       990,
+       1323,
+       991,
+       986,
+       948
+      ]
+     },
+     "lcpMs": {
+      "mediana": 956,
+      "min": 908,
+      "max": 1016,
+      "n": 5,
+      "valores": [
+       944,
+       1016,
+       956,
+       960,
+       908
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 992,
+      "min": 951,
+      "max": 1326,
+      "n": 5,
+      "valores": [
+       992,
+       1326,
+       993,
+       988,
+       951
+      ]
+     },
+     "recursos": {
+      "mediana": 156,
+      "min": 155,
+      "max": 157,
+      "n": 5,
+      "valores": [
+       155,
+       155,
+       157,
+       156,
+       156
+      ]
+     }
+    },
+    "https://www.youtube.com/": {
+     "loadMs": {
+      "mediana": 666,
+      "min": 519,
+      "max": 676,
+      "n": 5,
+      "valores": [
+       519,
+       676,
+       666,
+       668,
+       663
+      ]
+     },
+     "lcpMs": {
+      "mediana": 720,
+      "min": 636,
+      "max": 732,
+      "n": 5,
+      "valores": [
+       636,
+       732,
+       720,
+       728,
+       712
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1209,
+      "min": 1022,
+      "max": 1213,
+      "n": 5,
+      "valores": [
+       1022,
+       1213,
+       1209,
+       1168,
+       1210
+      ]
+     },
+     "recursos": {
+      "mediana": 134,
+      "min": 129,
+      "max": 150,
+      "n": 5,
+      "valores": [
+       150,
+       134,
+       134,
+       137,
+       129
+      ]
+     }
+    },
+    "https://developer.mozilla.org/es/": {
+     "loadMs": {
+      "mediana": 109,
+      "min": 100,
+      "max": 125,
+      "n": 5,
+      "valores": [
+       100,
+       113,
+       125,
+       109,
+       102
+      ]
+     },
+     "lcpMs": {
+      "mediana": 404,
+      "min": 336,
+      "max": 424,
+      "n": 5,
+      "valores": [
+       336,
+       424,
+       424,
+       404,
+       372
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 112,
+      "min": 102,
+      "max": 127,
+      "n": 5,
+      "valores": [
+       102,
+       115,
+       127,
+       112,
+       105
+      ]
+     },
+     "recursos": {
+      "mediana": 76,
+      "min": 76,
+      "max": 76,
+      "n": 5,
+      "valores": [
+       76,
+       76,
+       76,
+       76,
+       76
+      ]
+     }
+    },
+    "https://www.bbc.com/mundo": {
+     "loadMs": {
+      "mediana": 388,
+      "min": 383,
+      "max": 426,
+      "n": 5,
+      "valores": [
+       426,
+       388,
+       383,
+       383,
+       426
+      ]
+     },
+     "lcpMs": {
+      "mediana": 276,
+      "min": 268,
+      "max": 296,
+      "n": 5,
+      "valores": [
+       280,
+       276,
+       268,
+       268,
+       296
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 391,
+      "min": 385,
+      "max": 429,
+      "n": 5,
+      "valores": [
+       429,
+       391,
+       385,
+       385,
+       429
+      ]
+     },
+     "recursos": {
+      "mediana": 81,
+      "min": 81,
+      "max": 81,
+      "n": 5,
+      "valores": [
+       81,
+       81,
+       81,
+       81,
+       81
+      ]
+     }
+    },
+    "https://news.ycombinator.com/": {
+     "loadMs": {
+      "mediana": 754,
+      "min": 752,
+      "max": 763,
+      "n": 5,
+      "valores": [
+       754,
+       753,
+       763,
+       757,
+       752
+      ]
+     },
+     "lcpMs": {
+      "mediana": 628,
+      "min": 624,
+      "max": 636,
+      "n": 5,
+      "valores": [
+       624,
+       624,
+       636,
+       632,
+       628
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 756,
+      "min": 755,
+      "max": 765,
+      "n": 5,
+      "valores": [
+       756,
+       756,
+       765,
+       759,
+       755
+      ]
+     },
+     "recursos": {
+      "mediana": 6,
+      "min": 6,
+      "max": 6,
+      "n": 5,
+      "valores": [
+       6,
+       6,
+       6,
+       6,
+       6
+      ]
+     }
+    },
+    "https://www.reddit.com/r/programming/": {
+     "loadMs": {
+      "mediana": 306,
+      "min": 305,
+      "max": 311,
+      "n": 5,
+      "valores": [
+       311,
+       305,
+       306,
+       305,
+       308
+      ]
+     },
+     "lcpMs": {
+      "mediana": 240,
+      "min": 236,
+      "max": 244,
+      "n": 5,
+      "valores": [
+       244,
+       236,
+       236,
+       240,
+       240
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 308,
+      "min": 308,
+      "max": 314,
+      "n": 5,
+      "valores": [
+       314,
+       308,
+       308,
+       308,
+       311
+      ]
+     },
+     "recursos": {
+      "mediana": 5,
+      "min": 5,
+      "max": 6,
+      "n": 5,
+      "valores": [
+       5,
+       5,
+       5,
+       5,
+       6
+      ]
+     }
+    },
+    "https://www.amazon.com/": {
+     "loadMs": {
+      "mediana": 697,
+      "min": 559,
+      "max": 779,
+      "n": 5,
+      "valores": [
+       703,
+       779,
+       697,
+       675,
+       559
+      ]
+     },
+     "lcpMs": {
+      "mediana": 416,
+      "min": 300,
+      "max": 516,
+      "n": 5,
+      "valores": [
+       416,
+       516,
+       408,
+       464,
+       300
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1088,
+      "min": 828,
+      "max": 1099,
+      "n": 5,
+      "valores": [
+       1099,
+       828,
+       1093,
+       1088,
+       956
+      ]
+     },
+     "recursos": {
+      "mediana": 117,
+      "min": 99,
+      "max": 122,
+      "n": 5,
+      "valores": [
+       121,
+       122,
+       99,
+       115,
+       117
+      ]
+     }
+    },
+    "https://www.nytimes.com/": {
+     "loadMs": {
+      "mediana": 2489,
+      "min": 2317,
+      "max": 2634,
+      "n": 5,
+      "valores": [
+       2498,
+       2317,
+       2634,
+       2455,
+       2489
+      ]
+     },
+     "lcpMs": {
+      "mediana": 2856,
+      "min": 2832,
+      "max": 3600,
+      "n": 5,
+      "valores": [
+       2832,
+       2868,
+       3600,
+       2856,
+       2852
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 2492,
+      "min": 2320,
+      "max": 2638,
+      "n": 5,
+      "valores": [
+       2500,
+       2320,
+       2638,
+       2458,
+       2492
+      ]
+     },
+     "recursos": {
+      "mediana": 51,
+      "min": 51,
+      "max": 51,
+      "n": 5,
+      "valores": [
+       51,
+       51,
+       51,
+       51,
+       51
+      ]
+     }
+    },
+    "https://elcomercio.pe/": {
+     "loadMs": {
+      "mediana": 648,
+      "min": 615,
+      "max": 948,
+      "n": 5,
+      "valores": [
+       617,
+       648,
+       948,
+       731,
+       615
+      ]
+     },
+     "lcpMs": {
+      "mediana": 236,
+      "min": 220,
+      "max": 340,
+      "n": 5,
+      "valores": [
+       252,
+       236,
+       224,
+       340,
+       220
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 651,
+      "min": 617,
+      "max": 950,
+      "n": 5,
+      "valores": [
+       620,
+       651,
+       950,
+       733,
+       617
+      ]
+     },
+     "recursos": {
+      "mediana": 139,
+      "min": 137,
+      "max": 139,
+      "n": 5,
+      "valores": [
+       138,
+       139,
+       137,
+       139,
+       139
+      ]
+     }
+    },
+    "_suma": {
+     "loadMs": 7422,
+     "lcpMs": 7256,
+     "ordenLoadMs": 8377
+    }
+   },
+   "brave": {
+    "https://es.wikipedia.org/wiki/Navegador_web": {
+     "loadMs": {
+      "mediana": 405,
+      "min": 356,
+      "max": 575,
+      "n": 5,
+      "valores": [
+       410,
+       405,
+       356,
+       575,
+       357
+      ]
+     },
+     "lcpMs": {
+      "mediana": 356,
+      "min": 352,
+      "max": 356,
+      "n": 5,
+      "valores": [
+       352,
+       352,
+       356,
+       356,
+       356
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 407,
+      "min": 359,
+      "max": 578,
+      "n": 5,
+      "valores": [
+       413,
+       407,
+       359,
+       578,
+       360
+      ]
+     },
+     "recursos": {
+      "mediana": 42,
+      "min": 42,
+      "max": 42,
+      "n": 5,
+      "valores": [
+       42,
+       42,
+       42,
+       42,
+       42
+      ]
+     }
+    },
+    "https://github.com/electron/electron": {
+     "loadMs": {
+      "mediana": 1048,
+      "min": 1020,
+      "max": 1100,
+      "n": 5,
+      "valores": [
+       1100,
+       1048,
+       1021,
+       1059,
+       1020
+      ]
+     },
+     "lcpMs": {
+      "mediana": 932,
+      "min": 900,
+      "max": 988,
+      "n": 5,
+      "valores": [
+       932,
+       900,
+       964,
+       908,
+       988
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1051,
+      "min": 1022,
+      "max": 1102,
+      "n": 5,
+      "valores": [
+       1102,
+       1051,
+       1023,
+       1061,
+       1022
+      ]
+     },
+     "recursos": {
+      "mediana": 155,
+      "min": 154,
+      "max": 155,
+      "n": 5,
+      "valores": [
+       154,
+       154,
+       155,
+       155,
+       155
+      ]
+     }
+    },
+    "https://www.youtube.com/": {
+     "loadMs": {
+      "mediana": 562,
+      "min": 529,
+      "max": 589,
+      "n": 5,
+      "valores": [
+       562,
+       589,
+       580,
+       529,
+       562
+      ]
+     },
+     "lcpMs": {
+      "mediana": 660,
+      "min": 616,
+      "max": 680,
+      "n": 5,
+      "valores": [
+       648,
+       680,
+       668,
+       616,
+       660
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 2433,
+      "min": 2394,
+      "max": 2472,
+      "n": 5,
+      "valores": [
+       2413,
+       2472,
+       2448,
+       2433,
+       2394
+      ]
+     },
+     "recursos": {
+      "mediana": 121,
+      "min": 113,
+      "max": 125,
+      "n": 5,
+      "valores": [
+       123,
+       121,
+       113,
+       125,
+       118
+      ]
+     }
+    },
+    "https://developer.mozilla.org/es/": {
+     "loadMs": {
+      "mediana": 136,
+      "min": 130,
+      "max": 144,
+      "n": 5,
+      "valores": [
+       144,
+       130,
+       144,
+       136,
+       131
+      ]
+     },
+     "lcpMs": {
+      "mediana": 524,
+      "min": 432,
+      "max": 840,
+      "n": 5,
+      "valores": [
+       496,
+       776,
+       840,
+       524,
+       432
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 139,
+      "min": 133,
+      "max": 146,
+      "n": 5,
+      "valores": [
+       146,
+       133,
+       146,
+       139,
+       133
+      ]
+     },
+     "recursos": {
+      "mediana": 76,
+      "min": 76,
+      "max": 76,
+      "n": 5,
+      "valores": [
+       76,
+       76,
+       76,
+       76,
+       76
+      ]
+     }
+    },
+    "https://www.bbc.com/mundo": {
+     "loadMs": {
+      "mediana": 315,
+      "min": 203,
+      "max": 333,
+      "n": 5,
+      "valores": [
+       203,
+       314,
+       315,
+       333,
+       319
+      ]
+     },
+     "lcpMs": {
+      "mediana": 148,
+      "min": 144,
+      "max": 156,
+      "n": 5,
+      "valores": [
+       148,
+       144,
+       144,
+       152,
+       156
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 317,
+      "min": 206,
+      "max": 336,
+      "n": 5,
+      "valores": [
+       206,
+       316,
+       317,
+       336,
+       322
+      ]
+     },
+     "recursos": {
+      "mediana": 93,
+      "min": 90,
+      "max": 93,
+      "n": 5,
+      "valores": [
+       90,
+       93,
+       93,
+       93,
+       93
+      ]
+     }
+    },
+    "https://news.ycombinator.com/": {
+     "loadMs": {
+      "mediana": 833,
+      "min": 778,
+      "max": 836,
+      "n": 5,
+      "valores": [
+       833,
+       834,
+       836,
+       778,
+       778
+      ]
+     },
+     "lcpMs": {
+      "mediana": 692,
+      "min": 648,
+      "max": 696,
+      "n": 5,
+      "valores": [
+       692,
+       696,
+       696,
+       648,
+       648
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 835,
+      "min": 780,
+      "max": 838,
+      "n": 5,
+      "valores": [
+       835,
+       837,
+       838,
+       781,
+       780
+      ]
+     },
+     "recursos": {
+      "mediana": 6,
+      "min": 6,
+      "max": 6,
+      "n": 5,
+      "valores": [
+       6,
+       6,
+       6,
+       6,
+       6
+      ]
+     }
+    },
+    "https://www.reddit.com/r/programming/": {
+     "loadMs": {
+      "mediana": 1040,
+      "min": 1001,
+      "max": 1566,
+      "n": 5,
+      "valores": [
+       1566,
+       1085,
+       1040,
+       1001,
+       1035
+      ]
+     },
+     "lcpMs": {
+      "mediana": 628,
+      "min": 596,
+      "max": 880,
+      "n": 5,
+      "valores": [
+       880,
+       660,
+       624,
+       596,
+       628
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1085,
+      "min": 1048,
+      "max": 1612,
+      "n": 5,
+      "valores": [
+       1612,
+       1132,
+       1085,
+       1048,
+       1084
+      ]
+     },
+     "recursos": {
+      "mediana": 79,
+      "min": 77,
+      "max": 80,
+      "n": 5,
+      "valores": [
+       77,
+       79,
+       80,
+       79,
+       78
+      ]
+     }
+    },
+    "https://www.amazon.com/": {
+     "loadMs": {
+      "mediana": 721,
+      "min": 181,
+      "max": 899,
+      "n": 5,
+      "valores": [
+       899,
+       798,
+       721,
+       181,
+       716
+      ]
+     },
+     "lcpMs": {
+      "mediana": 508,
+      "min": 208,
+      "max": 544,
+      "n": 5,
+      "valores": [
+       512,
+       544,
+       496,
+       208,
+       508
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1098,
+      "min": 280,
+      "max": 1276,
+      "n": 5,
+      "valores": [
+       1276,
+       868,
+       1098,
+       280,
+       1103
+      ]
+     },
+     "recursos": {
+      "mediana": 118,
+      "min": 2,
+      "max": 121,
+      "n": 5,
+      "valores": [
+       118,
+       116,
+       121,
+       2,
+       119
+      ]
+     }
+    },
+    "https://www.nytimes.com/": {
+     "loadMs": {
+      "mediana": 878,
+      "min": 800,
+      "max": 907,
+      "n": 5,
+      "valores": [
+       893,
+       907,
+       878,
+       800,
+       836
+      ]
+     },
+     "lcpMs": {
+      "mediana": 2888,
+      "min": 2800,
+      "max": 2940,
+      "n": 5,
+      "valores": [
+       2940,
+       2888,
+       2872,
+       2912,
+       2800
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 880,
+      "min": 803,
+      "max": 910,
+      "n": 5,
+      "valores": [
+       896,
+       910,
+       880,
+       803,
+       840
+      ]
+     },
+     "recursos": {
+      "mediana": 250,
+      "min": 250,
+      "max": 250,
+      "n": 5,
+      "valores": [
+       250,
+       250,
+       250,
+       250,
+       250
+      ]
+     }
+    },
+    "https://elcomercio.pe/": {
+     "loadMs": {
+      "mediana": 489,
+      "min": 361,
+      "max": 825,
+      "n": 5,
+      "valores": [
+       516,
+       825,
+       361,
+       489,
+       378
+      ]
+     },
+     "lcpMs": {
+      "mediana": 592,
+      "min": 372,
+      "max": 804,
+      "n": 5,
+      "valores": [
+       804,
+       496,
+       372,
+       708,
+       592
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 492,
+      "min": 364,
+      "max": 827,
+      "n": 5,
+      "valores": [
+       519,
+       827,
+       364,
+       492,
+       382
+      ]
+     },
+     "recursos": {
+      "mediana": 56,
+      "min": 56,
+      "max": 56,
+      "n": 5,
+      "valores": [
+       56,
+       56,
+       56,
+       56,
+       56
+      ]
+     }
+    },
+    "_suma": {
+     "loadMs": 6427,
+     "lcpMs": 7928,
+     "ordenLoadMs": 8737
+    }
+   },
+   "naviris-sin": {
+    "https://es.wikipedia.org/wiki/Navegador_web": {
+     "loadMs": {
+      "mediana": 379,
+      "min": 376,
+      "max": 383,
+      "n": 5,
+      "valores": [
+       376,
+       376,
+       380,
+       383,
+       379
+      ]
+     },
+     "lcpMs": {
+      "mediana": 320,
+      "min": 316,
+      "max": 328,
+      "n": 5,
+      "valores": [
+       316,
+       320,
+       324,
+       328,
+       316
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 388,
+      "min": 383,
+      "max": 390,
+      "n": 5,
+      "valores": [
+       383,
+       384,
+       388,
+       390,
+       388
+      ]
+     },
+     "recursos": {
+      "mediana": 41,
+      "min": 41,
+      "max": 41,
+      "n": 5,
+      "valores": [
+       41,
+       41,
+       41,
+       41,
+       41
+      ]
+     }
+    },
+    "https://github.com/electron/electron": {
+     "loadMs": {
+      "mediana": 974,
+      "min": 907,
+      "max": 1051,
+      "n": 5,
+      "valores": [
+       1007,
+       1051,
+       907,
+       954,
+       974
+      ]
+     },
+     "lcpMs": {
+      "mediana": 792,
+      "min": 748,
+      "max": 936,
+      "n": 5,
+      "valores": [
+       840,
+       936,
+       748,
+       772,
+       792
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 982,
+      "min": 914,
+      "max": 1058,
+      "n": 5,
+      "valores": [
+       1014,
+       1058,
+       914,
+       962,
+       982
+      ]
+     },
+     "recursos": {
+      "mediana": 152,
+      "min": 151,
+      "max": 152,
+      "n": 5,
+      "valores": [
+       151,
+       152,
+       152,
+       152,
+       152
+      ]
+     }
+    },
+    "https://www.youtube.com/": {
+     "loadMs": {
+      "mediana": 676,
+      "min": 544,
+      "max": 723,
+      "n": 5,
+      "valores": [
+       581,
+       723,
+       544,
+       704,
+       676
+      ]
+     },
+     "lcpMs": {
+      "mediana": 708,
+      "min": 668,
+      "max": 728,
+      "n": 5,
+      "valores": [
+       728,
+       728,
+       680,
+       708,
+       668
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1211,
+      "min": 1041,
+      "max": 1241,
+      "n": 5,
+      "valores": [
+       1134,
+       1228,
+       1041,
+       1211,
+       1241
+      ]
+     },
+     "recursos": {
+      "mediana": 127,
+      "min": 83,
+      "max": 134,
+      "n": 5,
+      "valores": [
+       83,
+       127,
+       131,
+       126,
+       134
+      ]
+     }
+    },
+    "https://developer.mozilla.org/es/": {
+     "loadMs": {
+      "mediana": 90,
+      "min": 86,
+      "max": 93,
+      "n": 5,
+      "valores": [
+       90,
+       90,
+       93,
+       86,
+       86
+      ]
+     },
+     "lcpMs": {
+      "mediana": 408,
+      "min": 396,
+      "max": 896,
+      "n": 5,
+      "valores": [
+       404,
+       896,
+       408,
+       396,
+       408
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 98,
+      "min": 93,
+      "max": 101,
+      "n": 5,
+      "valores": [
+       98,
+       98,
+       101,
+       93,
+       95
+      ]
+     },
+     "recursos": {
+      "mediana": 73,
+      "min": 73,
+      "max": 73,
+      "n": 5,
+      "valores": [
+       73,
+       73,
+       73,
+       73,
+       73
+      ]
+     }
+    },
+    "https://www.bbc.com/mundo": {
+     "loadMs": {
+      "mediana": 428,
+      "min": 413,
+      "max": 445,
+      "n": 5,
+      "valores": [
+       413,
+       428,
+       416,
+       445,
+       439
+      ]
+     },
+     "lcpMs": {
+      "mediana": 280,
+      "min": 272,
+      "max": 292,
+      "n": 5,
+      "valores": [
+       280,
+       288,
+       272,
+       272,
+       292
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 436,
+      "min": 420,
+      "max": 453,
+      "n": 5,
+      "valores": [
+       420,
+       436,
+       423,
+       453,
+       447
+      ]
+     },
+     "recursos": {
+      "mediana": 82,
+      "min": 82,
+      "max": 83,
+      "n": 5,
+      "valores": [
+       82,
+       82,
+       83,
+       82,
+       82
+      ]
+     }
+    },
+    "https://news.ycombinator.com/": {
+     "loadMs": {
+      "mediana": 810,
+      "min": 755,
+      "max": 811,
+      "n": 5,
+      "valores": [
+       811,
+       810,
+       755,
+       810,
+       757
+      ]
+     },
+     "lcpMs": {
+      "mediana": 668,
+      "min": 628,
+      "max": 672,
+      "n": 5,
+      "valores": [
+       668,
+       672,
+       628,
+       668,
+       632
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 817,
+      "min": 762,
+      "max": 819,
+      "n": 5,
+      "valores": [
+       819,
+       818,
+       762,
+       817,
+       764
+      ]
+     },
+     "recursos": {
+      "mediana": 5,
+      "min": 5,
+      "max": 5,
+      "n": 5,
+      "valores": [
+       5,
+       5,
+       5,
+       5,
+       5
+      ]
+     }
+    },
+    "https://www.reddit.com/r/programming/": {
+     "loadMs": {
+      "mediana": 222,
+      "min": 213,
+      "max": 257,
+      "n": 5,
+      "valores": [
+       257,
+       213,
+       222,
+       213,
+       245
+      ]
+     },
+     "lcpMs": {
+      "mediana": 140,
+      "min": 140,
+      "max": 152,
+      "n": 5,
+      "valores": [
+       140,
+       140,
+       152,
+       140,
+       144
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 230,
+      "min": 220,
+      "max": 265,
+      "n": 5,
+      "valores": [
+       265,
+       220,
+       230,
+       222,
+       254
+      ]
+     },
+     "recursos": {
+      "mediana": 4,
+      "min": 4,
+      "max": 4,
+      "n": 5,
+      "valores": [
+       4,
+       4,
+       4,
+       4,
+       4
+      ]
+     }
+    },
+    "https://www.amazon.com/": {
+     "loadMs": {
+      "mediana": 699,
+      "min": 592,
+      "max": 991,
+      "n": 5,
+      "valores": [
+       991,
+       699,
+       592,
+       798,
+       693
+      ]
+     },
+     "lcpMs": {
+      "mediana": 540,
+      "min": 360,
+      "max": 560,
+      "n": 5,
+      "valores": [
+       544,
+       532,
+       360,
+       560,
+       540
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1049,
+      "min": 950,
+      "max": 1069,
+      "n": 5,
+      "valores": [
+       1049,
+       1058,
+       950,
+       1019,
+       1069
+      ]
+     },
+     "recursos": {
+      "mediana": 119,
+      "min": 118,
+      "max": 145,
+      "n": 5,
+      "valores": [
+       118,
+       119,
+       145,
+       119,
+       119
+      ]
+     }
+    },
+    "https://www.nytimes.com/": {
+     "loadMs": {
+      "mediana": 2239,
+      "min": 2221,
+      "max": 6380,
+      "n": 5,
+      "valores": [
+       2231,
+       2239,
+       2221,
+       2298,
+       6380
+      ]
+     },
+     "lcpMs": {
+      "mediana": 2736,
+      "min": 2596,
+      "max": 6956,
+      "n": 5,
+      "valores": [
+       2620,
+       2596,
+       2736,
+       2868,
+       6956
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 2246,
+      "min": 2228,
+      "max": 6387,
+      "n": 5,
+      "valores": [
+       2239,
+       2246,
+       2228,
+       2305,
+       6387
+      ]
+     },
+     "recursos": {
+      "mediana": 49,
+      "min": 45,
+      "max": 50,
+      "n": 5,
+      "valores": [
+       45,
+       49,
+       49,
+       45,
+       50
+      ]
+     }
+    },
+    "https://elcomercio.pe/": {
+     "loadMs": {
+      "mediana": 995,
+      "min": 631,
+      "max": 1114,
+      "n": 5,
+      "valores": [
+       631,
+       1114,
+       1040,
+       995,
+       648
+      ]
+     },
+     "lcpMs": {
+      "mediana": 228,
+      "min": 212,
+      "max": 664,
+      "n": 5,
+      "valores": [
+       228,
+       228,
+       664,
+       248,
+       212
+      ]
+     },
+     "ordenLoadMs": {
+      "mediana": 1005,
+      "min": 640,
+      "max": 1121,
+      "n": 5,
+      "valores": [
+       640,
+       1121,
+       1047,
+       1005,
+       654
+      ]
+     },
+     "recursos": {
+      "mediana": 111,
+      "min": 109,
+      "max": 112,
+      "n": 5,
+      "valores": [
+       110,
+       112,
+       109,
+       111,
+       111
+      ]
+     }
+    },
+    "_suma": {
+     "loadMs": 7512,
+     "lcpMs": 6820,
+     "ordenLoadMs": 8462
+    }
+   }
+  },
+  "youtube": {
+   "chrome": {
+    "cpuMs60s": {
+     "mediana": 8173,
+     "min": 7063,
+     "max": 8516,
+     "n": 3,
+     "valores": [
+      8516,
+      8173,
+      7063
+     ]
+    },
+    "wsMB": {
+     "mediana": 1241.5,
+     "min": 1232.1,
+     "max": 1254.8,
+     "n": 3,
+     "valores": [
+      1241.5,
+      1254.8,
+      1232.1
+     ]
+    },
+    "privateBytesMB": {
+     "mediana": 895.1,
+     "min": 894.4,
+     "max": 898.5,
+     "n": 3,
+     "valores": [
+      895.1,
+      898.5,
+      894.4
+     ]
+    },
+    "procesos": {
+     "mediana": 17,
+     "min": 16,
+     "max": 17,
+     "n": 3,
+     "valores": [
+      17,
+      17,
+      16
+     ]
+    },
+    "frames": {
+     "mediana": 1829,
+     "min": 1828,
+     "max": 1830,
+     "n": 3,
+     "valores": [
+      1829,
+      1828,
+      1830
+     ]
+    },
+    "perdidos": {
+     "mediana": 0,
+     "min": 0,
+     "max": 0,
+     "n": 3,
+     "valores": [
+      0,
+      0,
+      0
+     ]
+    },
+    "avanceS": {
+     "mediana": 61,
+     "min": 60.9,
+     "max": 61,
+     "n": 3,
+     "valores": [
+      61,
+      60.9,
+      61
+     ]
+    },
+    "calidad": [
+     "large→large"
+    ],
+    "codec": [
+     "av01.0.04M.08 (397) / opus (251)"
+    ],
+    "anuncios": [
+     0,
+     0,
+     0
+    ]
+   },
+   "brave": {
+    "cpuMs60s": {
+     "mediana": 8844,
+     "min": 6500,
+     "max": 9812,
+     "n": 3,
+     "valores": [
+      8844,
+      6500,
+      9812
+     ]
+    },
+    "wsMB": {
+     "mediana": 1148.5,
+     "min": 1147.8,
+     "max": 1164.3,
+     "n": 3,
+     "valores": [
+      1147.8,
+      1148.5,
+      1164.3
+     ]
+    },
+    "privateBytesMB": {
+     "mediana": 889.1,
+     "min": 863.5,
+     "max": 897,
+     "n": 3,
+     "valores": [
+      863.5,
+      889.1,
+      897
+     ]
+    },
+    "procesos": {
+     "mediana": 10,
+     "min": 10,
+     "max": 10,
+     "n": 3,
+     "valores": [
+      10,
+      10,
+      10
+     ]
+    },
+    "frames": {
+     "mediana": 1827,
+     "min": 1827,
+     "max": 1828,
+     "n": 3,
+     "valores": [
+      1828,
+      1827,
+      1827
+     ]
+    },
+    "perdidos": {
+     "mediana": 0,
+     "min": 0,
+     "max": 0,
+     "n": 3,
+     "valores": [
+      0,
+      0,
+      0
+     ]
+    },
+    "avanceS": {
+     "mediana": 60.9,
+     "min": 60.9,
+     "max": 60.9,
+     "n": 3,
+     "valores": [
+      60.9,
+      60.9,
+      60.9
+     ]
+    },
+    "calidad": [
+     "large→large"
+    ],
+    "codec": [
+     "av01.0.04M.08 (397) / opus (251)"
+    ],
+    "anuncios": [
+     0,
+     0,
+     0
+    ]
+   },
+   "naviris": {
+    "cpuMs60s": {
+     "mediana": 7001,
+     "min": 6438,
+     "max": 9781,
+     "n": 3,
+     "valores": [
+      7001,
+      9781,
+      6438
+     ]
+    },
+    "wsMB": {
+     "mediana": 1312,
+     "min": 1301.7,
+     "max": 1349.7,
+     "n": 3,
+     "valores": [
+      1301.7,
+      1349.7,
+      1312
+     ]
+    },
+    "privateBytesMB": {
+     "mediana": 889.7,
+     "min": 885.5,
+     "max": 924.6,
+     "n": 3,
+     "valores": [
+      885.5,
+      924.6,
+      889.7
+     ]
+    },
+    "procesos": {
+     "mediana": 8,
+     "min": 8,
+     "max": 8,
+     "n": 3,
+     "valores": [
+      8,
+      8,
+      8
+     ]
+    },
+    "frames": {
+     "mediana": 1830,
+     "min": 1828,
+     "max": 1835,
+     "n": 3,
+     "valores": [
+      1828,
+      1835,
+      1830
+     ]
+    },
+    "perdidos": {
+     "mediana": 0,
+     "min": 0,
+     "max": 0,
+     "n": 3,
+     "valores": [
+      0,
+      0,
+      0
+     ]
+    },
+    "avanceS": {
+     "mediana": 61,
+     "min": 60.9,
+     "max": 61.2,
+     "n": 3,
+     "valores": [
+      60.9,
+      61.2,
+      61
+     ]
+    },
+    "calidad": [
+     "large→large"
+    ],
+    "codec": [
+     "av01.0.04M.08 (397) / opus (251)"
+    ],
+    "anuncios": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "bench": {
+   "naviris": {
+    "speedometer": {
+     "mediana": 40,
+     "min": 39.7,
+     "max": 40.7,
+     "n": 3,
+     "valores": [
+      40.7,
+      39.7,
+      40
+     ]
+    },
+    "jetstream": {
+     "mediana": 461.99,
+     "min": 454.54,
+     "max": 468.91,
+     "n": 3,
+     "valores": [
+      468.91,
+      461.99,
+      454.54
+     ]
+    },
+    "motionmark": {
+     "mediana": 1672.72,
+     "min": 1665.86,
+     "max": 1685.08,
+     "n": 3,
+     "valores": [
+      1665.86,
+      1672.72,
+      1685.08
+     ]
+    },
+    "viewport": [
+     "1216x692 dpr 1"
+    ]
+   },
+   "chrome": {
+    "speedometer": {
+     "mediana": 41.2,
+     "min": 40.8,
+     "max": 41.2,
+     "n": 3,
+     "valores": [
+      41.2,
+      40.8,
+      41.2
+     ]
+    },
+    "jetstream": {
+     "mediana": 467.44,
+     "min": 464.19,
+     "max": 469.61,
+     "n": 3,
+     "valores": [
+      467.44,
+      469.61,
+      464.19
+     ]
+    },
+    "motionmark": {
+     "mediana": 2800.03,
+     "min": 2675.69,
+     "max": 2810,
+     "n": 3,
+     "valores": [
+      2810,
+      2800.03,
+      2675.69
+     ]
+    },
+    "viewport": [
+     "1264x705 dpr 1"
+    ]
+   },
+   "brave": {
+    "speedometer": {
+     "mediana": 38.4,
+     "min": 38.4,
+     "max": 38.8,
+     "n": 3,
+     "valores": [
+      38.4,
+      38.4,
+      38.8
+     ]
+    },
+    "jetstream": {
+     "mediana": 468.26,
+     "min": 463.45,
+     "max": 477.47,
+     "n": 3,
+     "valores": [
+      477.47,
+      468.26,
+      463.45
+     ]
+    },
+    "motionmark": {
+     "mediana": 1415.24,
+     "min": 1409.24,
+     "max": 1432.65,
+     "n": 3,
+     "valores": [
+      1432.65,
+      1409.24,
+      1415.24
+     ]
+    },
+    "viewport": [
+     "1264x711 dpr 1"
+    ]
+   },
+   "electron": {
+    "speedometer": {
+     "mediana": 40.8,
+     "min": 39.7,
+     "max": 40.8,
+     "n": 3,
+     "valores": [
+      40.8,
+      40.8,
+      39.7
+     ]
+    },
+    "jetstream": {
+     "mediana": 466.72,
+     "min": 429.4,
+     "max": 471.48,
+     "n": 3,
+     "valores": [
+      471.48,
+      466.72,
+      429.4
+     ]
+    },
+    "motionmark": {
+     "mediana": 1686.83,
+     "min": 1676.7,
+     "max": 1704.99,
+     "n": 3,
+     "valores": [
+      1704.99,
+      1686.83,
+      1676.7
+     ]
+    },
+    "viewport": [
+     "1264x735 dpr 1"
+    ]
+   }
+  }
+ },
+ "antesDespues": {
+  "titulo": "Arranque antes y después de los cambios de la 3.0.0",
+  "nota": "Lo medido arriba es f1b6bd2. La 3.0.0 añade dos cambios: el motor del bloqueador se carga después de pedir la ventana, y el widget Tendencias guarda las tendencias mundiales 20 min y ya no monta páginas ocultas en cada repintado del hub.",
+  "nombres": {
+   "antes": "f1b6bd2",
+   "despues": "con los cambios de la 3.0.0"
+  },
+  "arranque": {
+   "antes": {
+    "frio.ventanaMs": {
+     "mediana": 1418,
+     "min": 1383,
+     "max": 1445,
+     "n": 8,
+     "valores": [
+      1425,
+      1407,
+      1445,
+      1444,
+      1383,
+      1400,
+      1422,
+      1414
+     ]
+    },
+    "frio.navegableMs": {
+     "mediana": 1025.5,
+     "min": 954,
+     "max": 1433,
+     "n": 8,
+     "valores": [
+      1048,
+      994,
+      975,
+      1064,
+      1014,
+      1037,
+      1433,
+      954
+     ]
+    },
+    "caliente.ventanaMs": {
+     "mediana": 1293.5,
+     "min": 1285,
+     "max": 1330,
+     "n": 8,
+     "valores": [
+      1330,
+      1291,
+      1301,
+      1301,
+      1296,
+      1287,
+      1285,
+      1286
+     ]
+    },
+    "caliente.navegableMs": {
+     "mediana": 372,
+     "min": 355,
+     "max": 410,
+     "n": 8,
+     "valores": [
+      410,
+      357,
+      382,
+      398,
+      362,
+      355,
+      357,
+      387
+     ]
+    }
+   },
+   "despues": {
+    "frio.ventanaMs": {
+     "mediana": 1434,
+     "min": 1416,
+     "max": 1456,
+     "n": 8,
+     "valores": [
+      1430,
+      1416,
+      1433,
+      1450,
+      1456,
+      1435,
+      1451,
+      1430
+     ]
+    },
+    "frio.navegableMs": {
+     "mediana": 903,
+     "min": 850,
+     "max": 980,
+     "n": 8,
+     "valores": [
+      863,
+      895,
+      850,
+      879,
+      950,
+      911,
+      980,
+      926
+     ]
+    },
+    "caliente.ventanaMs": {
+     "mediana": 1298,
+     "min": 1288,
+     "max": 1324,
+     "n": 8,
+     "valores": [
+      1290,
+      1301,
+      1292,
+      1295,
+      1309,
+      1324,
+      1314,
+      1288
+     ]
+    },
+    "caliente.navegableMs": {
+     "mediana": 389,
+     "min": 348,
+     "max": 449,
+     "n": 8,
+     "valores": [
+      360,
+      399,
+      348,
+      402,
+      397,
+      449,
+      381,
+      369
+     ]
+    }
+   }
+  },
+  "tendencias": {
+   "antes": {
+    "cpuMs25s": {
+     "mediana": 672,
+     "min": 594,
+     "max": 2406,
+     "n": 3,
+     "valores": [
+      672,
+      2406,
+      594
+     ]
+    },
+    "picoPrivateBytesMB": {
+     "mediana": 557.6,
+     "min": 542.3,
+     "max": 613.3,
+     "n": 3,
+     "valores": [
+      542.3,
+      613.3,
+      557.6
+     ]
+    },
+    "procesosNuevos": {
+     "mediana": 1,
+     "min": 1,
+     "max": 6,
+     "n": 3,
+     "valores": [
+      1,
+      6,
+      1
+     ]
+    }
+   },
+   "despues": {
+    "cpuMs25s": {
+     "mediana": 203,
+     "min": 172,
+     "max": 266,
+     "n": 3,
+     "valores": [
+      172,
+      203,
+      266
+     ]
+    },
+    "picoPrivateBytesMB": {
+     "mediana": 463,
+     "min": 459,
+     "max": 469.9,
+     "n": 3,
+     "valores": [
+      463,
+      459,
+      469.9
+     ]
+    },
+    "procesosNuevos": {
+     "mediana": 0,
+     "min": 0,
+     "max": 0,
+     "n": 3,
+     "valores": [
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  }
+ }
+}
