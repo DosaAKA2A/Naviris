@@ -17,3 +17,4 @@ diseno/
 # Secretos de wrangler dev: NUNCA al repo (main es publico)
 .dev.vars
 **/.dev.vars
+!test/ayudas/localstorage-file/*.log

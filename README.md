@@ -30,18 +30,43 @@ npm start
 npm run dist        # genera instalador NSIS + portable en dist/
 ```
 
-## Publicar una nueva versión (auto-update)
+## Canales, pruebas y publicación
 
-1. Sube la versión en `package.json` (p. ej. `1.0.1`).
-2. Exporta un token de GitHub con permiso `repo`:
-   ```bash
-   export GH_TOKEN=tu_token   # en PowerShell: $env:GH_TOKEN="tu_token"
-   ```
-3. Publica:
-   ```bash
-   npm run release
-   ```
-   Esto compila (`npm run dist`, con la firma VMP de Widevine) y después `build/publish-release.js` sube a la release del tag el instalador, el portable, el blockmap y el feed: `latest.yml` si la versión es estable o `dev.yml` si lleva `-dev` (NavirisDev). No se usa `electron-builder --publish`: sus dos publicadores chocan y dejan la release a medias. Las copias instaladas de cada línea detectarán la nueva versión y podrán actualizarse desde el propio navegador.
+### Canales de actualización
+
+Naviris tiene dos líneas que no se cruzan:
+
+- **Estable** (versiones como `2.8.1`): se publica como release normal de GitHub con el feed `latest.yml`. Las instalaciones estables solo ven estables.
+- **Dev** (versiones con `-dev`, como `3.0.0-dev.1`; la instalación se llama NavirisDev): release marcada como *prerelease* con el feed `dev.yml`. Las instalaciones dev solo ven devs.
+
+Desde el menú, en las actualizaciones, se puede instalar a mano la última de la otra línea. Quién escucha qué está en `src/canal-actualizaciones.js`; el feed y sus comprobaciones, en `build/feed-actualizador.js`. Cada versión publicada tiene su entrada en [CHANGELOG.md](CHANGELOG.md) y sus novedades en `novedades/`.
+
+### Cómo se prueba
+
+```bash
+npm run check          # node --check de todo src/
+npm test               # pruebas unitarias (sin abrir la app)
+npm run test:e2e:ci    # la app real, sin red de terceros ni cuentas (repite una vez el archivo que falle)
+npm run test:e2e       # todas las de la app real, también las que necesitan YouTube, X o el relay de Watch Party
+npm run test:e2e:adblock
+```
+
+Las pruebas con la app real arrancan Naviris con un perfil temporal propio y hablan con ella por CDP. El puerto se elige con `NAVIRIS_E2E_PUERTO` (y `NAVIRIS_E2E_PORT` para la de perfiles). `test/actualizador.test.js` pasa los feeds que genera el publicador por el mismo electron-updater de la app, contra un GitHub simulado: comprueba versión, sha512, tamaño y nombre, y que una estable nunca recibe una dev.
+
+En GitHub, el workflow **Pruebas** (`.github/workflows/pruebas.yml`) corre `npm run check`, `npm test` y `npm run test:e2e:ci` en Windows en cada push y pull request a `main` y `v3`. Notas de instalación en CI: `electron` es el de castlabs y viene de GitHub por git (el workflow reescribe ssh a https porque el runner no tiene clave), el binario se baja con `node node_modules/electron/install.js`, `adblock-rs` se compila con Rust (el runner trae rustup) y la firma VMP de Widevine no hace falta para probar.
+
+### Cómo se publica
+
+1. Sube la versión en `package.json` y añade su entrada en `CHANGELOG.md` y en `novedades/`.
+2. Exporta un token de GitHub con permiso `repo` (`GH_TOKEN`).
+3. `npm run release`: compila con la firma VMP (`npm run dist`) y luego `build/publish-release.js`:
+   - corre `npm test` y **no publica si falla**;
+   - genera el feed de su línea (`latest.yml` o `dev.yml`, nunca los dos), comprueba que cuadra con el instalador y que la release está marcada como prerelease solo si es dev;
+   - sube instalador, portable, blockmap y feed, y vuelve a comprobar el feed tal como lo sirve GitHub.
+
+No se usa `electron-builder --publish`: sus dos publicadores (instalador y portable) chocan y dejan la release a medias.
+
+Solo en una emergencia se puede publicar sin pruebas con `NAVIRIS_PUBLICAR_SIN_PRUEBAS=1`; el script lo avisa en la salida. El workflow **Desktop Release** solo compila (sin firma VMP, no se distribuye) y no arranca si **Pruebas** falla.
 
 ## Licencia
 

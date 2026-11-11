@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <!-- CSP de la INTERFAZ (no de las webs que visitas). Esta página tiene acceso
-       al puente window.cobalt (contraseñas, tarjetas), así que se blinda: nada
+       al puente window.navirisApp (contraseñas, tarjetas), así que se blinda: nada
        de <script> remotos ni eval, y las conexiones salientes se limitan a los
        servicios que la interfaz usa de verdad. img-src acepta https: y data:
        porque los favicons y miniaturas vienen de cualquier sitio. -->
@@ -16,9 +16,6 @@
 </head>
 <body>
 
-  <!-- La refracción del liquid glass la genera el motor de lentes de
-       renderer.js (lgAplicar): filtros SVG por forma en un <defs> propio. -->
-
   <!-- El arranque ya NO vive aquí (2026-08-17): era una placa pequeña flotando
        dentro de una ventana de 1280×800, así que lo que se veía era la ventana
        enorme. Ahora es una ventana propia y cuadrada (src/splash.html) y esta
@@ -28,7 +25,7 @@
   <header id="titlebar">
     <div class="tb-logo" title="Naviris"><span class="iris-slot" data-iris="30"></span></div>
     <span id="private-badge" class="hidden" title="Ventana privada"></span>
-    <span id="agent-badge" class="hidden" title="Modo agente activo: un agente externo (por ejemplo, tu Claude) puede controlar este navegador por CDP (127.0.0.1:9223). Desactívalo en Ajustes cuando no lo uses."><span class="ab-dot"></span>Agente</span>
+    <span id="agent-badge" class="hidden" title="Modo agente activo: cualquier programa de tu equipo puede controlar este navegador por completo (CDP en 127.0.0.1:9223), sin pedir clave. Apágalo en Ajustes cuando no lo uses."><span class="ab-dot"></span>Agente</span>
     <nav id="tabstrip"></nav>
     <button id="newtab-btn" title="Nueva pestaña (Ctrl+T)" data-ico="plus"></button>
     <div class="tb-drag"></div>
@@ -82,7 +79,9 @@
         <div id="urlbox">
           <button id="url-secure" type="button" title="Conexión" aria-label="Información del sitio" data-ico="lock-closed"></button>
           <input id="urlbar" type="text" spellcheck="false" autocomplete="off"
-                 placeholder="Busca en Google o escribe una dirección" />
+                 placeholder="Busca o escribe una dirección" />
+          <!-- Sin foco: el dominio en blanco y la ruta en gris (pintaVistaUrl) -->
+          <span id="url-vista" aria-hidden="true"><span class="uv-dom"></span><span class="uv-ruta"></span></span>
           <div id="suggest" class="hidden"></div>
         </div>
         <button id="nav-shield" title="Bloqueador de anuncios" data-ico="shield-half"></button>
@@ -99,6 +98,22 @@
         <label class="perm-remember"><input type="checkbox" id="perm-remember" checked /> Recordar</label>
         <button id="perm-block">Bloquear</button>
         <button id="perm-allow" class="primary">Permitir</button>
+      </div>
+
+      <!-- Ventana emergente bloqueada (abierta sin gesto): permitirlas en ese sitio -->
+      <div id="emerg-bar" class="hidden">
+        <span class="perm-ic" data-ico="shield-half"></span>
+        <span id="emerg-text"></span>
+        <button id="emerg-close">Cerrar</button>
+        <button id="emerg-allow" class="primary">Permitir en este sitio</button>
+      </div>
+
+      <!-- Programa o script que una web descargó sin un clic: conservarlo o descartarlo -->
+      <div id="riesgo-bar" class="hidden">
+        <span class="perm-ic" data-ico="shield-half"></span>
+        <span id="riesgo-text"></span>
+        <button id="riesgo-conservar">Conservar</button>
+        <button id="riesgo-descartar" class="primary">Descartar</button>
       </div>
 
       <!-- Barra de contraseñas: guardar al iniciar sesión / autorrellenar -->
@@ -136,6 +151,19 @@
             <button id="fallo-reintentar" type="button"><span data-ico="arrow-path"></span>Reintentar</button>
           </div>
         </section>
+
+        <!-- alert/confirm/prompt de la página y «abrir con otra aplicación»:
+             tapa solo la pestaña que pregunta (la rellena pintaDialogo) -->
+        <div id="tab-dialogo" class="hidden">
+          <div class="modal-card td-card" role="alertdialog" aria-modal="false" aria-labelledby="td-tit" aria-describedby="td-texto">
+            <h3 id="td-tit"></h3>
+            <p id="td-texto"></p>
+            <p id="td-url"></p>
+            <input id="td-valor" type="text" spellcheck="false" autocomplete="off" />
+            <label id="td-silencio" class="td-silencio"><input type="checkbox" id="td-silenciar" /> No dejar que esta página muestre más avisos</label>
+            <div class="modal-actions"><button id="td-cancelar" type="button">Cancelar</button><button id="td-aceptar" type="button" class="primary">Aceptar</button></div>
+          </div>
+        </div>
 
         <!-- Hub con widgets -->
         <section id="hub">
@@ -186,6 +214,13 @@
                  al bajarlo se vuelven translúcidas y se enciende el desenfoque. -->
             <div class="hp-fila"><span id="op-tit">Transparencia</span><b id="op-valor">0 %</b></div>
             <input id="op-slider" type="range" aria-labelledby="op-tit" min="0" max="65" step="5" value="0" title="Cuánto se transparentan los widgets del hub" />
+            <!-- Dock de accesos (Naviris 3): el de siempre, con su contenedor, o la
+                 repisa de vidrio tenue. Lo aplica aplicaDock(). -->
+            <div class="hp-fila"><span id="dock-tit">Dock de accesos</span></div>
+            <div class="hp-seg" role="radiogroup" aria-labelledby="dock-tit">
+              <button type="button" role="radio" data-dock="contenedor">Con contenedor</button>
+              <button type="button" role="radio" data-dock="repisa">Repisa de vidrio</button>
+            </div>
           </div>
         </section>
 
@@ -208,7 +243,7 @@
         <section id="dl-page" class="overlay-page hidden">
           <div class="bmp-inner">
             <div class="bmp-head">
-              <h2><span data-ico="download"></span> Descargas</h2>
+              <h2>Descargas</h2>
               <div class="bmp-tools">
                 <button id="dlp-folder" class="ghost-btn"><span data-ico="folder"></span> Abrir carpeta</button>
               </div>
@@ -263,21 +298,27 @@
   <!-- ===== Menú ===== -->
   <div id="menu-pop" class="hidden">
     <button data-action="newtab">Nueva pestaña <span class="kbd">Ctrl+T</span></button>
+    <button data-action="newwindow">Nueva ventana <span class="kbd">Ctrl+N</span></button>
     <button data-action="private">Nueva ventana privada <span class="kbd">Ctrl+Shift+N</span></button>
     <button data-action="bookmarks">Ver todos los marcadores</button>
     <button data-action="toggle-bookmarks">Mostrar/ocultar barra de marcadores</button>
     <button data-action="permissions">Permisos de sitios…</button>
+    <button data-action="borrar-datos">Borrar datos de navegación…</button>
+    <button data-action="predeterminado" class="menu-toggle"><span>Hacer de Naviris el navegador predeterminado<br /><small id="menu-predet-estado">Se elige en Configuración de Windows</small></span></button>
     <hr />
+    <label class="menu-toggle menu-select"><span>Buscador<br /><small>El que usa la barra de direcciones</small></span><select id="opt-buscador"></select></label>
     <label class="menu-toggle"><span><span class="mt-ico" data-ico="sun"></span>Modo claro<br /><small>Tema claro para la interfaz de Naviris</small></span><input type="checkbox" id="opt-light" /></label>
     <label class="menu-toggle"><span>Búsqueda inteligente<br /><small>Autocompleta la barra con tus sitios</small></span><input type="checkbox" id="opt-smartsearch" /></label>
     <label class="menu-toggle"><span>Bloquear claves de acceso<br /><small>Evita la ventana de Windows Hello · reinicia pestaña</small></span><input type="checkbox" id="opt-passkeys" /></label>
     <label class="menu-toggle"><span>Continuar donde lo dejaste<br /><small>Reabre las pestañas al iniciar</small></span><input type="checkbox" id="opt-restore" /></label>
+    <label class="menu-toggle"><span>Preguntar dónde guardar<br /><small>Cada descarga abre el cuadro de Guardar</small></span><input type="checkbox" id="opt-preguntar-descargas" /></label>
     <label class="menu-toggle"><span>Ahorro de energía<br /><small>Duerme las pestañas tras 30 min sin usarlas</small></span><input type="checkbox" id="opt-powersaver" /></label>
     <label class="menu-toggle"><span>Atajos de teclado<br /><small>Ctrl+T, Ctrl+W, Ctrl+R… · F11 y F12 siguen activos</small></span><input type="checkbox" id="opt-atajos" /></label>
     <label class="menu-toggle"><span>Pestañas en vertical<br /><small>En una columna a la izquierda, con mucho más sitio para el título</small></span><input type="checkbox" id="opt-vtabs" /></label>
     <label class="menu-toggle"><span>Botones laterales del mouse<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
+    <label class="menu-toggle"><span>Sonidos<br /><small>Al abrir Naviris, al terminar una descarga y en los recordatorios</small></span><input type="checkbox" id="opt-sonidos" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
-    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
+    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Mientras esté encendido, cualquier programa de tu equipo puede controlar Naviris por completo, sin pedir clave · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <label class="menu-toggle"><span>Actualizaciones automáticas<br /><small>Se bajan solas y se instalan al cerrar · apagado: te avisa y decides tú</small></span><input type="checkbox" id="opt-updauto" /></label>
     <hr />
     <!-- Sin "Buscar actualizaciones" (Dosa, 2026-08-18): las dos líneas se
@@ -448,6 +489,12 @@
   <div id="prompt-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><h3 id="prompt-title">Nueva carpeta</h3><input id="prompt-input" type="text" /><div class="modal-actions"><button id="prompt-cancel">Cancelar</button><button id="prompt-ok" class="primary">Crear</button></div></div></div>
 
 
+  <div id="datos-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="datos-modal-tit"><h3 id="datos-modal-tit">Borrar datos de navegación</h3>
+    <label class="datos-fila"><span>Historial de</span><select id="datos-periodo"><option value="3600000">la última hora</option><option value="86400000">las últimas 24 horas</option><option value="604800000">los últimos 7 días</option><option value="2419200000">las últimas 4 semanas</option><option value="0" selected>siempre</option></select></label>
+    <label class="datos-op"><input type="checkbox" id="datos-historial" checked /><span>Historial de navegación<small>Las páginas visitadas en ese periodo</small></span></label>
+    <label class="datos-op"><input type="checkbox" id="datos-cookies" /><span>Cookies y datos de sitios<small>Cierra tu sesión en casi todos los sitios. Se borra todo, sin importar el periodo</small></span></label>
+    <label class="datos-op"><input type="checkbox" id="datos-cache" checked /><span>Archivos en caché<small>Las páginas pueden tardar un poco más la próxima vez. Se borra todo</small></span></label>
+    <div class="modal-actions"><button id="datos-cancelar" type="button">Cancelar</button><button id="datos-borrar" type="button" class="primary">Borrar datos</button></div></div></div>
   <div id="perm-modal" class="modal hidden"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="perm-modal-tit"><h3 id="perm-modal-tit">Permisos de sitios</h3><p>Cámara, micrófono, ubicación, notificaciones… Naviris pregunta la primera vez y recuerda tu decisión por sitio. Aquí puedes revisarlas o revocarlas.</p><div id="perm-list"></div><div class="modal-actions"><button id="perm-clear-all" style="margin-right:auto">Borrar todos</button><button id="perm-modal-close" class="primary">Cerrar</button></div></div></div>
 
   <!-- ===== Cuenta Naviris ===== -->
@@ -514,6 +561,44 @@
 
   <script src="icons.js"></script>
   <script src="brands.js"></script>
-  <script src="renderer.js"></script>
+  <script src="sonidos.js"></script>
+  <script src="rat.js"></script>
+  <script src="hub-escala.js"></script>
+  <script src="atajos.js"></script>
+  <script src="buscadores.js"></script>
+  <script src="migra-claves.js"></script>
+  <!-- La interfaz: scripts clásicos que comparten el ámbito global (lo que uno declara lo ven
+       los demás, y los addons también). El orden importa: lo que se ejecuta al cargar un módulo
+       solo puede usar lo de los anteriores, y entre un módulo y el siguiente pueden correr
+       temporizadores y respuestas de IPC. -->
+  <script src="renderer/nucleo.js" defer></script>
+  <script src="renderer/espacios.js" defer></script>
+  <script src="renderer/menu-contextual.js" defer></script>
+  <script src="renderer/iconos-sitios.js" defer></script>
+  <script src="renderer/pestanas.js" defer></script>
+  <script src="renderer/barra-pestanas.js" defer></script>
+  <script src="renderer/barra-direcciones.js" defer></script>
+  <script src="renderer/marcadores.js" defer></script>
+  <script src="renderer/accesos.js" defer></script>
+  <script src="renderer/hub-maqueta.js" defer></script>
+  <script src="renderer/widget-spotify.js" defer></script>
+  <script src="renderer/widgets.js" defer></script>
+  <script src="renderer/widgets-personales.js" defer></script>
+  <script src="renderer/hub.js" defer></script>
+  <script src="renderer/cuenta.js" defer></script>
+  <script src="renderer/hub-aspecto.js" defer></script>
+  <script src="renderer/descargas.js" defer></script>
+  <script src="renderer/paneles.js" defer></script>
+  <script src="renderer/contrasenas.js" defer></script>
+  <script src="renderer/herramientas.js" defer></script>
+  <script src="renderer/menu-principal.js" defer></script>
+  <script src="renderer/mensajes-paginas.js" defer></script>
+  <script src="renderer/avisos.js" defer></script>
+  <script src="renderer/addons.js" defer></script>
+  <script src="renderer/actualizaciones.js" defer></script>
+  <script src="renderer/buscar.js" defer></script>
+  <script src="renderer/atajos-teclado.js" defer></script>
+  <script src="renderer/arranque.js" defer></script>
+  <script src="renderer/scroll.js" defer></script>
 </body>
 </html>

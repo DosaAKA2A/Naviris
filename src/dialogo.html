@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <!-- alert, confirm y prompt de una ventanita emergente (y «abrir con otra
+       aplicación»). Va en una capa propia encima de la página de la ventanita,
+       como el de las pestañas va encima de su pestaña: la página está parada
+       esperando la respuesta y no puede pintar nada. No navega ni pide red;
+       solo habla con main por su preload (dialogo-preload.js). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'" />
+  <title>Naviris</title>
+  <style>
+    @font-face {
+      font-family: 'Inter Var';
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url('fonts/inter-var.woff2') format('woff2');
+    }
+    /* Tokens del tema Naviris (mono) y, en .claro, los del tema claro (styles.css) */
+    :root {
+      --fondo: #1f1f1f; --aro: rgba(255,255,255,.07); --sombra: 0 14px 36px rgba(0,0,0,.55);
+      --texto: #f2f2f2; --fuerte: #ffffff; --tenue: #9a9a9a; --roce: rgba(255,255,255,.085); --campo: rgba(255,255,255,.055);
+      --acento: #ffffff; --acento-fg: #131313; --velo: rgba(8,8,8,.36);
+      --frena: cubic-bezier(.16,1,.3,1);
+    }
+    :root.claro {
+      --fondo: #ffffff; --aro: rgba(18,20,26,.09); --sombra: 0 14px 36px rgba(24,28,36,.16);
+      --texto: #2e3038; --fuerte: #23252b; --tenue: #5d5f66; --roce: rgba(20,22,28,.08); --campo: rgba(20,22,28,.055);
+      --acento: #3a3d45; --acento-fg: #f6f7f9; --velo: rgba(35,39,46,.22);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: var(--velo); display: flex; justify-content: center; align-items: flex-start; padding: 24px 16px;
+      font: 13.5px/1.45 "Inter Var", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--texto);
+      -webkit-font-smoothing: antialiased;
+    }
+    .tarjeta {
+      width: min(420px, 100%); max-height: calc(100% - 8px); overflow-y: auto; background: var(--fondo); border-radius: 14px; padding: 20px;
+      box-shadow: var(--sombra), 0 0 0 1px var(--aro); display: flex; flex-direction: column; gap: 10px;
+      animation: entra 260ms var(--frena);
+    }
+    @keyframes entra { from { opacity: 0; transform: translateY(-6px); } }
+    @media (prefers-reduced-motion: reduce) { .tarjeta { animation: none; } }
+    h1 { font-size: 15px; font-weight: 600; letter-spacing: -.005em; color: var(--fuerte); overflow-wrap: anywhere; }
+    p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow-y: auto; }
+    #url { font-size: 12.5px; color: var(--tenue); }
+    input[type="text"] { height: 34px; border: none; border-radius: 9px; padding: 0 10px; font: inherit; color: var(--texto); background: var(--campo); outline: none; }
+    input[type="text"]:focus-visible { box-shadow: 0 0 0 2px var(--acento); }
+    label { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--tenue); cursor: pointer; }
+    label input { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; accent-color: var(--acento); cursor: pointer; }
+    .acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    button { height: 32px; border: none; border-radius: 9px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 560; cursor: pointer;
+      background: transparent; color: var(--texto); transition: background-color 120ms ease, transform 100ms ease; }
+    button:hover { background: var(--roce); }
+    button:active { transform: scale(.97); }
+    button:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+    button.primario { background: var(--acento); color: var(--acento-fg); }
+    button.primario:hover { background: color-mix(in srgb, var(--acento) 88%, var(--fondo)); }
+    .oculto { display: none; }
+  </style>
+</head>
+<body>
+  <div class="tarjeta" role="alertdialog" aria-modal="true" aria-labelledby="tit" aria-describedby="texto">
+    <h1 id="tit"></h1>
+    <p id="texto"></p>
+    <p id="url" class="oculto"></p>
+    <input id="valor" type="text" class="oculto" spellcheck="false" autocomplete="off" />
+    <label id="silencio" class="oculto"><input type="checkbox" id="silenciar" /> No dejar que esta página muestre más avisos</label>
+    <div class="acciones"><button id="cancelar" type="button">Cancelar</button><button id="aceptar" type="button" class="primario">Aceptar</button></div>
+  </div>
+  <script src="dialogo.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- Imitación de un canal de Twitch con lo que toca el AutoClaim, copiado del DOM
+     real el 2026-11-03: el resumen de puntos (saldo de Bits y de puntos en el 1er
+     hijo; el cofre aparece en el 2º) y el menú de calidad del reproductor con sus
+     data-a-target. Elegir calidad en el menú escribe video-quality en localStorage,
+     como hace Twitch. Las funciones __pon* las usa el test para simular a Twitch. -->
+<html><head><meta charset="utf-8"><title>canal - Twitch</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; }
+  .video-player { position: relative; width: 640px; height: 360px; background: #000; }
+  video { width: 100%; height: 100%; }
+  #menu { position: absolute; right: 8px; bottom: 48px; background: #222; color: #fff; padding: 6px; }
+  .community-points-summary { display: flex; gap: 8px; padding: 8px; }
+  .community-points-summary button { min-width: 40px; min-height: 30px; }
+</style></head>
+<body>
+<div class="video-player">
+  <video id="v" autoplay muted playsinline loop src="/naviris-prueba/v720.webm"></video>
+  <button data-a-target="player-settings-button" style="position:absolute;right:8px;bottom:8px">Ajustes</button>
+  <div id="menu" hidden>
+    <button data-a-target="player-settings-menu-item-quality">Calidad</button>
+    <div id="sub" hidden></div>
+  </div>
+</div>
+<div data-test-selector="community-points-summary" class="community-points-summary">
+  <div><button aria-label="Saldo de Bits y puntos"><div data-test-selector="bits-balance-string"><span>150</span></div><div data-test-selector="copo-balance-string"><span>1.250</span></div></button></div>
+  <div id="hueco"></div>
+</div>
+<div id="cambios"></div>
+<script>
+  window.__registro = [];
+  const v = document.getElementById('v');
+  const menu = document.getElementById('menu'), sub = document.getElementById('sub');
+  document.querySelector('[data-a-target="player-settings-button"]').addEventListener('click', () => { menu.hidden = !menu.hidden; sub.hidden = true; });
+  // El submenú de calidades tarda un poco en pintarse, como el de React
+  document.querySelector('[data-a-target="player-settings-menu-item-quality"]').addEventListener('click', () => setTimeout(() => {
+    sub.innerHTML = '';
+    for (const [q, src] of [['Automática', 'v720'], ['720p', 'v720'], ['160p', 'v160']]) {
+      const o = document.createElement('div');
+      o.setAttribute('data-a-target', 'player-settings-submenu-quality-option');
+      o.innerHTML = '<input type="radio" name="q"><label></label>';
+      o.querySelector('label').textContent = q;
+      o.querySelector('input').addEventListener('click', () => {
+        v.src = '/naviris-prueba/' + src + '.webm';
+        localStorage.setItem('video-quality', JSON.stringify({ default: q }));
+        menu.hidden = true;
+      });
+      sub.appendChild(o);
+    }
+    sub.hidden = false;
+  }, 150));
+  // El cofre de bonificación: Twitch tarda un poco en quitarlo después del clic
+  window.__ponCofre = () => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'Reclamar bonificación');
+    b.innerHTML = '<div class="claimable-bonus__icon">+</div>';
+    b.addEventListener('click', () => { window.__registro.push('cofre'); setTimeout(() => b.remove(), 1000); });
+    document.getElementById('hueco').appendChild(b);
+  };
+  // Un aviso de drop con su botón, que aquí no se va
+  window.__ponDrop = () => {
+    const b = document.createElement('button');
+    b.textContent = 'Reclamar ahora';
+    b.addEventListener('click', () => window.__registro.push('drop'));
+    document.body.appendChild(b);
+  };
+  // Cualquier cambio del DOM (despierta al MutationObserver del AutoClaim)
+  window.__toca = () => document.getElementById('cambios').appendChild(document.createElement('div'));
+  // Navegación interna a otro canal (un raid): el stream nuevo entra en Automática
+  window.__otroCanal = () => { history.pushState({}, '', '/naviris-prueba-otro'); v.src = '/naviris-prueba/v720.webm'; };
+</script>
+</body></html>

@@ -44,6 +44,82 @@ if (ARRANQUE.scriptlets) {
   try { webFrame.executeJavaScript(ARRANQUE.scriptlets).catch(() => {}); } catch (e) { /* nada */ }
 }
 
+// --- alert, confirm y prompt con el diálogo de Naviris (2026-11-03) ---
+// Los nativos están apagados (disableDialogs) porque congelaban la ventana
+// entera. Estos preguntan a main con una llamada síncrona: la página espera la
+// respuesta como con los de verdad, pero solo se para ESTA pestaña (ver
+// 'wv:dialogo' en main.js). La función se pasa como argumento y no como global
+// para no dejar nada nuevo en window. Van como Proxy de la función original:
+// conservan su nombre y su longitud, y toString sigue diciendo [native code].
+try {
+  const pregunta = (tipo, texto, valor) => {
+    try { return ipcRenderer.sendSync('wv:dialogo', { tipo, texto, valor }) || { ok: false }; } catch (e) { return { ok: false }; }
+  };
+  contextBridge.executeInMainWorld({
+    args: [pregunta],
+    func: function (pregunta) {
+      var texto = function (v) { return v === undefined ? '' : String(v); };
+      var cambia = function (nombre, fn) {
+        var original = window[nombre];
+        if (typeof original !== 'function') return;
+        window[nombre] = new Proxy(original, { apply: function (_f, _esto, args) { return fn(args); } });
+      };
+      cambia('alert', function (a) { pregunta('alert', texto(a[0])); });
+      cambia('confirm', function (a) { return !!pregunta('confirm', texto(a[0])).ok; });
+      cambia('prompt', function (a) {
+        var r = pregunta('prompt', texto(a[0]), a.length > 1 ? texto(a[1]) : '');
+        return r.ok ? String(r.valor == null ? '' : r.valor) : null;
+      });
+    }
+  });
+} catch (e) { /* nada */ }
+
+// --- Ocultado genérico por clase e id (`##.anuncio`, ver genericosPara en adblock.js) ---
+// Como uBlock y Brave: se apuntan las clases e ids que van apareciendo y se
+// pregunta a main, en tandas de 100 ms y solo por los NUEVOS, qué reglas les
+// tocan. Todo corre en el mundo aislado de este preload: la página no ve el
+// observador ni nada nuevo en window. No se activa donde las listas lo apagan
+// (`generichide`, YouTube incluido) ni con el sitio en la lista blanca.
+if (ARRANQUE.genericos) {
+  try {
+    const vistas = new Set();   // 'c' + clase / 'i' + id ya preguntados
+    let clases = [], ids = [], tanda = 0;
+    const apunta = (el) => {
+      const id = el.id;
+      if (id && typeof id === 'string' && !vistas.has('i' + id)) { vistas.add('i' + id); ids.push(id); }
+      const cl = el.classList;
+      if (cl) for (let i = 0; i < cl.length; i++) if (!vistas.has('c' + cl[i])) { vistas.add('c' + cl[i]); clases.push(cl[i]); }
+    };
+    const recorre = (raiz) => {
+      if (raiz.nodeType !== 1) return;
+      apunta(raiz);
+      const hijos = raiz.querySelectorAll('[id],[class]');
+      for (let i = 0; i < hijos.length; i++) apunta(hijos[i]);
+    };
+    const envia = () => {
+      tanda = 0;
+      const c = clases, d = ids;
+      clases = []; ids = [];
+      ipcRenderer.invoke('adblock:genericos', c, d).then((sel) => {
+        for (let i = 0; i < sel.length; i += 200) webFrame.insertCSS(sel.slice(i, i + 200).join(',') + '{display:none !important}');
+      }).catch(() => {});
+    };
+    const programa = () => { if (!tanda && (clases.length || ids.length)) tanda = setTimeout(envia, 100); };
+    const obs = new MutationObserver((cambios) => {
+      for (const m of cambios) {
+        if (m.type === 'attributes') apunta(m.target);
+        else for (const n of m.addedNodes) recorre(n);
+      }
+      programa();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+      recorre(document.documentElement);
+      programa();
+      obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'] });
+    }, { once: true });
+  } catch (e) { /* nada */ }
+}
+
 // --- Identidad coherente del navegador (client hints) ---
 // main ya reescribe las cabeceras Sec-CH-UA, pero eso no basta: los antifraude
 // leen TAMBIÉN navigator.userAgentData desde JavaScript, y ahí Chromium seguía
@@ -350,6 +426,53 @@ if (/(^|\.)(x\.com|twitter\.com)$/.test(location.hostname)) {
       });
     }
   } catch (e) { /* nada */ }
+  // --- Videos con tarjeta de sitio web: se reproducen aquí, sin abrir la web ---
+  // En los anuncios y posts con "video website card" (tarjeta unificada
+  // video_website), X tapa el video con un enlace a la web del anunciante: haces
+  // clic para verlo y se te abre otra pestaña. Medido el 2026-11-03 en x.com
+  // (cliente nuevo, sin sesión): el reproductor lleva encima un
+  // <a href="https://…" target="_blank" class="absolute inset-0"> que ocupa todo el
+  // video. Aquí ese clic se queda en el video: pausa o reanuda. Si el enlace envuelve
+  // al reproductor en vez de taparlo (o va por t.co), vale igual. Las de app
+  // (video_app) ya traen un reproductor normal y no se tocan. El título y el "De sitio.com" de debajo siguen abriendo la web, igual que
+  // los enlaces normales, las tarjetas sin video y el clic con Ctrl o con la rueda.
+  // Va por el DOM y no podando la tarjeta: en el cliente nuevo de X el enlace no sale
+  // del componente "media" sino de la tarjeta entera (si falta, usa la URL del título),
+  // así que quitárselo no sirve y quitarlas todas borra la tarjeta con su video.
+  // Escucha en `window` en fase de captura, antes que X, desde el mundo aislado del
+  // preload: la página no lo ve y no hace falta tocar ninguna función suya.
+  window.addEventListener('click', function (e) {
+    const v = videoTapadoPorEnlace(e);
+    if (!v) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (v.paused) v.play().catch(() => {}); else v.pause();
+  }, true);
+}
+// El <video> que tapa un enlace a otro sitio cuando el clic cae justo encima del
+// video; si no es eso, null. El enlace puede envolver al reproductor o estar
+// encima como hermano (lo que hace X hoy): se busca el único video del bloque.
+function videoTapadoPorEnlace(e) {
+  if (!e.isTrusted || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return null;
+  const t = e.target;
+  const a = t && t.closest && t.closest('a[href]');
+  if (!a) return null;
+  // Los controles del reproductor (silenciar, pantalla completa…) siguen a lo suyo
+  const control = t.closest('button, [role="button"], [role="slider"], input');
+  if (control && a.contains(control)) return null;
+  let u;
+  try { u = new URL(a.href, location.href); } catch (err) { return null; }
+  if (!/^https?:$/.test(u.protocol) || /(^|\.)(x\.com|twitter\.com)$/.test(u.hostname)) return null;
+  let v = a.querySelector('video');
+  for (let p = a.parentElement, i = 0; !v && p && i < 4; p = p.parentElement, i++) {
+    const vs = p.querySelectorAll('video');
+    if (vs.length > 1) return null;
+    if (vs.length === 1) v = vs[0];
+  }
+  if (!v) return null;
+  const r = v.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return null;
+  return v;
 }
 // --- Passkeys bloqueadas: la página no ve autenticador de plataforma ---
 // Con el ajuste blockPasskeys, main.js registra un autenticador virtual (por
@@ -378,17 +501,16 @@ try {
 } catch (e) { /* nada */ }
 
 // --- MOOVIN: pase de la biblioteca ---
-// La biblioteca de iris.it.com/moovin es privada: su worker no suelta ni el catálogo
+// La biblioteca de MOOVIN es privada: su worker no suelta ni el catálogo
 // ni un solo archivo sin pase. Naviris lo recuerda a nivel de navegador y lo pone
 // ANTES de que corra la página (de ahí executeInMainWorld en document_start), así
 // que aquí la pantalla del pase no llega a verse. Si la persona lo escribe a mano
 // en la página, se guarda solo para las próximas veces, incluso si luego borra los
 // datos del sitio. El pase no llega a ningún otro dominio: main.js solo lo entrega
-// y solo lo acepta desde moovin.live y iris.it.com.
-// MOOVIN vive en moovin.live y ahí la biblioteca es la RAÍZ; en iris.it.com sigue
-// colgando de /moovin (la tele todavía descarga la interfaz de esa dirección).
-const enMoovin = /(^|\.)moovin\.live$/.test(location.hostname) ||
-  (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0);
+// y solo lo acepta desde https://moovin.live.
+// Solo moovin.live y por https: iris.it.com caducó y lo sirve un tercero, y por
+// http la página la puede falsificar cualquiera en la misma red (ver esMoovin en main.js).
+const enMoovin = location.protocol === 'https:' && /(^|\.)moovin\.live$/.test(location.hostname);
 if (enMoovin) {
   try {
     /* DESDE 2.7.10-dev.4 Naviris YA NO ENTREGA EL PASE NI LA CLAVE DE LA APP.
@@ -410,116 +532,122 @@ if (enMoovin) {
   } catch (e) { /* nada */ }
 }
 
-// --- YouTube: bloqueo de anuncios a nivel del player, en document_start ---
-// El preload corre ANTES que los scripts de la página: vaciamos los campos de anuncio
-// de la respuesta del player (adPlacements/playerAds/adSlots) ANTES de que el player
-// la lea. Se cubren las TRES vías por las que llega esa respuesta:
+// --- YouTube: el muro anti-bloqueador, el arranque a 0:00 y la poda de respaldo ---
+// Los anuncios del reproductor los quitan los scriptlets de las listas (arriba):
+// json-prune, json-prune-fetch-response/xhr-response, trusted-replace-*-response
+// y set ytInitialPlayerResponse.*, los mismos que usan uBlock y Brave. Este bloque
+// ya NO poda por su cuenta cuando esos scriptlets llegan: lo hacía además de
+// ellos, y eso era doble trabajo en cada JSON.parse de YouTube y, peor, una
+// diferencia con uBlock que la página puede ver (Response.prototype.json dejaba
+// de ser nativa; medido el 03/11/2026 con la batería e2e, prueba "huellas").
+// La poda propia queda solo de RESPALDO, para cuando el motor aún no tiene
+// scriptlets que dar (primer arranque, antes de bajar las listas). Cubre las tres
+// vías por las que llega la respuesta del player:
 //   1. ytInitialPlayerResponse embebido en el HTML (primera carga, con URL directa).
 //   2. fetch(...).json()  -> Response.prototype.json.
 //   3. XHR + JSON.parse   -> buena parte de /youtubei/v1/player viaja así.
-// Cubrir solo la 2 era el fallo de antes: abrir un vídeo por URL directa iba limpio,
-// pero navegar dentro de YouTube (SPA) traía anuncios, porque esa vía no pasa por
-// Response.json. El hook de JSON.parse lleva una guarda barata (mira la cadena antes
-// de tocar nada) para no pagar el coste en los miles de parseos de YouTube, que es
-// justo por lo que se había quitado.
 // Se inyecta con contextBridge.executeInMainWorld, no con un <script> inline: el
 // <script> dependía de que main.js borrase la CSP de YouTube entera (un debilitamiento
 // real de seguridad) y aun así podía fallar en silencio. Ver el bloque de X arriba.
 if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
   try {
-    if (ipcRenderer.sendSync('yt-adblock-on', location.href)) {
+    // El interruptor del adblock Y la lista blanca (ver 'preload:arranque').
+    if (ARRANQUE.bloqueo) {
       // Nombre del evento con el que el mundo de la página avisa del muro: uno
       // nuevo por documento, porque la página también puede escuchar `document`
       // y un nombre fijo ("naviris-yt-muro") era una firma del navegador.
       const EVENTO_MURO = 'e' + Math.random().toString(36).slice(2, 10);
       contextBridge.executeInMainWorld({
-        args: [EVENTO_MURO],
-        func: function (EVENTO_MURO) {
+        args: [EVENTO_MURO, !ARRANQUE.scriptlets],
+        func: function (EVENTO_MURO, podar) {
           // Sin marca global (`window.__navYT`) para no inyectarse dos veces: el
           // preload corre una sola vez por documento, así que no hacía falta, y
           // una variable con ese nombre la puede leer cualquier script de YouTube.
-          // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
-          // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
-          //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
-          //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
-          //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
-          //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
-          //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
-          //   señal más con la que YouTube puede reconocer el bloqueador (la
-          //   lección de Amazon: no inventar señales sin medirlas).
-          // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
-          //   carga inicial, sí se anulan los tres, como hace uBlock con
-          //   `set ytInitialPlayerResponse.playerAds undefined`.
-          var AD_PLAYER = ['adPlacements', 'adSlots'];
-          var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
-          // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
-          // (o.playerResponse, y solo si era objeto), así que las respuestas donde
-          // el player response viene anidado —o como CADENA JSON, que es como lo
-          // sirven las rutas de Shorts— no se tocaban.
-          function prune(o, prof, campos) {
-            try {
-              if (!o || typeof o !== 'object' || prof > 4) return o;
-              for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
-              if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
-                try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
-              }
-              var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
-              for (var k = 0; k < claves.length; k++) {
-                var v = o[claves[k]];
-                if (v && typeof v === 'object') {
-                  if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
-                  else prune(v, prof + 1, campos);
+          // Poda de respaldo, solo sin scriptlets (ver arriba).
+          if (podar) (function () {
+            // Qué se quita y dónde, alineado con lo que hace hoy uBlock Origin:
+            // - En las respuestas de /youtubei/v1/player (fetch y XHR, o sea
+            //   Response.json y JSON.parse), solo adPlacements y adSlots. uBlock dejó
+            //   de podar playerAds ahí: lo desactivó el 24-jul-2025 y lo retiró de
+            //   todas sus reglas de fetch/XHR el 6-nov-2025. Naviris lo seguía
+            //   quitando, y con él adBreakHeartbeatParams y adParams, que uBlock
+            //   tampoco toca. Cada campo que falta aquí y no falta con uBlock es una
+            //   señal más con la que YouTube puede reconocer el bloqueador (la
+            //   lección de Amazon: no inventar señales sin medirlas).
+            // - En ytInitialPlayerResponse, la respuesta embebida en el HTML de la
+            //   carga inicial, sí se anulan los tres, como hace uBlock con
+            //   `set ytInitialPlayerResponse.playerAds undefined`.
+            var AD_PLAYER = ['adPlacements', 'adSlots'];
+            var AD_INICIAL = ['adPlacements', 'adSlots', 'playerAds'];
+            // Poda acotada en profundidad. Antes solo miraba la raíz y un nivel
+            // (o.playerResponse, y solo si era objeto), así que las respuestas donde
+            // el player response viene anidado —o como CADENA JSON, que es como lo
+            // sirven las rutas de Shorts— no se tocaban.
+            function prune(o, prof, campos) {
+              try {
+                if (!o || typeof o !== 'object' || prof > 4) return o;
+                for (var i = 0; i < campos.length; i++) if (campos[i] in o) delete o[campos[i]];
+                if (typeof o.playerResponse === 'string' && (o.playerResponse.indexOf('adPlacements') !== -1 || o.playerResponse.indexOf('adSlots') !== -1)) {
+                  try { o.playerResponse = JSON.stringify(prune(JSON.parse(o.playerResponse), prof + 1, campos)); } catch (e) { /* nada */ }
                 }
-              }
+                var claves = ['playerResponse', 'playerResponses', 'watchNextResponse', 'contents', 'onResponseReceivedEndpoints'];
+                for (var k = 0; k < claves.length; k++) {
+                  var v = o[claves[k]];
+                  if (v && typeof v === 'object') {
+                    if (Array.isArray(v)) { for (var j = 0; j < v.length; j++) prune(v[j], prof + 1, campos); }
+                    else prune(v, prof + 1, campos);
+                  }
+                }
+              } catch (e) { /* nada */ }
+              return o;
+            }
+            // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
+            function sospechosa(s) {
+              return typeof s === 'string' && s.length > 3000 &&
+                (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
+            }
+            // Se engancha la Response y no fetch, así que da igual cómo se pidió:
+            // con una URL o con fetch(new Request(...)), que es como YouTube pide
+            // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
+            // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
+            // Con Proxy y no con una función nuestra, como hace uBlock: así
+            // JSON.parse.toString() sigue diciendo "[native code]" y conserva su
+            // nombre y su length (2). Una función normal se distinguía a simple
+            // vista, y cada diferencia con uBlock es algo con lo que YouTube puede
+            // reconocer el bloqueador.
+            try {
+              Response.prototype.json = new Proxy(Response.prototype.json, {
+                apply: function (fn, yo, args) {
+                  return Reflect.apply(fn, yo, args).then(function (d) { return prune(d, 0, AD_PLAYER); });
+                }
+              });
             } catch (e) { /* nada */ }
-            return o;
-          }
-          // Huele a respuesta de player antes de gastar un JSON.parse/stringify.
-          function sospechosa(s) {
-            return typeof s === 'string' && s.length > 3000 &&
-              (s.indexOf('adPlacements') !== -1 || s.indexOf('adSlots') !== -1);
-          }
-          // Se engancha la Response y no fetch, así que da igual cómo se pidió:
-          // con una URL o con fetch(new Request(...)), que es como YouTube pide
-          // /youtubei/v1/player en algunas cuentas desde agosto. Comprobado el
-          // 2026-10-07 con un fetch(new Request(...)) real a /youtubei/v1/player.
-          // Con Proxy y no con una función nuestra, como hace uBlock: así
-          // JSON.parse.toString() sigue diciendo "[native code]" y conserva su
-          // nombre y su length (2). Una función normal se distinguía a simple
-          // vista, y cada diferencia con uBlock es algo con lo que YouTube puede
-          // reconocer el bloqueador.
-          try {
-            Response.prototype.json = new Proxy(Response.prototype.json, {
-              apply: function (fn, yo, args) {
-                return Reflect.apply(fn, yo, args).then(function (d) { return prune(d, 0, AD_PLAYER); });
-              }
-            });
-          } catch (e) { /* nada */ }
-          try {
-            JSON.parse = new Proxy(JSON.parse, {
-              apply: function (fn, yo, args) {
-                var r = Reflect.apply(fn, yo, args);
-                try { if (sospechosa(args[0])) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
-                return r;
-              }
-            });
-          } catch (e) { /* nada */ }
-          // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
-          // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
-          // además el propio XHR obligaría a registrar un listener en send(), que
-          // corre DESPUÉS del onreadystatechange que la página haya asignado antes:
-          // llegaríamos tarde justo en el caso que queríamos cubrir.
-          // Respuesta embebida: se poda la que YA esté puesta (puede haberse asignado
-          // antes que nosotros) y se deja el setter para la que venga.
-          try {
-            var _v;
-            try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
-            Object.defineProperty(window, 'ytInitialPlayerResponse', {
-              configurable: true,
-              get: function () { return _v; },
-              set: function (n) { _v = prune(n, 0, AD_INICIAL); }
-            });
-          } catch (e) { /* nada */ }
+            try {
+              JSON.parse = new Proxy(JSON.parse, {
+                apply: function (fn, yo, args) {
+                  var r = Reflect.apply(fn, yo, args);
+                  try { if (sospechosa(args[0])) return prune(r, 0, AD_PLAYER); } catch (e) { /* nada */ }
+                  return r;
+                }
+              });
+            } catch (e) { /* nada */ }
+            // No hace falta hookear XMLHttpRequest: la vía XHR acaba en
+            // JSON.parse(xhr.responseText), que ya está cubierto arriba. Parchear
+            // además el propio XHR obligaría a registrar un listener en send(), que
+            // corre DESPUÉS del onreadystatechange que la página haya asignado antes:
+            // llegaríamos tarde justo en el caso que queríamos cubrir.
+            // Respuesta embebida: se poda la que YA esté puesta (puede haberse asignado
+            // antes que nosotros) y se deja el setter para la que venga.
+            try {
+              var _v;
+              try { if (window.ytInitialPlayerResponse) _v = prune(window.ytInitialPlayerResponse, 0, AD_INICIAL); } catch (e) { /* nada */ }
+              Object.defineProperty(window, 'ytInitialPlayerResponse', {
+                configurable: true,
+                get: function () { return _v; },
+                set: function (n) { _v = prune(n, 0, AD_INICIAL); }
+              });
+            } catch (e) { /* nada */ }
+          })();
           // Vídeos con anuncio cosido en el servidor (SSAP, `daiConfig`): al
           // podarles los campos de anuncio, el reproductor se queda en
           // "unstarted" (estado -1) esperando un anuncio que ya no está y el
@@ -639,7 +767,7 @@ if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
       // datos del player, y llega aquí por un evento del DOM (lo comparten los dos
       // mundos). ipcRenderer solo existe de este lado.
       document.addEventListener(EVENTO_MURO, function () {
-        try { ipcRenderer.sendToHost('cobalt-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
+        try { ipcRenderer.sendToHost('naviris-yt-muro', { url: location.href }); } catch (e) { /* nada */ }
       });
     }
   } catch (e) { /* nada */ }
@@ -664,7 +792,7 @@ function tryCapture(root) {
     const pass = (root.querySelector ? root.querySelector('input[type="password"]') : null) || document.querySelector('input[type="password"]');
     if (!pass || !pass.value) return;
     const l = findLogin();
-    ipcRenderer.sendToHost('cobalt-capture', {
+    ipcRenderer.sendToHost('naviris-capture', {
       url: location.href,
       username: (l && l.user && l.user.value) || '',
       password: pass.value
@@ -680,7 +808,7 @@ document.addEventListener('click', (e) => {
 
 // --- Copia desde un campo de contraseña, de código o de número de tarjeta ---
 // Se avisa a la interfaz para que el widget Portapapeles no lo apunte en su
-// historial (onWebviewMessage, canal 'cobalt-copia-sensible').
+// historial (onWebviewMessage, canal 'naviris-copia-sensible').
 const AUTOCOMPLETE_SENSIBLE = ['current-password', 'new-password', 'one-time-code', 'cc-number'];
 function avisaCopiaSensible() {
   try {
@@ -691,7 +819,7 @@ function avisaCopiaSensible() {
     // Tipos como number no exponen la selección: entonces va el valor entero.
     const ini = el.selectionStart, fin = el.selectionEnd;
     const texto = ini != null && fin != null ? el.value.slice(ini, fin) : el.value;
-    if (texto) ipcRenderer.sendToHost('cobalt-copia-sensible', texto);
+    if (texto) ipcRenderer.sendToHost('naviris-copia-sensible', texto);
   } catch (e) { /* nada */ }
 }
 window.addEventListener('copy', avisaCopiaSensible, true);
@@ -701,7 +829,7 @@ window.addEventListener('cut', avisaCopiaSensible, true);
 let announced = false;
 function announce() {
   if (announced) return;
-  if (findLogin()) { announced = true; ipcRenderer.sendToHost('cobalt-loginform', { url: location.href }); }
+  if (findLogin()) { announced = true; ipcRenderer.sendToHost('naviris-loginform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') announce();
 document.addEventListener('DOMContentLoaded', announce);
@@ -728,7 +856,7 @@ function buscaOtp() {
 }
 function avisaOtp() {
   if (otpAvisado) return;
-  if (buscaOtp()) { otpAvisado = true; ipcRenderer.sendToHost('cobalt-otpform', { url: location.href }); }
+  if (buscaOtp()) { otpAvisado = true; ipcRenderer.sendToHost('naviris-otpform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') avisaOtp();
 document.addEventListener('DOMContentLoaded', avisaOtp);
@@ -777,13 +905,13 @@ function findCardForm() {
 let cardAnnounced = false;
 function announceCard() {
   if (cardAnnounced) return;
-  if (findCardForm()) { cardAnnounced = true; ipcRenderer.sendToHost('cobalt-cardform', { url: location.href }); }
+  if (findCardForm()) { cardAnnounced = true; ipcRenderer.sendToHost('naviris-cardform', { url: location.href }); }
 }
 if (document.readyState !== 'loading') announceCard();
 document.addEventListener('DOMContentLoaded', announceCard);
 [600, 1500, 3000, 6000].forEach((ms) => setTimeout(announceCard, ms));
 
-ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
+ipcRenderer.on('naviris-fill-card', (_e, card, host) => {
   if (!esElSitio(host)) return;
   const f = findCardForm();
   if (!f) return;
@@ -808,44 +936,63 @@ ipcRenderer.on('cobalt-fill-card', (_e, card, host) => {
   }
 });
 
-// --- Twitch: AutoLoot por pestaña. Lo activa/para la interfaz con 'cobalt-autoloot'. ---
+// --- Twitch: AutoClaim por pestaña. Lo enciende y lo apaga la interfaz con 'naviris-autoloot'. ---
+// Cada reclamo se avisa con un 'claim' y la cuenta de la sesión la lleva la interfaz.
+// Antes viajaba también un contador propio de este preload, que volvía a cero al
+// recargar la página y pisaba los drops que sumaba el webview oculto del inventario.
 if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
-  let claims = 0, lastPoints = 0, timer = null;
-  function clickChest() {
-    try {
-      if (Date.now() - lastPoints < 5000) return; // evita doble conteo del mismo cofre
-      // Selectores en orden de robustez. El del contenedor de resumen es
-      // idioma-agnóstico (el cofre es el 2º hijo) y es el más fiable.
-      var sum = document.querySelector('.community-points-summary');
-      var btn = (sum && (sum.querySelector(':scope > *:nth-child(2) button')
-                      || sum.querySelector('button[aria-label="Claim Bonus"]')))
-              || (document.querySelector('.claimable-bonus__icon') || {}).closest
-                 && document.querySelector('.claimable-bonus__icon').closest('button');
-      if (btn) {
-        btn.click(); lastPoints = Date.now(); claims++;
-        var bal = null; // saldo de puntos del canal, para el historial
-        try { var ps = document.querySelector('.community-points-summary'); if (ps) { var digs = (ps.textContent || '').replace(/[^\d]/g, ''); if (digs) bal = parseInt(digs, 10); } } catch (e) { /* nada */ }
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'points', count: claims, balance: bal });
-      }
-    } catch (e) { /* nada */ }
+  let timer = null, obs = null, lastPoints = 0;
+  // Texto EXACTO (anclado) de los botones de reclamar un drop, en inglés y en español:
+  // así no se pulsa "claim your channel points" ni otros que solo contengan "claim".
+  const RE_RECLAMAR = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
+  // Un botón se pulsa (y se cuenta) una sola vez: si Twitch tarda en quitarlo, la
+  // siguiente vuelta del reloj no lo cuenta de nuevo.
+  const pulsados = new WeakSet();
+  const limpio = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  // Visible según sus medidas: el aviso de drop es position:fixed y su offsetParent
+  // es null, así que no sirve filtrar por offsetParent.
+  function botonesDeReclamo() {
+    return Array.from(document.querySelectorAll('button, [role="button"]')).filter((el) => {
+      if (pulsados.has(el)) return false;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 4 || r.height <= 4) return false;
+      return RE_RECLAMAR.test(limpio(el.textContent)) || RE_RECLAMAR.test(limpio(el.getAttribute('aria-label')));
+    });
   }
-  // Visible según dimensiones (el toast de reclamo de drop es position:fixed y
-  // su offsetParent es null, por eso NO se puede filtrar por offsetParent).
-  function isVisible(el) { var r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4; }
-  function claimDrops() {
-    try {
-      var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
-      document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
-        if (!isVisible(el)) return;
-        var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        // Texto EXACTO (anclado) para no pulsar "claim your channel points" (los
-        // puntos los reclama clickChest) ni otros botones que contengan "claim".
-        if (RE.test(txt) || RE.test(aria)) {
-          el.click(); claims++; ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', count: claims });
-        }
-      });
-    } catch (e) { /* nada */ }
+  // El cofre de bonificación de puntos. Aparece en el 2º hijo del resumen de puntos
+  // (no depende del idioma) y lleva el icono .claimable-bonus__icon. Repasado el
+  // 2026-11-03 con el DOM de Twitch de hoy y con las extensiones de reclamo al día,
+  // que usan los mismos selectores.
+  function botonCofre() {
+    const sum = document.querySelector('.community-points-summary');
+    const b = sum && (sum.querySelector(':scope > :nth-child(2) button') || sum.querySelector('button[aria-label="Claim Bonus"]'));
+    if (b) return b;
+    const icono = document.querySelector('.claimable-bonus__icon');
+    return icono && icono.closest('button');
+  }
+  // Saldo de puntos del canal, para el historial. Antes se juntaban TODOS los dígitos
+  // del resumen, que también enseña el saldo de Bits, y salía un número pegado
+  // ("0" Bits + "1250" puntos = 01250). Twitch abrevia los saldos grandes ("12,3 mil",
+  // "1.2K"): con abreviatura el número es aproximado.
+  function saldoPuntos() {
+    const el = document.querySelector('[data-test-selector="copo-balance-string"]');
+    const m = el && limpio(el.textContent).replace(/\s/g, '').match(/^([\d.,]+)(k|mil|m|mill\.?)?$/);
+    if (!m) return null;
+    if (!m[2]) return parseInt(m[1].replace(/[.,]/g, ''), 10);
+    return Math.round(parseFloat(m[1].replace(',', '.')) * (m[2] === 'k' || m[2] === 'mil' ? 1e3 : 1e6));
+  }
+  function reclamaCofre() {
+    if (Date.now() - lastPoints < 5000) return; // el cofre tarda en irse: un solo reclamo por cofre
+    const b = botonCofre();
+    if (!b) return;
+    b.click(); lastPoints = Date.now();
+    ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'points', balance: saldoPuntos() });
+  }
+  function reclamaDrops() {
+    for (const el of botonesDeReclamo()) {
+      pulsados.add(el); el.click();
+      ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'drop' });
+    }
   }
   // --- Detección de drops pendientes por la API de inventario de Twitch ---
   // OJO: el reclamo DIRECTO por GraphQL lo rechaza Twitch con "failed integrity check"
@@ -905,49 +1052,43 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
     fetchInventory().then(function (res) {
       if (countClaimable(res) > 0 && Date.now() - lastPendingPing > 30000) {
         lastPendingPing = Date.now();
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'drops-pending' });
+        ipcRenderer.sendToHost('naviris-twitch', { type: 'drops-pending' });
       }
     }).catch(function () { /* sin sesión o red caída: nada */ });
   }
   // Rol "claimer": en /drops/inventory pulsa los botones "Reclamar/Claim" reales de la
   // página (van por la maquinaria de Twitch, que sí firma con Client-Integrity). Lo
-  // dispara el host con 'cobalt-claim-inventory' sobre el webview oculto.
+  // dispara el host con 'naviris-claim-inventory' sobre el webview oculto.
   var claimerRan = false;
   function runInventoryClaimer() {
     if (claimerRan) return; claimerRan = true;
-    var RE = /^(claim( now| drop| your drop)?|reclamar( ahora| drop| recompensa)?)$/;
+    ipcRenderer.send('wv:sin-freno', true);   // oculto, pero tiene que trabajar
     var tries = 0, clicked = 0;
     var iv = setInterval(function () {
       try {
-        document.querySelectorAll('button, a[role="button"], [role="button"]').forEach(function (el) {
-          if (el.__navClaimed) return;
-          var r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
-          var txt = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          var aria = (el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
-          if (RE.test(txt) || RE.test(aria)) {
-            el.__navClaimed = true;
-            // Nombre de la recompensa: sube al contenedor-tarjeta y coge el texto más
-            // destacado (heading). Best-effort; se afina con la prueba en dev.
-            var name = '';
-            try {
-              var card = el.closest('.inventory-max-width, [data-test-selector*="DropsGrantedCard"], [class*="card" i]') || el.parentElement;
-              var h = card && (card.querySelector('h3, h4, p[class*="bold" i], strong') || card.querySelector('p'));
-              name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
-            } catch (e) { /* nada */ }
-            el.click(); clicked++;
-            ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim', kind: 'drop', name: name });
-          }
-        });
+        for (const el of botonesDeReclamo()) {
+          pulsados.add(el);
+          // Nombre de la recompensa: sube al contenedor-tarjeta y coge el texto más
+          // destacado (heading). Best-effort; se afina con la prueba en dev.
+          var name = '';
+          try {
+            var card = el.closest('.inventory-max-width, [data-test-selector*="DropsGrantedCard"], [class*="card" i]') || el.parentElement;
+            var h = card && (card.querySelector('h3, h4, p[class*="bold" i], strong') || card.querySelector('p'));
+            name = ((h && h.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+          } catch (e) { /* nada */ }
+          el.click(); clicked++;
+          ipcRenderer.sendToHost('naviris-twitch', { type: 'claim', kind: 'drop', name: name });
+        }
       } catch (e) { /* nada */ }
-      if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('cobalt-twitch', { type: 'claim-done', clicked: clicked }); }
+      if (++tries >= 8) { clearInterval(iv); ipcRenderer.sendToHost('naviris-twitch', { type: 'claim-done', clicked: clicked }); }
     }, 1500); // ~12s: la SPA de inventario tarda en pintar los botones
   }
-  ipcRenderer.on('cobalt-claim-inventory', function () { runInventoryClaimer(); });
+  ipcRenderer.on('naviris-claim-inventory', function () { runInventoryClaimer(); });
   // Mantiene el stream vivo en segundo plano: reanuda el vídeo y cierra el "¿sigues ahí?".
   function keepAlive() {
     try {
       var v = document.querySelector('video');
-      if (v && v.paused) { try { v.play(); } catch (e) { /* nada */ } }
+      if (v && v.paused) v.play().catch(function () { /* nada */ });
       document.querySelectorAll('button').forEach(function (el) {
         if (el.offsetParent === null) return;
         var t = (el.textContent || '').trim().toLowerCase();
@@ -955,29 +1096,29 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       });
     } catch (e) { /* nada */ }
   }
-  // Engaña a la API de visibilidad: Twitch solo cuenta el TIEMPO de visualización
-  // de los drops si cree que la pestaña está visible. En segundo plano dejaría de
-  // avanzar el progreso (los puntos sí caían porque los reclamamos nosotros, pero
-  // los drops necesitan ese tiempo). Esto lo mantiene contando siempre.
-  let visSpoofed = false;
-  function spoofVisible() {
-    if (visSpoofed) return; visSpoofed = true;
-    try {
-      Object.defineProperty(document, 'hidden', { get: function () { return false; }, configurable: true });
-      Object.defineProperty(document, 'visibilityState', { get: function () { return 'visible'; }, configurable: true });
-      Object.defineProperty(document, 'webkitHidden', { get: function () { return false; }, configurable: true });
-      Object.defineProperty(document, 'webkitVisibilityState', { get: function () { return 'visible'; }, configurable: true });
-      var block = function (e) { e.stopImmediatePropagation(); };
-      document.addEventListener('visibilitychange', block, true);
-      window.addEventListener('visibilitychange', block, true);
-      document.addEventListener('webkitvisibilitychange', block, true);
-      window.addEventListener('webkitvisibilitychange', block, true);
-    } catch (e) { /* nada */ }
+  // Que Twitch no se entere de que no se le mira. Con la pestaña de fondo dentro de
+  // Naviris la página sigue diciendo "visible" (el webview se pinta fuera de la
+  // pantalla); solo con la ventana MINIMIZADA pasa a "hidden" y el reproductor sigue
+  // igual (medido el 2026-11-03: 20 s minimizada, el directo no se para). Lo que sí
+  // se puede hacer es cortar el aviso visibilitychange, en captura y antes que nadie:
+  // los escuchadores son del DOM, así que desde este mundo aislado también le llegan
+  // cortados a Twitch. Antes, además, se redefinían document.hidden y visibilityState,
+  // pero en un webview esas dos las fija Electron como propiedades NO configurables
+  // (siguen la visibilidad de la ventana) y ni aquí ni en el mundo de la página se
+  // pueden cambiar: no hacían nada.
+  let visibilidadCortada = false;
+  function cortaVisibilidad() {
+    if (visibilidadCortada) return; visibilidadCortada = true;
+    const corta = (e) => e.stopImmediatePropagation();
+    for (const t of ['visibilitychange', 'webkitvisibilitychange']) {
+      document.addEventListener(t, corta, true);
+      window.addEventListener(t, corta, true);
+    }
   }
   // Baja la calidad desde el MENÚ del reproductor de Twitch: cambio EN VIVO (sin
   // recargar) y solo de ESTA pestaña. Asíncrono con esperas porque el menú de React
-  // tarda en pintarse tras abrirlo; si consultas al instante, no encuentra las opciones
-  // (ese era el fallo). Llama cb(true) si logró pulsar la opción más baja.
+  // tarda en pintarse tras abrirlo; si consultas al instante, no encuentra las opciones.
+  // Llama cb(true) si llegó a pulsar la opción más baja.
   function applyLowQualityViaMenu(cb) {
     try {
       var gear = document.querySelector('[data-a-target="player-settings-button"]');
@@ -997,49 +1138,55 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
       }, 450);
     } catch (e) { cb(false); }
   }
-  var qualityHandled = false;
-  function lowResThisTabOnly() {
-    if (qualityHandled) return; qualityHandled = true;
-    // Baja SOLO esta pestaña a 160p por el menú (en vivo, sin recargar). Seleccionar por
-    // menú escribe video-quality GLOBAL en localStorage; lo guardamos y lo restauramos al
-    // final para que las pestañas/streams NUEVOS sigan en Automática (no heredan el 160p).
-    var savedLS = null;
-    try { savedLS = localStorage.getItem('video-quality'); } catch (e) { /* nada */ }
-    function restoreLS() {
-      try { if (savedLS == null) localStorage.removeItem('video-quality'); else localStorage.setItem('video-quality', savedLS); } catch (e) { /* nada */ }
-    }
-    var tries = 0;
-    function attempt() {
-      var v = document.querySelector('video');
-      if (v && v.videoHeight && v.videoHeight <= 200) { restoreLS(); return; } // confirmado bajo
-      if (++tries > 20) { restoreLS(); return; } // no se pudo: al menos no dejamos el LS sucio
-      applyLowQualityViaMenu(function () { setTimeout(attempt, 1800); }); // reintenta y re-verifica la altura
-    }
-    attempt();
+  // Se mira en cada vuelta del reloj y no una vez por documento: al navegar dentro de
+  // Twitch (entrar en otro canal, un raid) el reproductor carga el stream nuevo en
+  // Automática y la pestaña volvía a 720p con el AutoClaim puesto (medido el
+  // 2026-11-03). Elegir en el menú escribe video-quality en localStorage, que es
+  // GLOBAL: se guarda antes y se repone después para que las pestañas y los streams
+  // NUEVOS sigan en Automática. Hasta 5 elecciones por canal; si no baja, se deja.
+  // Con el video parado no se toca: en un descanso publicitario el menú no trae las
+  // calidades y cada vuelta gastaba un intento (medido el 2026-11-03).
+  let bajaRes = false, bajando = false, rutaRes = '', intentosRes = 0;
+  function bajaCalidad() {
+    if (!bajaRes || bajando) return;
+    const v = document.querySelector('video');
+    if (!v || v.paused || !v.videoHeight || v.videoHeight <= 200) return;
+    if (rutaRes !== location.pathname) { rutaRes = location.pathname; intentosRes = 0; }
+    if (intentosRes >= 5) return;
+    bajando = true;
+    let guardada = null;
+    try { guardada = localStorage.getItem('video-quality'); } catch (e) { /* nada */ }
+    applyLowQualityViaMenu(function (ok) {
+      if (ok) intentosRes++;
+      setTimeout(function () {
+        try { if (guardada == null) localStorage.removeItem('video-quality'); else localStorage.setItem('video-quality', guardada); } catch (e) { /* nada */ }
+        bajando = false;
+      }, 1500);
+    });
   }
-  let obs = null;
-  function tick() { clickChest(); claimDrops(); checkPendingDrops(false); keepAlive(); }
-  ipcRenderer.on('cobalt-autoloot', function (_e, opt) {
+  function tick() { reclamaCofre(); reclamaDrops(); checkPendingDrops(false); keepAlive(); bajaCalidad(); }
+  ipcRenderer.on('naviris-autoloot', function (_e, opt) {
+    // De fondo sigue contando: sin el freno de las pestañas que no se ven.
+    ipcRenderer.send('wv:sin-freno', !!(opt && opt.on));
     if (opt && opt.on) {
-      spoofVisible(); // sin esto, los drops no acumulan tiempo en segundo plano
-      if (opt.lowRes) lowResThisTabOnly();
-      if (!timer) {
-        ipcRenderer.sendToHost('cobalt-twitch', { type: 'active' });
-        checkPendingDrops(true); // comprobación inmediata: si ya hay drops pendientes, dispara el claimer
-        tick();
-        timer = setInterval(tick, 8000);
-        // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
-        try {
-          let deb = null;
-          // Los cambios del chat (no para nunca) no traen ni cofres ni drops.
-          obs = new MutationObserver(function (muts) {
-            if (muts.every(function (m) { return m.target.closest && m.target.closest('.chat-scrollable-area__message-container'); })) return;
-            if (deb) return; deb = setTimeout(function () { deb = null; clickChest(); claimDrops(); }, 800);
-          });
-          obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-        } catch (e) { /* nada */ }
-      }
+      cortaVisibilidad();
+      bajaRes = !!opt.lowRes;
+      if (timer) return;
+      checkPendingDrops(true); // comprobación inmediata: si ya hay drops pendientes, dispara el claimer
+      tick();
+      timer = setInterval(tick, 8000);
+      // Reacción inmediata: al aparecer el cofre o un botón de drop, reclama enseguida (con debounce)
+      try {
+        let deb = null;
+        // Los cambios del chat (no para nunca) no traen ni cofres ni drops.
+        obs = new MutationObserver(function (muts) {
+          if (muts.every(function (m) { return m.target.closest && m.target.closest('.chat-scrollable-area__message-container'); })) return;
+          if (deb) return; deb = setTimeout(function () { deb = null; reclamaCofre(); reclamaDrops(); }, 800);
+        });
+        obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      } catch (e) { /* nada */ }
     } else {
+      bajaRes = false;
       if (timer) { clearInterval(timer); timer = null; }
       if (obs) { obs.disconnect(); obs = null; }
     }
@@ -1052,14 +1199,15 @@ if (/(^|\.)twitch\.tv$/.test(location.hostname)) {
 window.addEventListener('mouseup', function (e) {
   if (e.button === 3 || e.button === 4) {
     e.preventDefault();
-    try { ipcRenderer.sendToHost('cobalt-mouse-nav', e.button === 3 ? 'back' : 'forward'); } catch (err) { /* nada */ }
+    try { ipcRenderer.sendToHost('naviris-mouse-nav', e.button === 3 ? 'back' : 'forward'); } catch (err) { /* nada */ }
   }
 }, true);
 window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true);
 
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
-ipcRenderer.on('cobalt-fill', (_e, cred, host) => {
-  if (!esElSitio(host)) return;
+ipcRenderer.on('naviris-fill', (_e, cred, host) => {
+  // Una contraseña guardada en https nunca se escribe en una página http.
+  if (!esElSitio(host) || (cred.soloHttps && location.protocol !== 'https:')) return;
   const l = findLogin();
   if (!l) return;
   const set = (el, val) => {
@@ -1085,7 +1233,7 @@ ipcRenderer.on('cobalt-fill', (_e, cred, host) => {
       var de = document.documentElement;
       var v = de ? de.getAttribute('data-naviris-agent') : null;
       var on = v != null && v !== '' && v !== '0' && v !== 'false';
-      ipcRenderer.sendToHost('cobalt-agent', { on: on, label: on ? v : '' });
+      ipcRenderer.sendToHost('naviris-agent', { on: on, label: on ? v : '' });
     } catch (e) { /* nada */ }
   }
   try {

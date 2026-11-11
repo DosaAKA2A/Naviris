@@ -11,6 +11,13 @@
  * `npm run dist`) y lo sube a la release del tag, generando el feed correcto:
  *   - latest.yml para las versiones estables
  *   - dev.yml    para las que llevan sufijo -dev
+ * El feed y sus comprobaciones viven en build/feed-actualizador.js, lo mismo que
+ * prueba test/actualizador.test.js.
+ * Cada feed se FIRMA con la clave propia (build/firma.js) y la firma se sube
+ * como <feed>.sig: las instalaciones 3.x no descargan nada sin ella.
+ *
+ * ANTES DE NADA corre `npm test` y, si falla, no publica (tampoco con --dry).
+ * Solo se salta con NAVIRIS_PUBLICAR_SIN_PRUEBAS=1, y lo avisa bien alto.
  *
  * USO:  node build/publish-release.js            (usa la version de package.json)
  *       node build/publish-release.js --dry      (solo enseña lo que haria)
@@ -19,14 +26,17 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const { spawnSync } = require('child_process');
+const feed = require('./feed-actualizador');
+const { clavePrivada, firmaFeed } = require('./firma');
+const firmas = require('../src/firmas');
 
 const RAIZ = path.join(__dirname, '..');
 const DIST = path.join(RAIZ, 'dist');
 const pkg = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8'));
 const VER = pkg.version;
-const ES_DEV = /-dev/i.test(VER);
-const CANAL = ES_DEV ? 'dev.yml' : 'latest.yml';
+const ES_DEV = feed.esDev(VER);
+const CANAL = feed.feedDe(VER);
 /* Cada línea escribe SOLO su feed: una estable no toca dev.yml, o las
    instalaciones dev verían una versión de la otra línea. Las dos líneas no se
    cruzan; si quien está en dev tiene que recibir algo, se publica en dev. */
@@ -36,13 +46,23 @@ const [OWNER, REPO] = ['DosaAKA2A', 'Naviris'];
 const DRY = process.argv.includes('--dry');
 const TOKEN = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 
-const SETUP = `Naviris Setup ${VER}.exe`;
-const PORTABLE = `Naviris ${VER}.exe`;
-const BLOCKMAP = `${SETUP}.blockmap`;
+const { setup: SETUP, portable: PORTABLE, blockmap: BLOCKMAP, subido: SUBIDO } = feed.nombres(VER);
 
-function sha512(file) {
-  return crypto.createHash('sha512').update(fs.readFileSync(file)).digest('base64');
+/* La puerta: sin pruebas en verde no se publica. Va aquí y no solo en
+   `npm run release` porque este script también se lanza a mano. */
+function pasaLasPruebas() {
+  if (process.env.NAVIRIS_PUBLICAR_SIN_PRUEBAS === '1') {
+    console.warn('\n*** NAVIRIS_PUBLICAR_SIN_PRUEBAS=1: se publica SIN correr las pruebas. ***\n');
+    return true;
+  }
+  console.log('Corriendo las pruebas (npm test) antes de publicar...');
+  const r = spawnSync('npm test', { cwd: RAIZ, stdio: 'inherit', shell: true });
+  if (r.status === 0) return true;
+  console.error(`\nNO SE PUBLICA: las pruebas han fallado (npm test terminó con ${r.status ?? r.error?.message}).` +
+    '\nArréglalas y vuelve a lanzar. Solo en una emergencia: NAVIRIS_PUBLICAR_SIN_PRUEBAS=1 (ver README).');
+  return false;
 }
+
 async function api(url, opts = {}) {
   const res = await fetch(url, {
     ...opts,
@@ -54,28 +74,32 @@ async function api(url, opts = {}) {
 }
 
 (async () => {
+  if (!pasaLasPruebas()) process.exit(1);
   if (!TOKEN) { console.error('Falta GH_TOKEN en el entorno.'); process.exit(1); }
+  let clave;
+  try { clave = clavePrivada(); } catch (e) { console.error('NO SE PUBLICA: ' + e.message); process.exit(1); }
   console.log(`Publicando ${TAG} (${ES_DEV ? 'DEV' : 'ESTABLE'}) -> feed ${CANAL}`);
 
   const setupPath = path.join(DIST, SETUP);
   if (!fs.existsSync(setupPath)) { console.error('No encuentro', setupPath, '\nCompila antes con: npm run dist'); process.exit(1); }
 
   // Feed del actualizador, con el hash del instalador REAL que vamos a subir
-  const hash = sha512(setupPath);
-  const size = fs.statSync(setupPath).size;
-  const nombreSetup = SETUP.replace(/ /g, '-');
-  const yml = `version: ${VER}\nfiles:\n  - url: ${nombreSetup}\n    sha512: ${hash}\n    size: ${size}\npath: ${nombreSetup}\nsha512: ${hash}\nreleaseDate: '${new Date().toISOString()}'\n`;
-  const ymlPaths = CANALES.map((c) => {
+  const yml = feed.generaFeed(VER, setupPath);
+  const mal = feed.compruebaFeed(yml, { version: VER, setupPath, nombreFeed: CANAL });
+  if (mal.length) { console.error('El feed generado no cuadra:\n - ' + mal.join('\n - ')); process.exit(1); }
+  // La firma se sube ANTES que su feed: un feed a la vista sin su firma haría que las instalaciones lo rechacen
+  const ymlPaths = CANALES.flatMap((c) => {
     const p = path.join(DIST, c);
     fs.writeFileSync(p, yml);
-    return { file: p, name: c };
+    fs.writeFileSync(p + '.sig', firmaFeed(yml, clave) + '\n');
+    return [{ file: p + '.sig', name: c + '.sig' }, { file: p, name: c }];
   });
-  console.log(` feeds generados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
+  console.log(` feeds generados y firmados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
 
   const subir = [
-    { file: setupPath, name: nombreSetup },
-    { file: path.join(DIST, PORTABLE), name: PORTABLE.replace(/ /g, '-') },
-    { file: path.join(DIST, BLOCKMAP), name: BLOCKMAP.replace(/ /g, '-') },
+    { file: setupPath, name: SUBIDO.setup },
+    { file: path.join(DIST, PORTABLE), name: SUBIDO.portable },
+    { file: path.join(DIST, BLOCKMAP), name: SUBIDO.blockmap },
     ...ymlPaths
   ].filter((a) => fs.existsSync(a.file));
 
@@ -97,6 +121,9 @@ async function api(url, opts = {}) {
     });
     console.log(` release creada id=${rel.id}`);
   }
+  // Una dev sin marcar como prerelease se cuela como «la última estable» (ver feed-actualizador.js)
+  const malRelease = feed.compruebaRelease(rel, VER);
+  if (malRelease.length) { console.error('NO SE PUBLICA: ' + malRelease.join('; ') + '. Corrígelo en GitHub y vuelve a lanzar.'); process.exit(1); }
 
   for (const a of subir) {
     const viejo = (rel.assets || []).find((x) => x.name === a.name);
@@ -114,14 +141,15 @@ async function api(url, opts = {}) {
     console.log(` subido ${a.name} (${(buf.length / 1048576).toFixed(1)} MB)`);
   }
 
-  // Comprobación final: el feed debe descargarse y apuntar al instalador subido
+  // Comprobación final: el feed servido debe cuadrar con el instalador subido
   let todosOk = true;
   for (const c of CANALES) {
     const feedUrl = `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/${c}`;
-    const check = await (await fetch(feedUrl)).text();
-    const ok = check.includes(`version: ${VER}`) && check.includes(hash.slice(0, 24));
-    if (!ok) todosOk = false;
-    console.log(`\n${ok ? 'OK' : 'AVISO'}: ${c} servido y ${ok ? 'coherente' : 'NO coincide (revisar)'}`);
+    const servido = await (await fetch(feedUrl)).text();
+    const malServido = feed.compruebaFeed(servido, { version: VER, setupPath, nombreFeed: c });
+    if (!firmas.verifica('feed', servido, await (await fetch(feedUrl + '.sig')).text())) malServido.push('la firma servida no vale para el feed servido');
+    if (malServido.length) todosOk = false;
+    console.log(`\n${malServido.length ? 'AVISO' : 'OK'}: ${c} servido y ${malServido.length ? 'NO coincide: ' + malServido.join('; ') : 'coherente'}`);
   }
   if (!todosOk) process.exitCode = 1;
   console.log(`https://github.com/${OWNER}/${REPO}/releases/tag/${TAG}`);

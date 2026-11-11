@@ -1,17 +1,39 @@
 // Bloqueador de anuncios con el motor de Brave (adblock-rs, el crate adblock-rust
 // oficial compilado para Node) y las MISMAS listas que usa Brave: se leen de su
 // catálogo público y se refrescan solas cada día, así los cambios que Brave
-// publica llegan sin actualizar Naviris.
+// publica llegan sin actualizar Naviris. Más la que uBlock trae por defecto y
+// Brave no (LISTAS_UBLOCK).
 const { app, net } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Worker } = require('worker_threads');
 const { generarRecursos } = require('./adblock-recursos');
+const { montaMotor } = require('./adblock-motor');
 
 let Engine = null, FilterSet = null;
 try { ({ Engine, FilterSet } = require('adblock-rs')); } catch (e) { console.log('[Naviris] adblock-rs no disponible:', e.message); }
 
 const CATALOG_URL = 'https://raw.githubusercontent.com/brave/adblock-resources/master/filter_lists/list_catalog.json';
+/* Listas que uBlock Origin trae activadas por defecto y el catálogo de Brave
+   no. De su conjunto por defecto (assets.json) solo falta esta: la de Peter
+   Lowe, unos 3.500 dominios de anuncios y rastreo (+3 en adblock.turtlecute.org,
+   sin coste medible al montar ni en memoria; medido el 03/11/2026). Va sin
+   permisos (máscara 0): son solo reglas de red y no le hace falta inyectar
+   scriptlets de confianza. */
+const LISTAS_UBLOCK = ['https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext'];
+/* Listas que Brave activa por defecto y Naviris NO baja (por su uuid del catálogo).
+   · «Cookie notice blocker» (EasyList Cookie, uBlock filters – Cookie Notices y
+     los añadidos de Brave): acepta o cierra sola los avisos de consentimiento
+     de cookies, con clics automáticos (`trusted-click-element`), cookies de
+     consentimiento puestas a mano y CSS que los esconde. Decisión de Dosa
+     (03/11/2026): acepta o rechaza la persona, en todas las webs. Era también
+     la única que traía el clic automático en el aviso de YouTube que provocaba
+     el bucle de recargas (21/10/2026), que antes se quitaba regla a regla.
+     Medido sin ella: el resto de listas no trae ningún clic de consentimiento. */
+const LISTAS_FUERA = ['AC023D22-AE88-4060-A978-4FEEEC4221693'];
+// Con qué fuentes se bajaron las listas del perfil: si cambian, se vuelven a bajar.
+const claveFuentes = [...LISTAS_UBLOCK, ...LISTAS_FUERA.map((id) => 'sin ' + id)].join(' ');
 const REFRESH_MS = 24 * 3600 * 1000; // cadencia de actualización de listas y recursos
 // Tope para regenerar TODOS los recursos (unos 80 archivos pequeños de GitHub).
 // Si no da tiempo, se sigue con los que ya había: mejor viejos que a medias.
@@ -111,11 +133,12 @@ function leerListas() {
   return grupos;
 }
 
-async function bajarListas() {
-  const catalog = JSON.parse(await fetchText(CATALOG_URL));
+// Las URL que se bajan del catálogo de Brave, cada una con su máscara de permisos.
+function fuentesDe(catalog) {
   const fuentes = [];
   for (const list of catalog) {
     if (!list.default_enabled) continue; // el mismo conjunto activo por defecto en Brave
+    if (LISTAS_FUERA.includes(list.uuid)) continue;
     // Las de otra plataforma, fuera: "Brave IOS-Specific Filters" viene activa
     // por defecto pero es solo para iOS (`platforms: ["IOS"]`), y con los
     // recursos cargados sus scriptlets pasarían a ejecutarse aquí (en YouTube
@@ -125,6 +148,12 @@ async function bajarListas() {
     const mascara = Number(list.permission_mask) || 0;
     for (const s of list.sources || []) if (s.url) fuentes.push({ url: s.url, mascara });
   }
+  for (const url of LISTAS_UBLOCK) fuentes.push({ url, mascara: 0 });
+  return fuentes;
+}
+
+async function bajarListas() {
+  const fuentes = fuentesDe(JSON.parse(await fetchText(CATALOG_URL)));
   const grupos = new Map();
   let okLists = 0;
   for (const f of fuentes) {
@@ -138,22 +167,88 @@ async function bajarListas() {
   return { grupos, okLists };
 }
 
+/* El motor se monta en un hilo de trabajo (ver adblock-motor.js) y se guarda
+   serializado en motor.bin: al arrancar se carga de ahí en unos 25 ms en vez
+   de montarlo de nuevo (150-200 ms con el proceso principal parado, que es lo
+   que se hacía en cada arranque). La clave dice con qué se montó: si cambian
+   las listas, las reglas que se quitan o la versión de adblock-rs (su formato
+   de serializado), no vale y se vuelve a montar. Los recursos no van dentro:
+   se ponen aparte con useResources (3 ms). */
+const motorFile = () => path.join(dir(), 'motor.bin');
+let versionMotor = '';
+try { versionMotor = require('adblock-rs/package.json').version; } catch { /* nada */ }
+const claveMotor = () => JSON.stringify([versionMotor, meta.updated, meta.mascaras || [1]]);
+
+function ponMotor(e, recursos, como, ms) {
+  const t0 = Date.now();
+  // Los recursos completos (unos 1 MB de JSON, 216 en octubre de 2026) cuestan
+  // 3 ms y alrededor de 1 MB más de memoria en el proceso principal.
+  if (recursos) { try { e.useResources(recursos); } catch (err) { console.log('[Naviris] resources del adblock inválidos:', err.message); } }
+  engine = e;
+  console.log('[Naviris] Motor del adblock listo (' + como + ') en', ms, 'ms (+' + (Date.now() - t0), 'ms los recursos)');
+}
+
+// Montaje en este mismo hilo: respaldo si el hilo de trabajo falla, y tests.
 function buildEngine(grupos, recursos) {
   if (!Engine) return;
   const t0 = Date.now();
-  // false = sin modo depuración: guardaba el texto de cada regla (unos 8 MB más
-  // en el proceso principal, medido) y no cambia qué se bloquea.
-  const set = new FilterSet(false);
-  // Siempre con objeto de opciones: el binding lanza si recibe `undefined`.
-  for (const [mascara, texto] of grupos) set.addFilters(texto, { permissions: mascara });
-  const e = new Engine(set);
-  const t1 = Date.now();
-  // Los recursos completos (unos 1 MB de JSON, 216 en octubre de 2026) cuestan
-  // 3 ms y alrededor de 1 MB más de memoria en el proceso principal (medido con
-  // el recolector forzado); el motor con las listas, unos 170 ms.
-  if (recursos) { try { e.useResources(recursos); } catch (err) { console.log('[Naviris] resources del adblock inválidos:', err.message); } }
-  engine = e;
-  console.log('[Naviris] Motor del adblock listo en', t1 - t0, 'ms (+' + (Date.now() - t1), 'ms los recursos)');
+  ponMotor(montaMotor(grupos), recursos, 'montado en el hilo principal', Date.now() - t0);
+}
+
+/* Tope del hilo: montar cuesta 150-250 ms (medido). Si el hilo no contesta
+   nunca (colgado, o parado por un depurador, que es como lo vio la parte
+   «medición»), el bloqueador se quedaba apagado toda la sesión sin aviso: a los
+   10 s se termina el hilo y se monta en el principal, como cuando falla. */
+const HILO_TOPE_MS = 10000;
+const HILO_MOTOR = path.join(__dirname, 'adblock-motor.js');
+
+// `archivo` y `topeMs` solo cambian en los tests (un hilo que no contesta).
+function montaEnHilo(grupos, { archivo = HILO_MOTOR, topeMs = HILO_TOPE_MS } = {}) {
+  return new Promise((ok, no) => {
+    const w = new Worker(archivo, { workerData: { motorDelBloqueador: true, grupos: [...grupos] } });
+    const tope = setTimeout(() => {
+      w.terminate();
+      no(new Error('el hilo del motor no contestó en ' + topeMs / 1000 + ' s'));
+    }, topeMs);
+    const fin = (f) => (v) => { clearTimeout(tope); f(v); };
+    w.once('message', fin(ok));
+    w.once('error', fin(no));
+    w.once('exit', fin((codigo) => no(new Error('el hilo del motor terminó con ' + codigo))));
+  });
+}
+
+async function montaYGuarda(grupos, recursos, hilo) {
+  const t0 = Date.now();
+  let buf = null;
+  try {
+    buf = await montaEnHilo(grupos, hilo);
+    const e = new Engine(new FilterSet(false));
+    e.deserialize(buf);
+    ponMotor(e, recursos, 'montado en un hilo aparte', Date.now() - t0);
+  } catch (err) {
+    console.log('[Naviris] Sin hilo para el motor del adblock, se monta aquí:', err.message);
+    buildEngine(grupos, recursos);
+    try { buf = engine.serialize(); } catch { buf = null; }
+  }
+  if (!buf) return;
+  try {
+    fs.mkdirSync(dir(), { recursive: true });
+    fs.writeFileSync(motorFile(), Buffer.from(buf));
+    meta = { ...meta, motor: claveMotor() };
+    fs.writeFileSync(metaFile(), JSON.stringify(meta), 'utf8');
+  } catch (err) { console.log('[Naviris] No se pudo guardar el motor del adblock:', err.message); }
+}
+
+function motorDelDisco(recursos) {
+  if (meta.motor !== claveMotor()) return false;
+  try {
+    const t0 = Date.now();
+    const e = new Engine(new FilterSet(false));
+    const b = fs.readFileSync(motorFile());
+    e.deserialize(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    ponMotor(e, recursos, 'del disco', Date.now() - t0);
+    return true;
+  } catch (err) { console.log('[Naviris] motor.bin no vale, se vuelve a montar:', err.message); return false; }
 }
 
 async function refresh(force = false) {
@@ -161,7 +256,8 @@ async function refresh(force = false) {
   const ahora = Date.now();
   // `mascaras` falta en los perfiles de antes de separar por permisos: se
   // rebajan las listas una vez para dejar fuera la de iOS (ver bajarListas).
-  const tocanListas = force || !meta.mascaras || ahora - meta.updated >= REFRESH_MS;
+  // Lo mismo si cambian las fuentes (LISTAS_UBLOCK, LISTAS_FUERA): sin esperar 24 h.
+  const tocanListas = force || !meta.mascaras || meta.fuentes !== claveFuentes || ahora - meta.updated >= REFRESH_MS;
   const copias = copiasDeRecursos();
   const tocanRecursos = force || !copias.length || ahora - copias[0].fecha >= REFRESH_MS;
   if (!tocanListas && !tocanRecursos) return;
@@ -174,7 +270,7 @@ async function refresh(force = false) {
         grupos = r.grupos;
         fs.mkdirSync(dir(), { recursive: true });
         for (const [m, texto] of grupos) fs.writeFileSync(rulesFile(m), texto, 'utf8');
-        meta = { ...meta, updated: Date.now(), lists: r.okLists, mascaras: [...grupos.keys()] };
+        meta = { ...meta, updated: Date.now(), lists: r.okLists, mascaras: [...grupos.keys()], fuentes: claveFuentes };
         fs.writeFileSync(metaFile(), JSON.stringify(meta), 'utf8');
         let kb = 0; for (const t of grupos.values()) kb += t.length / 1024;
         console.log('[Naviris] Listas de Brave actualizadas:', r.okLists, 'listas,', Math.round(kb), 'KB');
@@ -195,10 +291,17 @@ async function refresh(force = false) {
         console.log('[Naviris] No se pudieron regenerar los recursos del adblock (sigue con los que había):', e.message);
       }
     }
-    if (grupos || recursos) {
-      const g = grupos || leerListas();
+    // Listas nuevas: motor nuevo (en el hilo aparte). Solo recursos nuevos: se
+    // cambian en el motor que ya hay, sin volver a montarlo (antes se montaba
+    // entero también en ese caso, cada vez que se regeneraban los recursos).
+    if (grupos) {
       if (!recursos) { recursos = recursosEnDisco(); logRecursos(recursos); }
-      if (g.size) buildEngine(g, recursos && recursos.lista);
+      if (grupos.size) await montaYGuarda(grupos, recursos && recursos.lista);
+    } else if (recursos && engine) {
+      try { engine.useResources(recursos.lista); } catch (err) { console.log('[Naviris] resources del adblock inválidos:', err.message); }
+    } else if (recursos) {
+      const g = leerListas();
+      if (g.size) await montaYGuarda(g, recursos.lista);
     }
   } finally {
     refreshing = false;
@@ -211,15 +314,22 @@ function init() {
   try {
     meta = JSON.parse(fs.readFileSync(metaFile(), 'utf8'));
   } catch (e) { meta = { updated: 0, lists: 0 }; }
+  /* Listas bajadas con otras fuentes (un perfil de antes de LISTAS_FUERA): no se
+     cargan, porque traen lo que Naviris ya no aplica (los clics en los avisos de
+     cookies), y se vuelven a bajar ya. Mientras, la red usa el respaldo por
+     dominios de main. */
+  const viejas = !!meta.updated && meta.fuentes !== claveFuentes;
   try {
-    const grupos = leerListas();
-    if (grupos.size) {
-      const r = recursosEnDisco();
-      logRecursos(r);
-      buildEngine(grupos, r && r.lista);
+    const r = recursosEnDisco();
+    logRecursos(r);
+    if (viejas) console.log('[Naviris] Listas del adblock con otras fuentes: se vuelven a bajar antes de usarlas');
+    else if (!motorDelDisco(r && r.lista)) {
+      const grupos = leerListas();
+      // Mientras se monta, refresh() espera: no puede pisarlo con otro motor.
+      if (grupos.size) { refreshing = true; montaYGuarda(grupos, r && r.lista).finally(() => { refreshing = false; }); }
     }
   } catch (e) { console.log('[Naviris] No se pudo cargar la caché del adblock:', e.message); }
-  setTimeout(() => refresh(), 15000);           // tras el arranque, sin bloquearlo
+  setTimeout(() => refresh(), viejas ? 0 : 15000);  // tras el arranque, sin bloquearlo
   setInterval(() => refresh(), 6 * 3600 * 1000); // y comprueba cada 6 h (aplica si tocan 24 h)
 }
 
@@ -300,27 +410,52 @@ function check(details, pagina) {
 }
 
 // CSS de ocultado (element hiding de las listas). Los scriptlets van aparte,
-// por scriptletsFor(): se inyectan desde el preload, al empezar el documento.
+// por arranqueDe(): se inyectan desde el preload, al empezar el documento.
 function cosmeticsFor(url) {
   if (!engine) return null;
   try {
     const r = engine.urlCosmeticResources(url);
     if (!r) return null;
     let css = '';
-    /* Los avisos de cookies NO se esconden. Las listas de Brave tapan el de
-       YouTube (`##ytd-consent-bump-renderer`, `div[class^="ytd-consent"]`),
-       pero el aviso sigue montado y su componente PAUSA el reproductor cada
-       100 ms mientras esté ahí (`pausePlayer` de la app): el video arrancaba y
-       se quedaba parado a los 0,5 s sin que se viera por qué (Dosa,
-       2026-09-19). Con el aviso a la vista se acepta una vez y no vuelve. */
-    const sel = (r.hide_selectors || []).filter((s) => !/consent/i.test(s));
+    const sel = sinAvisoDeCookies(r.hide_selectors || []);
     for (let i = 0; i < sel.length; i += 200) css += sel.slice(i, i + 200).join(',') + '{display:none !important}\n';
     return { css };
   } catch (e) { return null; }
 }
 
+/* Los avisos de consentimiento de cookies NO se esconden en ninguna web: los
+   acepta o los rechaza la persona (Dosa, 03/11/2026; la lista de avisos de
+   cookies tampoco se baja, ver LISTAS_FUERA). Las demás listas aún traen algún
+   selector de aviso suelto, y esconderlo deja el aviso montado sin poder
+   contestarlo. En YouTube (`##ytd-consent-bump-renderer`,
+   `div[class^="ytd-consent"]`) su componente PAUSA el reproductor cada 100 ms
+   mientras siga ahí (`pausePlayer` de la app): el video arrancaba y se quedaba
+   parado a los 0,5 s sin que se viera por qué (Dosa, 2026-09-19). Con el aviso
+   a la vista se contesta una vez y no vuelve. */
+const sinAvisoDeCookies = (selectores) => selectores.filter((s) => !/consent/i.test(s));
+
+/* Ocultado GENÉRICO por clase e id (`##.anuncio`, `###banner-ad`): son casi
+   29.000 reglas de las listas (noviembre de 2026) que valen en cualquier sitio
+   y que urlCosmeticResources NO devuelve, porque meterlas todas en cada página
+   sería un CSS enorme. uBlock y Brave las aplican al vuelo: miran qué clases e
+   ids hay en la página y piden al motor solo las reglas que casan con ellas.
+   Aquí igual: el preload junta las clases e ids que aparecen (ver
+   'adblock:genericos' en main) y esto devuelve los selectores que tocan, con
+   las excepciones del sitio (`#@#`) ya descontadas. Hasta el 03/11/2026 no se
+   aplicaban en ninguna parte: los anuncios de prueba "Static Ad" y "Dynamic Ad"
+   de adblock.turtlecute.org quedaban a la vista. */
+function genericosPara(url, clases, ids) {
+  if (!engine) return [];
+  try {
+    const r = engine.urlCosmeticResources(url);
+    if (!r || r.generichide) return [];
+    return sinAvisoDeCookies(engine.hiddenClassIdSelectors(clases, ids, r.exceptions || []) || []);
+  } catch (e) { return []; }
+}
+
 /* Scriptlets (`##+js(...)`) de una URL, ya envueltos para inyectarse UNA vez
-   en el mundo principal al empezar el documento (lo hace webview-preload.js).
+   en el mundo principal al empezar el documento (lo hace webview-preload.js;
+   en los iframes, main, ver 'did-frame-navigate').
    adblock-rust junta todos los de la URL en un solo texto: primero las
    funciones (las de apoyo y las de cada scriptlet) y luego una llamada por
    regla, cada una en su try/catch. Aquí se mete en una función anónima, como
@@ -330,19 +465,25 @@ function cosmeticsFor(url) {
        ella, TODOS lanzaban un ReferenceError que su propio try/catch se
        tragaba: no hacían nada y no se notaba.
      · Así sus funciones (jsonPrune, safeSelf...) no quedan como globales de la
-       página, donde la web podría verlas o pisarlas. */
-function scriptletsFor(url) {
-  if (!engine) return '';
+       página, donde la web podría verlas o pisarlas.
+   Devuelve también `genericos`: si en este sitio vale el ocultado genérico por
+   clase e id (no lo vale con `$generichide`, YouTube entre ellos), para que
+   el preload no vigile la página si no hace falta. */
+function arranqueDe(url) {
+  const nada = { scriptlets: '', genericos: false };
+  if (!engine) return nada;
   try {
     const r = engine.urlCosmeticResources(url);
-    const s = r && r.injected_script;
-    if (!s) return '';
-    return '(function () {\nconst scriptletGlobals = {};\n' + s + '\n})();';
-  } catch (e) { return ''; }
+    if (!r) return nada;
+    const s = r.injected_script;
+    return { scriptlets: s ? '(function () {\nconst scriptletGlobals = {};\n' + s + '\n})();' : '', genericos: !r.generichide };
+  } catch (e) { return nada; }
 }
 
 function status() {
   return { engine: !!engine, lists: meta.lists, updated: meta.updated };
 }
 
-module.exports = { init, refresh, check, sustituto, ESQUEMA_SUSTITUTOS, cosmeticsFor, scriptletsFor, status };
+// buildEngine y montaYGuarda se exportan para los tests (test/adblock.test.js):
+// montan el motor con listas y recursos fijos, sin red ni perfil.
+module.exports = { init, refresh, check, sustituto, ESQUEMA_SUSTITUTOS, cosmeticsFor, genericosPara, arranqueDe, status, buildEngine, montaYGuarda, fuentesDe };

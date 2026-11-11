@@ -1,7 +1,7 @@
 {
   "name": "naviris-browser",
   "productName": "Naviris",
-  "version": "2.8.2-dev.1",
+  "version": "3.0.0",
   "description": "Naviris",
   "author": "Iris Studio",
   "license": "MIT",
@@ -12,21 +12,27 @@
   },
   "scripts": {
     "start": "electron .",
+    "check": "node build/comprueba-sintaxis.js",
+    "test": "node --test --test-timeout=20000 \"test/*.test.js\"",
+    "test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.test.js\" \"test/e2e/arranque.e2e.js\" \"test/e2e/perfiles.e2e.js\" \"test/e2e/huecos.e2e.js\" \"test/e2e/rendimiento.e2e.js\" \"test/e2e/menus.e2e.js\" \"test/e2e/instancia.e2e.js\" \"test/e2e/seguridad.e2e.js\" \"test/e2e/auditoria.e2e.js\" \"test/e2e/protocolo.e2e.js\" \"test/e2e/migracion.e2e.js\" \"test/e2e/endurece.e2e.js\" \"test/e2e/firmas.e2e.js\"",
+    "test:e2e:ci": "node build/e2e-ci.js",
     "icon": "electron build/render-icon.js",
     "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
     "adblock-recursos": "node build/adblock-recursos.js",
+    "firma:addons": "node build/firma.js addons",
+    "test:e2e:adblock": "node --test --test-concurrency=1 test/e2e/adblock.e2e.js",
     "dist": "electron-builder --win",
     "release": "npm run dist && node build/publish-release.js",
     "publish": "node build/publish-release.js",
     "dist-publish": "npm run dist && node build/publish-release.js"
   },
   "devDependencies": {
-    "electron": "github:castlabs/electron-releases#v42.5.2+wvcus",
+    "electron": "github:castlabs/electron-releases#v45.2.1+wvcus",
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.estudiodeiris.cobalt",
+    "appId": "com.estudiodeiris.naviris",
     "productName": "Naviris",
     "afterSign": "build/evs-sign.js",
     "electronDownload": {
@@ -74,6 +80,7 @@
       ]
     },
     "nsis": {
+      "guid": "d31db246-92f5-5005-a1d2-33cc1464dc5d",
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
@@ -90,5 +97,8 @@
   "dependencies": {
     "adblock-rs": "^0.13.2",
     "electron-updater": "^6.8.9"
+  },
+  "overrides": {
+    "js-yaml": "^4.3.2"
   }
 }

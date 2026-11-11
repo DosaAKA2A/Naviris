@@ -10,13 +10,17 @@ name: Desktop Release (solo compilacion de prueba)
 #
 # Flujo de publicacion vigente:
 #   1. En local: `npm run release` -> `npm run dist` (compila y firma VMP) y
-#      luego build/publish-release.js, que sube los assets y genera el feed.
+#      luego build/publish-release.js, que corre `npm test` (y no publica si
+#      falla), sube los assets y genera el feed.
 #      NO usar `electron-builder --publish`: sus dos publicadores (nsis y
 #      portable) compiten por crear la misma release y el segundo muere con un
 #      422, dejandola sin instalador y sin .yml. Por eso existe el script.
 #   2. Al publicarse la release, "Mobile APK" adjunta el APK automaticamente.
 #
 # Este workflow queda solo como comprobacion manual de que el proyecto compila.
+# Y no compila si fallan las pruebas: el job "pruebas" (pruebas.yml) va antes y
+# "compilar" lo necesita (needs). Si algun dia este workflow vuelve a publicar,
+# el paso de publicar tiene que ir en un job que tambien dependa de "pruebas".
 
 on:
   workflow_dispatch:
@@ -25,15 +29,24 @@ permissions:
   contents: read
 
 jobs:
+  pruebas:
+    uses: ./.github/workflows/pruebas.yml
+
   compilar:
+    needs: pruebas
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24: el Electron de castlabs pide >= 22.12, y es con el que se prueba
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
+
+      # electron (castlabs) viene de GitHub por git y el lock lo apunta por ssh
+      - name: Dependencias de GitHub por https (sin clave ssh)
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 
       - name: Instalar dependencias
         run: npm ci

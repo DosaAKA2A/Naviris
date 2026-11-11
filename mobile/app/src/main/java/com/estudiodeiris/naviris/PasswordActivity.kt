@@ -1,4 +1,4 @@
-package com.estudiodeiris.cobalt
+package com.estudiodeiris.naviris
 
 import android.os.Bundle
 import android.view.Gravity
@@ -20,6 +20,7 @@ class PasswordActivity : AppCompatActivity() {
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
         EncryptedSharedPreferences.create(
+            // Mismo nombre de archivo de siempre: con otro, las contraseñas guardadas no se encontrarían.
             this, "cobalt_passwords", key,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
@@ -136,7 +137,7 @@ class PasswordActivity : AppCompatActivity() {
             .setView(tv)
             .setPositiveButton("Copiar") { _, _ ->
                 val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("cobalt", pw))
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Naviris", pw))
                 toast("Copiada")
             }
             .setNegativeButton("Cerrar", null)

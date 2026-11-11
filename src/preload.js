@@ -1,10 +1,11 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-contextBridge.exposeInMainWorld('cobalt', {
+contextBridge.exposeInMainWorld('navirisApp', {
   minimize: () => ipcRenderer.send('win:minimize'),
   maximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close'),
   newPrivateWindow: () => ipcRenderer.send('win:new-private'),
+  newWindow: () => ipcRenderer.send('win:nueva'),
   // Sacar una pestaña de la barra a su propia ventana, con su contenedor.
   sacarPestana: (url, contenedorId) => ipcRenderer.send('win:sacar-pestana', url, contenedorId || null),
   // Atrás y adelante de una pestaña que se duerme: se leen antes de quitar su
@@ -28,6 +29,9 @@ contextBridge.exposeInMainWorld('cobalt', {
   updateNovedades: () => ipcRenderer.invoke('update:novedades'),
   version: () => ipcRenderer.invoke('app:version'),
   gpuStatus: () => ipcRenderer.invoke('gpu:status'),
+  // Navegador predeterminado: { registrado, predeterminado } y abrir su página de Configuración de Windows
+  navegadorEstado: () => ipcRenderer.invoke('navegador:estado'),
+  hacerPredeterminado: () => ipcRenderer.invoke('navegador:hacer-predeterminado'),
 
   adblockGet: () => ipcRenderer.invoke('adblock:get'),
   adblockSetEnabled: (v) => ipcRenderer.invoke('adblock:set-enabled', v),
@@ -40,6 +44,10 @@ contextBridge.exposeInMainWorld('cobalt', {
   importAvailable: () => ipcRenderer.invoke('import:available'),
   importBookmarks: (key) => ipcRenderer.invoke('import:bookmarks', key),
   cancelDownload: (id) => ipcRenderer.send('download:cancel', id),
+  keepDownload: (id) => ipcRenderer.send('download:conservar', id),
+  pauseDownload: (id) => ipcRenderer.send('download:pause', id),
+  resumeDownload: (id) => ipcRenderer.send('download:resume', id),
+  retryDownload: (id) => ipcRenderer.send('download:retry', id),
   openDownload: (id) => ipcRenderer.send('download:open', id),
   revealDownload: (id) => ipcRenderer.send('download:reveal', id),
   downloadPath: (id) => ipcRenderer.invoke('download:path', id),
@@ -66,13 +74,33 @@ contextBridge.exposeInMainWorld('cobalt', {
   onUpdateStatus: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s)),
 
   onOpenUrl: (cb) => ipcRenderer.on('tab:open-url', (_e, payload) => cb(payload)),
+  onBucle: (cb) => ipcRenderer.on('tab:bucle', (_e, p) => cb(p)),
+  reintentaBucle: (id) => ipcRenderer.send('tab:reintenta-bucle', id),
+  // Antes de cada recarga o navegación que pide el usuario: el freno de bucles
+  // no la cuenta. Síncrono para que llegue antes que la navegación.
+  navUsuario: (wcId) => { try { ipcRenderer.sendSync('tab:nav-usuario', wcId); } catch { /* nada */ } },
+  // Diálogos de las páginas (alert/confirm/prompt) y de abrir con otra aplicación
+  onDialogo: (cb) => ipcRenderer.on('tab:dialogo', (_e, d) => cb(d)),
+  onDialogoFin: (cb) => ipcRenderer.on('tab:dialogo-fin', (_e, id) => cb(id)),
+  respondeDialogo: (r) => ipcRenderer.send('tab:dialogo-respuesta', r),
+  // Clic derecho en un campo de la interfaz y «Pegar e ir» de la barra
+  menuCampo: (d) => ipcRenderer.send('ui:menu-campo', d),
+  // Menús que arma el main (página y campos) y pinta la interfaz: abrir y elegir
+  onMenu: (cb) => ipcRenderer.on('ctx:menu', (_e, m) => cb(m)),
+  eligeMenu: (id, n) => ipcRenderer.send('ctx:elige', id, n),
+  onPegarEIr: (cb) => ipcRenderer.on('ui:pegar-e-ir', (_e, t) => cb(t)),
+  borraDatos: (opciones) => ipcRenderer.invoke('datos:borra', opciones),
+  onColgada: (cb) => ipcRenderer.on('tab:colgada', (_e, p) => cb(p)),
+  guardaPagina: (wcId) => ipcRenderer.send('tab:guardar', wcId),
+  onEmergenteBloqueada: (cb) => ipcRenderer.on('tab:emergente-bloqueada', (_e, p) => cb(p)),
+  permitirEmergentes: (origen, wc) => ipcRenderer.send('emergentes:permitir', origen, wc),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
   pwAvailable: () => ipcRenderer.invoke('pw:available'),
   pwList: () => ipcRenderer.invoke('pw:list'),
-  pwAdd: (site, username, password) => ipcRenderer.invoke('pw:add', { site, username, password }),
-  pwForHost: (host) => ipcRenderer.invoke('pw:for-host', host),
+  pwAdd: (site, username, password, esquema) => ipcRenderer.invoke('pw:add', { site, username, password, esquema }),
+  pwForHost: (host, esquema) => ipcRenderer.invoke('pw:for-host', host, esquema),
   pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
   pwImportCsv: () => ipcRenderer.invoke('pw:import-csv'),
   pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),
@@ -111,6 +139,12 @@ contextBridge.exposeInMainWorld('cobalt', {
   // filePath usa webUtils porque File.path se retiró en Electron 32+.
   filePath: (f) => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
   pickWallpaper: () => ipcRenderer.invoke('hub:pick-wallpaper'),
+  // Imagen de un widget: se copia al perfil y vuelve su dirección naviris://app/datos/...
+  imagenWidget: (ruta) => ipcRenderer.invoke('hub:imagen-widget', ruta),
+  // Lo que la interfaz guardaba en file:// (ver migraOrigen en migra-claves.js). Síncrono:
+  // tiene que llegar antes de que la interfaz lea su localStorage.
+  almacenViejo: () => ipcRenderer.sendSync('ui:almacen-viejo'),
+  almacenMigrado: (r) => ipcRenderer.send('ui:almacen-migrado', r),
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),
