@@ -225,7 +225,7 @@ function abreNovedadesPagina(d) {
     }
     cont.appendChild(sec);
   }
-  tabs.forEach((t) => t.webview?.classList.remove('active'));
+  tabs.forEach((t) => t.webview?.classList.remove('active')); cierraCentro(true);
   els.hub.classList.remove('active');
   pg.classList.remove('hidden'); pg.classList.add('active');
   pg.scrollTop = 0;

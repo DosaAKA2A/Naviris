@@ -297,7 +297,7 @@ function activateTab(id) {
   if (tab.asleep) despiertaPestana(tab);
   // La de novedades tambien: si no, se quedaba encima al cambiar de pestaña y
   // parecia una pestaña que no se podia cerrar (2026-08-18).
-  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
+  hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true); cierraCentro(true);
   cerrarBuscar();   // la búsqueda es de la página que se deja atrás
   if (divId !== null && divId === id) divId = null;   // no se divide consigo misma
   els.hub.classList.toggle('active', tab.kind === 'hub');

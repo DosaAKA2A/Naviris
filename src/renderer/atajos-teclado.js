@@ -32,6 +32,7 @@ window.addEventListener('keydown', (e) => {
     if (cerrarBuscar()) return;
     if (cierraMenusHub()) return;
     if (cierraNovedadesPagina()) return;
+    if (cierraCentro()) return;
     if (adEls.page.classList.contains('active')) { hideAddonsPage(); els.hub.classList.add('active'); return; }
     if (!escribiendo) { pararCarga(); return; }
     return;

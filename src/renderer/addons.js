@@ -10,7 +10,7 @@ const adEls = {
 };
 function showAddonsPage() {
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage(); cierraNovedadesPagina(true);
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideDownloadsPage(); cierraNovedadesPagina(true); cierraCentro(true);
   adEls.page.classList.remove('hidden'); adEls.page.classList.add('active');
   renderAddons();
 }

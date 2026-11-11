@@ -21,6 +21,9 @@ const protocolo = require('./protocolo'); // la interfaz por naviris://app (se p
 const migraOrigen = require('./migra-origen'); // lo que la interfaz guardaba en file://
 const credenciales = require('./credenciales'); // a qué páginas se ofrece cada contraseña (se prueba en test/)
 const descargasSeguras = require('./descargas-seguras'); // descargas peligrosas y automáticas (se prueba en test/)
+const centroRend = require('./centro-rendimiento'); // cuentas del Centro de rendimiento de Ajustes (se prueba en test/)
+const os = require('os');
+const http = require('http');
 
 // Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
 // con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
@@ -1525,6 +1528,9 @@ const SPLASH_MINIMO = 1050; // ms en pantalla: la animación entera (~0,9 s) y u
 const SPLASH_SALIDA = 200;  // el fundido de salida de splash.html (.sale)
 // Tope de seguridad tras ocultarse, por si el audio nunca avisa de que acabó (el de arranque dura < 3 s)
 const SPLASH_TOPE_SONIDO = 4000;
+/* Hitos del arranque para el Centro de rendimiento (Ajustes): tres marcas de
+   tiempo, nada más. El inicio es la creación del proceso (getAppMetrics). */
+const hitosArranque = { listo: 0, interfaz: 0, visible: 0 };
 let splashWin = null;
 let splashPct = 0;          // último hito, por si el splash aún no ha cargado
 let splashDesde = 0;        // cuándo empezó su animación: el mínimo en pantalla cuenta desde ahí
@@ -1595,7 +1601,7 @@ async function cerrarSplash(win) {
   await Promise.race([splashAnda, new Promise((r) => setTimeout(r, 1500))]);
   const espera = splashDesde ? Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde)) : 0;
   setTimeout(() => {
-    if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); }
+    if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); if (!hitosArranque.visible) hitosArranque.visible = Date.now(); }
     if (!splashWin || splashWin.isDestroyed()) return;
     const sw = splashWin;
     try { sw.webContents.send('splash:sale'); } catch {}
@@ -1662,6 +1668,7 @@ ipcMain.on('ui:listo', soloUI((e) => {
   const win = ventanaEsperandoUI;
   if (!win) return;
   ventanaEsperandoUI = null;
+  if (!hitosArranque.interfaz) hitosArranque.interfaz = Date.now();
   cerrarSplash(win);
 }));
 
@@ -2863,10 +2870,8 @@ ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message) }; }
 }));
 // Memoria de un proceso en KB: la PRIVADA, la que enseña el administrador de
-// tareas. workingSetSize cuenta también las páginas compartidas en cada proceso
-// y el total salía unas cuatro veces más alto (NAV-VIVO-08). Fuera de Windows
-// no hay privateBytes y se usa el working set.
-const memKb = (p) => (p.memory && (p.memory.privateBytes ?? p.memory.workingSetSize)) || 0;
+// tareas (NAV-VIVO-08, ver centro-rendimiento.js).
+const memKb = centroRend.memoriaKb;
 // Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris
 // (app.getAppMetrics agrega todos los procesos del navegador).
 ipcMain.handle('sys:stats', soloUI(async () => {
@@ -2920,6 +2925,74 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
       procesos: mets.length
     };
   } catch { return null; }
+}));
+
+/* ---------- Centro de rendimiento (Ajustes) ----------
+   Lo que ve el usuario de cómo va su Naviris. Las cuentas están en
+   centro-rendimiento.js; aquí solo se leen los procesos.
+   Coste fuera del Centro: una muestra de memoria cada 5 min (getAppMetrics,
+   menos de 1 ms) para la tendencia de la sesión, en memoria y como mucho las
+   últimas 24 h. Lo demás solo corre cuando la interfaz lo pide. */
+const MUESTRA_MEMORIA_MS = 5 * 60 * 1000;
+const MUESTRAS_MAX = 288;
+const muestrasMemoria = [];
+const NUCLEOS = Math.max(1, os.cpus().length);
+function apuntaMemoria() {
+  try {
+    muestrasMemoria.push({ t: Date.now(), kb: centroRend.sumaMetricas(app.getAppMetrics(), NUCLEOS).memoriaKb });
+    if (muestrasMemoria.length > MUESTRAS_MAX) muestrasMemoria.shift();
+  } catch { /* sin métricas esta vez */ }
+}
+const inicioProceso = (mets = app.getAppMetrics()) => centroRend.inicioDelProceso(mets, Math.round(performance.timeOrigin));
+// Lo que se ve en vivo (cada 2 s mientras el Centro está abierto).
+ipcMain.handle('centro:vivo', soloUI(() => {
+  try {
+    const mets = app.getAppMetrics();
+    return { ...centroRend.sumaMetricas(mets, NUCLEOS), inicio: inicioProceso(mets), ahora: Date.now(), muestras: muestrasMemoria };
+  } catch { return null; }
+}));
+// Foto de la memoria por tipo de proceso.
+ipcMain.handle('centro:memoria', soloUI(() => {
+  try {
+    const mets = app.getAppMetrics();
+    return { totalKb: centroRend.sumaMetricas(mets, NUCLEOS).memoriaKb, procesos: mets.length, grupos: centroRend.agrupaProcesos(mets) };
+  } catch { return null; }
+}));
+// El equipo y los hitos del arranque de esta sesión.
+ipcMain.handle('centro:info', soloUI(() => ({
+  equipo: {
+    naviris: app.getVersion(), chromium: process.versions.chrome, electron: process.versions.electron,
+    windows: process.platform === 'win32' ? centroRend.nombreWindows(os.release()) : os.type() + ' ' + os.release(),
+    cpu: (os.cpus()[0]?.model || '').trim(), nucleos: NUCLEOS, ramKb: Math.round(os.totalmem() / 1024)
+  },
+  arranque: centroRend.tramosArranque({ inicio: inicioProceso(), ...hitosArranque })
+})));
+/* Las páginas de las pruebas de carga y renderizado: un servidor en 127.0.0.1,
+   en un puerto libre, que solo vive mientras dura la prueba (con tope de 2 min
+   por si la interfaz no lo apaga). Solo sirve las páginas fijas de
+   centro-rendimiento.js: nada del disco, nada de fuera. */
+let servidorPruebas = null, servidorTope = null;
+function paraServidorPruebas() {
+  clearTimeout(servidorTope); servidorTope = null;
+  if (!servidorPruebas) return;
+  servidorPruebas.close(); servidorPruebas.closeAllConnections();
+  servidorPruebas = null;
+}
+ipcMain.handle('centro:paginas', soloUI(async (_e, encender) => {
+  paraServidorPruebas();
+  if (!encender) return { ok: true };
+  try {
+    const srv = http.createServer((req, res) => {
+      const p = centroRend.paginaDePrueba(req.url);
+      if (!p) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': p.tipo, 'Cache-Control': 'no-store' });
+      res.end(p.cuerpo);
+    });
+    await new Promise((ok, mal) => { srv.once('error', mal); srv.listen(0, '127.0.0.1', ok); });
+    servidorPruebas = srv;
+    servidorTope = setTimeout(paraServidorPruebas, 2 * 60 * 1000);
+    return { ok: true, puerto: srv.address().port };
+  } catch (e) { return { ok: false, error: String(e && e.message) }; }
 }));
 /* Lo que copia un gestor de contraseñas (Bitwarden, KeePass, 1Password) lleva
    la marca de Windows para que ningún historial lo guarde: el widget
@@ -4112,6 +4185,8 @@ ipcMain.handle('update:novedades', soloUI(async () => {
 nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
 
 app.whenReady().then(async () => {
+  hitosArranque.listo = Date.now();
+  setInterval(apuntaMemoria, MUESTRA_MEMORIA_MS);
   // naviris://app solo en la sesión de la interfaz y en la del splash: las webs no lo tienen (ver protocolo.js).
   const sirveApp = protocolo.manejador({ app: __dirname, datos: app.getPath('userData') });
   protocol.handle(protocolo.ESQUEMA, sirveApp);

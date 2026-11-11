@@ -1,7 +1,7 @@
 /* Navegación y barra de direcciones: ir a una dirección, vista del dominio, estrella, autocompletado, recargar, atrás y adelante, zoom y reabrir pestañas. */
 
 function navigateActive(input) {
-  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage();
+  const url = toUrl(input); if (!url) return; hideBookmarkPage(); hideAddonsPage(); hideDownloadsPage(); cierraCentro(true);
   const tab = activeTab() || createTab();
   if (tab.kind === 'hub') { attachWebview(tab, url); tab.title = 'Cargando…'; activateTab(tab.id); }
   else {
