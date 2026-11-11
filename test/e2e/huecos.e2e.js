@@ -122,6 +122,13 @@ test('Ctrl+Mayús+AvPág mueve la pestaña en vez de cambiar de pestaña', async
   await app.ui.evalua(`window.__atajos = []; if (!window.__espiaAtajos) { window.__espiaAtajos = ejecutaAtajo; ejecutaAtajo = (c) => { __atajos.push(c); return __espiaAtajos(c); }; } 1`);
   const movida = () => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`);
   for (let i = 0; i < 4 && !(await movida()); i++) {
+    /* Esta tecla no es reservada: la ve primero la web y el webview la pasa a la
+       interfaz si no la usa. En el runner la ventana a veces no tiene el foco
+       del sistema (foco=false) y entonces ese reenvío no llega nunca (atajos=[]).
+       Un usuario siempre tiene la ventana activa al pulsar, así que se le da. */
+    await app.ui.envia('Page.bringToFront').catch(() => {});
+    await web.envia('Page.bringToFront').catch(() => {});
+    await espera(200);
     await tecla(web, 'PageDown', 'PageDown', 34, CTRL | MAYUS);
     await hasta(movida, 4000).catch(() => {});
   }
