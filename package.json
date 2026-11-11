@@ -27,7 +27,7 @@
     "dist-publish": "npm run dist && node build/publish-release.js"
   },
   "devDependencies": {
-    "electron": "github:castlabs/electron-releases#v42.5.2+wvcus",
+    "electron": "github:castlabs/electron-releases#v45.2.1+wvcus",
     "electron-builder": "^26.15.3"
   },
   "build": {

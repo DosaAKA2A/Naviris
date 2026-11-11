@@ -15,31 +15,56 @@
    Cómo: al salir, las cookies marcadas como de sesión se vuelven a escribir
    con caducidad de 30 días. Es lo mismo que hace Chrome de facto.
    Va aparte de main.js para poder probarlo sin Electron (test/sesiones.test.js):
-   recibe el `cookies` de una sesión y devuelve cuántas conservó. */
+   recibe el `cookies` de una sesión y la lista de sus particionadas, y
+   devuelve cuántas conservó. */
 const DIAS_SESION = 30;
 
-async function conservaCookiesDeSesion(cookies, ahora = Date.now()) {
+/* Las PARTICIONADAS (CHIPS) se quedan como están (2026-11-03). Son las que
+   pone un iframe de otro sitio (un video de YouTube incrustado, el botón de
+   Google, un Turnstile...) y solo valen dentro de la web que lo incrusta.
+   cookies.get({}) las devuelve mezcladas con las demás y sin decir que lo
+   son, y al reescribirlas aquí sin partición se volvían cookies NORMALES del
+   sitio incrustado: medido, la cookie de sesión de un iframe salía al reabrir
+   como cookie propia de su dominio, y con el mismo nombre que una de verdad la
+   pisaba. Cada cierre metía en youtube.com o google.com valores sacados de sus
+   iframes, por eso el lío solo aparecía en perfiles usados.
+   Hasta Electron 42 se reconocían porque una consulta por URL no las veía;
+   desde Electron 43 esa consulta también las devuelve (medido el 11/11), y la
+   API de cookies sigue sin decir la partición. La única que la dice es la del
+   protocolo de DevTools (partitionKey), así que se piden por ahí, con una vista
+   en blanco de la misma sesión que no carga nada. */
+async function cookiesParticionadas(ses) {
+  const { WebContentsView } = require('electron');
+  const wc = new WebContentsView({ webPreferences: { session: ses, sandbox: true, javascript: false } }).webContents;
+  try {
+    await wc.loadURL('about:blank');
+    wc.debugger.attach('1.3');
+    const { cookies } = await wc.debugger.sendCommand('Network.getAllCookies');
+    return cookies.filter((c) => c.partitionKey);
+  } finally {
+    try { wc.debugger.detach(); } catch { /* no llegó a engancharse */ }
+    wc.close();
+  }
+}
+
+const clave = (c) => [c.name, c.domain, c.path, c.value].join('\0');
+
+// `particionadas`: las de cookiesParticionadas() (vale cualquier lista con name, domain, path y value).
+async function conservaCookiesDeSesion(cookies, particionadas, ahora = Date.now()) {
   const todas = await cookies.get({});
   const caduca = Math.floor(ahora / 1000) + DIAS_SESION * 24 * 60 * 60;
+  // Cuántas particionadas hay de cada clave: si una propia y una particionada
+  // coinciden en todo, get({}) devuelve las dos y solo se salta una.
+  const quedan = new Map();
+  for (const c of particionadas) quedan.set(clave(c), (quedan.get(clave(c)) || 0) + 1);
   let n = 0;
   for (const c of todas) {
     if (!c.session) continue;                    // las persistentes ya aguantan
     const host = (c.domain || '').replace(/^\./, '');
     if (!host) continue;
+    const k = clave(c);
+    if (quedan.get(k)) { quedan.set(k, quedan.get(k) - 1); continue; }
     const url = (c.secure ? 'https://' : 'http://') + host + (c.path || '/');
-    /* Las PARTICIONADAS (CHIPS) se quedan como están (2026-11-03). Son las que
-       pone un iframe de otro sitio (un video de YouTube incrustado, el botón
-       de Google, un Turnstile...) y solo valen dentro de la web que lo
-       incrusta. cookies.get({}) las devuelve mezcladas con las demás y sin
-       decir que lo son, y al reescribirlas aquí sin partición se volvían
-       cookies NORMALES del sitio incrustado: medido, la cookie de sesión de
-       un iframe salía al reabrir como cookie propia de su dominio, y con el
-       mismo nombre que una de verdad la pisaba. Cada cierre metía en
-       youtube.com o google.com valores sacados de sus iframes, por eso el
-       lío solo aparecía en perfiles usados. Se reconocen porque una consulta
-       por URL, que no incluye particionadas, no las ve. */
-    const propias = await cookies.get({ url, name: c.name });
-    if (!propias.some((p) => p.domain === c.domain && p.path === c.path && p.value === c.value)) continue;
     /* Las cookies de UN solo host (hostOnly) se reescriben SIN domain. Con
        domain, Chromium crea otra cookie distinta, de dominio, que convive con
        la original: Google y YouTube recibían dos cookies con el mismo nombre
@@ -60,4 +85,4 @@ async function conservaCookiesDeSesion(cookies, ahora = Date.now()) {
   return n;
 }
 
-module.exports = { conservaCookiesDeSesion, DIAS_SESION };
+module.exports = { conservaCookiesDeSesion, cookiesParticionadas, DIAS_SESION };
