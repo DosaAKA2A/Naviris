@@ -13,6 +13,8 @@
  *   - dev.yml    para las que llevan sufijo -dev
  * El feed y sus comprobaciones viven en build/feed-actualizador.js, lo mismo que
  * prueba test/actualizador.test.js.
+ * Cada feed se FIRMA con la clave propia (build/firma.js) y la firma se sube
+ * como <feed>.sig: las instalaciones 3.x no descargan nada sin ella.
  *
  * ANTES DE NADA corre `npm test` y, si falla, no publica (tampoco con --dry).
  * Solo se salta con NAVIRIS_PUBLICAR_SIN_PRUEBAS=1, y lo avisa bien alto.
@@ -26,6 +28,8 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const feed = require('./feed-actualizador');
+const { clavePrivada, firmaFeed } = require('./firma');
+const firmas = require('../src/firmas');
 
 const RAIZ = path.join(__dirname, '..');
 const DIST = path.join(RAIZ, 'dist');
@@ -72,6 +76,8 @@ async function api(url, opts = {}) {
 (async () => {
   if (!pasaLasPruebas()) process.exit(1);
   if (!TOKEN) { console.error('Falta GH_TOKEN en el entorno.'); process.exit(1); }
+  let clave;
+  try { clave = clavePrivada(); } catch (e) { console.error('NO SE PUBLICA: ' + e.message); process.exit(1); }
   console.log(`Publicando ${TAG} (${ES_DEV ? 'DEV' : 'ESTABLE'}) -> feed ${CANAL}`);
 
   const setupPath = path.join(DIST, SETUP);
@@ -81,12 +87,15 @@ async function api(url, opts = {}) {
   const yml = feed.generaFeed(VER, setupPath);
   const mal = feed.compruebaFeed(yml, { version: VER, setupPath, nombreFeed: CANAL });
   if (mal.length) { console.error('El feed generado no cuadra:\n - ' + mal.join('\n - ')); process.exit(1); }
-  const ymlPaths = CANALES.map((c) => {
+  // La firma se sube ANTES que su feed: un feed a la vista sin su firma haría que las instalaciones lo rechacen
+  const ymlPaths = CANALES.flatMap((c) => {
     const p = path.join(DIST, c);
     fs.writeFileSync(p, yml);
-    return { file: p, name: c };
+    fs.writeFileSync(p + '.sig', firmaFeed(yml, clave) + '
+');
+    return [{ file: p + '.sig', name: c + '.sig' }, { file: p, name: c }];
   });
-  console.log(` feeds generados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
+  console.log(` feeds generados y firmados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
 
   const subir = [
     { file: setupPath, name: SUBIDO.setup },
@@ -139,6 +148,7 @@ async function api(url, opts = {}) {
     const feedUrl = `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/${c}`;
     const servido = await (await fetch(feedUrl)).text();
     const malServido = feed.compruebaFeed(servido, { version: VER, setupPath, nombreFeed: c });
+    if (!firmas.verifica('feed', servido, await (await fetch(feedUrl + '.sig')).text())) malServido.push('la firma servida no vale para el feed servido');
     if (malServido.length) todosOk = false;
     console.log(`\n${malServido.length ? 'AVISO' : 'OK'}: ${c} servido y ${malServido.length ? 'NO coincide: ' + malServido.join('; ') : 'coherente'}`);
   }

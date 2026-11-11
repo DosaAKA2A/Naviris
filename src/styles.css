@@ -1452,6 +1452,9 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 #upd-status { font-size: 12.5px; color: var(--text-dim); }
 #upd-status.hot { color: var(--ok); }
 #upd-status.err { color: var(--danger); }
+/* Versión sin firma válida: se baja a mano desde la web */
+#upd-status .upd-web { border: none; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--text); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+#upd-status .upd-web:hover { color: var(--accent); }
 .upd-bar { height: 4px; border-radius: 2px; background: var(--active); overflow: hidden; margin-top: 8px; }
 .upd-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--bar-from), var(--bar-to)); transition: width .2s; }
 /* Las dos líneas oficiales (Naviris estable / NavirisDev) con botón propio */

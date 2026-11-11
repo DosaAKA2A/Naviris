@@ -20,6 +20,10 @@ const { AppUpdater } = require('electron-updater/out/AppUpdater');
 const semver = require(require.resolve('semver', { paths: [require.resolve('electron-updater')] }));
 const feed = require('../build/feed-actualizador');
 const { canalDeActualizacion } = require('../src/canal-actualizaciones');
+const firmas = require('../src/firmas');
+
+// Clave de usar y tirar para firmar los feeds de prueba, como hace build/publish-release.js con la real
+const { publicKey: clavePub, privateKey: clavePriv } = crypto.generateKeyPairSync('ed25519');
 
 const OWNER = 'DosaAKA2A', REPO = 'Naviris';
 const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'naviris-test-actualizador-'));
@@ -29,7 +33,8 @@ test.after(() => fs.rmSync(carpeta, { recursive: true, force: true }));
 function publica(version, { prerelease = feed.esDev(version), feedComo = feed.feedDe(version) } = {}) {
   const setupPath = path.join(carpeta, feed.nombres(version).setup);
   fs.writeFileSync(setupPath, crypto.randomBytes(4096 + Math.floor(Math.random() * 4096)));
-  return { tag: 'v' + version, version, prerelease, setupPath, feeds: { [feedComo]: feed.generaFeed(version, setupPath) } };
+  const texto = feed.generaFeed(version, setupPath);
+  return { tag: 'v' + version, version, prerelease, setupPath, feeds: { [feedComo]: texto, [feedComo + '.sig']: firmas.firma('feed', texto, clavePriv) } };
 }
 
 /* GitHub de mentira con lo justo que pide electron-updater: el atom de releases
@@ -169,6 +174,38 @@ test('con el electron-updater real: si una dev escribiera latest.yml, las establ
     // El publicador nunca genera eso: la dev va a dev.yml y la comprobación del feed lo rechazaría
     assert.equal(feed.feedDe('3.0.0-dev.1'), 'dev.yml');
     assert.notDeepEqual(feed.compruebaFeed(releases[0].feeds['latest.yml'], { version: '3.0.0-dev.1', nombreFeed: 'latest.yml' }), []);
+  } finally { await gh.cierra(); }
+});
+
+test('con el electron-updater real: lo que va a bajar pasa la firma; con el feed o la firma tocados, o sin firma, no', async () => {
+  const releases = [publica('3.0.0-dev.2'), publica('2.8.1')];
+  const gh = await githubFalso(releases);
+  // La app pide a github.com; aquí se redirige al GitHub de mentira
+  const pide = (url) => fetch(url.replace('https://github.com/', `http://${gh.host}/`));
+  try {
+    const dev = await mira(gh, '3.0.0-dev.1');
+    assert.equal(dev.info.version, '3.0.0-dev.2');
+    assert.equal(await firmas.compruebaActualizacion(dev.info, { pide, clave: clavePub }), null);
+    const estable = await mira(gh, '2.8.0');
+    assert.equal(await firmas.compruebaActualizacion(estable.info, { pide, clave: clavePub }), null);
+
+    // Alguien con acceso a la release cambia el instalador y su sha512 en el feed: la firma ya no vale
+    const r = releases[0];
+    const original = r.feeds['dev.yml'];
+    fs.writeFileSync(r.setupPath, crypto.randomBytes(5000));
+    r.feeds['dev.yml'] = feed.generaFeed(r.version, r.setupPath);
+    const tocado = await mira(gh, '3.0.0-dev.1');
+    assert.notEqual(tocado.info.sha512, dev.info.sha512);
+    assert.match(await firmas.compruebaActualizacion(tocado.info, { pide, clave: clavePub }), /firma del feed no es válida/);
+    // …y si además firma él (con otra clave), tampoco
+    r.feeds['dev.yml.sig'] = firmas.firma('feed', r.feeds['dev.yml'], crypto.generateKeyPairSync('ed25519').privateKey);
+    assert.match(await firmas.compruebaActualizacion(tocado.info, { pide, clave: clavePub }), /no es válida/);
+    // Si deja el feed firmado original pero electron-updater leyera otro, tampoco
+    r.feeds['dev.yml'] = original; r.feeds['dev.yml.sig'] = firmas.firma('feed', original, clavePriv);
+    assert.match(await firmas.compruebaActualizacion(tocado.info, { pide, clave: clavePub }), /no coinciden/);
+    // Sin firma (una release vieja, o quitada): no
+    delete r.feeds['dev.yml.sig'];
+    assert.match(await firmas.compruebaActualizacion(dev.info, { pide, clave: clavePub }), /no tiene firma/);
   } finally { await gh.cierra(); }
 });
 

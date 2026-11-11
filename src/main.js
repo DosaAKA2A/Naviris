@@ -8,6 +8,7 @@ const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion, cookiesParticionadas } = require('./sesiones');
 const { migraPerfil, migraCarpetaV1, migraNombre, sesionPendiente, migraSesion, PART_NAVIRIS } = require('./migraciones');
 const { canalDeActualizacion } = require('./canal-actualizaciones');
+const firmas = require('./firmas'); // feed del actualizador y catálogo de addons firmados (se prueba en test/)
 const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
 const archivosLocales = require('./archivos-locales'); // lo que puede cargar una página file:// (se prueba en test/)
 const { creaDownloadTo } = require('./descarga-binarios');
@@ -3508,42 +3509,57 @@ function loadAddonCode() {
 }
 loadAddonCode();
 
-function fetchText(url) {
+// Los bytes tal cual llegan: la firma y la huella se comprueban sobre ellos.
+function fetchBytes(url) {
   return new Promise((resolve, reject) => {
     const req = net.request(url);
-    let data = '';
+    const trozos = [];
     req.on('response', (res) => {
       if (res.statusCode !== 200) { reject(new Error('HTTP ' + res.statusCode)); return; }
-      res.on('data', (c) => { data += c; });
-      res.on('end', () => resolve(data));
+      res.on('data', (c) => { trozos.push(c); });
+      res.on('end', () => resolve(Buffer.concat(trozos)));
     });
     req.on('error', reject);
     req.end();
   });
 }
 
+/* El catálogo, solo si viene con la firma de Naviris (ver firmas.js). Sin red
+   falla como siempre; sin firma o con una que no vale, con el texto de firmas.js. */
+async function catalogoVerificado() {
+  const t = Date.now();
+  const [raw, firma] = await Promise.all([
+    fetchBytes(ADDONS_BASE + 'catalog.json?t=' + t),
+    fetchBytes(ADDONS_BASE + 'catalog.json.sig?t=' + t).catch(() => null)
+  ]);
+  return firmas.leeCatalogo(raw, firma && firma.toString('utf8'));
+}
+
 ipcMain.handle('addons:catalog', soloUI(async () => {
-  try {
-    const raw = await fetchText(ADDONS_BASE + 'catalog.json?t=' + Date.now());
-    const cat = JSON.parse(raw);
-    return { ok: true, addons: Array.isArray(cat.addons) ? cat.addons : [] };
-  } catch (e) { return { ok: false, message: String(e.message || e) }; }
+  try { return { ok: true, addons: await catalogoVerificado() }; }
+  catch (e) { return { ok: false, message: String(e.message || e) }; }
 }));
 
 ipcMain.handle('addons:list', soloUI(() => settings.addons || {}));
 
-ipcMain.handle('addons:install', soloUI(async (_e, meta) => {
+/* Instalar o actualizar: de lo que manda la interfaz solo cuenta el id. Todo lo
+   demás (de dónde se baja, la huella del código, nombre y versión) sale del
+   catálogo FIRMADO, y el código solo se escribe si tiene esa huella. */
+ipcMain.handle('addons:install', soloUI(async (_e, pedido) => {
   try {
-    if (!meta || !/^[a-z0-9-]{1,60}$/.test(meta.id || '')) throw new Error('Addon inválido');
+    const id = pedido && pedido.id;
+    if (!/^[a-z0-9-]{1,60}$/.test(id || '')) throw new Error('Addon inválido');
+    const meta = (await catalogoVerificado()).find((a) => a && a.id === id);
+    if (!meta) throw new Error('Ese addon ya no está en el catálogo');
     const entry = String(meta.entry || '');
     if (!entry.startsWith(ADDONS_BASE)) throw new Error('Origen no permitido');
-    const code = await fetchText(entry + '?t=' + Date.now());
+    const code = firmas.compruebaAddon(meta, await fetchBytes(entry + '?t=' + Date.now()));
     fs.mkdirSync(addonsDir(), { recursive: true });
-    fs.writeFileSync(addonFile(meta.id), code, 'utf8');
+    fs.writeFileSync(addonFile(id), code, 'utf8');
     settings.addons = {
       ...(settings.addons || {}),
-      [meta.id]: {
-        id: meta.id, name: meta.name || meta.id, version: meta.version || '0',
+      [id]: {
+        id, name: meta.name || id, version: meta.version || '0',
         description: meta.description || '', kind: meta.kind === 'tool' ? 'tool' : 'content',
         matches: Array.isArray(meta.matches) ? meta.matches : [], icon: meta.icon || 'puzzle-piece',
         enabled: true
@@ -3661,16 +3677,39 @@ let bajandoSolo = false;         // evita relanzar la descarga en cada aviso
 function actualizacionSolaPermitida() {
   return app.isPackaged && settings.updatesAuto !== false;
 }
+/* NADA SE DESCARGA SIN LA FIRMA DE NAVIRIS (auditoría 2026-11, #7). Sin
+   Authenticode, lo único que protegía el instalador era el sha512 del feed, que
+   viene del mismo sitio (GitHub). Antes de cada downloadUpdate se baja el feed
+   de esa versión con su firma (<feed>.sig, ver firmas.js) y tiene que anunciar
+   exactamente lo que electron-updater va a bajar. Si falta o no vale, no se
+   descarga ni se instala, y la interfaz manda a bajarla a mano desde la web. */
+const WEB_DESCARGA = 'https://naviris.site/#descargar';
+let ultimaInfo = null;   // lo que electron-updater descargaría ahora mismo
+async function descargaVerificada() {
+  const info = ultimaInfo;
+  let motivo;
+  try { motivo = await firmas.compruebaActualizacion(info, { pide: (url) => net.fetch(url) }); }
+  catch (e) { broadcast('update:status', { state: 'error', message: friendlyUpdateError(e), auto: bajandoSolo }); throw e; }
+  // Si mientras tanto apareció otra versión, se comprueba esa: se descarga la última que se encontró
+  if (info !== ultimaInfo) return descargaVerificada();
+  if (motivo) {
+    console.log('[Naviris] actualización a la ' + (info && info.version) + ' rechazada: ' + motivo);
+    broadcast('update:status', { state: 'sin-firma', version: info && info.version, web: WEB_DESCARGA, auto: bajandoSolo });
+    throw new Error('sin firma: ' + motivo);
+  }
+  return autoUpdater.downloadUpdate();
+}
 autoUpdater.on('checking-for-update', () => broadcast('update:status', { state: 'checking' }));
 autoUpdater.on('update-available', (info) => {
+  ultimaInfo = info;
   const sola = chequeoSilencioso && actualizacionSolaPermitida();
   broadcast('update:status', { state: 'available', version: info.version, auto: sola });
   if (sola && !bajandoSolo) {
     bajandoSolo = true;
     // Si falla (sin red, release a medio publicar) no se avisa de nada: se
     // reintenta en el siguiente arranque. Un error de algo que el usuario no
-    // ha pedido no debe interrumpirle.
-    autoUpdater.downloadUpdate().catch(() => { bajandoSolo = false; });
+    // ha pedido no debe interrumpirle. Sin firma sí se avisa (ver descargaVerificada).
+    descargaVerificada().catch(() => { bajandoSolo = false; });
   }
 });
 autoUpdater.on('update-not-available', (info) => broadcast('update:status', { state: 'latest', version: info.version }));
@@ -3780,7 +3819,7 @@ ipcMain.handle('update:choose', soloUI(async (_e, line) => {
    medias — el sintoma que reporto el amigo de Dosa: "descargando 12%" y de ahi
    no pasa. Bajar los 86 MB enteros tarda un poco mas y termina siempre. */
 autoUpdater.disableDifferentialDownload = true;
-ipcMain.handle('update:download', soloUI(async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } }));
+ipcMain.handle('update:download', soloUI(async () => { try { await descargaVerificada(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } }));
 /* INSTALACIÓN SIN INSTALADOR (petición de Dosa, 2026-08-17: "que se instale
    automáticamente al abrir pero sin abrir un instalador; eso provoca que mis
    usuarios pierdan interés en las actualizaciones").

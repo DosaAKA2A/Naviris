@@ -81,7 +81,8 @@ els.menuPop.addEventListener('click', (e) => {
   if (a === 'toggle-bookmarks') els.bookmarksBar.classList.toggle('hidden'); if (a === 'about') showAbout();
   // Con la estable ya descargada, la entrada del menú instala directamente: el
   // texto dice "Reiniciar e instalar la X", así que no hay sorpresa posible.
-  if (a === 'update') { if (updAutoLista) window.navirisApp.updateInstall(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
+  // Si la versión nueva no tiene firma válida, la entrada lleva a la web para bajarla a mano.
+  if (a === 'update') { if (updAutoLista) window.navirisApp.updateInstall(); else if (updSoloWeb) abreWebDescarga(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
   if (a === 'permissions') showPermManager();
   // Volver a ver la página de la versión instalada cuando quieras: sale sola al
   // actualizar, pero cerrarla no puede significar perderla.
