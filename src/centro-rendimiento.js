@@ -133,6 +133,13 @@
      frecuencia de la pantalla se estima con la mediana (60, 120, 144 Hz…) y un
      fotograma es lento si tarda más de vez y media lo que toca: se ha saltado
      al menos un refresco. */
+  // Frecuencias de pantalla habituales: 1000/mediana da 179 en una de 180 Hz.
+  const FRECUENCIAS = [60, 75, 90, 100, 120, 144, 165, 170, 175, 180, 200, 240, 280, 300, 360, 480, 500];
+  const frecuenciaDe = (ms) => {
+    const hz = 1000 / ms;
+    const cerca = FRECUENCIAS.reduce((m, f) => (Math.abs(hz - f) < Math.abs(hz - m) ? f : m));
+    return Math.abs(hz - cerca) / cerca < 0.03 ? cerca : Math.round(hz);
+  };
   function resumenFotogramas(intervalos) {
     const v = (intervalos || []).filter((x) => typeof x === 'number' && x > 0 && isFinite(x));
     if (v.length < 10) return null;
@@ -142,7 +149,7 @@
     return {
       fotogramas: v.length,
       fps: redondea1(v.length / (total / 1000)),
-      refrescoHz: Math.round(1000 / tipico),
+      refrescoHz: frecuenciaDe(tipico),
       lentos,
       pctLentos: redondea1(lentos / v.length * 100),
       peorMs: Math.round(Math.max(...v))

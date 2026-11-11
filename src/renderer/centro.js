@@ -18,7 +18,7 @@ let crTimer = null;
 let crVivo = null;          // la última lectura, para «Copiar resultados»
 let crTend = null;          // la tendencia de las muestras guardadas
 let crTendDe = 0;           // hora de la última muestra con la que se calculó
-let crInfo = null;          // el equipo y el arranque (no cambian en la sesión)
+let crInfo = null;          // el equipo y el arranque de esta sesión
 let crPrueba = 0;           // se incrementa al cancelar: una prueba vieja no apunta nada
 let crOcupado = false;
 const crResultados = store.get('naviris.centro', null) || {};
@@ -77,6 +77,8 @@ async function pintaVivo() {
   crEls.activo.textContent = cr.formatoDuracion(crVivo.activoMs);
   crEls.activoS.textContent = 'Desde las ' + new Date(v.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   pintaTendencia(v.muestras, { t: v.ahora, kb: v.memoriaKb });
+  // Abierto nada más arrancar: el hito de la ventana visible llega un poco después.
+  if (crInfo && crInfo.arranque && crInfo.arranque.visible == null) cargaInfo();
 }
 
 /* La línea de la memoria en la sesión: una muestra cada 5 min (las toma el
@@ -87,6 +89,8 @@ function pintaTendencia(muestras, ahora) {
   const ultima = muestras.length ? muestras[muestras.length - 1].t : 0;
   if (!crTend || ultima !== crTendDe) { crTend = cr.tendencia(muestras); crTendDe = ultima; }
   const m = [...muestras, ahora];
+  // Sin muestras guardadas no hay línea que dibujar: fuera el hueco vacío.
+  crEls.tendG.parentNode.classList.toggle('hidden', m.length < 2);
   if (m.length < 2) { crEls.tendG.setAttribute('points', ''); }
   else {
     const t0 = m[0].t, dt = Math.max(1, m[m.length - 1].t - t0);
@@ -105,8 +109,10 @@ function pintaTendencia(muestras, ahora) {
 }
 
 /* ---------- Resultados ---------- */
+/* Se pide cada vez que se abre: si se abre nada más arrancar, la ventana aún
+   no se ha enseñado y ese hito llega después. */
 async function cargaInfo() {
-  if (!crInfo) crInfo = await window.navirisApp.centroInfo().catch(() => null);
+  crInfo = await window.navirisApp.centroInfo().catch(() => null) || crInfo;
   if (crInfo && crInfo.arranque) { crResultados.arranque = { fecha: Date.now(), ...crInfo.arranque }; guardaResultados(); }
   pintaResultados();
 }
@@ -159,7 +165,12 @@ function quitaBanco() {
   crEls.banco.classList.add('hidden');
   window.navirisApp.centroPaginas(false).catch(() => {});
 }
-function cancelaPrueba() { crPrueba++; quitaBanco(); }
+// Cancelar libera los botones al momento: la prueba vieja ya no apunta nada.
+function cancelaPrueba() { crPrueba++; quitaBanco(); liberaPruebas(); }
+function liberaPruebas() {
+  crOcupado = false;
+  crEls.page.querySelectorAll('.cr-medir').forEach((b) => { b.disabled = false; b.textContent = 'Medir'; });
+}
 
 // navigationStart → fin del evento load, leído de la propia página.
 const CR_LEE_CARGA = `new Promise((fin) => { const mira = () => { const n = performance.getEntriesByType('navigation')[0];
@@ -200,8 +211,7 @@ async function lanzaPrueba(boton) {
   if (crOcupado) return;
   const nombre = boton.dataset.prueba, id = ++crPrueba;
   crOcupado = true;
-  const botones = crEls.page.querySelectorAll('.cr-medir');
-  botones.forEach((b) => { b.disabled = true; });
+  crEls.page.querySelectorAll('.cr-medir').forEach((b) => { b.disabled = true; });
   boton.textContent = 'Midiendo…';
   try {
     const r = await CR_PRUEBAS[nombre](id);
@@ -209,16 +219,13 @@ async function lanzaPrueba(boton) {
   } catch (e) {
     if (id === crPrueba) toast('No se pudo hacer la prueba: ' + (e && e.message || 'error'));
   } finally {
-    if (id === crPrueba) quitaBanco();
-    crOcupado = false;
-    botones.forEach((b) => { b.disabled = false; });
-    boton.textContent = 'Medir';
+    if (id === crPrueba) { quitaBanco(); liberaPruebas(); }
   }
 }
 crEls.page.addEventListener('click', (e) => { const b = e.target.closest('.cr-medir'); if (b) lanzaPrueba(b); });
 
 crEls.copiar.addEventListener('click', async () => {
-  if (!crInfo) await cargaInfo();
+  await cargaInfo();
   const texto = cr.textoResultados({ fecha: Date.now(), equipo: crInfo && crInfo.equipo, vivo: crVivo, resultados: crResultados, tendencia: crTend });
   toast(await window.navirisApp.clipWrite(texto) ? 'Resultados copiados' : 'No se pudieron copiar los resultados');
 });

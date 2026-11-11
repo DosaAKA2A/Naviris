@@ -29,7 +29,8 @@ test('Centro de rendimiento', { timeout: 180000 }, async (t) => {
       assert.match(v.cpu, /^\d+\.\d %$/, v.cpu);
       assert.match(v.tabs, /^\d+$/);
       assert.match(v.activo, /\d/);
-      await hasta(() => ui.evalua('document.querySelectorAll("#cr-r-arranque .cr-mini").length === 3'));
+      // Abierto nada más arrancar, la ventana visible llega a los pocos segundos (se vuelve a pedir en vivo).
+      await hasta(() => ui.evalua('[...document.querySelectorAll("#cr-r-arranque .cr-mini-v")].filter((e) => /\\d/.test(e.textContent)).length === 3'), 15000);
       const arr = await ui.evalua('[...document.querySelectorAll("#cr-r-arranque .cr-mini-v")].map((e) => e.textContent)');
       for (const x of arr) assert.match(x, /\d+(\.\d+)? (ms|s)$/, 'hito: ' + x);
     });

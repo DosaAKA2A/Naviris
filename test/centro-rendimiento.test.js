@@ -123,6 +123,9 @@ test('renderizado: fotogramas por segundo, frecuencia de la pantalla y fotograma
   const a144 = Array(700).fill(1000 / 144);
   assert.equal(c.resumenFotogramas(a144).refrescoHz, 144);
   assert.equal(c.resumenFotogramas(a144).lentos, 0);
+  // 1000/5,58 ms = 179,2: es una pantalla de 180 Hz. Una rara se deja tal cual.
+  assert.equal(c.resumenFotogramas(Array(100).fill(5.58)).refrescoHz, 180);
+  assert.equal(c.resumenFotogramas(Array(100).fill(1000 / 50)).refrescoHz, 50);
   assert.equal(c.resumenFotogramas([16, 16]), null);    // muy pocos para decir nada
   assert.equal(c.resumenFotogramas(null), null);
 });
