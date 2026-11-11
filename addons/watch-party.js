@@ -28,7 +28,7 @@
    toda la sala. Quien crea la sala recibe una clave (solo él) y con ella
    vuelve a ser el anfitrión si recarga y entra con el código. Con el control
    exclusivo o el cambio de video cerrados, el anfitrión tampoco obedece las
-   órdenes de los invitados. iris.it.com (caducado) ya no cuenta como MOOVIN.
+   órdenes de los invitados. El dominio viejo de IRIS (caducado) ya no cuenta como MOOVIN.
    Con el relay anterior funciona como la 2.8.3.
    v2.8.3 (2026-11-03): una conexión muerta en silencio (suspensión, cambio
    de red) ya no deja la sala en "En la sala" sin sincronizar: ping/pong con
@@ -295,7 +295,7 @@
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
-    // MOOVIN: solo moovin.live. iris.it.com caducó y hoy es un aparcado: lo
+    // MOOVIN: solo moovin.live. El dominio viejo de IRIS caducó y hoy es un aparcado: lo
     // que llegue de la sala apuntando ahí no se abre.
     if (/(^|\.)moovin\.live$/.test(h)) return 'iris';
     return null;
