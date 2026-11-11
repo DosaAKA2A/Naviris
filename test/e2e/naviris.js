@@ -40,7 +40,13 @@ async function conecta(urlWs) {
     const i = ++id; pend.set(i, { res, rej }); ws.send(JSON.stringify({ id: i, method, params }));
   });
   const evalua = async (expr) => {
-    const r = await envia('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
+    // Recién conectados o mientras la página navega, Chromium contesta «Cannot find default
+    // execution context» hasta que crea el contexto: en el runner de GitHub pasa a menudo.
+    let r;
+    for (let intento = 0; ; intento++) {
+      try { r = await envia('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); break; }
+      catch (e) { if (intento >= 20 || !/default execution context/.test(e.message)) throw e; await espera(150); }
+    }
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
     return r.result.value;
   };

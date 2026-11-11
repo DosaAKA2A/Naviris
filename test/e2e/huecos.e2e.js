@@ -116,7 +116,9 @@ test('Ctrl+Mayús+AvPág mueve la pestaña en vez de cambiar de pestaña', async
   await espera(300);
   const antes = await app.ui.evalua('tabs.findIndex((t) => t.id === activeId)');
   await tecla(web, 'PageDown', 'PageDown', 34, CTRL | MAYUS);
-  await hasta(() => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`));
+  await hasta(() => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`)).catch(async (e) => {
+    throw new Error(e.message + ' | antes=' + antes + ' pestañas=' + await app.ui.evalua(`JSON.stringify(tabs.map((t) => [t.id === ${id}, t.kind, t.url, !!t.pinned]))`) + ' activa=' + await app.ui.evalua('activeId === ' + id));
+  });
   assert.equal(await app.ui.evalua('activeId'), id, 'sigue activa la misma');
 });
 
