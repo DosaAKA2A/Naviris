@@ -244,9 +244,23 @@ function renderXTrends(body) {
   /* La caché duraba 20 min PARA TODO, también para el respaldo mundial: una
      vez caía ahí seguía enseñando mundiales veinte minutos aunque ya tuvieras
      X abierto. Ahora lo tuyo se cachea 20 min y el respaldo solo 2, para que
-     vuelva a intentarlo en cuanto haya sesión. */
-  const vida = xtCache.src === 'ti' ? 20 * 60 * 1000 : 2 * 60 * 1000;
-  if (xtCache.items.length && Date.now() - xtCache.t < vida) { pinta(xtCache.items); return; }
+     vuelva a intentarlo en cuanto haya sesión.
+     Ese reintento ya no vuelve a cargar trends24.in (comparativa, 11/11/2026):
+     cada repintado del hub pasados 2 min (tema, cambio de maqueta al
+     redimensionar) montaba otra vez un webview oculto con su proceso para
+     traer las mismas mundiales. Las mundiales valen 20 min como lo tuyo y, a
+     partir de los 2, solo se mira si ya tienes X abierto en una pestaña. */
+  const edad = Date.now() - xtCache.t;
+  if (xtCache.items.length && edad < 20 * 60 * 1000) {
+    pinta(xtCache.items);
+    if (xtCache.src !== 'ti' && edad > 2 * 60 * 1000 && !xtLectura) {
+      xtLectura = tendenciasDeTuPestana().then((mias) => {
+        if (mias && mias.length >= 3) xtCache = { t: Date.now(), items: mias, src: 'ti' };
+      }).finally(() => { xtLectura = null; });
+      xtLectura.then(() => { if (body.isConnected && xtCache.src === 'ti') pinta(xtCache.items); });
+    }
+    return;
+  }
   pinta([], true);
   /* UNA lectura a la vez (auditoría 2026-10): cada repintado del hub con la
      caché vacía (tema, ventana, accesos, sincronización) lanzaba su propia
@@ -263,17 +277,17 @@ function renderXTrends(body) {
       login, en los 20 min siguientes ni se intenta (no hay sesion que leer).
    3. trends24.in: las mundiales publicas, el ultimo recurso honesto. */
 let xtLectura = null, xtSinSesionHasta = 0;
+function tendenciasDeTuPestana() {
+  const t = tabs.find((x) => x.kind === 'web' && !x.asleep && x.webview &&
+    /(^|\.)(x|twitter)\.com$/.test(hostOf(x.url) || ''));
+  if (!t) return Promise.resolve(null);
+  return t.webview.executeJavaScript(XT_LEE_X, false).catch(() => null);
+}
 function leeTendencias() {
-  const deTuPestana = () => {
-    const t = tabs.find((x) => x.kind === 'web' && !x.asleep && x.webview &&
-      /(^|\.)(x|twitter)\.com$/.test(hostOf(x.url) || ''));
-    if (!t) return Promise.resolve(null);
-    return t.webview.executeJavaScript(XT_LEE_X, false).catch(() => null);
-  };
   const mundiales = () => scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
     if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
   });
-  return deTuPestana().then((mias) => {
+  return tendenciasDeTuPestana().then((mias) => {
     if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; return null; }
     if (Date.now() < xtSinSesionHasta) return mundiales();
     return scrapeOculto('https://x.com/explore', XT_LEE_X, 24000).then((tuyas) => {
