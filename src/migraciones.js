@@ -130,16 +130,55 @@ function migraArchivos(userData) {
    medias una base de datos en uso. Todo se arma en "naviris.migrando" y solo al
    final se renombra a "naviris": hasta entonces Naviris sigue con la sesión
    vieja y, si algo falla, se deshace (las cachés vuelven a su sitio) y se
-   reintenta en el siguiente arranque. Devuelve la partición que hay que usar. */
-const CACHES = ['Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', path.join('Service Worker', 'CacheStorage')];
+   reintenta en el siguiente arranque. Devuelve la partición que hay que usar.
 
-function migraParticion(userData) {
+   ES ASÍNCRONA (P2 de la auditoría de seguridad, 2026-11-11). Lo que tarda es
+   el número de archivos, no los GB: medido en el NVMe de Dosa, 20.000 archivos
+   pequeños eran 16-18 s con la copia síncrona, antes de que existiera ninguna
+   ventana, y parecía que Naviris no arrancaba. Ahora main.js la lanza con el
+   splash ya en pantalla («Actualizando tu perfil») y sin bloquear el proceso
+   principal. Se copian COPIAS_A_LA_VEZ archivos a la vez: medido con esos
+   20.000 archivos, 5,0 s frente a 9,6-12 s de cpSync y 16-19 s de
+   fs.promises.cp, que copia de uno en uno. */
+const CACHES = ['Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', path.join('Service Worker', 'CacheStorage')];
+const COPIAS_A_LA_VEZ = 4; // los hilos de disco de libuv: más no acelera (medido con 16)
+
+// Copia el árbol `de` en `a` (que ya existe), sin lo que diga `fuera(rutaRelativa)`.
+async function copiaArbol(de, a, fuera) {
+  const entradas = await fs.promises.readdir(de, { recursive: true, withFileTypes: true });
+  const archivos = [];
+  for (const e of entradas) {
+    const rel = path.relative(de, path.join(e.parentPath, e.name));
+    if (fuera(rel)) continue;
+    if (e.isDirectory()) await fs.promises.mkdir(path.join(a, rel), { recursive: true });
+    else archivos.push(rel);
+  }
+  let siguiente = 0;
+  const copia = async () => {
+    while (siguiente < archivos.length) {
+      const rel = archivos[siguiente++];
+      await fs.promises.copyFile(path.join(de, rel), path.join(a, rel));
+    }
+  };
+  await Promise.all(Array.from({ length: COPIAS_A_LA_VEZ }, copia));
+}
+
+const rutasDeSesion = (userData) => {
   const dir = path.join(userData, 'Partitions');
-  const vieja = path.join(dir, VIEJO);
-  const nueva = path.join(dir, 'naviris');
-  if (fs.existsSync(nueva) || !fs.existsSync(vieja)) return PART_NAVIRIS;
+  return { vieja: path.join(dir, VIEJO), nueva: path.join(dir, 'naviris') };
+};
+
+// ¿Hay sesión vieja por pasar? Es lo que decide si el splash avisa (main.js).
+function sesionPendiente(userData) {
+  const { vieja, nueva } = rutasDeSesion(userData);
+  return !fs.existsSync(nueva) && fs.existsSync(vieja);
+}
+
+async function migraParticion(userData) {
+  if (!sesionPendiente(userData)) return PART_NAVIRIS;
+  const { vieja, nueva } = rutasDeSesion(userData);
   const obra = nueva + '.migrando';
-  fs.rmSync(obra, { recursive: true, force: true });   // resto de un intento cortado
+  await fs.promises.rm(obra, { recursive: true, force: true });   // resto de un intento cortado
   const movidas = [];
   try {
     fs.mkdirSync(path.join(obra, 'Service Worker'), { recursive: true });
@@ -148,36 +187,40 @@ function migraParticion(userData) {
       fs.renameSync(path.join(vieja, c), path.join(obra, c));
       movidas.push(c);
     }
-    const esCache = (f) => CACHES.includes(path.relative(vieja, f));
-    fs.cpSync(vieja, obra, { recursive: true, filter: (f) => !esCache(f), preserveTimestamps: true });
+    const esCache = (rel) => CACHES.some((c) => rel === c || rel.startsWith(c + path.sep));
+    await copiaArbol(vieja, obra, esCache);
     fs.renameSync(obra, nueva);
     return PART_NAVIRIS;
   } catch (e) {
     for (const c of movidas) { try { fs.renameSync(path.join(obra, c), path.join(vieja, c)); } catch { /* se queda sin esa caché */ } }
-    try { fs.rmSync(obra, { recursive: true, force: true }); } catch { /* se limpia en el siguiente intento */ }
+    try { await fs.promises.rm(obra, { recursive: true, force: true }); } catch { /* se limpia en el siguiente intento */ }
     throw e;
   }
 }
 
-// Los archivos y la sesión, antes de leer los ajustes. Lo que no se pudo pasar
-// se sigue usando con el nombre viejo: nada se pierde y se vuelve a intentar al
-// abrir otra vez. Devuelve con qué nombres arrancar.
+// Los archivos del perfil, antes de leer los ajustes (síncrono: son unos pocos
+// JSON). Lo que no se pudo pasar se sigue usando con el nombre viejo: nada se
+// pierde y se vuelve a intentar al abrir otra vez.
 function migraNombre(userData, log = () => {}) {
-  const usa = { archivos: 'naviris-', particion: PART_NAVIRIS };
   try {
     const copiados = migraArchivos(userData);
     if (copiados.length) log('archivos del perfil copiados: ' + copiados.join(', '));
+    return { archivos: 'naviris-' };
   } catch (e) {
     log('los archivos del perfil siguen con el nombre viejo hasta el próximo arranque: ' + e.message);
-    usa.archivos = VIEJO + '-';
+    return { archivos: VIEJO + '-' };
   }
-  try {
-    usa.particion = migraParticion(userData);
-  } catch (e) {
-    log('la sesión de las webs sigue en la vieja hasta el próximo arranque: ' + e.message);
-    usa.particion = PART_VIEJA;
-  }
-  return usa;
 }
 
-module.exports = { migraPerfil, limpiaCookiesDeIframes, NOMBRES_DE_SESION, migraCarpetaV1, migraArchivos, migraParticion, migraNombre, PART_NAVIRIS };
+// La sesión de las webs, ya con la app lista y antes de abrirla. Devuelve con
+// qué partición arrancar: la vieja si no se pudo pasar (se reintenta al abrir otra vez).
+async function migraSesion(userData, log = () => {}) {
+  try {
+    return await migraParticion(userData);
+  } catch (e) {
+    log('la sesión de las webs sigue en la vieja hasta el próximo arranque: ' + e.message);
+    return PART_VIEJA;
+  }
+}
+
+module.exports = { migraPerfil, limpiaCookiesDeIframes, NOMBRES_DE_SESION, migraCarpetaV1, migraArchivos, migraParticion, sesionPendiente, migraNombre, migraSesion, PART_NAVIRIS };

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { migraArchivos, migraParticion, migraNombre, migraCarpetaV1, PART_NAVIRIS } = require('../src/migraciones');
+const { migraArchivos, migraParticion, sesionPendiente, migraNombre, migraSesion, migraCarpetaV1, PART_NAVIRIS } = require('../src/migraciones');
 const { migraClaves } = require('../src/migra-claves');
 
 const temporales = [];
@@ -42,59 +42,64 @@ function perfilViejo() {
 }
 const part = (ud, p, f) => path.join(ud, 'Partitions', p, f);
 
-test('la sesión vieja pasa entera a la nueva y la vieja se queda sin las cachés', () => {
+test('la sesión vieja pasa entera a la nueva y la vieja se queda sin las cachés', async () => {
   const ud = perfilViejo();
-  assert.equal(migraParticion(ud), PART_NAVIRIS);
+  assert.equal(sesionPendiente(ud), true);
+  assert.equal(await migraParticion(ud), PART_NAVIRIS);
+  assert.equal(sesionPendiente(ud), false);
   for (const [f, v] of Object.entries({ ...DATOS, ...CACHES })) assert.equal(lee(part(ud, 'naviris', f)), v, f);
   for (const [f, v] of Object.entries(DATOS)) assert.equal(lee(part(ud, 'cobalt', f)), v, 'la vieja conserva ' + f);
   for (const f of Object.keys(CACHES)) assert.equal(fs.existsSync(part(ud, 'cobalt', f)), false, 'caché movida: ' + f);
   assert.equal(fs.existsSync(path.join(ud, 'Partitions', 'naviris.migrando')), false);
 });
 
-test('la sesión se pasa una sola vez: lo que cambie después en la nueva no se pisa', () => {
+test('la sesión se pasa una sola vez: lo que cambie después en la nueva no se pisa', async () => {
   const ud = perfilViejo();
-  migraParticion(ud);
+  await migraParticion(ud);
   fs.writeFileSync(part(ud, 'naviris', 'Network/Cookies'), 'cookies nuevas');
   fs.writeFileSync(part(ud, 'cobalt', 'Network/Cookies'), 'la 2.x siguió usando la vieja');
-  assert.equal(migraParticion(ud), PART_NAVIRIS);
+  assert.equal(await migraParticion(ud), PART_NAVIRIS);
   assert.equal(lee(part(ud, 'naviris', 'Network/Cookies')), 'cookies nuevas');
 });
 
-test('un perfil nuevo o sin sesión vieja no crea nada', () => {
+test('un perfil nuevo o sin sesión vieja no crea nada', async () => {
   const ud = carpeta();
-  assert.equal(migraParticion(ud), PART_NAVIRIS);
+  assert.equal(sesionPendiente(ud), false);
+  assert.equal(await migraParticion(ud), PART_NAVIRIS);
   assert.equal(fs.existsSync(path.join(ud, 'Partitions')), false);
-  assert.deepEqual(migraNombre(ud), { archivos: 'naviris-', particion: PART_NAVIRIS });
+  assert.deepEqual(migraNombre(ud), { archivos: 'naviris-' });
+  assert.equal(await migraSesion(ud), PART_NAVIRIS);
 });
 
-test('si la copia falla a medias, todo vuelve a su sitio, se sigue con la vieja y se reintenta', () => {
+test('si la copia falla a medias, todo vuelve a su sitio, se sigue con la vieja y se reintenta', async () => {
   const ud = perfilViejo();
-  const cpSync = fs.cpSync;
-  fs.cpSync = (...a) => { cpSync(...a); throw new Error('disco lleno'); };
+  const copyFile = fs.promises.copyFile;
+  let copias = 0;
+  fs.promises.copyFile = async (...a) => { if (++copias === 4) throw new Error('disco lleno'); return copyFile(...a); };
   let usa;
-  try { usa = migraNombre(ud); } finally { fs.cpSync = cpSync; }
-  assert.equal(usa.particion, 'persist:cobalt');
+  try { usa = await migraSesion(ud); } finally { fs.promises.copyFile = copyFile; }
+  assert.equal(usa, 'persist:cobalt');
   assert.equal(fs.existsSync(path.join(ud, 'Partitions', 'naviris')), false);
   assert.equal(fs.existsSync(path.join(ud, 'Partitions', 'naviris.migrando')), false);
   for (const [f, v] of Object.entries({ ...DATOS, ...CACHES })) assert.equal(lee(part(ud, 'cobalt', f)), v, 'intacto: ' + f);
   // Siguiente arranque: sale bien.
-  assert.equal(migraNombre(ud).particion, PART_NAVIRIS);
+  assert.equal(await migraSesion(ud), PART_NAVIRIS);
   for (const [f, v] of Object.entries({ ...DATOS, ...CACHES })) assert.equal(lee(part(ud, 'naviris', f)), v, f);
 });
 
-test('si la sesión vieja está en uso (no se deja mover), no se copia nada', () => {
+test('si la sesión vieja está en uso (no se deja mover), no se copia nada', async () => {
   const ud = perfilViejo();
   const renameSync = fs.renameSync;
   fs.renameSync = (de, a) => { if (de.endsWith('Code Cache')) { const e = new Error('EBUSY: resource busy or locked'); e.code = 'EBUSY'; throw e; } return renameSync(de, a); };
-  try { assert.throws(() => migraParticion(ud), /EBUSY/); } finally { fs.renameSync = renameSync; }
+  try { await assert.rejects(migraParticion(ud), /EBUSY/); } finally { fs.renameSync = renameSync; }
   assert.equal(fs.existsSync(path.join(ud, 'Partitions', 'naviris')), false);
   assert.equal(lee(part(ud, 'cobalt', 'Cache/Cache_Data/data_0')), 'caché http', 'la caché ya movida vuelve');
 });
 
-test('los restos de un intento cortado (un apagón) se tiran y se empieza de cero', () => {
+test('los restos de un intento cortado (un apagón) se tiran y se empieza de cero', async () => {
   const ud = perfilViejo();
   escribe(path.join(ud, 'Partitions', 'naviris.migrando', 'Network', 'Cookies'), 'a medias');
-  assert.equal(migraParticion(ud), PART_NAVIRIS);
+  assert.equal(await migraParticion(ud), PART_NAVIRIS);
   assert.equal(lee(part(ud, 'naviris', 'Network/Cookies')), DATOS['Network/Cookies']);
 });
 

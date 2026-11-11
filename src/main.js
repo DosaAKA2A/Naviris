@@ -6,7 +6,8 @@ const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
 const { conservaCookiesDeSesion } = require('./sesiones');
-const { migraPerfil, migraCarpetaV1, migraNombre, PART_NAVIRIS } = require('./migraciones');
+const { migraPerfil, migraCarpetaV1, migraNombre, sesionPendiente, migraSesion, PART_NAVIRIS } = require('./migraciones');
+const { canalDeActualizacion } = require('./canal-actualizaciones');
 const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
 const archivosLocales = require('./archivos-locales'); // lo que puede cargar una página file:// (se prueba en test/)
 const { creaDownloadTo } = require('./descarga-binarios');
@@ -496,13 +497,15 @@ if (!app.requestSingleInstanceLock({ destinos: DESTINOS_AL_ARRANCAR })) {
   return;
 }
 
-/* Los nombres del perfil: naviris-*.json y la sesión persist:naviris. Los de
-   antes (con el nombre viejo del navegador) se copian aquí, antes de leer los
-   ajustes y de que Chromium abra la sesión. Si algo no se pudo copiar, este
-   arranque sigue con lo viejo y se reintenta en el siguiente (migraNombre). */
-const nombres = migraNombre(app.getPath('userData'), (m) => console.log('[Naviris] Cambio de nombre:', m));
-const ARCHIVOS = nombres.archivos;
-const PART_NORMAL = nombres.particion;
+/* Los nombres del perfil: naviris-*.json y la sesión persist:naviris. Los
+   archivos de antes (con el nombre viejo del navegador) se copian aquí, antes de
+   leer los ajustes. La sesión de las webs se pasa en el arranque, con el splash
+   ya en pantalla y antes de abrirla (migraSesion en whenReady): con muchos
+   archivos tarda segundos. Si algo no se pudo copiar, este arranque sigue con lo
+   viejo y se reintenta en el siguiente. */
+const logNombre = (m) => console.log('[Naviris] Cambio de nombre:', m);
+const ARCHIVOS = migraNombre(app.getPath('userData'), logNombre).archivos;
+let PART_NORMAL = PART_NAVIRIS; // la confirma migraSesion antes de abrir ninguna sesión
 const PART_PRIVATE = 'naviris-private'; // sin "persist:" → solo en memoria
 
 let settings = loadSettings();
@@ -2413,8 +2416,9 @@ ipcMain.on('ui:almacen-migrado', (e, r) => {
   saveSettings(settings);
 });
 // ---------- Información del sitio (popover del candado) ----------
-// Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
-const PARTICIONES_VALIDAS = new Set([PART_NORMAL, PART_PRIVATE]);
+// Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles.
+// La normal se añade en el arranque, cuando migraSesion dice cuál es.
+const PARTICIONES_VALIDAS = new Set([PART_PRIVATE]);
 /* ===== Contenedores =====
    Un contenedor es una sesión con su propio bote de cookies: sirve para tener
    dos cuentas del mismo sitio abiertas a la vez sin que se pisen. La lista vive
@@ -3608,17 +3612,12 @@ ipcMain.handle('file:save-png', soloUI(async (e, { dataUrl, suggestedName }) => 
 // ---------- Actualización automática (GitHub Releases) ----------
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
-// Canal DEV: las versiones con sufijo "-dev" (p. ej. 2.6.0-dev.1) siguen su PROPIO
-// canal (dev.yml) y solo reciben otras DEV. La versión estable (sin sufijo) sigue el
-// canal por defecto (latest.yml). El ajuste "Actualizaciones dev" (devUpdates) deja
-// que cualquier instalación se apunte al canal dev — o que una -dev vuelva a la
-// estable, lo que exige permitir el "downgrade" (2.6.0-dev.1 → 2.5.10).
+// Canal DEV o estable: lo decide canal-actualizaciones.js (ver allí).
 function applyUpdateChannel() {
-  const isDevBuild = /-dev/i.test(app.getVersion());
-  const wantDev = (typeof settings.devUpdates === 'boolean') ? settings.devUpdates : isDevBuild;
-  autoUpdater.channel = wantDev ? 'dev' : 'latest';
-  autoUpdater.allowPrerelease = wantDev;
-  autoUpdater.allowDowngrade = !wantDev && isDevBuild;
+  const canal = canalDeActualizacion(app.getVersion(), settings.devUpdates);
+  autoUpdater.channel = canal.channel;
+  autoUpdater.allowPrerelease = canal.allowPrerelease;
+  autoUpdater.allowDowngrade = canal.allowDowngrade; // va DESPUÉS: el setter de channel lo toca
 }
 applyUpdateChannel();
 // Traduce cualquier error del updater a un mensaje CORTO y genérico. NUNCA expone rutas
@@ -3838,13 +3837,25 @@ app.whenReady().then(async () => {
   // Lo PRIMERO que ocurre: el cuadrado ya está en pantalla mientras el resto
   // del arranque (que es lo que tarda) sigue su curso por detrás.
   crearSplash();
-  splashProgreso(12);
+  // La sesión vieja (persist:cobalt) se pasa a la nueva con el splash ya a la
+  // vista: en el splash se lee «Actualizando tu perfil» si tarda. Va a la vez que
+  // Widevine y antes de abrir ninguna sesión. Sin nada que pasar no cambia nada.
+  const pasaSesion = sesionPendiente(app.getPath('userData'));
+  splashProgreso(pasaSesion ? 6 : 12);
   // Widevine (castlabs ECS): descargar/registrar el CDM antes de crear ventanas,
   // para poder reproducir vídeo DRM (Crunchyroll, Netflix, etc.). Con Electron
   // estándar `components` no existe; el guard evita romper ese caso.
   // Es el tramo más lento del arranque (la primera vez incluso descarga el CDM).
-  try { if (components && components.whenReady) await components.whenReady(); }
-  catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
+  const widevine = (async () => {
+    try { if (components && components.whenReady) await components.whenReady(); }
+    catch (e) { console.log('[Naviris] Widevine no disponible:', e && e.message); }
+  })();
+  if (pasaSesion) {
+    PART_NORMAL = await migraSesion(app.getPath('userData'), logNombre);
+    splashProgreso(12);
+  }
+  PARTICIONES_VALIDAS.add(PART_NORMAL);
+  await widevine;
   splashProgreso(48);
   // Comprobación silenciosa al arrancar (solo en versión instalada): cada
   // línea baja la suya y se instala al cerrar. Y MIENTRAS el navegador siga

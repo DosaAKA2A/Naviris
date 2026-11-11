@@ -1,0 +1,88 @@
+name: Pruebas
+
+# Corre en cada push y PR a main y v3, y antes de compilar en "Desktop Release"
+# (que lo llama con workflow_call y no sigue si esto falla).
+#
+# Qué corre, en Windows (Naviris solo se distribuye para Windows):
+#   1. node --check de todo src/ (npm run check)
+#   2. pruebas unitarias (npm test)
+#   3. pruebas con la app real que NO necesitan red de terceros ni cuentas
+#      (npm run test:e2e:ci): arranque y splash, perfiles, huecos, rendimiento,
+#      menús, una sola instancia, seguridad, paso de la sesión vieja, hub y las
+#      páginas de X y Twitch servidas por la propia prueba. Las que dependen de
+#      YouTube, X o el relay de Watch Party (npm run test:e2e y
+#      npm run test:e2e:adblock completos) se corren en local antes de publicar.
+#
+# Instalación (ver también "Cómo se prueba" en el README):
+#   - electron es el de castlabs (con Widevine) y viene de GitHub por git; el
+#     package-lock.json lo apunta por ssh, y el runner no tiene clave ssh. Se
+#     reescribe a https antes de npm ci.
+#   - El binario de Electron no se baja en npm ci: lo baja node_modules/electron/
+#     install.js del mirror de castlabs. Se hace en un paso propio para que un
+#     fallo de descarga se vea como tal, y se guarda en caché.
+#   - Widevine (el CDM) lo descarga la app al arrancar; las pruebas no lo
+#     necesitan y, si no llega, la app sigue (lo apunta en el log). La firma VMP
+#     de castlabs (EVS) no hace falta para probar, solo para distribuir.
+#   - adblock-rs NO trae binario: se compila con Rust en npm ci (su postinstall
+#     llama a cargo). El runner de Windows trae rustup y las herramientas de
+#     Visual Studio; la versión de Rust la fija su rust-toolchain.toml y rustup
+#     la instala sola. Es lo que más tarda de la instalación.
+
+on:
+  push:
+    branches: [main, v3]
+  pull_request:
+    branches: [main, v3]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      # Las pruebas con la app real usan este puerto CDP (y +100 para el inspector)
+      NAVIRIS_E2E_PUERTO: '9423'
+      NAVIRIS_E2E_PORT: '9424'
+      electron_config_cache: ${{ github.workspace }}\.cache-electron
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependencias de GitHub por https (sin clave ssh)
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Caché del binario de Electron (castlabs)
+        uses: actions/cache@v4
+        with:
+          path: .cache-electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Bajar el binario de Electron (castlabs)
+        run: node node_modules/electron/install.js
+
+      - name: Sintaxis de src/
+        run: npm run check
+
+      - name: Pruebas unitarias
+        run: npm test
+
+      # Algunas pruebas maximizan ventanas y miden la pantalla: el runner
+      # arranca a 1024x768. Si no se puede cambiar, las pruebas siguen.
+      - name: Pantalla de 1920x1080
+        shell: pwsh
+        continue-on-error: true
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+
+      - name: Pruebas con la app real, sin red de terceros
+        run: npm run test:e2e:ci
