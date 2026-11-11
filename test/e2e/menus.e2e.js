@@ -40,10 +40,13 @@ const menuAbierto = () => ui().evalua('!!document.querySelector(".ctx-menu.abier
 const opciones = () => ui().evalua(`[...ctxMenuEl.querySelectorAll('.ctx-item')].map((b) => ({ t: b.querySelector('.ctx-tx').textContent, off: b.disabled, kbd: b.querySelector('kbd')?.textContent || '' }))`);
 const portapapelesEs = (t) => hasta(async () => (await ui().evalua('window.navirisApp.readClipboard()')) === t, 4000);
 async function clicDerecho(dest, x, y) {
-  await dest.envia('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-  await dest.envia('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', buttons: 2, clickCount: 1 });
-  await dest.envia('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', buttons: 0, clickCount: 1 });
-  await hasta(menuAbierto, 5000);
+  // En el runner de GitHub el primer clic tras abrir la página a veces no llega: se repite.
+  for (let intento = 0; ; intento++) {
+    await dest.envia('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await dest.envia('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', buttons: 2, clickCount: 1 });
+    await dest.envia('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', buttons: 0, clickCount: 1 });
+    try { await hasta(menuAbierto, 4000); break; } catch (e) { if (intento >= 3) throw e; }
+  }
   await espera(250);   // lo que tarda en abrirse (200 ms): una persona apunta después
 }
 // Elige una opción por su texto con el ratón de verdad (sobre la interfaz)
