@@ -64,7 +64,7 @@ test.before(async () => {
   const salida = fs.openSync(log, 'a');
   app = spawn(ELECTRON, [REPO, '--user-data-dir=' + perfil, '--remote-debugging-port=' + PUERTO], { stdio: ['ignore', salida, salida], windowsHide: true });
   const pagina = await hasta(async () => {
-    try { return (await json('/json/list')).find((t) => t.type === 'page' && /\/src\/index\.html/.test(t.url)); } catch { return null; }
+    try { return (await json('/json/list')).find((t) => t.type === 'page' && /^naviris:\/\/app\/index\.html/.test(t.url)); } catch { return null; }
   }, 60000, 'la ventana de Naviris');
   ws = new WebSocket(pagina.webSocketDebuggerUrl);
   ws.onmessage = (ev) => {

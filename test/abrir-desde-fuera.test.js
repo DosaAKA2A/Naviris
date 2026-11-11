@@ -57,7 +57,7 @@ test('en desarrollo («electron .») la carpeta de la app no es un destino', () 
 });
 
 test('solo http, https y file; varios a la vez, sin repetir', () => {
-  const argv = [EXE, 'https://a.com/', 'javascript:alert(1)', 'mailto:x@y.z', 'naviris-addon://tool/x.js', 'file:///C:/x/y.html', 'https://a.com/', 'https://'];
+  const argv = [EXE, 'https://a.com/', 'javascript:alert(1)', 'mailto:x@y.z', 'naviris-addon://tool/x.js', 'naviris://app/index.html', 'file:///C:/x/y.html', 'https://a.com/', 'https://'];
   assert.deepEqual(destinosDeArgumentos(argv, { existe: nada }), ['https://a.com/', 'file:///C:/x/y.html']);
 });
 

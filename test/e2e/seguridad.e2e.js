@@ -253,7 +253,8 @@ test('«Abrir el enlace en una ventana nueva» sale con el contenedor de la pest
   await app.ui.evalua(`void createTab(${JSON.stringify(base + '/enlace')}, true, contenedores.find((x) => x.id === ${JSON.stringify(c)}))`);
   const w = await hasta(async () => (await lista()).find((x) => x.type === 'webview' && !antes.has(x.id) && /enlace/.test(x.url)));
   const web = await conecta(w.webSocketDebuggerUrl);
-  await hasta(() => web.evalua('document.readyState === "complete"'));
+  // La pestaña nace con about:blank: hay que esperar a la página del enlace, no a que algo esté «complete».
+  await hasta(() => web.evalua('location.pathname === "/enlace" && document.readyState === "complete"'));
   const [x, y] = await web.evalua(`(() => { const r = document.getElementById('a').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
   await web.envia('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
   await web.envia('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', buttons: 2, clickCount: 1 });
@@ -392,13 +393,14 @@ test('abrir y ver archivos locales sigue funcionando: imagen, svg, texto, audio 
   s.cierra(); c.cierra();
 });
 
-test('la interfaz no se entera: sigue con su localStorage y sus imágenes locales', async () => {
+test('la interfaz no se entera: sigue con su localStorage y no carga nada de file:', async () => {
   assert.equal(await app.ui.evalua(`localStorage.setItem('naviris.__seguridad', '1'), localStorage.getItem('naviris.__seguridad')`), '1');
   await app.ui.evalua(`localStorage.removeItem('naviris.__seguridad'), 1`);
+  // Desde 2026-11-11 la interfaz va por naviris://app: las imágenes propias se copian al perfil (ver protocolo.e2e.js).
   const ancho = await app.ui.evalua(`(async () => {
     const i = new Image(); i.src = ${JSON.stringify(url('otra-carpeta/lejos.png'))};
     await new Promise((ok) => { i.onload = ok; i.onerror = ok; });
     return i.naturalWidth;
   })()`);
-  assert.equal(ancho, 2, 'el fondo del hub es un file: de cualquier carpeta');
+  assert.equal(ancho, 0, 'una imagen de file:');
 });

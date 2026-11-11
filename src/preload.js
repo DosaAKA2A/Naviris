@@ -138,6 +138,12 @@ contextBridge.exposeInMainWorld('navirisApp', {
   // filePath usa webUtils porque File.path se retiró en Electron 32+.
   filePath: (f) => { try { return webUtils.getPathForFile(f); } catch { return ''; } },
   pickWallpaper: () => ipcRenderer.invoke('hub:pick-wallpaper'),
+  // Imagen de un widget: se copia al perfil y vuelve su dirección naviris://app/datos/...
+  imagenWidget: (ruta) => ipcRenderer.invoke('hub:imagen-widget', ruta),
+  // Lo que la interfaz guardaba en file:// (ver migraOrigen en migra-claves.js). Síncrono:
+  // tiene que llegar antes de que la interfaz lea su localStorage.
+  almacenViejo: () => ipcRenderer.sendSync('ui:almacen-viejo'),
+  almacenMigrado: (r) => ipcRenderer.send('ui:almacen-migrado', r),
 
   siteData: (url, partition) => ipcRenderer.invoke('site:data', { url, partition }),
   siteClear: (url, partition) => ipcRenderer.invoke('site:clear', { url, partition }),

@@ -13,7 +13,7 @@ function upsertDownload(m) {
   row.classList.toggle('done', done); row.classList.toggle('error', error);
   row.querySelector('.dl-kind').innerHTML = window.icon(m.kind === 'audio' ? 'musical-note' : m.kind === 'video' ? 'film' : done ? 'check' : 'arrow-down-tray');
   row.querySelector('.dl-name').textContent = m.name;
-  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : ((m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
+  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : ((m.cortada ? 'Conexión cortada · ' : m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
   row.querySelector('.dl-bar > i').style.transform = `scaleX(${pct / 100})`;
   // La página de descargas, si está abierta, sigue el progreso en vivo
@@ -30,14 +30,15 @@ function upsertDownload(m) {
 function accionDescarga(b, m) {
   const archivo = m.kind === 'file' && m.state !== 'completed';
   const enCurso = m.state === 'progressing';
+  const parada = m.paused || m.cortada;   // cortada: se fue la red y se puede reanudar
   b.classList.toggle('hidden', !archivo);
   if (!archivo) return;
-  b.innerHTML = window.icon(enCurso ? (m.paused ? 'play' : 'pause') : 'arrow-path');
-  b.title = enCurso ? (m.paused ? 'Reanudar' : 'Pausar') : 'Reintentar';
+  b.innerHTML = window.icon(enCurso ? (parada ? 'play' : 'pause') : 'arrow-path');
+  b.title = enCurso ? (parada ? 'Reanudar' : 'Pausar') : 'Reintentar';
   b.setAttribute('aria-label', b.title);
   b.onclick = (e) => {
     e.stopPropagation();
-    if (enCurso) { if (m.paused) window.navirisApp.resumeDownload(m.id); else window.navirisApp.pauseDownload(m.id); return; }
+    if (enCurso) { if (parada) window.navirisApp.resumeDownload(m.id); else window.navirisApp.pauseDownload(m.id); return; }
     window.navirisApp.retryDownload(m.id);
     dlRows.get(m.id)?.remove(); dlRows.delete(m.id); dlMeta.delete(m.id);
     if (els.dlPage.classList.contains('active')) renderDlActive();
