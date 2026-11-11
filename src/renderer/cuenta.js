@@ -154,19 +154,23 @@ async function cargaFoto() {
   if (r && r.ok) { store.set('naviris.account.foto', r.img || null); pintaFoto(r.img); }
 }
 /* Reducción en el cliente: se recorta al cuadrado central y se escala a 128,
-   así una foto apaisada no sale deformada. */
-function reduceImagen(ruta) {
+   así una foto apaisada no sale deformada. Se lee del archivo elegido (blob:):
+   la interfaz va por naviris:// y no puede cargar file:. */
+function reduceImagen(archivo) {
   return new Promise((res, rej) => {
     const im = new Image();
+    const url = URL.createObjectURL(archivo);
+    const suelta = () => URL.revokeObjectURL(url);
     im.onload = () => {
+      suelta();
       const lado = Math.min(im.naturalWidth, im.naturalHeight);
       const c = document.createElement('canvas'); c.width = c.height = FOTO_LADO;
       const g = c.getContext('2d');
       g.drawImage(im, (im.naturalWidth - lado) / 2, (im.naturalHeight - lado) / 2, lado, lado, 0, 0, FOTO_LADO, FOTO_LADO);
       res(c.toDataURL('image/jpeg', 0.85));
     };
-    im.onerror = () => rej(new Error('no se pudo leer la imagen'));
-    im.src = 'file:///' + String(ruta).replace(/\\/g, '/');
+    im.onerror = () => { suelta(); rej(new Error('no se pudo leer la imagen')); };
+    im.src = url;
   });
 }
 async function eligeFoto() {
@@ -174,9 +178,8 @@ async function eligeFoto() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const f = inp.files && inp.files[0]; if (!f) return;
-    const ruta = window.navirisApp.filePath(f); if (!ruta) return;
     try {
-      const img = await reduceImagen(ruta);
+      const img = await reduceImagen(f);
       const r = await accRequest('/avatar', { method: 'PUT', body: JSON.stringify({ img }) });
       if (r && r.ok) { store.set('naviris.account.foto', img); pintaFoto(img); toast('Foto de perfil actualizada'); }
       else toast('No se pudo guardar la foto: ' + ((r && r.error) || 'error del servidor'));

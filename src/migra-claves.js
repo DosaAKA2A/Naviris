@@ -52,7 +52,33 @@
     return copiadas;
   }
 
-  const api = { migraClaves };
+  /* EL ORIGEN DE LA INTERFAZ (2026-11-11). La interfaz pasó de file:// a
+     naviris://app (ver protocolo.js) y su localStorage empieza vacío. `pide`
+     trae del proceso principal lo que había en file:// (migra-origen.js) y aquí
+     se copia tal cual, claves viejas cobalt.* incluidas (de ellas se encarga
+     migraClaves, que va después). Se pide ANTES de tocar este almacén: el
+     principal lee la misma base de disco que Chromium abre al primer acceso.
+     Mientras no se apunte como hecha, lo viejo gana a lo que haya: si un
+     arranque no pudo leerlo, la interfaz habrá puesto sus valores por defecto,
+     y el dato bueno es el viejo. Si una clave no cabe, no se apunta y se
+     reintenta entera en el siguiente arranque; nunca se borra nada. */
+  const ORIGEN_HECHO = 'naviris.origenMigrado';
+  function migraOrigen(ls, pide) {
+    const viejo = pide();
+    if (!viejo) return { nada: true };
+    if (viejo.error) return { ok: false, error: viejo.error };
+    if (ls.getItem(ORIGEN_HECHO) === '1') return { ok: true, copiadas: 0 };
+    const fallidas = [];
+    let copiadas = 0;
+    for (const [k, v] of Object.entries(viejo.claves || {})) {
+      try { ls.setItem(k, v); copiadas++; } catch { fallidas.push(k); }
+    }
+    if (fallidas.length) return { ok: false, fallidas };
+    ls.setItem(ORIGEN_HECHO, '1');
+    return { ok: true, copiadas };
+  }
+
+  const api = { migraClaves, migraOrigen };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else raiz.naviMigraClaves = api;
 })(typeof window !== 'undefined' ? window : globalThis);

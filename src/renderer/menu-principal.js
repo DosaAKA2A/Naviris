@@ -140,8 +140,9 @@ const gpuTxt = (v) => !v ? '—' : /^enabled/.test(v) ? 'activado' : /software/.
 async function showAbout() { $('#about-version').textContent = 'v' + (await window.navirisApp.version()); const gpu = await window.navirisApp.gpuStatus(); const sec = await window.navirisApp.secStatus(); $('#about-gpu').innerHTML = `Aceleración por GPU: <b>${settings.hardwareAcceleration ? 'activada' : 'desactivada'}</b><br>Canvas 2D: <b>${gpuTxt(gpu['2d_canvas'])}</b> · WebGL: <b>${gpuTxt(gpu.webgl)}</b><br>Sandbox por proceso: <b>${sec.sandbox ? 'activo' : 'no'}</b> · Aislamiento de sitios: <b>${sec.siteIsolation ? 'activo' : 'no'}</b><br>HTTPS por defecto: <b>${sec.httpsUpgrades ? 'activo' : 'no'}</b><br>Modo agente (CDP): <b>${settings.agentMode ? 'activo en 127.0.0.1:9223' : 'desactivado'}</b>`; $('#about-modal').classList.remove('hidden'); }
 $('#about-close').addEventListener('click', () => $('#about-modal').classList.add('hidden'));
 /* Navegador predeterminado (menú). Windows no deja ponerlo desde la app: se
-   abre su página de Configuración. El estado se mira al arrancar y cada vez
-   que se vuelve a la ventana, que es lo que pasa al cerrar Configuración. */
+   abre su página de Configuración. El estado se mira al arrancar y al abrir el
+   menú (que es cuando se ve). Antes se miraba en cada foco de la ventana, o sea
+   una consulta a Windows cada vez que se volvía a la interfaz desde una web. */
 let predet = { registrado: false, predeterminado: false };
 async function pintaPredeterminado() {
   try { predet = await window.navirisApp.navegadorEstado(); } catch { return; }
@@ -154,7 +155,8 @@ async function hacerPredeterminado() {
   toast(await window.navirisApp.hacerPredeterminado() ? 'Elige Naviris en Configuración de Windows' : 'No se pudo abrir Configuración de Windows');
 }
 pintaPredeterminado();
-window.addEventListener('focus', pintaPredeterminado);
+// En captura: corre antes que el clic que lo despliega, con el menú aún cerrado.
+for (const b of [els.navMenu, els.sbSettings]) b.addEventListener('click', () => { if (els.menuPop.classList.contains('hidden')) pintaPredeterminado(); }, true);
 
 /* Ventana */
 $('#win-min').addEventListener('click', () => window.navirisApp.minimize());

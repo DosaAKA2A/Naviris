@@ -17,7 +17,9 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); return true; } catch { return false; } }
 };
-// Las claves con el nombre viejo pasan a naviris.* antes de leer ninguna (ver migra-claves.js).
+// Lo que la interfaz guardaba cuando se cargaba por file:// pasa a su origen de ahora, y
+// después las claves con el nombre viejo pasan a naviris.*, antes de leer ninguna (ver migra-claves.js).
+try { window.navirisApp.almacenMigrado(window.naviMigraClaves.migraOrigen(localStorage, window.navirisApp.almacenViejo)); } catch (e) { console.warn('[Naviris] Datos de la versión anterior pendientes:', e && e.message); }
 try { window.naviMigraClaves.migraClaves(localStorage); } catch (e) { console.warn('[Naviris] Claves de la interfaz pendientes:', e && e.message); }
 
 const els = {};

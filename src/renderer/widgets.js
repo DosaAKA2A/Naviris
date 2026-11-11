@@ -311,14 +311,17 @@ function imagenDeTema(w) {
 function renderImagen(body, w) {
   const elige = () => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
-    inp.onchange = () => {
+    inp.onchange = async () => {
       const f = inp.files && inp.files[0]; if (!f) return;
       const ruta = window.navirisApp.filePath(f);
       if (!ruta) return;
+      // Se copia al perfil: la interfaz va por naviris:// y no puede cargar file:.
+      const r = await window.navirisApp.imagenWidget(ruta);
+      if (!r || !r.ok) { toast('No se pudo usar esa imagen'); return; }
       // GIF animado permitido: es contenido DEL USUARIO y la optimizacion es
       // decision suya (la regla anti-animacion-infinita es para NUESTRA UI).
       if (/\.gif$/i.test(ruta)) toast('GIF en bucle: se ve genial, pero consume más GPU. Decisión tuya');
-      w.img = 'file:///' + ruta.replace(/\\/g, '/'); w.slot = 0; saveWidgets(); pinta();
+      w.img = r.url; w.slot = 0; saveWidgets(); pinta();
     };
     inp.click();
   };

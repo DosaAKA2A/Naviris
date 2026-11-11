@@ -15,6 +15,8 @@ const atajos = require('./atajos');             // tabla única de atajos (tambi
 const { crearFreno } = require('./freno-recargas');
 const { aplicacionPara } = require('./externos');
 const abrirDesdeFuera = require('./abrir-desde-fuera'); // enlaces y archivos que llegan de Windows (se prueba en test/)
+const protocolo = require('./protocolo'); // la interfaz por naviris://app (se prueba en test/)
+const migraOrigen = require('./migra-origen'); // lo que la interfaz guardaba en file://
 
 // Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
 // con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
@@ -24,6 +26,8 @@ const abrirDesdeFuera = require('./abrir-desde-fuera'); // enlaces y archivos qu
 // registerSchemesAsPrivileged tiene que ir ANTES de que la app esté lista.
 const ADDON_SCHEME = 'naviris-addon';
 protocol.registerSchemesAsPrivileged([
+  // La interfaz y el splash (ver protocolo.js).
+  { scheme: protocolo.ESQUEMA, privileges: protocolo.PRIVILEGIOS },
   { scheme: ADDON_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
   /* Sustitutos del bloqueador (`$redirect=`), ver adblock.js. Los pide la
      PÁGINA (un <script>, un fetch, un vídeo), así que el esquema necesita lo
@@ -656,12 +660,17 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null) {
     meta.paused = item.isPaused();
     meta.received = item.getReceivedBytes();
     meta.total = item.getTotalBytes();
-    meta.state = state === 'interrupted' ? 'interrupted' : 'progressing';
+    /* Aquí 'interrupted' es un corte del que se puede volver (se fue la red):
+       la descarga sigue viva y se puede reanudar. El fallo de verdad llega por
+       'done'. Antes se marcaba como fallida y sonaba el error, y si luego
+       terminaba bien ya no sonaba (cada descarga suena una vez). */
+    meta.cortada = state === 'interrupted';
+    meta.state = 'progressing';
     broadcast('download:update', meta);
   });
   item.once('done', (_e, state) => {
     meta.state = state; // completed | cancelled | interrupted
-    meta.paused = false;
+    meta.paused = meta.cortada = false;
     rutaElegida();
     meta.received = item.getReceivedBytes();
     if (state === 'completed' && enHistorial) recordDlHistory(meta.path);
@@ -1381,6 +1390,7 @@ let splashSonando = true;   // hasta que splash.js avisa de que su sonido acabó
 let splashOculto = false;   // ya hizo su salida: solo espera a que acabe el sonido para cerrarse
 let splashAnda = Promise.resolve(); // se cumple cuando arranca la animación del splash
 
+const PART_SPLASH = 'naviris-splash';
 function crearSplash() {
   const [width, height] = SPLASH_TAMANO[SPLASH_VARIANTE];
   splashWin = new BrowserWindow({
@@ -1399,12 +1409,10 @@ function crearSplash() {
          castlabs registre el CDM de Widevine, y la sesión por defecto es
          justo donde se registra: con su propia partición no la toca ni de
          lado, así que el DRM de la ventana principal queda intacto. */
-      partition: 'naviris-splash'
+      partition: PART_SPLASH
     }
   });
-  splashWin.loadFile(path.join(__dirname, 'splash.html'), {
-    query: { v: SPLASH_VARIANTE, lente: SPLASH_LENTE, tema: settings.lightMode ? 'claro' : 'oscuro', sonido: settings.sonidos === false ? '0' : '1' }
-  });
+  splashWin.loadURL(protocolo.url('splash.html', { v: SPLASH_VARIANTE, lente: SPLASH_LENTE, tema: settings.lightMode ? 'claro' : 'oscuro', sonido: settings.sonidos === false ? '0' : '1' }));
   splashWin.once('ready-to-show', () => {
     if (!splashWin || splashWin.isDestroyed()) return;
     splashDesde = Date.now();
@@ -1586,7 +1594,7 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
   if (isPrivate) query.private = '1';
   if (sacada) query.sacada = '1';
   if (!isPrivate && PART_NORMAL !== PART_NAVIRIS) query.particion = PART_NORMAL;
-  win.loadFile(path.join(__dirname, 'index.html'), Object.keys(query).length ? { query } : undefined);
+  win.loadURL(protocolo.url('index.html', query));
   // La interfaz no navega nunca: ni un <meta refresh> inyectado ni un enlace o
   // archivo soltado sobre ella pueden cambiar index.html por otra página (que
   // heredaría window.navirisApp).
@@ -2321,17 +2329,16 @@ app.on('web-contents-created', (_event, contents) => {
 const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
 
 // Defensa en profundidad: los canales sensibles solo se atienden si quien llama
-// es la INTERFAZ de Naviris (index.html cargado por file://), nunca un webview
-// con una web dentro. Hoy las webs ya no pueden hablar por IPC (sandbox +
-// contextIsolation + sin nodeIntegration), pero si un fallo futuro filtrara
-// ipcRenderer a una página, esto impide que pida contraseñas o tarjetas.
-const uiPath = path.join(__dirname, 'index.html');
+// es la INTERFAZ de Naviris (naviris://app/index.html, en la sesión de la
+// interfaz), nunca un webview con una web dentro. Hoy las webs ya no pueden
+// hablar por IPC (sandbox + contextIsolation + sin nodeIntegration), pero si un
+// fallo futuro filtrara ipcRenderer a una página, esto impide que pida
+// contraseñas o tarjetas.
 function esUI(e) {
   try {
     const wc = e.sender;
     if (wc.getType() === 'webview') return false;                 // contenido de un sitio: nunca
-    const u = new URL(wc.getURL());
-    return u.protocol === 'file:' && decodeURIComponent(u.pathname).replace(/^\//, '').replace(/\//g, path.sep).toLowerCase() === uiPath.toLowerCase();
+    return wc.session === session.defaultSession && protocolo.esInterfaz(wc.getURL());
   } catch { return false; }
 }
 // Envuelve un handler para que solo responda a la interfaz. Es una función
@@ -2377,6 +2384,31 @@ ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
 ipcMain.on('win:nueva', soloUI(() => ventanaConUrl(null, false)));
 
 ipcMain.handle('settings:get', soloUI(() => settings));
+
+/* Lo que la interfaz guardaba en file:// (ver migra-origen.js y migraOrigen en
+   migra-claves.js). Se lee del disco al pedirlo la primera ventana, antes de que
+   su página toque el localStorage, y se apunta como hecho cuando ella confirma
+   que lo copió todo. Si algo falla no se apunta y se reintenta al volver a abrir. */
+ipcMain.on('ui:almacen-viejo', (e) => {
+  // returnValue contesta en cuanto se asigna: una sola vez y al final.
+  if (!esUI(e) || (settings.migraciones || {}).origenInterfaz) { e.returnValue = null; return; }
+  const t0 = Date.now();
+  let r;
+  try {
+    r = migraOrigen.almacenViejo(app.getPath('userData'));
+    console.log(`[Naviris] Datos de la interfaz en file://: ${Object.keys(r.claves).length} claves leídas en ${Date.now() - t0} ms`);
+  } catch (err) {
+    console.log('[Naviris] No se pudieron leer los datos de la interfaz en file://, se reintenta al volver a abrir:', err.message);
+    r = { error: String(err.message || err) };
+  }
+  e.returnValue = r;
+});
+ipcMain.on('ui:almacen-migrado', (e, r) => {
+  if (!esUI(e) || !r || r.nada) return;
+  if (!r.ok) { console.log('[Naviris] Datos de la interfaz sin pasar al origen nuevo, se reintenta al volver a abrir:', r.error || (r.fallidas || []).join(', ')); return; }
+  settings.migraciones = { ...(settings.migraciones || {}), origenInterfaz: true };
+  saveSettings(settings);
+});
 // ---------- Información del sitio (popover del candado) ----------
 // Solo las dos particiones reales de Naviris: nada de leer cookies de otros perfiles
 const PARTICIONES_VALIDAS = new Set([PART_NORMAL, PART_PRIVATE]);
@@ -3542,8 +3574,16 @@ async function guardarFondo(origen) {
   for (const viejo of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, viejo)); } catch { /* en uso */ } }
   const destino = path.join(dir, 'hub-' + Date.now() + path.extname(origen).toLowerCase());
   fs.copyFileSync(origen, destino);
-  return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
+  return { ok: true, url: protocolo.urlDeDatos('fondos', path.basename(destino)) };
 }
+// Imagen de un widget del hub: la interfaz (naviris://) no puede cargar file:, así que se copia al perfil.
+ipcMain.handle('hub:imagen-widget', soloUI(async (_e, ruta) => {
+  try {
+    if (typeof ruta !== 'string' || !path.isAbsolute(ruta) || !fs.statSync(ruta).isFile()) return { ok: false };
+    const url = migraOrigen.copiaImagen(ruta, app.getPath('userData'));
+    return url ? { ok: true, url } : { ok: false };
+  } catch { return { ok: false }; }
+}));
 ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
   try {
     const r = await dialog.showSaveDialog(winOf(e), {
@@ -3783,6 +3823,10 @@ ipcMain.handle('update:novedades', async () => {
 nativeTheme.themeSource = settings.lightMode ? 'light' : 'dark';
 
 app.whenReady().then(async () => {
+  // naviris://app solo en la sesión de la interfaz y en la del splash: las webs no lo tienen (ver protocolo.js).
+  const sirveApp = protocolo.manejador({ app: __dirname, datos: app.getPath('userData') });
+  protocol.handle(protocolo.ESQUEMA, sirveApp);
+  session.fromPartition(PART_SPLASH).protocol.handle(protocolo.ESQUEMA, sirveApp);
   // Lo PRIMERO que ocurre: el cuadrado ya está en pantalla mientras el resto
   // del arranque (que es lo que tarda) sigue su curso por detrás.
   crearSplash();

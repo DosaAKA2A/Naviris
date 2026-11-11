@@ -5,11 +5,13 @@
    contenido de un iframe de cualquier archivo y los píxeles de cualquier imagen
    (canvas), y lo mandaba a un servidor. Ese .html lo puede bajar cualquier web.
 
-   Apagar la fuse no es la salida: la interfaz también se carga por file:// y sin
-   ella pierde el localStorage (medido: SecurityError), o sea marcadores,
-   historial y ajustes. Hasta que la interfaz viva en un protocolo propio, se
-   corta aquí, en las sesiones de las webs (la interfaz va en otra y no pasa por
-   esto), con lista blanca:
+   Desde el 2026-11-11 la interfaz va por naviris://app (protocolo.js) y el
+   instalable sale con esa fuse apagada (package.json, electronFuses), que ya
+   cierra fetch, XHR e iframes a file:. Esto se queda igual: es lo único que
+   protege con `npm start` (el Electron de desarrollo trae la fuse encendida) y
+   lo único que impide abrir un file: en una ventanita o cargar archivos de
+   fuera de la carpeta de la página. Se corta aquí, en las sesiones de las webs
+   (la interfaz va en otra y no pasa por esto), con lista blanca:
 
    · Un documento file: solo se abre en una pestaña. En una ventanita no, porque
      quien la abrió se queda con su window.opener y leería el documento.
