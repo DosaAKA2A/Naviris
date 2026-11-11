@@ -166,7 +166,7 @@ test('ventanas emergentes: sin gesto se bloquean y avisan; con clic se abren', {
   // Sin gesto: ni pestañas ni ventanas, y el aviso de la barra con las tres
   const c = await pestana(nav, sitio + '/emergentes');
   await espera(2500);
-  assert.equal((await pestanas()) - t0, 1, 'solo la pestaña de la prueba');
+  assert.equal((await pestanas()) - t0, 1, 'solo la pestaña de la prueba: ' + await nav.ui.evalua('JSON.stringify(tabs.map((x) => x.kind + " " + x.url))'));
   assert.equal((await ventanas()).length, 0, 'ninguna ventana');
   const aviso = await nav.ui.evalua(`({ visible: !document.getElementById('emerg-bar').classList.contains('hidden'), texto: document.getElementById('emerg-text').textContent })`);
   assert.deepEqual(aviso, { visible: true, texto: 'Se bloquearon 3 ventanas emergentes de 127.0.0.1.' });
