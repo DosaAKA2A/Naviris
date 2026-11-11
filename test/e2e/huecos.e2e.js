@@ -111,6 +111,9 @@ test('Ctrl+Mayús+AvPág mueve la pestaña en vez de cambiar de pestaña', async
   const web = await app.abre(BASE + 'mover', RUTAS);
   const id = await app.ui.evalua('activeId');
   await app.ui.evalua(`createTab('${BASE}otra', false), 1`);
+  // En el runner de GitHub la pestaña nueva tarda: se espera a que exista antes de pulsar.
+  await hasta(() => app.ui.evalua(`tabs.some((t) => t.url.endsWith('/otra'))`));
+  await espera(300);
   const antes = await app.ui.evalua('tabs.findIndex((t) => t.id === activeId)');
   await tecla(web, 'PageDown', 'PageDown', 34, CTRL | MAYUS);
   await hasta(() => app.ui.evalua(`tabs.findIndex((t) => t.id === ${id}) === ${antes + 1}`));

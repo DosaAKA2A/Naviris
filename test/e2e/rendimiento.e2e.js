@@ -108,7 +108,7 @@ test('las pestañas que no se ven dejan de pintar; el sonido sigue y al volver n
   const c = await pestana(nav, `http://127.0.0.1:${WEB}/fondo`);
   await nav.ui.evalua(`(tabs.find((x) => x.url.endsWith('/fondo')).webview.setAudioMuted(true), 1)`);
   // En el runner de GitHub la pestaña puede llegar antes que su <audio>: se espera a que exista.
-  await c.evalua(`new Promise((r) => { const f = () => { const a = document.getElementById('a'); if (a) r(a.play().then(() => 1)); else setTimeout(f, 50); }; f(); })`);
+  await hasta(() => c.evalua(`new Promise((r) => { const f = () => { const a = document.getElementById('a'); if (a) r(a.play().then(() => 1)); else setTimeout(f, 50); }; f(); })`));
   assert.ok(await fotogramas(c) > 20, 'la pestaña activa pinta');
   await c.evalua('window.__marca = 1');
 
