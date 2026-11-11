@@ -139,14 +139,11 @@ function pararCarga() { const wv = activeWv(); try { wv?.stop(); } catch { /* na
    Chromium quien lo recuerda por sitio, como hace Chrome.
    `wv` permite apuntar a una web concreta (Ctrl+rueda: la que está bajo el
    ratón); si no, la pestaña activa. */
-const ZOOM_PASOS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 function zoom(delta, wv = activeWv()) {
   if (!wv) return;
   let actual = 1;
   try { actual = wv.getZoomFactor(); } catch { return; }   // webview aún sin adjuntar
-  let f = 1;
-  if (delta > 0) f = ZOOM_PASOS.find((p) => p > actual + 0.001) ?? ZOOM_PASOS[ZOOM_PASOS.length - 1];
-  else if (delta < 0) f = [...ZOOM_PASOS].reverse().find((p) => p < actual - 0.001) ?? ZOOM_PASOS[0];
+  const f = window.naviAtajos.siguienteZoom(actual, delta);   // los pasos de Chrome (atajos.js)
   try { wv.setZoomFactor(f); } catch { /* nada */ }
   toast(f === 1 ? 'Zoom al 100 %' : 'Zoom ' + Math.round(f * 100) + ' %');
 }

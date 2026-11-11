@@ -19,13 +19,27 @@ const DE_LAS_PAGINAS = new Set([
   'moovin:pase', 'moovin:pase-set', 'moovin:clave-app', 'moovin:identidad'
 ]);
 const MIRAN_ESUI = new Set(['wv:historial', 'wv:historial-pendiente', 'tab:reintenta-bucle', 'tab:nav-usuario', 'tab:dialogo-respuesta', 'ui:almacen-viejo', 'ui:almacen-migrado']);
+// Los del aviso de una ventanita (dialogo.html): solo contestan a la capa que main creó para ese aviso.
+const DE_LA_CAPA = new Set(['ventanita:dialogo-datos', 'ventanita:dialogo-respuesta']);
 
 const canales = [...MAIN.matchAll(/ipcMain\.(on|handle)\('([^']+)',\s*(soloUI\()?/g)].map((m) => ({ canal: m[2], solo: !!m[3] }));
 
 test('todos los canales de la interfaz van con soloUI', () => {
   assert.ok(canales.length > 80, 'se encontraron ' + canales.length + ' canales');
-  const sueltos = canales.filter((c) => !c.solo && !DE_LAS_PAGINAS.has(c.canal) && !MIRAN_ESUI.has(c.canal)).map((c) => c.canal);
+  const sueltos = canales.filter((c) => !c.solo && !DE_LAS_PAGINAS.has(c.canal) && !MIRAN_ESUI.has(c.canal) && !DE_LA_CAPA.has(c.canal)).map((c) => c.canal);
   assert.deepEqual(sueltos, []);
+});
+
+test('los del aviso de una ventanita solo atienden a su capa', () => {
+  for (const canal of DE_LA_CAPA) {
+    const i = MAIN.indexOf(`ipcMain.on('${canal}'`);
+    assert.ok(i >= 0, canal);
+    assert.match(MAIN.slice(i, i + 200), /const a = avisosVentanita\.get\(e\.sender\.id\);/, canal);
+  }
+  // Y lo que pide el preload de la capa es justo eso.
+  const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'dialogo-preload.js'), 'utf8');
+  const pedidos = new Set([...preload.matchAll(/ipcRenderer\.(?:send|sendSync|invoke)\('([^']+)'/g)].map((m) => m[1]));
+  assert.deepEqual([...pedidos].sort(), [...DE_LA_CAPA].sort());
 });
 
 test('los que miran esUI por dentro lo hacen de verdad', () => {

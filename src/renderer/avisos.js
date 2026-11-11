@@ -1,9 +1,9 @@
 /* Avisos de las páginas: permisos, ventanas emergentes bloqueadas y diálogos dentro de su pestaña. */
 
 /* ============ Permisos de sitios ============ */
-const PERM_LABELS = { media: 'usar la cámara y el micrófono', geolocation: 'saber tu ubicación', notifications: 'enviarte notificaciones', midi: 'usar dispositivos MIDI', midiSysex: 'usar dispositivos MIDI', 'clipboard-read': 'leer tu portapapeles', hid: 'acceder a dispositivos HID', serial: 'acceder a puertos serie', usb: 'acceder a dispositivos USB', bluetooth: 'usar Bluetooth' };
-const PERM_SHORT = { popups: 'Ventanas emergentes', media: 'Cámara y micrófono', geolocation: 'Ubicación', notifications: 'Notificaciones', midi: 'MIDI', midiSysex: 'MIDI', 'clipboard-read': 'Portapapeles', hid: 'Dispositivos HID', serial: 'Puertos serie', usb: 'USB', bluetooth: 'Bluetooth' };
-const ICONO_PERMISO = { notifications: 'bell', media: 'camera', geolocation: 'map-pin', 'clipboard-read': 'clipboard' };
+const PERM_LABELS = { 'automatic-downloads': 'descargar varios archivos', media: 'usar la cámara y el micrófono', geolocation: 'saber tu ubicación', notifications: 'enviarte notificaciones', midi: 'usar dispositivos MIDI', midiSysex: 'usar dispositivos MIDI', 'clipboard-read': 'leer tu portapapeles', hid: 'acceder a dispositivos HID', serial: 'acceder a puertos serie', usb: 'acceder a dispositivos USB', bluetooth: 'usar Bluetooth' };
+const PERM_SHORT = { popups: 'Ventanas emergentes', 'automatic-downloads': 'Descargas automáticas', media: 'Cámara y micrófono', geolocation: 'Ubicación', notifications: 'Notificaciones', midi: 'MIDI', midiSysex: 'MIDI', 'clipboard-read': 'Portapapeles', hid: 'Dispositivos HID', serial: 'Puertos serie', usb: 'USB', bluetooth: 'Bluetooth' };
+const ICONO_PERMISO = { 'automatic-downloads': 'arrow-down-tray', notifications: 'bell', media: 'camera', geolocation: 'map-pin', 'clipboard-read': 'clipboard' };
 let permQueue = [];
 function showNextPerm() {
   if (!permQueue.length) { els.permBar.classList.add('hidden'); return; }
@@ -50,6 +50,29 @@ document.getElementById('emerg-allow').addEventListener('click', () => {
   ocultaEmergentes();
 });
 document.getElementById('emerg-close').addEventListener('click', ocultaEmergentes);
+
+/* Programas y scripts que una web bajó sin un clic (ver src/descargas-seguras.js
+   en main): no pasan a Descargas hasta que digas. Aviso en la ventana de su
+   pestaña, uno detrás de otro: «Conservar» lo pasa a Descargas y «Descartar»
+   lo borra. En la página de descargas salen con los mismos dos botones. */
+const riesgoEls = { bar: document.getElementById('riesgo-bar'), text: document.getElementById('riesgo-text') };
+const riesgoCola = [];   // las descargas que esperan respuesta en esta ventana
+function pintaRiesgo() {
+  const m = riesgoCola[0];
+  riesgoEls.bar.classList.toggle('hidden', !m);
+  if (m) riesgoEls.text.innerHTML = `<b>${escapeHtml(m.name)}</b> puede dañar tu equipo. La página lo descargó sin que hicieras clic.`;
+}
+function avisoDeRiesgo(m) {
+  const i = riesgoCola.findIndex((x) => x.id === m.id);
+  const espera = m.retenida === 'peligrosa' && m.state === 'progressing' && !!pestanaDeWebContents(m.wc);
+  if (espera && i === -1) riesgoCola.push(m);
+  else if (!espera && i !== -1) riesgoCola.splice(i, 1);
+  pintaRiesgo();
+}
+window.navirisApp.onDownloadNew(avisoDeRiesgo);
+window.navirisApp.onDownloadUpdate(avisoDeRiesgo);
+document.getElementById('riesgo-conservar').addEventListener('click', () => { const m = riesgoCola.shift(); if (m) window.navirisApp.keepDownload(m.id); pintaRiesgo(); });
+document.getElementById('riesgo-descartar').addEventListener('click', () => { const m = riesgoCola.shift(); if (m) window.navirisApp.cancelDownload(m.id); pintaRiesgo(); });
 
 async function showPermManager() {
   const perms = await window.navirisApp.permList();

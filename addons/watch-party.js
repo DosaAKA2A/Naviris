@@ -283,15 +283,13 @@
   var SITIOS = { netflix: 'Netflix', crunchy: 'Crunchyroll', disney: 'Disney+', youtube: 'YouTube', iris: 'MOOVIN' };
   var LISTA_SITIOS = 'Crunchyroll, Netflix, Disney+, YouTube o MOOVIN';
   function siteOf(url) {
-    var h = '', p = ''; try { var u = new URL(url); h = u.hostname; p = u.pathname; } catch (e) { return null; }
+    var h = ''; try { h = new URL(url).hostname; } catch (e) { return null; }
     if (/(^|\.)netflix\.com$/.test(h)) return 'netflix';
     if (/(^|\.)crunchyroll\.com$/.test(h)) return 'crunchy';
     if (/(^|\.)disneyplus\.com$/.test(h)) return 'disney';
     if (/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return 'youtube';
-    // MOOVIN: en moovin.live es todo el dominio; en iris.it.com (que sigue vivo
-    // por la tele) solo la ruta /moovin, el resto del estudio no reproduce.
+    // MOOVIN: todo moovin.live. iris.it.com ya no: caducó y lo sirve un tercero.
     if (/(^|\.)moovin\.live$/.test(h)) return 'iris';
-    if (/(^|\.)iris\.it\.com$/.test(h) && /^\/moovin(\/|$)/.test(p)) return 'iris';
     return null;
   }
   // Identidad del episodio (para saber si dos URLs son "el mismo capítulo"
@@ -312,9 +310,9 @@
     // MOOVIN: la película es el parámetro ?v= (URL del video). Sin él, la
     // página vacía cuenta como "el mismo sitio" para no forzar navegación
     // cuando el anfitrión reproduce un archivo local.
-    m = /(?:moovin\.live|iris\.it\.com\/moovin)[^#]*[?&]v=([^&#]+)/i.exec(url || '');
+    m = /moovin\.live[^#]*[?&]v=([^&#]+)/i.exec(url || '');
     if (m) { try { return 'iris:' + decodeURIComponent(m[1]); } catch (e) { return 'iris:' + m[1]; } }
-    if (/moovin\.live(\/|$|\?)|iris\.it\.com\/moovin(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
+    if (/moovin\.live(\/|$|\?)/i.test(url || '')) return 'iris:moovin';
     return null;
   }
   /* La URL que se manda a la sala, limpia. La de Netflix lleva trackId y tctx

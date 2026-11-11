@@ -107,7 +107,15 @@
   // Decisión de Dosa (2026-11-03): las fijadas se cierran desde su menú.
   const cierraConAtajo = (tab) => !!tab && !tab.pinned;
 
-  const api = { ATAJOS, comandoDe, cierraConAtajo };
+  // Los pasos del zoom, los de Chrome. Los usan las pestañas (renderer) y las ventanitas (main).
+  const ZOOM_PASOS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+  function siguienteZoom(actual, delta) {
+    if (delta > 0) return ZOOM_PASOS.find((p) => p > actual + 0.001) ?? ZOOM_PASOS[ZOOM_PASOS.length - 1];
+    if (delta < 0) return [...ZOOM_PASOS].reverse().find((p) => p < actual - 0.001) ?? ZOOM_PASOS[0];
+    return 1;
+  }
+
+  const api = { ATAJOS, comandoDe, cierraConAtajo, siguienteZoom };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else raiz.naviAtajos = api;
 })(typeof window !== 'undefined' ? window : globalThis);

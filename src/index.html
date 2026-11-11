@@ -25,7 +25,7 @@
   <header id="titlebar">
     <div class="tb-logo" title="Naviris"><span class="iris-slot" data-iris="30"></span></div>
     <span id="private-badge" class="hidden" title="Ventana privada"></span>
-    <span id="agent-badge" class="hidden" title="Modo agente activo: un agente externo (por ejemplo, tu Claude) puede controlar este navegador por CDP (127.0.0.1:9223). Desactívalo en Ajustes cuando no lo uses."><span class="ab-dot"></span>Agente</span>
+    <span id="agent-badge" class="hidden" title="Modo agente activo: cualquier programa de tu equipo puede controlar este navegador por completo (CDP en 127.0.0.1:9223), sin pedir clave. Apágalo en Ajustes cuando no lo uses."><span class="ab-dot"></span>Agente</span>
     <nav id="tabstrip"></nav>
     <button id="newtab-btn" title="Nueva pestaña (Ctrl+T)" data-ico="plus"></button>
     <div class="tb-drag"></div>
@@ -106,6 +106,14 @@
         <span id="emerg-text"></span>
         <button id="emerg-close">Cerrar</button>
         <button id="emerg-allow" class="primary">Permitir en este sitio</button>
+      </div>
+
+      <!-- Programa o script que una web descargó sin un clic: conservarlo o descartarlo -->
+      <div id="riesgo-bar" class="hidden">
+        <span class="perm-ic" data-ico="shield-half"></span>
+        <span id="riesgo-text"></span>
+        <button id="riesgo-conservar">Conservar</button>
+        <button id="riesgo-descartar" class="primary">Descartar</button>
       </div>
 
       <!-- Barra de contraseñas: guardar al iniciar sesión / autorrellenar -->
@@ -310,7 +318,7 @@
     <label class="menu-toggle"><span>Botones laterales del mouse<br /><small>Los de atrás y adelante</small></span><input type="checkbox" id="opt-mousenav" /></label>
     <label class="menu-toggle"><span>Sonidos<br /><small>Al abrir Naviris, al terminar una descarga y en los recordatorios</small></span><input type="checkbox" id="opt-sonidos" /></label>
     <label class="menu-toggle"><span>Aceleración por GPU<br /><small>Requiere reiniciar</small></span><input type="checkbox" id="opt-gpu" /></label>
-    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Deja que Claude controle Naviris · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
+    <label class="menu-toggle"><span>Modo agente (CDP)<br /><small>Mientras esté encendido, cualquier programa de tu equipo puede controlar Naviris por completo, sin pedir clave · reinicia</small></span><input type="checkbox" id="opt-agent" /></label>
     <label class="menu-toggle"><span>Actualizaciones automáticas<br /><small>Se bajan solas y se instalan al cerrar · apagado: te avisa y decides tú</small></span><input type="checkbox" id="opt-updauto" /></label>
     <hr />
     <!-- Sin "Buscar actualizaciones" (Dosa, 2026-08-18): las dos líneas se

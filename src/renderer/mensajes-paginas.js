@@ -16,7 +16,9 @@ function showPwBar(html, yesLabel, onYes, host = null) {
   els.pwBar.classList.remove('hidden');
   pwBarHost = host;
 }
-const sigueEnSitio = (wv, host) => { try { return hostOf(wv.getURL()) === host; } catch { return false; } };
+// `esquema`: además, que siga en ese esquema (una contraseña de https no se rellena en http).
+const sigueEnSitio = (wv, host, esquema) => { try { const u = wv.getURL(); return hostOf(u) === host && (!esquema || esquemaDe(u) === esquema); } catch { return false; } };
+const esquemaDe = (u) => { try { return new URL(u).protocol.slice(0, -1); } catch { return ''; } };
 // Indicador de Modo agente: ÁMBAR = activo (puerto CDP abierto, sin agente conectado);
 // VERDE = un agente está conectado/actuando. El agente declara presencia llamando a
 // window.navirisAgentPing() (heartbeat) o controlando alguna pestaña. Si el heartbeat
@@ -120,20 +122,23 @@ async function onWebviewMessage(wv, e) {
     const { url, username, password } = data;
     if (!password) return;
     const host = hostOf(url); if (!host) return;
-    const key = host + '|' + (username || '');
+    // Se guarda con el esquema de la página: la de https no se ofrecerá en http.
+    const esquema = esquemaDe(url);
+    const key = host + '|' + esquema + '|' + (username || '');
     if (pwPrompted.get(key) === password) return;
     pwPrompted.set(key, password);
-    const existing = (await window.navirisApp.pwForHost(host)).find((c) => (c.username || '') === (username || ''));
+    const existing = (await window.navirisApp.pwForHost(host, esquema)).find((c) => (c.username || '') === (username || ''));
     const who = username ? `<b>${escapeHtml(username)}</b> en <b>${escapeHtml(host)}</b>` : `<b>${escapeHtml(host)}</b>`;
-    if (existing) showPwBar(`¿Actualizar la contraseña de ${who}?`, 'Actualizar', () => doSavePw(host, username, password));
-    else showPwBar(`¿Guardar la contraseña de ${who} en Naviris?`, 'Guardar', () => doSavePw(host, username, password));
+    if (existing) showPwBar(`¿Actualizar la contraseña de ${who}?`, 'Actualizar', () => doSavePw(host, username, password, esquema));
+    else showPwBar(`¿Guardar la contraseña de ${who} en Naviris?`, 'Guardar', () => doSavePw(host, username, password, esquema));
   } else if (e.channel === 'naviris-loginform') {
     const host = hostOf(data.url); if (!host) return;
-    const creds = await window.navirisApp.pwForHost(host);
+    const esquema = esquemaDe(data.url);
+    const creds = await window.navirisApp.pwForHost(host, esquema);
     if (!creds.length) return;
     const cred = creds[0];
     const who = cred.username ? `<b>${escapeHtml(cred.username)}</b>` : 'la cuenta guardada';
-    showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred, host), host);
+    showPwBar(`Rellenar ${who} en <b>${escapeHtml(host)}</b> — te pedirá verificación de Windows.`, 'Rellenar', () => doFillPw(wv, cred, host, esquema), host);
   } else if (e.channel === 'naviris-otpform') {
     /* Casilla de código de un solo uso: si hay una cuenta del autenticador que
        case con este sitio, se ofrece el codigo. Se empareja por el emisor
@@ -201,14 +206,15 @@ async function doFillCard(wv, card, host) {
   if (r.ok) { try { wv.send('naviris-fill-card', r, host); toast('Tarjeta rellenada (falta el CVC)'); } catch { toast('No se pudo rellenar'); } }
   else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
 }
-async function doSavePw(host, username, password) {
-  const r = await window.navirisApp.pwAdd(host, username || '', password);
+async function doSavePw(host, username, password, esquema) {
+  const r = await window.navirisApp.pwAdd(host, username || '', password, esquema);
   toast(r && r.ok ? (r.updated ? 'Contraseña actualizada' : 'Contraseña guardada en Naviris') : 'No se pudo guardar');
 }
-async function doFillPw(wv, cred, host) {
-  if (!sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
+async function doFillPw(wv, cred, host, esquema) {
+  if (!sigueEnSitio(wv, host, esquema)) { toast('La página cambió; vuelve a intentarlo'); return; }
   const r = await window.navirisApp.pwReveal(cred.id);
-  if (r.ok && !sigueEnSitio(wv, host)) { toast('La página cambió; vuelve a intentarlo'); return; }
-  if (r.ok) { try { wv.send('naviris-fill', { username: cred.username, password: r.password }, host); toast('Contraseña rellenada'); } catch { toast('No se pudo rellenar'); } }
+  if (r.ok && !sigueEnSitio(wv, host, esquema)) { toast('La página cambió; vuelve a intentarlo'); return; }
+  // soloHttps: la página lo vuelve a mirar antes de escribir (webview-preload).
+  if (r.ok) { try { wv.send('naviris-fill', { username: cred.username, password: r.password, soloHttps: cred.esquema === 'https' }, host); toast('Contraseña rellenada'); } catch { toast('No se pudo rellenar'); } }
   else toast(r.error === 'verificacion cancelada' ? 'Verificación cancelada' : 'No se pudo rellenar');
 }

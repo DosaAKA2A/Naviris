@@ -4,6 +4,8 @@
 const dlMeta = new Map(); const dlRows = new Map();
 const fmtBytes = (n) => { if (!n) return ''; const u = ['B', 'KB', 'MB', 'GB']; let i = 0; while (n >= 1024 && i < 3) { n /= 1024; i++; } return n.toFixed(i ? 1 : 0) + ' ' + u[i]; };
 const VIEWABLE = /\.(png|jpe?g|gif|webp|bmp|svg|mp4|webm|ogg|mp3|wav|m4a|flac|pdf|txt|json|html?)$/i;
+// Lo que una web bajó sola y espera respuesta (ver src/descargas-seguras.js en main).
+const RETENIDA = { varias: 'Esperando tu permiso para descargar varios archivos', peligrosa: 'Sin guardar · puede dañar tu equipo' };
 function upsertDownload(m) {
   dlMeta.set(m.id, m);
   let row = dlRows.get(m.id);
@@ -13,7 +15,7 @@ function upsertDownload(m) {
   row.classList.toggle('done', done); row.classList.toggle('error', error);
   row.querySelector('.dl-kind').innerHTML = window.icon(m.kind === 'audio' ? 'musical-note' : m.kind === 'video' ? 'film' : done ? 'check' : 'arrow-down-tray');
   row.querySelector('.dl-name').textContent = m.name;
-  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : ((m.cortada ? 'Conexión cortada · ' : m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
+  row.querySelector('.dl-sub').textContent = done ? 'Completado · ' + fmtBytes(m.received) + ' · clic para abrir' : error ? (m.state === 'cancelled' ? 'Cancelada' : (m.error ? 'Error: ' + m.error : 'Error')) : RETENIDA[m.retenida] || ((m.cortada ? 'Conexión cortada · ' : m.paused ? 'En pausa · ' : '') + pct + '%' + (m.total ? ` · ${fmtBytes(m.received)} / ${fmtBytes(m.total)}` : ''));
   row.querySelector('.dl-sub').title = m.error || '';
   row.querySelector('.dl-bar > i').style.transform = `scaleX(${pct / 100})`;
   // La página de descargas, si está abierta, sigue el progreso en vivo
@@ -21,13 +23,20 @@ function upsertDownload(m) {
   const act = row.querySelector('.dl-act:not(.dl-act2)');
   if (done) { act.innerHTML = window.icon('folder'); act.title = 'Mostrar en carpeta'; act.onclick = (e) => { e.stopPropagation(); window.navirisApp.revealDownload(m.id); }; }
   else if (error) { act.innerHTML = window.icon('x-mark'); act.title = 'Cerrar'; act.onclick = (e) => { e.stopPropagation(); row.remove(); dlRows.delete(m.id); }; }
-  else { act.innerHTML = window.icon('x-mark'); act.title = 'Cancelar'; act.onclick = (e) => { e.stopPropagation(); window.navirisApp.cancelDownload(m.id); }; }
+  else { act.innerHTML = window.icon('x-mark'); act.title = m.retenida ? 'Descartar' : 'Cancelar'; act.onclick = (e) => { e.stopPropagation(); window.navirisApp.cancelDownload(m.id); }; }
   accionDescarga(row.querySelector('.dl-act2'), m);
 }
 /* Pausar y reanudar la que está en curso; reintentar la que falló o se
    canceló (2026-11-03). Solo las del navegador ('file'): las del Rat Tool son
    yt-dlp y no se pueden pausar. La reintentada vuelve como descarga nueva. */
 function accionDescarga(b, m) {
+  // La que espera respuesta: «Conservar» (la que espera el permiso del sitio, nada).
+  if (m.retenida) {
+    b.classList.toggle('hidden', m.retenida !== 'peligrosa');
+    b.innerHTML = window.icon('check'); b.title = 'Conservar'; b.setAttribute('aria-label', b.title);
+    b.onclick = (e) => { e.stopPropagation(); window.navirisApp.keepDownload(m.id); };
+    return;
+  }
   const archivo = m.kind === 'file' && m.state !== 'completed';
   const enCurso = m.state === 'progressing';
   const parada = m.paused || m.cortada;   // cortada: se fue la red y se puede reanudar
@@ -120,7 +129,7 @@ function renderDlActive() {
     // vez de un 0% que parecería atascado.
     const sub = hecha ? 'Completado · ' + (fmtBytes(m.received) || '0 B')
       : failed ? (m.state === 'cancelled' ? 'Cancelada' : 'Error: ' + (m.error || 'la descarga se interrumpió'))
-      : (m.paused ? 'En pausa · ' : '') + (pct != null
+      : RETENIDA[m.retenida] || (m.paused ? 'En pausa · ' : '') + (pct != null
         ? `${pct}% · ${fmtBytes(m.received) || '0 B'}${m.total ? ' / ' + fmtBytes(m.total) : ''}`
         : `${m.paused ? '' : 'Descargando… '}${fmtBytes(m.received) || '0 B'}`);
     let row = dlpFilas.get(m.id)?.row;
@@ -140,6 +149,7 @@ function renderDlActive() {
     row.querySelector('.dlp-name').textContent = m.name;
     row.title = m.name;
     row.querySelector('.dlp-sub').textContent = sub;
+    if (!failed) { const x = row.querySelector('.dlp-cancel'); x.title = m.retenida ? 'Descartar' : 'Cancelar'; x.setAttribute('aria-label', x.title); }
     row.classList.toggle('pausa', !!m.paused && !failed);
     if (hecha) {
       if (!row.classList.contains('fin')) {

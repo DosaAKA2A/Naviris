@@ -6,7 +6,7 @@ const DEFAULT_DIALS = [
   { name: 'Discord', url: 'https://discord.com/app' }, { name: 'WhatsApp', url: 'https://web.whatsapp.com' },
   { name: 'Crunchyroll', url: 'https://www.crunchyroll.com' }, { name: 'GitHub', url: 'https://github.com' },
   { name: 'Gmail', url: 'https://mail.google.com' },
-  { name: 'Pinterest', url: 'https://www.pinterest.com' }, { name: 'IRIS', url: 'https://iris.it.com' }
+  { name: 'Pinterest', url: 'https://www.pinterest.com' }
 ];
 let dials = store.get('naviris.dials', DEFAULT_DIALS);
 /* ===== BIBLIOTECA DE SITIOS (2026-09-09) =====
@@ -28,7 +28,7 @@ const LIBRERIA = [
   { name: 'Amazon', url: 'https://www.amazon.com' }, { name: 'LinkedIn', url: 'https://www.linkedin.com' },
   { name: 'Steam', url: 'https://store.steampowered.com' }, { name: 'Telegram', url: 'https://web.telegram.org' },
   { name: 'Notion', url: 'https://www.notion.so' }, { name: 'Figma', url: 'https://www.figma.com' },
-  { name: 'MOOVIN', url: 'https://moovin.live' }, { name: 'IRIS', url: 'https://iris.it.com' }
+  { name: 'MOOVIN', url: 'https://moovin.live' }
 ];
 function renderLibreria() {
   const g = els.libGrid; if (!g) return;
@@ -39,8 +39,7 @@ function renderLibreria() {
     if (puestos.has(hostOf(sitio.url))) { b.classList.add('puesto'); b.title = 'Ya lo tienes en el hub'; }
     const ic = document.createElement('span'); ic.className = 'lib-ic';
     const marca = brandOf(sitio.url);
-    if (/(^|\.)iris\.it\.com$/.test(hostOf(sitio.url))) ic.innerHTML = window.irisFlat(24);
-    else if (marca && window.brandIcon(marca)) ic.innerHTML = window.brandIcon(marca);
+    if (marca && window.brandIcon(marca)) ic.innerHTML = window.brandIcon(marca);
     else { ic.innerHTML = window.icon('star'); ponFavicon(ic, sitio.url); }
     const n = document.createElement('span'); n.className = 'lib-nom'; n.textContent = sitio.name;
     b.append(ic, n);
@@ -60,14 +59,6 @@ function removeDial(d) { dials = dials.filter((x) => x !== d); store.set('naviri
 // de vidrio y paleta única del hub).
 function styleDial(tile, letter, d) {
   const brand = brandOf(d.url);
-  // iris.it.com lleva SU logo oficial (nunca una inicial ni el favicon)
-  try {
-    if (/(^|\.)iris\.it\.com$/.test(new URL(d.url).hostname)) {
-      const m = document.createElement('span'); m.className = 'd-mono d-iris';
-      m.innerHTML = window.irisFlat(40); // monocromo, como el resto de marcas
-      tile.appendChild(m); letter.remove(); return;
-    }
-  } catch { /* url rara: sigue el camino normal */ }
   // El fondo y el filtro del favicon los pone el CSS (tokens --tile-default y
   // --fav-filter): antes se fijaban aquí en línea y en modo claro quedaban
   // tiles negros con iconos aclarados sobre un hub blanco.

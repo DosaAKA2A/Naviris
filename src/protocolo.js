@@ -31,9 +31,9 @@ const ORIGEN = `${ESQUEMA}://${HOST}`;
    compilado de los scripts y el arranque no los recompila cada vez. */
 const PRIVILEGIOS = { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true };
 
-// Lo que la interfaz y el splash cargan. Si se añade un script a index.html, va aquí (lo vigila test/protocolo.test.js).
+// Lo que la interfaz, el splash y el aviso de las ventanitas cargan. Si se añade un script a index.html, va aquí (lo vigila test/protocolo.test.js).
 const ARCHIVOS_APP = new Set(['index.html', 'splash.html', 'styles.css', 'icons.js', 'brands.js', 'sonidos.js', 'rat.js',
-  'hub-escala.js', 'atajos.js', 'buscadores.js', 'migra-claves.js', 'splash.js']);
+  'hub-escala.js', 'atajos.js', 'buscadores.js', 'migra-claves.js', 'splash.js', 'dialogo.html', 'dialogo.js']);
 const CARPETAS_APP = ['renderer', 'fonts', 'sonidos', 'temas', 'fondos'];
 const CARPETAS_DATOS = ['fondos', 'imagenes'];
 
