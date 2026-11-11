@@ -3879,7 +3879,6 @@ app.whenReady().then(async () => {
   // ¿Se actualizó desde la última vez? Entonces la interfaz enseñará qué cambió.
   revisaVersionInstalada();
   limpiaRestosRat();
-  braveAdblock.init();
   splashProgreso(62);
   // naviris-addon://tool/<id>.js — el código de un addon INSTALADO Y ACTIVO.
   // El id se valida contra la lista de instalados y se limita a [a-z0-9-], así
@@ -3911,6 +3910,14 @@ app.whenReady().then(async () => {
      dependen del menú. */
   Menu.setApplicationMenu(null);
   const principal = createWindow(false, true); // la primera ventana es la que releva al splash
+  /* El motor del bloqueador se carga DESPUÉS de pedir la ventana (comparativa,
+     11/11/2026): leer los recursos y deserializar motor.bin son unos 50 ms del
+     hilo principal (medido con el perfil de CPU del arranque) y antes iban
+     delante de createWindow, retrasando lo mismo la interfaz. Así se solapan con
+     el arranque del proceso de la interfaz. No cambia qué se bloquea: ninguna web
+     carga antes de que la interfaz avise con 'ui:listo', y esto termina antes de
+     que el hilo principal atienda nada más. */
+  braveAdblock.init();
   // Lo que traía el arranque (o llegó mientras): pestañas nuevas detrás de la sesión restaurada.
   if (paraLaPrimera.length) urlPendiente.set(principal.id, paraLaPrimera.map((url) => ({ url, contenedor: null })));
   paraLaPrimera = null;
