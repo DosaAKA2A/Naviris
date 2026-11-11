@@ -72,7 +72,9 @@ els.pwForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const site = hostOf(els.pwSite.value.includes('://') ? els.pwSite.value : 'https://' + els.pwSite.value) || els.pwSite.value.trim();
   if (!site || !els.pwPass.value) { toast('Falta el sitio o la contraseña'); return; }
-  const r = await window.navirisApp.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value);
+  // Con http:// o https:// escrito vale ese; sin él, main supone https salvo en la red de casa (credenciales.js).
+  const esquema = (/^(https?):\/\//i.exec(els.pwSite.value.trim()) || [])[1]?.toLowerCase();
+  const r = await window.navirisApp.pwAdd(site, els.pwUser.value.trim(), els.pwPass.value, esquema);
   if (r.ok) { els.pwForm.classList.add('hidden'); renderPasswords(); toast('Contraseña guardada y cifrada'); }
   else toast('No se pudo guardar');
 });

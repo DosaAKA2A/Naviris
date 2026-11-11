@@ -168,12 +168,6 @@
   // separado: la ventana de arranque (splash.js).
   window.irisRuta = { viewBox: IRIS_VB, d: IRIS_D };
   let irisSeq = 0;
-  // Version PLANA del logo (currentColor): para sitios donde el logo debe ser
-  // monocromo como el resto de marcas (p. ej. el acceso a iris.it.com).
-  window.irisFlat = function (size) {
-    return `<svg viewBox="${IRIS_VB}" width="${size}" height="${size}" fill="currentColor" aria-hidden="true">` +
-      `<path fill-rule="evenodd" d="${IRIS_D}"/></svg>`;
-  };
   window.irisLogo = function (size) {
     const id = 'irisg' + (++irisSeq);
     const stops = ['#b9aae6', '#9dc3e6', '#a4d9c2', '#e6d6a4', '#e6a9b4'];

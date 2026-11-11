@@ -78,7 +78,31 @@
     return { ok: true, copiadas };
   }
 
-  const api = { migraClaves, migraOrigen };
+  /* EL ACCESO DE FÁBRICA A IRIS.IT.COM (2026-11-11). El dominio caducó y hoy lo
+     sirve un tercero, así que sale de los accesos de fábrica. A quien ya tenía
+     sus accesos guardados se le quita solo ese, una vez, y solo si sigue siendo
+     exactamente el de fábrica (mismo nombre y misma dirección): uno que la
+     persona haya puesto o cambiado a mano se queda. Si no hay accesos
+     guardados, la interfaz ya usa la lista de fábrica nueva. Espera a que las
+     claves viejas estén copiadas: los accesos de la 2.x llegan por ahí. */
+  const DIALS = 'naviris.dials';
+  const IRIS_HECHO = 'naviris.irisFuera';
+  const esIrisDeFabrica = (d) => !!d && d.name === 'IRIS' && d.url === 'https://iris.it.com';
+  function quitaIrisDeFabrica(ls) {
+    if (ls.getItem(IRIS_HECHO) === '1' || ls.getItem(HECHO) !== '1') return 0;
+    let dials = null;
+    try { dials = JSON.parse(ls.getItem(DIALS)); } catch { /* ilegible: no se toca */ }
+    let quitados = 0;
+    if (Array.isArray(dials)) {
+      const quedan = dials.filter((d) => !esIrisDeFabrica(d));
+      quitados = dials.length - quedan.length;
+      if (quitados) ls.setItem(DIALS, JSON.stringify(quedan));
+    }
+    ls.setItem(IRIS_HECHO, '1');
+    return quitados;
+  }
+
+  const api = { migraClaves, migraOrigen, quitaIrisDeFabrica };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else raiz.naviMigraClaves = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('navirisApp', {
   importAvailable: () => ipcRenderer.invoke('import:available'),
   importBookmarks: (key) => ipcRenderer.invoke('import:bookmarks', key),
   cancelDownload: (id) => ipcRenderer.send('download:cancel', id),
+  keepDownload: (id) => ipcRenderer.send('download:conservar', id),
   pauseDownload: (id) => ipcRenderer.send('download:pause', id),
   resumeDownload: (id) => ipcRenderer.send('download:resume', id),
   retryDownload: (id) => ipcRenderer.send('download:retry', id),
@@ -98,8 +99,8 @@ contextBridge.exposeInMainWorld('navirisApp', {
 
   pwAvailable: () => ipcRenderer.invoke('pw:available'),
   pwList: () => ipcRenderer.invoke('pw:list'),
-  pwAdd: (site, username, password) => ipcRenderer.invoke('pw:add', { site, username, password }),
-  pwForHost: (host) => ipcRenderer.invoke('pw:for-host', host),
+  pwAdd: (site, username, password, esquema) => ipcRenderer.invoke('pw:add', { site, username, password, esquema }),
+  pwForHost: (host, esquema) => ipcRenderer.invoke('pw:for-host', host, esquema),
   pwDelete: (id) => ipcRenderer.invoke('pw:delete', id),
   pwImportCsv: () => ipcRenderer.invoke('pw:import-csv'),
   pwReveal: (id) => ipcRenderer.invoke('pw:reveal', id),

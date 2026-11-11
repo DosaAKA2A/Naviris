@@ -1206,7 +1206,8 @@ window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.butto
 
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
 ipcRenderer.on('naviris-fill', (_e, cred, host) => {
-  if (!esElSitio(host)) return;
+  // Una contraseña guardada en https nunca se escribe en una página http.
+  if (!esElSitio(host) || (cred.soloHttps && location.protocol !== 'https:')) return;
   const l = findLogin();
   if (!l) return;
   const set = (el, val) => {

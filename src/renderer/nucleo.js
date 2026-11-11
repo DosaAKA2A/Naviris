@@ -21,6 +21,7 @@ const store = {
 // después las claves con el nombre viejo pasan a naviris.*, antes de leer ninguna (ver migra-claves.js).
 try { window.navirisApp.almacenMigrado(window.naviMigraClaves.migraOrigen(localStorage, window.navirisApp.almacenViejo)); } catch (e) { console.warn('[Naviris] Datos de la versión anterior pendientes:', e && e.message); }
 try { window.naviMigraClaves.migraClaves(localStorage); } catch (e) { console.warn('[Naviris] Claves de la interfaz pendientes:', e && e.message); }
+try { window.naviMigraClaves.quitaIrisDeFabrica(localStorage); } catch (e) { console.warn('[Naviris] Accesos de fábrica pendientes:', e && e.message); }
 
 const els = {};
 [

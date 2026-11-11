@@ -11,7 +11,7 @@ const ARCHIVOS = [
   'test/e2e/arranque.e2e.js', 'test/e2e/perfiles.e2e.js', 'test/e2e/huecos.e2e.js',
   'test/e2e/rendimiento.e2e.js', 'test/e2e/menus.e2e.js', 'test/e2e/instancia.e2e.js',
   'test/e2e/seguridad.e2e.js', 'test/e2e/migracion.e2e.js', 'test/e2e/auditoria.e2e.js',
-  'test/e2e/protocolo.e2e.js', 'test/e2e/hub-escala.test.js', 'test/e2e/x-video-tarjeta.test.js',
+  'test/e2e/protocolo.e2e.js', 'test/e2e/endurece.e2e.js', 'test/e2e/hub-escala.test.js', 'test/e2e/x-video-tarjeta.test.js',
   'test/e2e/autoclaim.test.js'
 ];
 

@@ -916,31 +916,31 @@ body.sacando-pestana { cursor: copy; }
 .primary-btn:active { transform: scale(.98); }
 .primary-btn svg { width: 15px; height: 15px; }
 
-/* Barras de aviso: permisos, ventana emergente bloqueada y contraseñas
+/* Barras de aviso: permisos, ventana emergente bloqueada, descarga peligrosa y contraseñas
    (Naviris 3). Salen de debajo de la barra de direcciones, dentro de la misma
    hoja y sin banda de color: icono, qué pide quién y «Permitir» como único
    botón lleno. Entran en 260 ms (frena) bajando 6 px y salen en 180 ms
    (acelera); el hueco que ocupan cambia de golpe, no se anima su alto (sería
    redimensionar la página en cada fotograma). */
-#perm-bar, #emerg-bar, #pw-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 2px 16px 12px 20px; font-size: 13.5px; color: var(--text-dim);
+#perm-bar, #emerg-bar, #riesgo-bar, #pw-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 2px 16px 12px 20px; font-size: 13.5px; color: var(--text-dim);
   transition: opacity 200ms ease, transform 260ms var(--frena), display 260ms allow-discrete; }
-#perm-bar.hidden, #emerg-bar.hidden, #pw-bar.hidden { opacity: 0; transform: translateY(-6px); transition: opacity 140ms ease, transform 180ms var(--acelera), display 180ms allow-discrete; }
-@starting-style { #perm-bar, #emerg-bar, #pw-bar { opacity: 0; transform: translateY(-6px); } }
-#perm-bar .perm-ic, #emerg-bar .perm-ic, #pw-bar .perm-ic { color: var(--nav-fg); display: flex; }
-#perm-bar .perm-ic svg, #emerg-bar .perm-ic svg, #pw-bar .perm-ic svg { width: 17px; height: 17px; }
-#perm-text, #emerg-text, #pw-text { flex: 1; min-width: 200px; }
-#perm-text b, #emerg-text b, #pw-text b { color: var(--text-strong); font-weight: 560; }
+#perm-bar.hidden, #emerg-bar.hidden, #riesgo-bar.hidden, #pw-bar.hidden { opacity: 0; transform: translateY(-6px); transition: opacity 140ms ease, transform 180ms var(--acelera), display 180ms allow-discrete; }
+@starting-style { #perm-bar, #emerg-bar, #riesgo-bar, #pw-bar { opacity: 0; transform: translateY(-6px); } }
+#perm-bar .perm-ic, #emerg-bar .perm-ic, #riesgo-bar .perm-ic, #pw-bar .perm-ic { color: var(--nav-fg); display: flex; }
+#perm-bar .perm-ic svg, #emerg-bar .perm-ic svg, #riesgo-bar .perm-ic svg, #pw-bar .perm-ic svg { width: 17px; height: 17px; }
+#perm-text, #emerg-text, #riesgo-text, #pw-text { flex: 1; min-width: 200px; }
+#perm-text b, #emerg-text b, #riesgo-text b, #pw-text b { color: var(--text-strong); font-weight: 560; }
 /* «Recordar» como interruptor: es la casilla de siempre con otra piel */
 .perm-remember { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; cursor: pointer; margin-right: 8px; }
 .perm-remember input { appearance: none; position: relative; width: 30px; height: 18px; margin: 0; border-radius: 9px; background: var(--roce-2); cursor: pointer; transition: background-color 160ms ease; }
 .perm-remember input::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-dim); transition: transform 200ms var(--frena), background-color 160ms ease; }
 .perm-remember input:checked { background: var(--accent); }
 .perm-remember input:checked::after { transform: translateX(12px); background: var(--accent-fg); }
-#perm-bar button, #emerg-bar button, #pw-bar button { height: 32px; border: none; border-radius: 9px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 560; cursor: pointer; background: transparent; color: var(--text); transition: background-color 120ms ease, transform 100ms ease; }
-#perm-bar button:hover, #emerg-bar button:hover, #pw-bar button:hover { background: var(--roce-2); }
-#perm-bar button:active, #emerg-bar button:active, #pw-bar button:active { transform: scale(.97); }
-#perm-bar button.primary, #emerg-bar button.primary, #pw-bar button.primary { background: var(--accent); color: var(--accent-fg); }
-#perm-bar button.primary:hover, #emerg-bar button.primary:hover, #pw-bar button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--hoja)); }
+#perm-bar button, #emerg-bar button, #riesgo-bar button, #pw-bar button { height: 32px; border: none; border-radius: 9px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 560; cursor: pointer; background: transparent; color: var(--text); transition: background-color 120ms ease, transform 100ms ease; }
+#perm-bar button:hover, #emerg-bar button:hover, #riesgo-bar button:hover, #pw-bar button:hover { background: var(--roce-2); }
+#perm-bar button:active, #emerg-bar button:active, #riesgo-bar button:active, #pw-bar button:active { transform: scale(.97); }
+#perm-bar button.primary, #emerg-bar button.primary, #riesgo-bar button.primary, #pw-bar button.primary { background: var(--accent); color: var(--accent-fg); }
+#perm-bar button.primary:hover, #emerg-bar button.primary:hover, #riesgo-bar button.primary:hover, #pw-bar button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--hoja)); }
 #perm-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
 #perm-list:not(:has(> :not(.nvs-bar)))::after { content: "No hay permisos guardados."; color: var(--dim); font-size: 12.5px; padding: 12px 4px; display: block; }
 .perm-row { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 8px; }
@@ -1499,7 +1499,7 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
      diálogo de la página, foco de la barra, descargas, nombres de la repisa)
      no se desplaza ni crece, pero se sigue fundiendo: menos movimiento no es
      ningún movimiento. Las pestañas lo miran en JS (movReducido). */
-  .ctx-menu, #perm-bar, #emerg-bar, #pw-bar, .side-panel, .side-panel-left, #tab-dialogo, .td-card, #url-vista, #urlbar, #urlbox::before, #urlbox::after, .dlp-ic > span, .dlp-bar {
+  .ctx-menu, #perm-bar, #emerg-bar, #riesgo-bar, #pw-bar, .side-panel, .side-panel-left, #tab-dialogo, .td-card, #url-vista, #urlbar, #urlbox::before, #urlbox::after, .dlp-ic > span, .dlp-bar {
     transform: none !important; transition-property: opacity, display !important; transition-duration: 160ms !important; transition-timing-function: ease !important; transition-behavior: allow-discrete !important; }
   #hub-dock.repisa .d-name { transform: translate(-50%, 0) !important; transition-property: opacity !important; transition-duration: 120ms !important; }
   #hub-dock.repisa .d-tile { transform: none !important; }
@@ -2409,10 +2409,6 @@ button.hub-pill:active { transform: translateY(0) scale(.97); }
 .w-moov.t-1x1 .mv-cartel { position: static; inset: auto; }
 .w-moov.t-1x1 .mv-play { display: none; }
 .w-priv.t-1x1 .pv-t { display: none; }
-
-/* Acceso a iris.it.com: su logo oficial, al mismo tamano que los de marca */
-.d-iris .iris-wrap { display: flex; }
-.d-iris svg { width: var(--icon-sz, 40px); height: var(--icon-sz, 40px); }
 
 /* ===== Widget ADORNO (1x1): decoracion que despierta al pasar el raton =====
    Tres anillos concentricos en la gama del tema. En reposo estan quietos: el

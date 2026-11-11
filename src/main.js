@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen, webContents, webFrameMain } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, shell, nativeTheme, session, net, clipboard, safeStorage, dialog, components, protocol, Menu, screen, webContents, webFrameMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -18,6 +18,8 @@ const { aplicacionPara } = require('./externos');
 const abrirDesdeFuera = require('./abrir-desde-fuera'); // enlaces y archivos que llegan de Windows (se prueba en test/)
 const protocolo = require('./protocolo'); // la interfaz por naviris://app (se prueba en test/)
 const migraOrigen = require('./migra-origen'); // lo que la interfaz guardaba en file://
+const credenciales = require('./credenciales'); // a qué páginas se ofrece cada contraseña (se prueba en test/)
+const descargasSeguras = require('./descargas-seguras'); // descargas peligrosas y automáticas (se prueba en test/)
 
 // Los addons de herramienta se sirven por un esquema propio en vez de ejecutarse
 // con new Function(): la CSP de la interfaz privilegiada NO lleva 'unsafe-eval'
@@ -599,46 +601,161 @@ function broadcast(channel, payload) {
 
 // ---------- Descargas ----------
 let downloadSeq = 0;
-const downloads = new Map(); // id → { item, meta, ses }
+const downloads = new Map(); // id → { item, meta, ses } y, las de registerDownloadItem, { temporal, enHistorial, peligrosa, bajada }
 
-/* «Guardar el destino como…» y «Guardar la imagen como…» (2026-11-03) guardaban
-   directo en Descargas, sin preguntar, a pesar de los puntos suspensivos. Se
-   apunta la dirección y, cuando llega su will-download, se abre el diálogo de
-   Guardar en vez de fijar la ruta. El ajuste «Preguntar dónde guardar» hace lo
-   mismo con todas. */
-const preguntaDonde = new Map();   // url -> ts de la petición
-function descargaPreguntando(contents, url) {
-  for (const [u, ts] of preguntaDonde) if (Date.now() - ts > 60000) preguntaDonde.delete(u);   // las que nunca llegaron
-  preguntaDonde.set(url, Date.now());
-  contents.downloadURL(url);
+/* Lo que pide la persona desde Naviris (el menú de la página, la interfaz o
+   «Reintentar»): Chromium no lo ve como un gesto en la página, pero lo es.
+   «Guardar el destino como…» y «Guardar la imagen como…» (2026-11-03) además
+   abren el cuadro de Guardar (`preguntar`): antes guardaban directo en
+   Descargas, a pesar de los puntos suspensivos. El ajuste «Preguntar dónde
+   guardar» hace lo mismo con todas. Se apunta la dirección y se reconoce al
+   llegar su will-download. */
+const pedidas = new Map();   // url -> { ts, preguntar }
+function descargaPedida(descarga, url, preguntar = false) {
+  for (const [u, p] of pedidas) if (Date.now() - p.ts > 60000) pedidas.delete(u);   // las que nunca llegaron
+  pedidas.set(url, { ts: Date.now(), preguntar });
+  descarga(url);
 }
-function debePreguntar(item) {
-  if (settings.preguntarDescargas) return true;
+const descargaPreguntando = (contents, url) => descargaPedida((u) => contents.downloadURL(u), url, true);
+function pedidaDe(item) {
   let cadena = [];
   try { cadena = item.getURLChain(); } catch { /* nada */ }
-  const url = [item.getURL(), ...cadena].find((u) => preguntaDonde.has(u));
-  if (!url) return false;
-  const ts = preguntaDonde.get(url);
-  preguntaDonde.delete(url);
-  return Date.now() - ts < 60000;
+  const url = [item.getURL(), ...cadena].find((u) => pedidas.has(u));
+  if (!url) return null;
+  const p = pedidas.get(url);
+  pedidas.delete(url);
+  return Date.now() - p.ts < 60000 ? p : null;
 }
 
-function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null) {
-  const dir = app.getPath('downloads');
-  let name = item.getFilename() || 'descarga';
-  let candidate = path.join(dir, name);
+// Un nombre libre en esa carpeta. Tampoco vale el de otra descarga que siga en
+// marcha: su archivo aún no existe y las dos acababan escribiendo en el mismo.
+// `propia`: la descarga que busca sitio, que no se lo quita a sí misma.
+function nombreLibre(dir, name, propia = null) {
   const ext = path.extname(name);
   const base = path.basename(name, ext);
-  // Tampoco vale el nombre de otra descarga que siga en marcha: su archivo aún
-  // no existe y las dos acababan escribiendo en el mismo (se perdía la primera).
-  const ocupado = (p) => fs.existsSync(p) || [...downloads.values()].some((d) => d.item && (d.meta.state === 'progressing' || d.meta.state === 'interrupted') && d.meta.path.toLowerCase() === p.toLowerCase());
-  for (let i = 1; ocupado(candidate); i++) {
-    candidate = path.join(dir, `${base} (${i})${ext}`);
+  const ocupado = (p) => fs.existsSync(p) || [...downloads.values()].some((d) => d !== propia && d.item && (d.meta.state === 'progressing' || d.meta.state === 'interrupted') && d.meta.path.toLowerCase() === p.toLowerCase());
+  let candidate = path.join(dir, name);
+  for (let i = 1; ocupado(candidate); i++) candidate = path.join(dir, `${base} (${i})${ext}`);
+  return candidate;
+}
+
+/* Lo que no se guarda solo (ver descargas-seguras.js) baja a esta carpeta del
+   perfil, una subcarpeta por descarga, y pasa a Descargas al conservarlo. Lo
+   que quede de una sesión anterior (Naviris cerrado sin decidir) se borra. */
+const limitadorDescargas = descargasSeguras.creaLimitador();
+const esperandoPermiso = new Map();   // id del webContents + '|' + sitio -> ids de las descargas en pausa
+let sinConfirmarLimpia = false;
+function carpetaSinConfirmar(id) {
+  const raiz = path.join(app.getPath('userData'), 'descargas-sin-confirmar');
+  if (!sinConfirmarLimpia) { sinConfirmarLimpia = true; fs.rmSync(raiz, { recursive: true, force: true }); }
+  const dir = path.join(raiz, id);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+app.on('will-quit', () => { try { fs.rmSync(path.join(app.getPath('userData'), 'descargas-sin-confirmar'), { recursive: true, force: true }); } catch { /* en uso */ } });
+
+// Pasa a Descargas lo que estaba sin confirmar (con la marca de la web, que el
+// movimiento conserva) y la da por terminada.
+function pasaADescargas(d) {
+  const { meta } = d;
+  const destino = nombreLibre(app.getPath('downloads'), meta.name, d);
+  try {
+    try { fs.renameSync(d.temporal, destino); }
+    catch (e) { if (e.code !== 'EXDEV') throw e; fs.copyFileSync(d.temporal, destino); fs.rmSync(d.temporal, { force: true }); }
+  } catch (e) {
+    meta.state = 'interrupted'; meta.error = 'no se pudo mover a Descargas'; meta.retenida = undefined;
+    broadcast('download:update', meta);
+    return;
   }
-  if (debePreguntar(item)) item.setSaveDialogOptions({ defaultPath: candidate });
-  else item.setSavePath(candidate);
+  fs.rmSync(path.dirname(d.temporal), { recursive: true, force: true });
+  d.temporal = null;
+  Object.assign(meta, { path: destino, name: path.basename(destino), state: 'completed', retenida: undefined, percent: 100 });
+  if (d.enHistorial) recordDlHistory(destino);
+  broadcast('download:update', meta);
+}
+// «Descartar»: si sigue bajando se cancela; si ya bajó, se borra.
+function descarta(d) {
+  if (d.meta.state === 'progressing' && !d.bajada) { try { d.item.cancel(); } catch { /* nada */ } return; }
+  if (d.temporal) fs.rmSync(path.dirname(d.temporal), { recursive: true, force: true });
+  d.temporal = null;
+  Object.assign(d.meta, { state: 'cancelled', retenida: undefined });
+  broadcast('download:update', d.meta);
+}
+// La respuesta al permiso de descargar varios archivos, para las que esperaban.
+function resuelveEspera(d, permitido) {
+  if (!permitido) { descarta(d); return; }
+  d.meta.retenida = d.peligrosa ? 'peligrosa' : undefined;
+  if (d.bajada && !d.peligrosa) { pasaADescargas(d); return; }
+  try { if (!d.bajada) d.item.resume(); } catch { /* nada */ }
+  d.meta.paused = false;
+  broadcast('download:update', d.meta);
+}
+function pideDescargasAutomaticas(wc, origen, id) {
+  const clave = wc.id + '|' + origen;
+  const grupo = esperandoPermiso.get(clave);
+  if (grupo) { grupo.push(id); return; }
+  const ids = [id];
+  esperandoPermiso.set(clave, ids);
+  preguntaPermiso(wc, origen, descargasSeguras.PERMISO, (permitido) => {
+    esperandoPermiso.delete(clave);
+    for (const i of ids) { const d = downloads.get(i); if (d && d.meta.retenida === 'varias') resuelveEspera(d, permitido); }
+  });
+}
+
+/* La navegación de una pestaña que pidió Naviris y no la página: una dirección
+   escrita, un marcador, una pestaña nueva, atrás o adelante. Si acaba en una
+   descarga, la pidió la persona, como en Chrome (para Chromium no lleva gesto).
+   Las que empieza la página pasan por will-navigate; las de Naviris no. */
+const navDeNaviris = new Map();   // id del webContents -> dirección de su última navegación pedida por Naviris
+const navDeLaPagina = new Map();  // id del webContents -> { url, ts } de su último will-navigate
+function vigilaNavegaciones(contents) {
+  const id = contents.id;
+  contents.on('will-navigate', (e) => {
+    navDeLaPagina.set(id, { url: e.url, ts: Date.now() });
+    if (navDeNaviris.get(id) === e.url) navDeNaviris.delete(id);
+  });
+  contents.on('did-start-navigation', (e) => {
+    if (!e.isMainFrame || e.isSameDocument) return;
+    const p = navDeLaPagina.get(id);
+    if (p && p.url === e.url && Date.now() - p.ts < 5000) navDeNaviris.delete(id);
+    else navDeNaviris.set(id, e.url);
+  });
+  contents.once('destroyed', () => { navDeNaviris.delete(id); navDeLaPagina.delete(id); });
+}
+function deNaviris(item, wc) {
+  if (!wc || wc.isDestroyed() || !navDeNaviris.has(wc.id)) return false;
+  let primera = item.getURL();
+  try { primera = item.getURLChain()[0] || primera; } catch { /* nada */ }
+  return navDeNaviris.get(wc.id) === primera;
+}
+
+// Devuelve null si la descarga no debe empezar (el sitio tiene bloqueadas las descargas automáticas).
+function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null, wc = null) {
+  const pedida = pedidaDe(item);
+  const preguntar = settings.preguntarDescargas || !!(pedida && pedida.preguntar);
+  const gesto = !!pedida || item.hasUserGesture() || deNaviris(item, wc);
+  const name = item.getFilename() || 'descarga';
+  // Varias seguidas sin gesto: la segunda y siguientes necesitan el permiso del sitio.
+  const origen = wc && !wc.isDestroyed() ? originOf(wc.getURL()) : '';
+  let espera = false;
+  if (origen && limitadorDescargas.cuenta(wc.id, origen, gesto)) {
+    const guardado = settings.permissions[descargasSeguras.clavePermiso(origen)];
+    if (guardado === 'block') return null;
+    espera = guardado !== 'allow';
+  }
+  // Un programa o un script que la web baja sola: no va a Descargas sin preguntar.
+  const peligrosa = !gesto && !preguntar && descargasSeguras.esPeligrosa(name);
 
   const id = 'dl' + (++downloadSeq);
+  const candidate = nombreLibre(app.getPath('downloads'), name);
+  let temporal = null;
+  if (espera || peligrosa) {
+    temporal = path.join(carpetaSinConfirmar(id), path.basename(candidate));
+    item.setSavePath(temporal);
+    if (espera) item.pause();
+  } else if (preguntar) item.setSaveDialogOptions({ defaultPath: candidate });
+  else item.setSavePath(candidate);
+
   const meta = {
     id,
     name: path.basename(candidate),
@@ -646,14 +763,20 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null) {
     total: item.getTotalBytes(),
     received: 0,
     state: 'progressing',
-    paused: false,
+    paused: espera,
     kind: 'file',
     source: sourceUrl || item.getURL()
   };
-  downloads.set(id, { item, meta, ses });
+  // 'varias': espera el permiso del sitio; 'peligrosa': espera que la conserves.
+  // `wc`: la pestaña que la bajó, para avisar en su ventana.
+  if (temporal) { meta.retenida = espera ? 'varias' : 'peligrosa'; meta.wc = wc ? ventanitas.get(wc.id) ?? wc.id : null; }
+  const d = { item, meta, ses, temporal, enHistorial, peligrosa };
+  downloads.set(id, d);
   broadcast('download:new', meta);
+  if (espera) pideDescargasAutomaticas(wc, origen, id);
   // Con el diálogo de Guardar, la ruta buena llega después de elegirla.
   const rutaElegida = () => {
+    if (d.temporal) return;
     const p = item.getSavePath();
     if (p && p !== meta.path) { meta.path = p; meta.name = path.basename(p); }
   };
@@ -672,10 +795,19 @@ function registerDownloadItem(item, sourceUrl, enHistorial = true, ses = null) {
     broadcast('download:update', meta);
   });
   item.once('done', (_e, state) => {
-    meta.state = state; // completed | cancelled | interrupted
     meta.paused = meta.cortada = false;
     rutaElegida();
     meta.received = item.getReceivedBytes();
+    if (d.temporal) {
+      d.bajada = true;
+      if (state !== 'completed') { descarta(d); return; }
+      // Ya bajada (la pausa no frena un archivo pequeño): si espera el permiso o
+      // que la conserves, se queda donde está hasta entonces.
+      if (meta.retenida) { meta.percent = 100; broadcast('download:update', meta); return; }
+      pasaADescargas(d);
+      return;
+    }
+    meta.state = state; // completed | cancelled | interrupted
     if (state === 'completed' && enHistorial) recordDlHistory(meta.path);
     broadcast('download:update', meta);
   });
@@ -1142,7 +1274,7 @@ function setupSession(ses) {
   }
 
   // Lo bajado en la sesión privada (en memoria) no entra en el historial de descargas.
-  ses.on('will-download', (_e, item) => registerDownloadItem(item, undefined, ses.isPersistent(), ses));
+  ses.on('will-download', (e, item, wc) => { if (!registerDownloadItem(item, undefined, ses.isPersistent(), ses, wc)) e.preventDefault(); });
   /* SESIONES QUE NO SE PIERDEN (2026-08-13). Chromium guarda las cookies en
      memoria y las vuelca al disco cuando le parece: si el proceso muere de
      golpe (cierre forzado, cuelgue, corte de luz) se pierde lo escrito desde
@@ -1182,6 +1314,19 @@ const permPending = new Map();
 
 function originOf(url) { try { return new URL(url).origin; } catch { return ''; } }
 
+// Pregunta en la barra de permisos; con «Recordar», la respuesta queda en 'origen|permiso'.
+function preguntaPermiso(wc, origin, permission, callback, mediaTypes = []) {
+  const id = 'perm' + (++permSeq);
+  permPending.set(id, { callback, key: origin + '|' + permission });
+  // Si la pestaña se cierra sin contestar, la petición no se queda colgada.
+  wc?.once('destroyed', () => { const p = permPending.get(id); if (p) { permPending.delete(id); p.callback(false); } });
+  // Solo a la ventana de la pestaña que pregunta: antes salía en todas, también
+  // en las normales cuando preguntaba una web abierta en la ventana privada.
+  const host = wc && wc.hostWebContents;
+  if (host && !host.isDestroyed()) host.send('perm:ask', { id, origin, permission, mediaTypes });
+  else broadcast('perm:ask', { id, origin, permission, mediaTypes });
+}
+
 function setupPermissions(ses) {
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const origin = originOf(details.requestingUrl || (wc && wc.getURL && wc.getURL()) || '');
@@ -1193,17 +1338,7 @@ function setupPermissions(ses) {
     if (saved === 'allow') return callback(true);
     if (saved === 'block') return callback(false);
     if (!SENSITIVE.has(permission)) return callback(false); // desconocido/no listado → denegar por seguridad
-    // Preguntar al usuario
-    const id = 'perm' + (++permSeq);
-    permPending.set(id, { callback, key });
-    // Si la pestaña se cierra sin contestar, la petición no se queda colgada.
-    wc?.once('destroyed', () => { const p = permPending.get(id); if (p) { permPending.delete(id); p.callback(false); } });
-    const mediaTypes = (details && details.mediaTypes) || [];
-    // Solo a la ventana de la pestaña que pregunta: antes salía en todas, también
-    // en las normales cuando preguntaba una web abierta en la ventana privada.
-    const host = wc && wc.hostWebContents;
-    if (host && !host.isDestroyed()) host.send('perm:ask', { id, origin, permission, mediaTypes });
-    else broadcast('perm:ask', { id, origin, permission, mediaTypes });
+    preguntaPermiso(wc, origin, permission, callback, (details && details.mediaTypes) || []);
   });
   ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => {
     if (AUTO_ALLOW.has(permission)) return true;
@@ -1687,7 +1822,7 @@ const teclaVisible = (a) => (a ? a.split('+').map((k) => TECLAS_VISIBLES[k] || k
 // `antes` corre antes de la acción elegida (devolverle el foco a la página).
 function muestraMenu(host, items, donde, antes) {
   if (!host || host.isDestroyed()) {
-    Menu.buildFromTemplate(items.map(({ icon, ...resto }) => resto)).popup();
+    Menu.buildFromTemplate(items.map(({ icon, ...resto }) => resto)).popup({ window: donde.ventanita || undefined });
     return;
   }
   const id = ++ultimoMenu, clicks = [];
@@ -1738,9 +1873,11 @@ ipcMain.on('tab:guardar', soloUI((e, id) => {
   if (wc && !wc.isDestroyed() && wc.getType() === 'webview' && wc.hostWebContents?.id === e.sender.id) guardarComo(wc, false);
 }));
 
-function menuContextual(contents) {
+/* `ventanita`: el menú es el de una ventana emergente (window.open con gesto),
+   que no tiene interfaz propia. Se pinta con el menú del sistema dentro de ella
+   y lo que abre pestañas va a `host`, la interfaz de la pestaña que la abrió. */
+function menuContextual(contents, host = contents.hostWebContents, ventanita = null) {
   contents.on('context-menu', (_e, p) => {
-    const host = contents.hostWebContents;
     const aRenderer = (tipo, datos) => host?.send('ctx:accion', { tipo, datos });
     const items = [];
     const sep = () => { if (items.length && items[items.length - 1].type !== 'separator') items.push({ type: 'separator' }); };
@@ -1776,18 +1913,21 @@ function menuContextual(contents) {
       items.push({ label: 'Emojis', icon: 'smile', accelerator: 'Super+.', click: () => app.showEmojiPanel() });
       sep();
     }
+    /* Abrir, solo direcciones web (auditoría #10): un file:, javascript: o
+       cualquier otro esquema no pasa a una pestaña ni a una ventana desde aquí.
+       De esos enlaces solo se ofrece copiarlos. */
     if (p.linkURL) {
       const web = /^https?:/i.test(p.linkURL);
-      const privada = host ? esVentanaPrivada(host) : false;
-      items.push({ label: 'Abrir el enlace en una pestaña nueva', icon: 'plus', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
       if (web) {
+        const privada = host ? esVentanaPrivada(host) : false;
+        items.push({ label: 'Abrir el enlace en una pestaña nueva', icon: 'plus', click: () => host?.send('tab:open-url', { url: p.linkURL, background: true, origen: contents.id }) });
         items.push({ label: 'Abrir el enlace en una ventana nueva', icon: 'app-window', click: () => ventanaConUrl(p.linkURL, privada, contenedorDe(contents)) });
         if (!privada) items.push({ label: 'Abrir el enlace en una ventana privada', icon: 'venetian-mask', click: () => ventanaConUrl(p.linkURL, true) });
+        sep();
       }
-      sep();
       items.push({ label: 'Copiar el enlace', icon: 'link', click: () => clipboard.writeText(p.linkURL) });
       const texto = (p.linkText || '').trim();
-      if (texto) items.push({ label: 'Copiar el texto del enlace', icon: 'copy', click: () => clipboard.writeText(texto) });
+      if (web && texto) items.push({ label: 'Copiar el texto del enlace', icon: 'copy', click: () => clipboard.writeText(texto) });
       if (web) items.push({ label: 'Guardar el destino como…', icon: 'download', click: () => descargaPreguntando(contents, p.linkURL) });
       sep();
     }
@@ -1811,7 +1951,8 @@ function menuContextual(contents) {
         label: 'Descargar ' + (esVideo ? 'el video' : 'el audio') + ' con Rat Tool', icon: 'mouse',
         click: () => aRenderer('rat', { pagina: contents.getURL(), src: p.srcURL || '' })
       });
-      if (esVideo) {
+      // La miniatura y la pantalla completa son de la pestaña activa: en una ventanita no.
+      if (esVideo && !ventanita) {
         items.push({ label: 'Ver en miniatura', icon: 'pip', accelerator: 'Alt+P', click: () => aRenderer('pip') });
       }
       if (p.srcURL && /^https?:/.test(p.srcURL)) {
@@ -1827,7 +1968,7 @@ function menuContextual(contents) {
     items.push({ label: 'Añadir al acceso rápido', icon: 'square-plus', click: () => aRenderer('acceso', { url: contents.getURL(), titulo: contents.getTitle() }) });
     items.push({ label: 'Añadir a marcadores', icon: 'bookmark-add', accelerator: 'Ctrl+D', click: () => aRenderer('marcador', { url: contents.getURL(), titulo: contents.getTitle() }) });
     sep();
-    items.push({ label: 'Pantalla completa', icon: 'arrows-pointing-out', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
+    if (!ventanita) items.push({ label: 'Pantalla completa', icon: 'arrows-pointing-out', accelerator: 'F11', click: () => aRenderer('pantalla-completa') });
     items.push({ label: 'Copiar la dirección de la página', icon: 'link', click: () => clipboard.writeText(contents.getURL()) });
     sep();
     // Con el atajo que hace lo mismo desde el teclado (los tres existen desde la parte «huecos»).
@@ -1839,7 +1980,7 @@ function menuContextual(contents) {
     items.push({ label: 'Inspeccionar', icon: 'scan-search', accelerator: 'Ctrl+Shift+I', click: () => contents.inspectElement(p.x, p.y) });
 
     // Al elegir, el foco vuelve a la página (lo tenía el menú para el teclado).
-    muestraMenu(host, items, { wc: contents.id, x: p.x, y: p.y, teclado: p.menuSourceType === 'keyboard' }, () => { if (!contents.isDestroyed()) contents.focus(); });
+    muestraMenu(ventanita ? null : host, items, { wc: contents.id, x: p.x, y: p.y, teclado: p.menuSourceType === 'keyboard', ventanita }, () => { if (!contents.isDestroyed()) contents.focus(); });
   });
 }
 
@@ -2099,13 +2240,16 @@ function silencia(wc) {
   wc.once('did-navigate', () => silenciadas.delete(id));
   wc.once('destroyed', () => silenciadas.delete(id));
 }
+// Dónde se pregunta: en su pestaña, o en la capa de su ventanita (ver comoPestana).
+const preguntaPara = (wc) => wc.getType() === 'webview' ? preguntaEnPestana : ventanitas.has(wc.id) ? preguntaEnVentanita : null;
 ipcMain.on('wv:dialogo', (e, d) => {
   const wc = e.sender;
   const tipo = d && d.tipo;
-  if (wc.getType() !== 'webview' || !['alert', 'confirm', 'prompt'].includes(tipo) || silenciadas.has(wc.id)) { e.returnValue = { ok: false }; return; }
+  const pregunta = preguntaPara(wc);
+  if (!pregunta || !['alert', 'confirm', 'prompt'].includes(tipo) || silenciadas.has(wc.id)) { e.returnValue = { ok: false }; return; }
   const texto = String(d.texto ?? '').slice(0, 3000);
   const valor = tipo === 'prompt' ? String(d.valor ?? '').slice(0, 3000) : undefined;
-  preguntaEnPestana(wc, { tipo, texto, valor }).then((r) => {
+  pregunta(wc, { tipo, texto, valor }).then((r) => {
     if (r.silenciar && !wc.isDestroyed()) silencia(wc);
     try { e.returnValue = { ok: !!r.ok, valor: typeof r.valor === 'string' ? r.valor : null }; } catch { /* la página ya no está */ }
   });
@@ -2118,8 +2262,9 @@ ipcMain.on('tab:dialogo-respuesta', (e, r) => {
 // mailto:, tel:, magnet:… (ver externos.js). Solo desde una pestaña y solo los esquemas de la lista.
 function pideAbrirFuera(wc, url, callback) {
   const aplicacion = aplicacionPara(url);
-  if (!aplicacion || !wc || wc.isDestroyed() || wc.getType() !== 'webview') { callback(false); return; }
-  preguntaEnPestana(wc, { tipo: 'externo', texto: url, aplicacion }).then((r) => callback(!!r.ok));
+  const pregunta = wc && !wc.isDestroyed() && preguntaPara(wc);
+  if (!aplicacion || !pregunta) { callback(false); return; }
+  pregunta(wc, { tipo: 'externo', texto: url, aplicacion }).then((r) => callback(!!r.ok));
 }
 
 /* ===== MENÚ DE LOS CAMPOS DE LA INTERFAZ (2026-11-03) =====
@@ -2230,8 +2375,105 @@ function ventanasDe(contents, host, pestana = contents.id) {
   contents.on('did-create-window', (win) => {
     win.removeMenu();
     ventanasDe(win.webContents, host, pestana);
+    comoPestana(win, host, pestana);
   });
 }
+
+/* ===== LAS VENTANITAS, COMO LAS PESTAÑAS (Menor 4, 2026-11-11) =====
+   Una ventana abierta con window.open (con gesto: los inicios de sesión de
+   Google o X, por ejemplo) no tenía menú de clic derecho ni atajos, y alert,
+   confirm y prompt no salían: confirm devolvía false sin preguntar. Los nativos
+   están apagados (disableDialogs) y el aviso de las pestañas se pinta en la
+   interfaz, que la ventanita no tiene. Ahora lleva:
+   · el menú de las páginas (menuContextual), con el del sistema;
+   · los atajos que tienen sentido sin barra ni pestañas: Ctrl+W y Ctrl+F4
+     cierran, F5 y Ctrl+R recargan (con Mayús, sin caché), Alt+flechas, zoom
+     con Ctrl y la rueda (los mismos pasos que en las pestañas) y F12. Copiar,
+     cortar, pegar, deshacer y seleccionar todo ya los hace Chromium;
+   · sus avisos en una capa encima de su página (preguntaEnVentanita). */
+const ventanitas = new Map();          // id del webContents de la ventanita -> id de la pestaña que la abrió
+const avisosDelDocumento = new Map();  // id -> avisos que lleva su documento (la casilla de silenciar sale desde el segundo)
+const cambiaZoom = (c, paso) => { try { c.setZoomFactor(paso ? atajos.siguienteZoom(c.getZoomFactor(), paso) : 1); } catch { /* cerrándose */ } };
+const ACCIONES_VENTANITA = {
+  'close-tab': (w) => w.close(),
+  reload: (_w, c) => c.reload(),
+  'reload-hard': (_w, c) => c.reloadIgnoringCache(),
+  back: (_w, c) => irAtras(c),
+  forward: (_w, c) => irAdelante(c),
+  'zoom-in': (_w, c) => cambiaZoom(c, 1),
+  'zoom-out': (_w, c) => cambiaZoom(c, -1),
+  'zoom-reset': (_w, c) => cambiaZoom(c, 0),
+  devtools: (_w, c) => c.toggleDevTools()
+};
+function comoPestana(win, host, pestana) {
+  const contents = win.webContents, id = contents.id;
+  ventanitas.set(id, pestana);
+  contents.on('did-navigate', () => avisosDelDocumento.delete(id));
+  contents.once('destroyed', () => { ventanitas.delete(id); avisosDelDocumento.delete(id); });
+  menuContextual(contents, host, win);
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const accion = ACCIONES_VENTANITA[atajos.comandoDe(input, { soloReservados: true, activos: settings.atajos !== false })];
+    if (!accion) return;
+    event.preventDefault();
+    accion(win, contents);
+  });
+  contents.on('zoom-changed', (_e, dir) => cambiaZoom(contents, dir === 'in' ? 1 : -1));
+}
+
+/* El aviso de una ventanita: una capa propia (dialogo.html, en la sesión de la
+   interfaz) encima de su página y del tamaño de la ventana. La página espera
+   la respuesta como en una pestaña; la capa es otro proceso, así que se pinta
+   aunque la página esté parada. Se quita si la ventanita navega o se cierra. */
+const avisosVentanita = new Map();     // id del webContents de la capa -> { datos, fin }
+function preguntaEnVentanita(wc, datos) {
+  return new Promise((resuelve) => {
+    const win = BrowserWindow.fromWebContents(wc);
+    if (!win || win.isDestroyed()) { resuelve({ ok: false }); return; }
+    const capa = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'dialogo-preload.js'), sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    const cw = capa.webContents, capaId = cw.id;
+    capa.setBackgroundColor('#00000000');
+    const ajusta = () => { if (win.isDestroyed()) return; const [width, height] = win.getContentSize(); capa.setBounds({ x: 0, y: 0, width, height }); };
+    let hecho = false;
+    const alNavegar = (_e, _url, enDocumento, principal) => { if (principal && !enDocumento) fin({ ok: false }); };
+    const alCerrar = () => fin({ ok: false });
+    function fin(r) {
+      if (hecho) return;
+      hecho = true;
+      avisosVentanita.delete(capaId);
+      if (!wc.isDestroyed()) { wc.removeListener('did-start-navigation', alNavegar); wc.removeListener('destroyed', alCerrar); }
+      if (!win.isDestroyed()) { win.removeListener('resize', ajusta); win.contentView.removeChildView(capa); }
+      if (!cw.isDestroyed()) cw.close();
+      if (!wc.isDestroyed()) wc.focus();
+      resuelve(r);
+    }
+    wc.on('did-start-navigation', alNavegar);
+    wc.once('destroyed', alCerrar);
+    win.on('resize', ajusta);
+    // La capa no va a ningún otro sitio ni abre nada.
+    cw.on('will-navigate', (e) => e.preventDefault());
+    cw.setWindowOpenHandler(() => ({ action: 'deny' }));
+    cw.once('render-process-gone', alCerrar);
+    if (datos.tipo !== 'externo') avisosDelDocumento.set(wc.id, (avisosDelDocumento.get(wc.id) || 0) + 1);
+    avisosVentanita.set(capaId, {
+      datos: { ...datos, origen: originOf(wc.getURL()), avisos: avisosDelDocumento.get(wc.id) || 0, tema: settings.lightMode ? 'claro' : 'oscuro' },
+      fin
+    });
+    win.contentView.addChildView(capa);
+    ajusta();
+    cw.loadURL(protocolo.url('dialogo.html')).then(() => { if (!cw.isDestroyed()) cw.focus(); }, () => fin({ ok: false }));
+  });
+}
+// Solo contestan a la capa de ese aviso.
+ipcMain.on('ventanita:dialogo-datos', (e) => {
+  const a = avisosVentanita.get(e.sender.id);
+  e.returnValue = a ? a.datos : null;
+});
+ipcMain.on('ventanita:dialogo-respuesta', (e, r) => {
+  const a = avisosVentanita.get(e.sender.id);
+  if (!a) return;
+  a.fin({ ok: !!(r && r.ok), valor: r && typeof r.valor === 'string' ? r.valor.slice(0, 10000) : null, silenciar: !!(r && r.silenciar) });
+});
 /* «Permitir» en el aviso de la barra: ese sitio abre emergentes sin gesto, y
    lo que se le bloqueó en esa pestaña (`wc`, el id de su webview) se abre ya,
    en orden, repitiendo su window.open en la página que lo pidió (ver
@@ -2251,6 +2493,7 @@ ipcMain.on('emergentes:permitir', soloUI((_e, origen, wc) => {
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     frenoDeRecargas(contents);
+    vigilaNavegaciones(contents);
     // Pestaña que despierta: restaura su historial (ver historialPendiente). Si no
     // se puede, carga su URL como antes, para no dejarla en blanco.
     if (historialAlCrear) {
@@ -2856,7 +3099,14 @@ ipcMain.handle('clipboard:read', soloUI(async () => { try { return await clipboa
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
 const pwPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'passwords.json');
-function loadPasswords() { try { return JSON.parse(fs.readFileSync(pwPath(), 'utf8')); } catch { return []; } }
+// Las guardadas antes de la 3.0 no llevan esquema: se les pone una vez (ver credenciales.js).
+function loadPasswords() {
+  let lista;
+  try { lista = JSON.parse(fs.readFileSync(pwPath(), 'utf8')); } catch { return []; }
+  if (!Array.isArray(lista)) return [];
+  if (credenciales.migra(lista)) savePasswords(lista);
+  return lista;
+}
 function savePasswords(list) { try { escribeSeguro(pwPath(), JSON.stringify(list)); } catch (e) { console.error('pw save', e); } }
 let pwSeq = Date.now();
 
@@ -2931,52 +3181,25 @@ $task.Wait()
   });
 }
 
-function normHost(s) {
-  let h = String(s || '');
-  try { h = new URL(/^https?:\/\//.test(h) ? h : 'https://' + h).hostname; } catch { /* nada */ }
-  return h.toLowerCase().replace(/^www\./, '');
-}
-// Sufijos públicos de dos etiquetas más comunes: nadie "posee" bbc.co.uk como
-// co.uk, así que jamás pueden actuar de dominio padre para emparejar.
-const SUFIJOS_PUBLICOS = new Set([
-  'co.uk', 'org.uk', 'me.uk', 'gov.uk', 'ac.uk', 'co.jp', 'ne.jp', 'or.jp', 'co.kr', 'co.in',
-  'co.za', 'co.nz', 'co.il', 'co.th', 'com.br', 'com.ar', 'com.mx', 'com.au', 'com.tr', 'com.cn',
-  'com.es', 'com.co', 'com.pe', 'com.ve', 'com.uy', 'com.py', 'com.ec', 'com.bo', 'com.do',
-  'com.gt', 'com.pa', 'com.sv', 'com.hn', 'com.ni', 'com.pr', 'com.tw', 'com.hk', 'com.sg',
-  'com.my', 'com.ph', 'com.vn', 'com.pk', 'com.sa', 'com.eg', 'com.ng', 'com.pl', 'com.ua',
-  'com.ru', 'org.br', 'net.br', 'gov.br', 'edu.br', 'org.au', 'net.au', 'gov.au', 'edu.au'
-]);
-const esSufijoPublico = (h) => SUFIJOS_PUBLICOS.has(h) || h.split('.').length < 2;
-// ¿La credencial guardada para `saved` vale en la página `current`?
-// Coincidencia EXACTA de host, o que uno sea subdominio del otro (bbc.co.uk
-// vale en login.bbc.co.uk). ANTES esto reducía el host a sus dos últimas
-// etiquetas: bbc.co.uk y evil.co.uk quedaban ambos en "co.uk", así que un
-// dominio recién registrado bajo un sufijo de dos partes recibía la oferta de
-// autorrellenar credenciales de OTRO sitio. Sin la lista de sufijos públicos
-// entera, exigir el host completo como sufijo es la regla segura.
-function sameSite(saved, current) {
-  const a = normHost(saved), b = normHost(current);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  if (esSufijoPublico(a) || esSufijoPublico(b)) return false;
-  return b.endsWith('.' + a) || a.endsWith('.' + b);
-}
-
 ipcMain.handle('pw:available', soloUI(async () => ({ encryption: safeStorage.isEncryptionAvailable() })));
 ipcMain.handle('pw:list', soloUI(() => loadPasswords().map((e) => ({ id: e.id, site: e.site, username: e.username }))));
-// Credenciales guardadas para un sitio (sin exponer la contraseña; el revelado exige Windows Hello)
-ipcMain.handle('pw:for-host', soloUI((_e, host) => {
-  return loadPasswords().filter((e) => sameSite(e.site, host)).map((e) => ({ id: e.id, site: e.site, username: e.username }));
+// Credenciales para una página de ese host y ese esquema (sin exponer la
+// contraseña; el revelado exige Windows Hello). Las de https no salen en http.
+ipcMain.handle('pw:for-host', soloUI((_e, host, esquema) => {
+  return credenciales.paraLaPagina(loadPasswords(), host, esquema === 'http' ? 'http' : 'https')
+    .map((e) => ({ id: e.id, site: e.site, username: e.username, esquema: credenciales.esquemaDe(e) }));
 }));
-ipcMain.handle('pw:add', soloUI((_e, { site, username, password }) => {
+ipcMain.handle('pw:add', soloUI((_e, { site, username, password, esquema }) => {
   if (!site || !password || !safeStorage.isEncryptionAvailable()) return { ok: false };
   const list = loadPasswords();
   const enc = safeStorage.encryptString(String(password)).toString('base64');
   const user = String(username || '');
-  // Si ya existe una credencial para el mismo dominio + usuario, actualiza la contraseña
-  const existing = list.find((e) => e.username === user && normHost(e.site) === normHost(site));
-  if (existing) { existing.enc = enc; existing.site = String(site); }
-  else list.push({ id: 'pw' + (++pwSeq), site: String(site), username: user, enc });
+  // El esquema de la página donde se escribió; sin él (el formulario del panel), el que se le supone al sitio.
+  const esq = esquema === 'http' || esquema === 'https' ? esquema : credenciales.esquemaDe({ site });
+  // Mismo sitio y usuario: se actualiza la contraseña (ver credenciales.existente)
+  const existing = credenciales.existente(list, site, user, esq);
+  if (existing) { existing.enc = enc; existing.site = String(site); existing.esquema = esq; }
+  else list.push({ id: 'pw' + (++pwSeq), site: String(site), username: user, enc, esquema: esq });
   savePasswords(list);
   return { ok: true, updated: !!existing };
 }));
@@ -3024,9 +3247,10 @@ ipcMain.handle('pw:import-csv', soloUI(async (e) => {
       if (!site || !password) continue;
       const user = (iUser >= 0 ? rows[i][iUser] : '') || '';
       const enc = safeStorage.encryptString(String(password)).toString('base64');
-      const existing = list.find((x) => x.username === user && normHost(x.site) === normHost(site));
-      if (existing) { existing.enc = enc; updated++; }
-      else { list.push({ id: 'pw' + (++pwSeq), site, username: user, enc }); added++; }
+      const esquema = credenciales.esquemaDe({ site });   // el de la dirección del CSV
+      const existing = credenciales.existente(list, site, user, esquema);
+      if (existing) { existing.enc = enc; existing.esquema = esquema; updated++; }
+      else { list.push({ id: 'pw' + (++pwSeq), site, username: user, enc, esquema }); added++; }
     }
     savePasswords(list);
     return { ok: true, added, updated };
@@ -3256,7 +3480,7 @@ ipcMain.handle('adblock:whitelist', soloUI((_e, { action, domain } = {}) => {
 ipcMain.on('download:url', soloUI((_e, d) => {
   const { url, isPrivate } = d || {};
   if (typeof url !== 'string' || !/^https?:/.test(url)) return;
-  session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(url);
+  descargaPedida((u) => session.fromPartition(isPrivate ? PART_PRIVATE : PART_NORMAL).downloadURL(u), url);
 }));
 // La URL acaba en la línea de órdenes de yt-dlp: solo direcciones web, nunca
 // algo que empiece por "-" y se lea como una opción.
@@ -3404,7 +3628,8 @@ ipcMain.on('download:pause', soloUI((_e, id) => {
 }));
 ipcMain.on('download:resume', soloUI((_e, id) => {
   const d = downloads.get(id);
-  if (!d?.item || d.meta.state !== 'progressing') return;
+  // La que espera el permiso de descargar varios archivos no se reanuda a mano.
+  if (!d?.item || d.meta.state !== 'progressing' || d.meta.retenida === 'varias') return;
   try { if (d.item.canResume()) d.item.resume(); } catch { /* ya terminó */ }
   d.meta.paused = false; broadcast('download:update', d.meta);
 }));
@@ -3412,10 +3637,20 @@ ipcMain.on('download:retry', soloUI((_e, id) => {
   const d = downloads.get(id);
   if (!d?.item || !d.ses || !/^https?:/i.test(d.meta.source || '') || d.meta.state === 'progressing' || d.meta.state === 'completed') return;
   downloads.delete(id);
-  try { d.ses.downloadURL(d.meta.source); } catch { /* sesión cerrada */ }
+  try { descargaPedida((u) => d.ses.downloadURL(u), d.meta.source); } catch { /* sesión cerrada */ }
+}));
+// Lo que una web bajó sola y espera respuesta (ver descargas-seguras.js).
+ipcMain.on('download:conservar', soloUI((_e, id) => {
+  const d = downloads.get(id);
+  if (!d || d.meta.retenida !== 'peligrosa') return;
+  d.peligrosa = false;
+  d.meta.retenida = undefined;
+  if (d.bajada) pasaADescargas(d);
+  else broadcast('download:update', d.meta);
 }));
 ipcMain.on('download:cancel', soloUI((_e, id) => {
   const d = downloads.get(id);
+  if (d?.temporal) { descarta(d); return; }
   if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }
   if (ytJobs.has(id)) {
     const child = ytJobs.get(id);
