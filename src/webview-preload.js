@@ -501,17 +501,16 @@ try {
 } catch (e) { /* nada */ }
 
 // --- MOOVIN: pase de la biblioteca ---
-// La biblioteca de iris.it.com/moovin es privada: su worker no suelta ni el catálogo
+// La biblioteca de MOOVIN es privada: su worker no suelta ni el catálogo
 // ni un solo archivo sin pase. Naviris lo recuerda a nivel de navegador y lo pone
 // ANTES de que corra la página (de ahí executeInMainWorld en document_start), así
 // que aquí la pantalla del pase no llega a verse. Si la persona lo escribe a mano
 // en la página, se guarda solo para las próximas veces, incluso si luego borra los
 // datos del sitio. El pase no llega a ningún otro dominio: main.js solo lo entrega
-// y solo lo acepta desde moovin.live y iris.it.com.
-// MOOVIN vive en moovin.live y ahí la biblioteca es la RAÍZ; en iris.it.com sigue
-// colgando de /moovin (la tele todavía descarga la interfaz de esa dirección).
-const enMoovin = /(^|\.)moovin\.live$/.test(location.hostname) ||
-  (/(^|\.)iris\.it\.com$/.test(location.hostname) && location.pathname.indexOf('/moovin') === 0);
+// y solo lo acepta desde https://moovin.live.
+// Solo moovin.live y por https: iris.it.com caducó y lo sirve un tercero, y por
+// http la página la puede falsificar cualquiera en la misma red (ver esMoovin en main.js).
+const enMoovin = location.protocol === 'https:' && /(^|\.)moovin\.live$/.test(location.hostname);
 if (enMoovin) {
   try {
     /* DESDE 2.7.10-dev.4 Naviris YA NO ENTREGA EL PASE NI LA CLAVE DE LA APP.
