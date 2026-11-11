@@ -210,9 +210,10 @@ document.fonts.ready.then(() => {
 });
 
 /* Los hitos del arranque siguen llegando del proceso principal (Widevine,
-   bloqueador, sesiones, interfaz). Solo se enseñan si el arranque se alarga:
+   bloqueador, sesiones, interfaz; y el paso de la sesión vieja al nombre nuevo,
+   que con muchos archivos tarda segundos). Solo se enseñan si el arranque se alarga:
    en uno normal la ventana ya se ha ido antes de que haga falta. */
-const ETAPAS = { 12: 'Reproducción protegida', 48: 'Bloqueador de anuncios', 62: 'Sesiones y espacios', 74: 'Interfaz', 85: 'Casi listo' };
+const ETAPAS = { 6: 'Actualizando tu perfil', 12: 'Reproducción protegida', 48: 'Bloqueador de anuncios', 62: 'Sesiones y espacios', 74: 'Interfaz', 85: 'Casi listo' };
 const LENTO = 2200;
 let ultima = '';
 window.navSplash.onProgreso((p) => { if (ETAPAS[p]) { ultima = ETAPAS[p]; if (etapa.classList.contains('visible')) etapa.textContent = ultima; } });
