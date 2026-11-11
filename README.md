@@ -46,7 +46,7 @@ Desde el menú, en las actualizaciones, se puede instalar a mano la última de l
 ```bash
 npm run check          # node --check de todo src/
 npm test               # pruebas unitarias (sin abrir la app)
-npm run test:e2e:ci    # la app real, sin red de terceros ni cuentas
+npm run test:e2e:ci    # la app real, sin red de terceros ni cuentas (repite una vez el archivo que falle)
 npm run test:e2e       # todas las de la app real, también las que necesitan YouTube, X o el relay de Watch Party
 npm run test:e2e:adblock
 ```

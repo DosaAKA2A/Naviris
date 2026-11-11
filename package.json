@@ -15,7 +15,7 @@
     "check": "node build/comprueba-sintaxis.js",
     "test": "node --test --test-timeout=20000 \"test/*.test.js\"",
     "test:e2e": "node --test --test-concurrency=1 \"test/e2e/*.test.js\" \"test/e2e/arranque.e2e.js\" \"test/e2e/perfiles.e2e.js\" \"test/e2e/huecos.e2e.js\" \"test/e2e/rendimiento.e2e.js\" \"test/e2e/menus.e2e.js\" \"test/e2e/instancia.e2e.js\" \"test/e2e/seguridad.e2e.js\" \"test/e2e/auditoria.e2e.js\" \"test/e2e/protocolo.e2e.js\" \"test/e2e/migracion.e2e.js\"",
-    "test:e2e:ci": "node --test --test-concurrency=1 \"test/e2e/arranque.e2e.js\" \"test/e2e/perfiles.e2e.js\" \"test/e2e/huecos.e2e.js\" \"test/e2e/rendimiento.e2e.js\" \"test/e2e/menus.e2e.js\" \"test/e2e/instancia.e2e.js\" \"test/e2e/seguridad.e2e.js\" \"test/e2e/migracion.e2e.js\" \"test/e2e/auditoria.e2e.js\" \"test/e2e/protocolo.e2e.js\" \"test/e2e/hub-escala.test.js\" \"test/e2e/x-video-tarjeta.test.js\" \"test/e2e/autoclaim.test.js\"",
+    "test:e2e:ci": "node build/e2e-ci.js",
     "icon": "electron build/render-icon.js",
     "icon-ico": "electron build/make-ico.js",
     "fetch-bin": "node build/fetch-bin.js",
