@@ -327,7 +327,7 @@ const DEFAULT_SETTINGS = {
   buscador: 'google',       // motor de la barra: google | duckduckgo | bing | brave (src/buscadores.js)
   preguntarDescargas: false, // true = cada descarga pregunta dónde guardarse
   xRevealSensitive: false,  // mostrar contenido sensible en X/Twitter
-  moovinPase: '',             // pase de la biblioteca privada de iris.it.com/moovin
+  moovinPase: '',             // pase de la biblioteca privada de MOOVIN (moovin.live)
   atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
   mouseNav: true,           // botones laterales del ratón para atrás/adelante
   blockPasskeys: true,      // las webs no ven passkey de plataforma (preload); si una insiste, Windows Hello real
@@ -1208,11 +1208,11 @@ ipcMain.on('perm:respond', soloUI((_e, r) => {
 ipcMain.handle('perm:list', soloUI(() => settings.permissions));
 ipcMain.handle('perm:remove', soloUI((_e, key) => { delete settings.permissions[key]; saveSettings(settings); return settings.permissions; }));
 ipcMain.handle('perm:clear', soloUI(() => { settings.permissions = {}; saveSettings(settings); return settings.permissions; }));
-ipcMain.handle('sec:status', () => ({
+ipcMain.handle('sec:status', soloUI(() => ({
   sandbox: true,                                                   // sandbox activado en cada webview
   siteIsolation: !app.commandLine.hasSwitch('disable-site-isolation-trials'), // Chromium: por defecto activo
   httpsUpgrades: true                                             // auto-subida http→https
-}));
+})));
 
 // ---------- yt-dlp: vídeo y audio (mp3) ----------
 const ytJobs = new Map(); // id → child process
@@ -1500,7 +1500,7 @@ app.on('second-instance', (_e, _argv, _cwd, datos) => {
 });
 // El renderer avisa cuando la interfaz ya está en pantalla (pestañas, hub y
 // tema aplicados). Es el único hito que sabe de verdad que "ya se puede ver".
-ipcMain.on('ui:listo', (e) => {
+ipcMain.on('ui:listo', soloUI((e) => {
   // La ventana que acaba de montarse puede traer una pestaña sacada de otra
   // o lo que llegó de fuera mientras arrancaba.
   const suya = BrowserWindow.fromWebContents(e.sender);
@@ -1513,7 +1513,7 @@ ipcMain.on('ui:listo', (e) => {
   if (!win) return;
   ventanaEsperandoUI = null;
   cerrarSplash(win);
-});
+}));
 
 // ---------- Ventanas ----------
 // Las únicas sesiones en las que puede vivir una web dentro de Naviris.
@@ -1541,6 +1541,9 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
+    // Ni en los workers de la página (GHSA-9qh4-3jw8-366w: hasta Electron 42.9.2 un
+    // <webview> podía pedirlo aunque la interfaz no lo tuviera).
+    webPreferences.nodeIntegrationInWorker = false;
     // Corrector ortográfico (2026-11-03). La ventana de la interfaz se crea con
     // spellcheck:false y el webview lo heredaba: en ninguna web salía la línea
     // roja ni las sugerencias del clic derecho. Las webs lo llevan encendido,
@@ -2343,12 +2346,12 @@ function soloUI(fn) {
   };
 }
 
-ipcMain.on('win:minimize', (e) => winOf(e)?.minimize());
-ipcMain.on('win:maximize', (e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); });
-ipcMain.on('win:close', (e) => winOf(e)?.close());
+ipcMain.on('win:minimize', soloUI((e) => winOf(e)?.minimize()));
+ipcMain.on('win:maximize', soloUI((e) => { const w = winOf(e); if (w) w.isMaximized() ? w.unmaximize() : w.maximize(); }));
+ipcMain.on('win:close', soloUI((e) => winOf(e)?.close()));
 // F11: pantalla completa de la VENTANA (distinto del fullscreen del vídeo)
-ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); if (w) w.setFullScreen(!w.isFullScreen()); });
-ipcMain.on('win:new-private', () => createWindow(true));
+ipcMain.on('win:fullscreen', soloUI((e) => { const w = winOf(e); if (w) w.setFullScreen(!w.isFullScreen()); }));
+ipcMain.on('win:new-private', soloUI(() => createWindow(true)));
 /* Sacar una pestaña de la barra abre una ventana nueva con esa direccion.
    La ventana tarda en montar su interfaz, asi que la URL se guarda y se le
    manda cuando ella avisa de que ya esta lista ('ui:listo'). Con url null la
@@ -2364,14 +2367,14 @@ function ventanaConUrl(url, privada, contenedor = null) {
 // El contenedor (su id) de la pestaña, para que un enlace salga con su misma cuenta.
 const contenedorDe = (wc) => (settings.contenedores || []).find((c) => session.fromPartition(c.particion) === wc.session)?.id || null;
 const esVentanaPrivada = (wc) => { try { return new URL(wc.getURL()).searchParams.get('private') === '1'; } catch { return false; } };
-ipcMain.on('win:sacar-pestana', (e, url, contenedor) => {
+ipcMain.on('win:sacar-pestana', soloUI((e, url, contenedor) => {
   if (typeof url !== 'string' || !/^https?:/i.test(url)) return;
   // La pestaña sale con su contenedor (su id; la ventana nueva lo busca en los ajustes).
   if (typeof contenedor !== 'string' || !/^[a-z0-9]{1,24}$/.test(contenedor)) contenedor = null;
   // Si sale de una ventana privada, la nueva tambien lo es: no se saca una
   // pestaña privada a una ventana normal, que dejaria rastro.
   ventanaConUrl(url, esVentanaPrivada(e.sender), contenedor);
-});
+}));
 // Ctrl+N y «Nueva ventana» del menú: una ventana normal con el hub, como Chrome
 // (también desde una privada).
 ipcMain.on('win:nueva', soloUI(() => ventanaConUrl(null, false)));
@@ -2717,16 +2720,21 @@ ipcMain.on('x:age-gate-on', (e) => { e.returnValue = !!settings.xRevealSensitive
    -- junto con src/app-key.js y el secreto NAVIRIS_KEY del worker de MOOVIN --
    cuando esta version lleve un tiempo publicada. Ver
    moovin/worker/VINCULO-NAVIRIS.md en el repo Iris. */
-// Pase de la biblioteca de MOOVIN (moovin.live, y iris.it.com/moovin mientras
-// siga vivo), privada. Naviris lo recuerda a nivel de navegador para que ahí no
-// aparezca la pantalla del pase. A diferencia de los dos de arriba esto SÍ es un
-// secreto, y el preload corre en todos los sitios: solo se entrega y solo se
-// acepta desde esos dos dominios. Tampoco entra en la sincronización de la
+// Pase de la biblioteca de MOOVIN (moovin.live), privada. Naviris lo recuerda
+// a nivel de navegador para que ahí no aparezca la pantalla del pase. A
+// diferencia de los dos de arriba esto SÍ es un secreto, y el preload corre en
+// todos los sitios: solo se entrega y solo se acepta desde https://moovin.live. Tampoco entra en la sincronización de la
 // cuenta: no sale de este equipo.
+/* Solo moovin.live y solo por https (auditoría 2026-11-11). iris.it.com salió de
+   la lista: el dominio caducó en octubre y hoy lo sirve una página de aparcado,
+   o sea un tercero; quien lo registre recibiría la prueba de identidad de cada
+   cuenta que pase por ahí. Y por http cualquiera en la misma red (una wifi
+   pública) puede servir una página falsa de moovin.live: HttpsUpgrades vuelve a
+   http si el https falla, y eso lo provoca el propio atacante. */
 const esMoovin = (e) => {
   try {
-    const h = new URL(e.senderFrame.url).hostname;
-    return /(^|\.)moovin\.live$/.test(h) || /(^|\.)iris\.it\.com$/.test(h);
+    const u = new URL(e.senderFrame.url);
+    return u.protocol === 'https:' && /(^|\.)moovin\.live$/.test(u.hostname);
   } catch { return false; }
 };
 ipcMain.on('moovin:pase', (e) => { e.returnValue = esMoovin(e) ? (settings.moovinPase || '') : ''; });
@@ -2762,9 +2770,9 @@ ipcMain.on('moovin:clave-app', (e) => { e.returnValue = esMoovin(e) ? CLAVE_APP 
    instalador. Ese es el punto de todo esto. */
 const ACC_API = 'https://naviris-account.studio-iris2026.workers.dev';
 let TOKEN_CUENTA = '';
-ipcMain.on('cuenta:token', (_e, v) => {
+ipcMain.on('cuenta:token', soloUI((_e, v) => {
   TOKEN_CUENTA = (typeof v === 'string' && /^[0-9a-f]{64}$/.test(v)) ? v : '';
-});
+}));
 ipcMain.handle('moovin:identidad', async (e) => {
   if (!esMoovin(e) || !TOKEN_CUENTA) return '';
   try {
@@ -2778,8 +2786,8 @@ ipcMain.handle('moovin:identidad', async (e) => {
 });
 // Con app.quit() y no app.exit(): exit se saltaba el before-quit y el reinicio
 // de Ajustes (aceleración por hardware, modo agente) perdía las cookies de sesión.
-ipcMain.on('app:restart', () => { app.relaunch(); app.quit(); });
-ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.on('app:restart', soloUI(() => { app.relaunch(); app.quit(); }));
+ipcMain.handle('app:version', soloUI(() => app.getVersion()));
 /* Navegador predeterminado. Windows 10 y 11 no dejan que un programa se ponga
    solo: el instalador (build/installer.nsh) registra Naviris como navegador y
    aquí se abre su página de Configuración, donde lo elige la persona.
@@ -2799,7 +2807,7 @@ ipcMain.handle('navegador:estado', soloUI(async () => {
 // La página de Naviris dentro de Aplicaciones predeterminadas (Windows 11; en
 // Windows 10 se queda en la lista general). El nombre es el de RegisteredApplications.
 ipcMain.handle('navegador:hacer-predeterminado', soloUI(() => shell.openExternal('ms-settings:defaultapps?registeredAppUser=Naviris').then(() => true, () => false)));
-ipcMain.handle('gpu:status', () => app.getGPUFeatureStatus());
+ipcMain.handle('gpu:status', soloUI(() => app.getGPUFeatureStatus()));
 ipcMain.handle('clipboard:read', soloUI(() => { try { return clipboard.readText(); } catch { return ''; } }));
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
@@ -3190,7 +3198,7 @@ ipcMain.handle('totp:reveal', soloUI(async (_e, id) => {
   } catch { return { ok: false, error: 'no se pudo descifrar' }; }
 }));
 
-ipcMain.handle('adblock:get', () => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() }));
+ipcMain.handle('adblock:get', soloUI(() => ({ enabled: settings.adblockEnabled, whitelist: settings.adblockWhitelist, blocked: blockedCount, brave: braveAdblock.status() })));
 ipcMain.handle('adblock:set-enabled', soloUI((_e, enabled) => { settings.adblockEnabled = !!enabled; saveSettings(settings); return settings.adblockEnabled; }));
 ipcMain.handle('adblock:whitelist', soloUI((_e, { action, domain } = {}) => {
   const d = String(domain || '').toLowerCase().replace(/^www\./, '');
@@ -3215,7 +3223,7 @@ ipcMain.handle('yt:download', soloUI(async (_e, opts) => {
 }));
 // Siempre disponible: si faltan los binarios se descargan solos al abrir el
 // Rat Tool (ensureBins muestra el progreso en el panel de descargas)
-ipcMain.handle('yt:available', () => { ensureBins(); return true; });
+ipcMain.handle('yt:available', soloUI(() => { ensureBins(); return true; }));
 
 // ---------- Importar marcadores de otros navegadores ----------
 // Chromium guarda un JSON "Bookmarks"; Firefox comprime su backup en .jsonlz4 (LZ4 + cabecera Mozilla).
@@ -3297,11 +3305,11 @@ function flattenFirefox(node, out) {
   if (node.uri && /^https?:/.test(node.uri)) out.push({ title: node.title || node.uri, url: node.uri });
   if (Array.isArray(node.children)) node.children.forEach((c) => flattenFirefox(c, out));
 }
-ipcMain.handle('import:available', () => {
+ipcMain.handle('import:available', soloUI(() => {
   const avail = {};
   Object.keys(IMPORT_BROWSERS).forEach((k) => { const p = importPath(IMPORT_BROWSERS[k]); avail[k] = { label: IMPORT_BROWSERS[k].label, present: !!(p && fs.existsSync(p)) }; });
   return avail;
-});
+}));
 ipcMain.handle('import:bookmarks', soloUI((_e, key) => {
   try {
     const b = IMPORT_BROWSERS[key]; const p = importPath(b);
@@ -3362,7 +3370,7 @@ ipcMain.on('download:retry', soloUI((_e, id) => {
   downloads.delete(id);
   try { d.ses.downloadURL(d.meta.source); } catch { /* sesión cerrada */ }
 }));
-ipcMain.on('download:cancel', (_e, id) => {
+ipcMain.on('download:cancel', soloUI((_e, id) => {
   const d = downloads.get(id);
   if (d?.item) { try { d.item.cancel(); } catch { /* nada */ } }
   if (ytJobs.has(id)) {
@@ -3376,16 +3384,16 @@ ipcMain.on('download:cancel', (_e, id) => {
     ytJobs.delete(id);
     if (d) { d.meta.state = 'cancelled'; broadcast('download:update', d.meta); }
   }
-});
+}));
 // Abrir un archivo lo ejecuta si es un programa: solo a petición de la interfaz.
 ipcMain.on('download:open', soloUI((_e, id) => { const d = downloads.get(id); if (d) shell.openPath(d.meta.path); }));
-ipcMain.on('download:reveal', (_e, id) => { const d = downloads.get(id); if (d) shell.showItemInFolder(d.meta.path); });
-ipcMain.handle('download:path', (_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; });
-ipcMain.on('download:clear', () => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); });
+ipcMain.on('download:reveal', soloUI((_e, id) => { const d = downloads.get(id); if (d) shell.showItemInFolder(d.meta.path); }));
+ipcMain.handle('download:path', soloUI((_e, id) => { const d = downloads.get(id); return d ? d.meta.path : null; }));
+ipcMain.on('download:clear', soloUI(() => { for (const [id, d] of downloads) if (d.meta.state !== 'progressing') downloads.delete(id); }));
 
 /* Página de descargas: SOLO lo descargado desde Naviris (historial propio),
    comprobando que el archivo siga existiendo en disco. */
-ipcMain.handle('downloads:files', async () => {
+ipcMain.handle('downloads:files', soloUI(async () => {
   const out = [];
   for (const h of loadDlHistory()) {
     try {
@@ -3395,7 +3403,7 @@ ipcMain.handle('downloads:files', async () => {
   }
   out.sort((a, b) => b.mtime - a.mtime);
   return out;
-});
+}));
 // Solo se aceptan nombres simples que queden DENTRO de la carpeta de descargas
 function downloadsFilePath(name) {
   const dir = app.getPath('downloads');
@@ -3403,15 +3411,15 @@ function downloadsFilePath(name) {
   return path.dirname(p) === dir ? p : null;
 }
 ipcMain.on('downloads:open-file', soloUI((_e, name) => { const p = downloadsFilePath(name); if (p) shell.openPath(p); }));
-ipcMain.on('downloads:reveal-file', (_e, name) => { const p = downloadsFilePath(name); if (p) shell.showItemInFolder(p); });
-ipcMain.on('downloads:open-folder', () => shell.openPath(app.getPath('downloads')));
+ipcMain.on('downloads:reveal-file', soloUI((_e, name) => { const p = downloadsFilePath(name); if (p) shell.showItemInFolder(p); }));
+ipcMain.on('downloads:open-folder', soloUI(() => shell.openPath(app.getPath('downloads'))));
 
 // Favicon como dataURL
 /* `iconUrl` es el que declara la propia pagina (page-favicon-updated). Se
    prueba PRIMERO porque es el bueno: el servicio de Google devuelve lo que
    tiene cacheado, que para sitios poco populares es un icono generico o de
    16 px, y ahi es donde se veian pixelados. */
-ipcMain.handle('favicon:fetch', async (_e, pageUrl, iconUrl) => {
+ipcMain.handle('favicon:fetch', soloUI(async (_e, pageUrl, iconUrl) => {
   let host = '';
   try { host = new URL(pageUrl).hostname; } catch { return null; }
   /* El content-type lo decide el SITIO y acaba dentro de un data: que la
@@ -3439,7 +3447,7 @@ ipcMain.handle('favicon:fetch', async (_e, pageUrl, iconUrl) => {
     try { return await tryFetch(`https://${host}/favicon.ico`); }
     catch { return null; }
   }
-});
+}));
 
 // ---------- Addons (catálogo remoto en naviris.site, independiente de las releases) ----------
 const ADDONS_BASE = 'https://naviris.site/addons/';
@@ -3470,15 +3478,15 @@ function fetchText(url) {
   });
 }
 
-ipcMain.handle('addons:catalog', async () => {
+ipcMain.handle('addons:catalog', soloUI(async () => {
   try {
     const raw = await fetchText(ADDONS_BASE + 'catalog.json?t=' + Date.now());
     const cat = JSON.parse(raw);
     return { ok: true, addons: Array.isArray(cat.addons) ? cat.addons : [] };
   } catch (e) { return { ok: false, message: String(e.message || e) }; }
-});
+}));
 
-ipcMain.handle('addons:list', () => settings.addons || {});
+ipcMain.handle('addons:list', soloUI(() => settings.addons || {}));
 
 ipcMain.handle('addons:install', soloUI(async (_e, meta) => {
   try {
@@ -3524,7 +3532,7 @@ ipcMain.handle('addons:toggle', soloUI((_e, { id, on } = {}) => {
 /* Elegir fondo con el diálogo del SISTEMA. El <input type="file"> daba
    problemas: si elegías el mismo archivo dos veces no disparaba 'change' y el
    panel se quedaba colgado (2026-08-11). */
-ipcMain.handle('hub:pick-wallpaper', async (e) => {
+ipcMain.handle('hub:pick-wallpaper', soloUI(async (e) => {
   try {
     const r = await dialog.showOpenDialog(winOf(e), {
       title: 'Elegir fondo del hub',
@@ -3534,7 +3542,7 @@ ipcMain.handle('hub:pick-wallpaper', async (e) => {
     if (r.canceled || !r.filePaths?.length) return { ok: false, canceled: true };
     return await guardarFondo(r.filePaths[0]);
   } catch (err) { return { ok: false, message: String(err.message || err) }; }
-});
+}));
 async function guardarFondo(origen) {
   if (!origen || !fs.existsSync(origen)) return { ok: false, message: 'No se encontró la imagen' };
   const dir = path.join(app.getPath('userData'), 'fondos');
@@ -3544,7 +3552,7 @@ async function guardarFondo(origen) {
   fs.copyFileSync(origen, destino);
   return { ok: true, url: 'file:///' + destino.replace(/\\/g, '/') };
 }
-ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
+ipcMain.handle('file:save-png', soloUI(async (e, { dataUrl, suggestedName }) => {
   try {
     const r = await dialog.showSaveDialog(winOf(e), {
       defaultPath: path.join(app.getPath('downloads'), suggestedName || 'captura.png'),
@@ -3554,7 +3562,7 @@ ipcMain.handle('file:save-png', async (e, { dataUrl, suggestedName }) => {
     fs.writeFileSync(r.filePath, Buffer.from(String(dataUrl).split(',')[1], 'base64'));
     return { ok: true, path: r.filePath };
   } catch (err) { return { ok: false, message: String(err.message || err) }; }
-});
+}));
 
 
 // ---------- Actualización automática (GitHub Releases) ----------
@@ -3654,7 +3662,7 @@ function esMasNueva(a, b) {
 let lineasVistas = { stable: null, dev: null };
 // Las DOS líneas oficiales (Naviris estable y NavirisDev) tal y como están
 // publicadas ahora mismo, para que el usuario elija desde cualquier versión.
-ipcMain.handle('update:channels', async () => {
+ipcMain.handle('update:channels', soloUI(async () => {
   try {
     const cab = { headers: { 'User-Agent': 'Naviris', Accept: 'application/vnd.github+json' } };
     const sirve = (r, dev) => {
@@ -3692,10 +3700,10 @@ ipcMain.handle('update:channels', async () => {
     lineasVistas = { stable: estable, dev };
     return { ok: true, current: app.getVersion(), stable: estable, dev };
   } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; }
-});
+}));
 // El usuario eligió LÍNEA explícitamente: se apunta el feed a esa línea y se
 // permite bajar de versión (volver de NavirisDev a la estable es un downgrade).
-ipcMain.handle('update:choose', async (_e, line) => {
+ipcMain.handle('update:choose', soloUI(async (_e, line) => {
   if (!app.isPackaged) return { state: 'dev' };
   chequeoSilencioso = false;
   const dev = line === 'dev';
@@ -3718,14 +3726,14 @@ ipcMain.handle('update:choose', async (_e, line) => {
   autoUpdater.allowDowngrade = true; // va DESPUÉS: el setter de channel lo toca
   try { await autoUpdater.checkForUpdates(); return { state: 'checking' }; }
   catch (e) { return { state: 'error', message: friendlyUpdateError(e) }; }
-});
+}));
 /* DESCARGA COMPLETA, NUNCA DIFERENCIAL. electron-updater intenta bajar solo
    los trozos que cambian comparando blockmaps; entre líneas distintas (de la
    estable a NavirisDev) esa comparación no tiene sentido y se queda colgada a
    medias — el sintoma que reporto el amigo de Dosa: "descargando 12%" y de ahi
    no pasa. Bajar los 86 MB enteros tarda un poco mas y termina siempre. */
 autoUpdater.disableDifferentialDownload = true;
-ipcMain.handle('update:download', async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } });
+ipcMain.handle('update:download', soloUI(async () => { try { await autoUpdater.downloadUpdate(); return { ok: true }; } catch (e) { return { ok: false, message: friendlyUpdateError(e) }; } }));
 /* INSTALACIÓN SIN INSTALADOR (petición de Dosa, 2026-08-17: "que se instale
    automáticamente al abrir pero sin abrir un instalador; eso provoca que mis
    usuarios pierdan interés en las actualizaciones").
@@ -3743,7 +3751,7 @@ ipcMain.handle('update:download', async () => { try { await autoUpdater.download
    vez); a partir de ahí todas son silenciosas. Y las instalaciones nuevas ya no
    pueden elegir carpeta: eso es exactamente lo que se cambia por no tener
    ventana. */
-ipcMain.on('update:install', () => autoUpdater.quitAndInstall(true, true));
+ipcMain.on('update:install', soloUI(() => autoUpdater.quitAndInstall(true, true)));
 
 /* ---------- Novedades tras actualizar ----------
    La otra mitad de la experiencia tipo Opera GX: si te actualizas sin enterarte,
@@ -3764,7 +3772,7 @@ function revisaVersionInstalada() {
    (generate_release_notes en build/publish-release.js). Si no se pueden traer
    (sin red, release recién publicada), el panel se enseña igual con la versión:
    enterarte de que Naviris cambió es lo importante, el detalle es un extra. */
-ipcMain.handle('update:novedades', async () => {
+ipcMain.handle('update:novedades', soloUI(async () => {
   const pend = novedadesPendientes;
   if (!pend) return null;
   novedadesPendientes = null; // una vez por arranque
@@ -3775,7 +3783,7 @@ ipcMain.handle('update:novedades', async () => {
     if (r.ok) notas = String((await r.json()).body || '');
   } catch {}
   return { version: pend.version, anterior: pend.anterior, notas };
-});
+}));
 
 // El tema del navegador se propaga a las webs: con modo claro activo, las
 // páginas que respetan prefers-color-scheme (YouTube, Outlook…) también
