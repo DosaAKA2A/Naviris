@@ -107,7 +107,8 @@ test('las pestañas que no se ven dejan de pintar; el sonido sigue y al volver n
   t.after(() => nav.cierra());
   const c = await pestana(nav, `http://127.0.0.1:${WEB}/fondo`);
   await nav.ui.evalua(`(tabs.find((x) => x.url.endsWith('/fondo')).webview.setAudioMuted(true), 1)`);
-  await c.evalua(`document.getElementById('a').play().then(() => 1)`);
+  // En el runner de GitHub la pestaña puede llegar antes que su <audio>: se espera a que exista.
+  await c.evalua(`new Promise((r) => { const f = () => { const a = document.getElementById('a'); if (a) r(a.play().then(() => 1)); else setTimeout(f, 50); }; f(); })`);
   assert.ok(await fotogramas(c) > 20, 'la pestaña activa pinta');
   await c.evalua('window.__marca = 1');
 
@@ -159,7 +160,7 @@ test('la pestaña de AutoClaim sigue pintando y contando de fondo', { timeout: 1
 test('ventanas emergentes: sin gesto se bloquean y avisan; con clic se abren', { timeout: 150000 }, async (t) => {
   const nav = await arranca();
   t.after(() => nav.cierra());
-  const pestanas = () => nav.ui.evalua('tabs.length');
+  const pestanas = () => nav.ui.evalua(`tabs.filter((x) => x.kind === 'web').length`); // el hub de arranque puede llegar después de medir t0
   const sitio = `http://127.0.0.1:${WEB}`;
   const t0 = await pestanas();
 
@@ -212,7 +213,7 @@ test('ventanas emergentes: sin gesto se bloquean y avisan; con clic se abren', {
 test('al permitir, la ventana bloqueada se abre al momento y conserva window.opener', { timeout: 120000 }, async (t) => {
   const nav = await arranca();
   t.after(() => nav.cierra());
-  const pestanas = () => nav.ui.evalua('tabs.length');
+  const pestanas = () => nav.ui.evalua(`tabs.filter((x) => x.kind === 'web').length`); // el hub de arranque puede llegar después de medir t0
   const t0 = await pestanas();
   const c = await pestana(nav, `http://127.0.0.1:${WEB}/bloquea-login`);
   await espera(1500);
@@ -235,7 +236,7 @@ test('al permitir, la ventana bloqueada se abre al momento y conserva window.ope
 test('lo bloqueado se olvida al navegar: permitir después no abre nada', { timeout: 120000 }, async (t) => {
   const nav = await arranca();
   t.after(() => nav.cierra());
-  const pestanas = () => nav.ui.evalua('tabs.length');
+  const pestanas = () => nav.ui.evalua(`tabs.filter((x) => x.kind === 'web').length`); // el hub de arranque puede llegar después de medir t0
   const t0 = await pestanas();
   const c = await pestana(nav, `http://127.0.0.1:${WEB}/bloquea-login`);
   await espera(1500);
