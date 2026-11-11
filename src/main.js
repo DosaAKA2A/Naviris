@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const braveAdblock = require('./adblock');
-const { conservaCookiesDeSesion } = require('./sesiones');
+const { conservaCookiesDeSesion, cookiesParticionadas } = require('./sesiones');
 const { migraPerfil, migraCarpetaV1, migraNombre, sesionPendiente, migraSesion, PART_NAVIRIS } = require('./migraciones');
 const { canalDeActualizacion } = require('./canal-actualizaciones');
 const emergentes = require('./emergentes'); // ventanas emergentes solo con gesto (se prueba en test/)
@@ -1156,7 +1156,10 @@ function setupSession(ses) {
      donde lo dejaste", que es su significado. */
   async function conservaSesiones() {
     if (settings.restoreSession === false) return;
-    const n = await conservaCookiesDeSesion(ses.cookies);
+    let particionadas;
+    try { particionadas = await cookiesParticionadas(ses); }
+    catch (err) { console.warn('[Naviris] Sin la lista de cookies particionadas; no se conservan las de sesión:', err.message); return; }
+    const n = await conservaCookiesDeSesion(ses.cookies, particionadas);
     if (n) console.log(`[Naviris] ${n} cookies de sesión conservadas para el próximo arranque`);
   }
   // Lo espera el único before-quit (ver alSalir). La privada vive en memoria:
@@ -2128,7 +2131,7 @@ function pideAbrirFuera(wc, url, callback) {
    Chrome. Las acciones van sobre el campo con el foco: la interfaz se lo
    devuelve antes de pedir la acción. */
 const pareceDireccion = (t) => !/\s/.test(t) && (/^[a-z][a-z0-9+.-]*:/i.test(t) || /^[^/?#]+\.[^/?#]+/.test(t) || /^localhost(?=[:/?#]|$)/i.test(t));
-ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
+ipcMain.on('ui:menu-campo', soloUI(async (e, d = {}) => {
   const wc = e.sender;
   const conSeleccion = !!d.seleccion;
   const items = [
@@ -2141,7 +2144,7 @@ ipcMain.on('ui:menu-campo', soloUI((e, d = {}) => {
   ];
   if (d.urlbar) {
     let texto = '';
-    try { texto = clipboard.readText().trim(); } catch { /* nada */ }
+    try { texto = (await clipboard.readText()).trim(); } catch { /* nada */ }
     if (texto && texto.length <= 2000) {
       items.push({ label: pareceDireccion(texto) ? 'Pegar e ir' : 'Pegar y buscar', icon: pareceDireccion(texto) ? 'arrow-right' : 'magnifying-glass', click: () => wc.send('ui:pegar-e-ir', texto) });
     }
@@ -2676,20 +2679,25 @@ ipcMain.handle('perf:tabs', soloUI(async (_e, lista) => {
 }));
 /* Lo que copia un gestor de contraseñas (Bitwarden, KeePass, 1Password) lleva
    la marca de Windows para que ningún historial lo guarde: el widget
-   Portapapeles tampoco lo ve. */
-function copiaExcluida() {
+   Portapapeles tampoco lo ve. Desde Electron 44 el portapapeles es asíncrono
+   y los formatos propios de Windows se piden como «osclipboard». */
+const formatoWindows = (f) => `electron application/osclipboard;format="${f}"`;
+async function copiaExcluida() {
   if (process.platform !== 'win32') return false;
   try {
-    if (clipboard.has('ExcludeClipboardContentFromMonitorProcessing')) return true;
-    if (clipboard.has('CanIncludeInClipboardHistory')) {
-      const b = clipboard.readBuffer('CanIncludeInClipboardHistory');
+    if (await clipboard.has(formatoWindows('ExcludeClipboardContentFromMonitorProcessing'))) return true;
+    const historial = formatoWindows('CanIncludeInClipboardHistory');
+    if (await clipboard.has(historial)) {
+      const item = (await clipboard.read()).find((i) => i.types.includes(historial));
+      if (!item) return false;
+      const b = Buffer.from(await (await item.getType(historial)).arrayBuffer());
       return b.length >= 4 && b.readUInt32LE(0) === 0;
     }
   } catch { /* formato ilegible: se trata como una copia normal */ }
   return false;
 }
-ipcMain.handle('clip:read', soloUI(async () => { try { return copiaExcluida() ? '' : (clipboard.readText() || ''); } catch { return ''; } }));
-ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
+ipcMain.handle('clip:read', soloUI(async () => { try { return await copiaExcluida() ? '' : ((await clipboard.readText()) || ''); } catch { return ''; } }));
+ipcMain.handle('clip:write', soloUI(async (_e, t) => { try { await clipboard.writeText(String(t || '')); return true; } catch { return false; } }));
 ipcMain.handle('spotify:logged', soloUI(async () => {
   try {
     const cookies = await session.fromPartition(PART_NORMAL).cookies.get({ domain: '.spotify.com', name: 'sp_dc' });
@@ -2844,7 +2852,7 @@ ipcMain.handle('navegador:estado', soloUI(async () => {
 // Windows 10 se queda en la lista general). El nombre es el de RegisteredApplications.
 ipcMain.handle('navegador:hacer-predeterminado', soloUI(() => shell.openExternal('ms-settings:defaultapps?registeredAppUser=Naviris').then(() => true, () => false)));
 ipcMain.handle('gpu:status', soloUI(() => app.getGPUFeatureStatus()));
-ipcMain.handle('clipboard:read', soloUI(() => { try { return clipboard.readText(); } catch { return ''; } }));
+ipcMain.handle('clipboard:read', soloUI(async () => { try { return await clipboard.readText(); } catch { return ''; } }));
 
 // ---------- Gestor de contraseñas (safeStorage/DPAPI + Windows Hello) ----------
 const pwPath = () => path.join(app.getPath('userData'), ARCHIVOS + 'passwords.json');
