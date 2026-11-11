@@ -18,7 +18,7 @@ const DE_LAS_PAGINAS = new Set([
   'preload:arranque', 'adblock:genericos', 'wv:dialogo', 'wv:sin-freno', 'x:age-gate-on',
   'moovin:pase', 'moovin:pase-set', 'moovin:clave-app', 'moovin:identidad'
 ]);
-const MIRAN_ESUI = new Set(['wv:historial', 'wv:historial-pendiente', 'tab:reintenta-bucle', 'tab:nav-usuario', 'tab:dialogo-respuesta']);
+const MIRAN_ESUI = new Set(['wv:historial', 'wv:historial-pendiente', 'tab:reintenta-bucle', 'tab:nav-usuario', 'tab:dialogo-respuesta', 'ui:almacen-viejo', 'ui:almacen-migrado']);
 
 const canales = [...MAIN.matchAll(/ipcMain\.(on|handle)\('([^']+)',\s*(soloUI\()?/g)].map((m) => ({ canal: m[2], solo: !!m[3] }));
 
