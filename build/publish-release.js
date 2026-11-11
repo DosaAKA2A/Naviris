@@ -91,8 +91,7 @@ async function api(url, opts = {}) {
   const ymlPaths = CANALES.flatMap((c) => {
     const p = path.join(DIST, c);
     fs.writeFileSync(p, yml);
-    fs.writeFileSync(p + '.sig', firmaFeed(yml, clave) + '
-');
+    fs.writeFileSync(p + '.sig', firmaFeed(yml, clave) + '\n');
     return [{ file: p + '.sig', name: c + '.sig' }, { file: p, name: c }];
   });
   console.log(` feeds generados y firmados: ${CANALES.join(' + ')} (sha512 del Setup real)`);
