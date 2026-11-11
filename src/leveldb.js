@@ -1,10 +1,8 @@
 /* ===== LECTOR DE LEVELDB, SOLO PARA LEER (2026-11-11) =====
    Chromium guarda el localStorage de cada sesión en una base LevelDB
    («Local Storage/leveldb»). Al pasar la interfaz de file:// a naviris://app
-   (ver protocolo.js) hay que traer lo que guardaba con el origen viejo, y con la
-   fuse GrantFileProtocolExtraPrivileges apagada ninguna página ni DevTools lo
-   puede leer ya (medido: file:// da SecurityError y DOMStorage devuelve []).
-   Así que se lee el disco directamente.
+   (ver protocolo.js) hay que traer lo que guardaba con el origen viejo sin
+   volver a abrir la interfaz por file://. Así que se lee el disco directamente.
 
    Lo justo del formato para leer, sin escribir nunca:
    · CURRENT dice qué MANIFEST vale, y el MANIFEST qué tablas (.ldb) están vivas

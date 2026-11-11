@@ -2,6 +2,16 @@
 
 Lo que cambia en cada versión de Naviris para escritorio, de la más nueva a la más vieja. Las versiones **estables** llegan a todas las instalaciones; las **dev** (con `-dev`) solo a NavirisDev. Las notas largas de cada versión, con imágenes, están en `novedades/`.
 
+## 3.0.0 · estable · 11 de noviembre de 2026
+
+Naviris 3 llega a todos. Trae todo lo de la 3.0.0-dev.1 (abajo) y además:
+
+- **Motor al día**: Electron 45 con Chromium 156. Copiar y pegar desde las webs funciona como en Chrome.
+- **Actualizaciones firmadas**: Naviris solo instala versiones y complementos firmados por nosotros. Si una firma no cuadra, no descarga nada y te lleva a naviris.site.
+- **Más seguro**: la interfaz ya no se carga como archivo del disco, las descargas peligrosas preguntan antes de abrirse y las contraseñas se guardan por sitio y protocolo.
+- **Watch Party 2.9.0**: el servidor decide quién es el anfitrión, así nadie con el código puede hacerse pasar por él.
+- **Más rápido al abrir**: Tendencias ya no recarga cada vez que se repinta el hub y el bloqueador carga sin retrasar la ventana. Si la migración del perfil tarda, verás el arranque en vez de una espera en blanco.
+
 ## 3.0.0-dev.1 · dev · 4 de noviembre de 2026
 
 Primera versión de Naviris 3, un remaster completo.

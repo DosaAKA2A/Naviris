@@ -1,9 +1,9 @@
 /* ===== LA INTERFAZ SE SIRVE POR naviris://app (2026-11-11) =====
    Hasta la 3.0 la interfaz (index.html) y el splash se cargaban por file://.
-   Eso obligaba a dejar encendida la fuse GrantFileProtocolExtraPrivileges, que
-   da a TODA página file:// más poder que en Chrome: un .html bajado de internet
-   podía leer el disco (ver archivos-locales.js). Con la interfaz en su propio
-   esquema la fuse se apaga en el instalable (package.json, electronFuses).
+   Con la fuse GrantFileProtocolExtraPrivileges encendida (no se puede apagar:
+   castlabs no firma Widevine en un exe con fuses cambiadas), TODA página file://
+   tiene más poder que en Chrome. La interfaz va en su propio esquema y lo que
+   abren las webs por file:// lo frena archivos-locales.js.
 
    Qué sirve y a quién:
    · Solo existe en la sesión de la interfaz y en la del splash. Las webs viven

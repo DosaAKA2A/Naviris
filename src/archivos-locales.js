@@ -5,11 +5,11 @@
    contenido de un iframe de cualquier archivo y los píxeles de cualquier imagen
    (canvas), y lo mandaba a un servidor. Ese .html lo puede bajar cualquier web.
 
-   Desde el 2026-11-11 la interfaz va por naviris://app (protocolo.js) y el
-   instalable sale con esa fuse apagada (package.json, electronFuses), que ya
-   cierra fetch, XHR e iframes a file:. Esto se queda igual: es lo único que
-   protege con `npm start` (el Electron de desarrollo trae la fuse encendida) y
-   lo único que impide abrir un file: en una ventanita o cargar archivos de
+   Desde el 2026-11-11 la interfaz va por naviris://app (protocolo.js). La fuse
+   sigue encendida también en el instalable: castlabs no firma Widevine (VMP) en
+   un exe con cualquier fuse cambiada (probado el 11/11, una por una), y sin esa
+   firma no hay DRM. Así que esto es lo que protege, en `npm start` y en el
+   instalable, y también lo único que impide abrir un file: en una ventanita o cargar archivos de
    fuera de la carpeta de la página. Se corta aquí, en las sesiones de las webs
    (la interfaz va en otra y no pasa por esto), con lista blanca:
 

@@ -1,9 +1,10 @@
-// Fuses del instalable (auditoría #4, parte «endurece»): sin RunAsNode, sin
-// NODE_OPTIONS, sin --inspect, la app solo desde app.asar y con su integridad
-// comprobada. Mira tres cosas: que package.json las pide con los nombres que
-// entiende electron-builder (si uno está mal escrito se ignora sin avisar), que
-// el orden del empaquetado deja la firma VMP para el final y que el código no
-// necesita ninguna de las puertas que se cierran.
+// Fuses del instalable: NINGUNA. La parte «endurece» (auditoría #4) pidió siete,
+// pero castlabs EVS no firma Widevine (VMP) en un exe con cualquier fuse cambiada
+// («Binary signature denied», probado el 11/11 una por una con EVS 1.3.3), y si
+// se cambian después de firmar la firma deja de valer. Sin VMP no hay DRM
+// (Crunchyroll da KAT-6005), así que se quedan como vienen. Esto avisa si alguien
+// las vuelve a poner. Las protecciones que tapaban (file://, RunAsNode) van en el
+// código: archivos-locales.js y la última prueba de este archivo.
 // Se ejecuta con: npm test
 'use strict';
 const test = require('node:test');
@@ -13,34 +14,12 @@ const path = require('node:path');
 
 const RAIZ = path.join(__dirname, '..');
 const PKG = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8'));
-const FUSES = PKG.build.electronFuses;
 
-test('package.json pide las siete fuses', () => {
-  assert.deepEqual(FUSES, {
-    grantFileProtocolExtraPrivileges: false,
-    enableCookieEncryption: true,
-    runAsNode: false,
-    enableNodeOptionsEnvironmentVariable: false,
-    enableNodeCliInspectArguments: false,
-    onlyLoadAppFromAsar: true,
-    enableEmbeddedAsarIntegrityValidation: true
-  });
+test('el instalable no cambia ninguna fuse (castlabs no firmaría Widevine)', () => {
+  assert.equal(PKG.build.electronFuses, undefined);
 });
 
-test('electron-builder traduce cada una a su fuse de Electron', async () => {
-  const { PlatformPackager } = require('app-builder-lib');
-  const { FuseV1Options } = require('@electron/fuses');
-  const config = await PlatformPackager.prototype.generateFuseConfig.call({}, FUSES);
-  assert.equal(config[FuseV1Options.RunAsNode], false);
-  assert.equal(config[FuseV1Options.EnableNodeOptionsEnvironmentVariable], false);
-  assert.equal(config[FuseV1Options.EnableNodeCliInspectArguments], false);
-  assert.equal(config[FuseV1Options.OnlyLoadAppFromAsar], true);
-  assert.equal(config[FuseV1Options.EnableEmbeddedAsarIntegrityValidation], true);
-  assert.equal(config[FuseV1Options.GrantFileProtocolExtraPrivileges], false);
-  assert.equal(config[FuseV1Options.EnableCookieEncryption], true);
-});
-
-test('orden del empaquetado: asar e integridad, afterPack, fuses, Authenticode y la firma VMP al final', () => {
+test('orden del empaquetado: afterPack, Authenticode y la firma VMP al final', () => {
   // El asar va empaquetado (sin él no hay integridad que comprobar ni OnlyLoadAppFromAsar que valga).
   assert.notEqual(PKG.build.asar, false);
   assert.equal(PKG.build.afterSign, 'build/evs-sign.js');
