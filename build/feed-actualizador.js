@@ -18,8 +18,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 const yaml = require('js-yaml');
 
-const esDev = (version) => /-dev/i.test(String(version));
-const feedDe = (version) => (esDev(version) ? 'dev.yml' : 'latest.yml');
+// La misma regla que aplica la app al buscar (y al leer la firma del feed)
+const { esDev, feedDe } = require('../src/canal-actualizaciones');
 
 // Nombres que deja electron-builder en dist/ y con los que se suben (GitHub cambia los espacios por guiones).
 function nombres(version) {

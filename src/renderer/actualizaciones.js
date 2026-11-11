@@ -6,6 +6,7 @@ const updStatus = $('#upd-status'), updBtn = $('#upd-btn'), updBar = $('#upd-bar
 let updChosen = null;     // línea elegida ('stable'|'dev') mientras descarga
 let updReadyLine = null;  // línea ya descargada, lista para instalar
 let updAutoLista = null;  // versión estable bajada sola, esperando al cierre
+let updSoloWeb = null;    // versión sin firma válida: { version, web }, solo se baja a mano desde la web
 let updBusy = false;
 const UPD_LABEL = { stable: 'Naviris', dev: 'NavirisDev' };
 function setUpd(text, cls) { updStatus.textContent = text; updStatus.className = cls || ''; }
@@ -70,6 +71,16 @@ function marcaListaParaInstalar(version) {
     if (pop.firstElementChild !== entrada) pop.insertBefore(entrada, pop.firstElementChild);
   }
 }
+/* Una versión cuya firma no cuadra no se descarga (ver descargaVerificada en
+   main.js): se dice claro y se ofrece la web, donde se baja a mano. */
+function abreWebDescarga() { $('#about-modal').classList.add('hidden'); createTab(updSoloWeb.web); }
+function avisoSoloWeb(version) {
+  setUpd('No se pudo verificar la v' + version + ', así que no se descargó. Descárgala desde la web de Naviris.', 'err');
+  const ir = document.createElement('button');
+  ir.type = 'button'; ir.className = 'upd-web'; ir.textContent = 'Ir a naviris.site';
+  ir.addEventListener('click', abreWebDescarga);
+  updStatus.append(' ', ir);
+}
 window.navirisApp.onUpdateStatus((s) => {
   if (s.state === 'available') {
     // Solo se descarga si el usuario eligió línea; el aviso silencioso de arranque solo notifica
@@ -103,6 +114,14 @@ window.navirisApp.onUpdateStatus((s) => {
     updBar.classList.add('hidden');
     setUpd(UPD_LABEL[updReadyLine] + ' v' + s.version + ' lista para instalar.', 'hot');
     const { btn } = updLineEls(updReadyLine); btn.textContent = 'Reiniciar e instalar'; btn.disabled = false;
+  } else if (s.state === 'sin-firma') {
+    const repetido = updSoloWeb && updSoloWeb.version === s.version;
+    updSoloWeb = { version: s.version, web: s.web };
+    if (updChosen || updBusy) { updBar.classList.add('hidden'); updBusy = false; updChosen = null; avisoSoloWeb(s.version); return; }
+    if (repetido) return; // el reloj vuelve a mirar cada 2 h: avisar UNA vez
+    marcaActualizacion(s.version);
+    $('#menu-update').textContent = 'Descargar la ' + s.version + ' desde la web';
+    toast('Hay una versión nueva que no se pudo verificar: descárgala desde naviris.site');
   } else if (s.state === 'error') {
     if (updChosen || updBusy) { setUpd('Error al actualizar: ' + s.message, 'err'); updBusy = false; updChosen = null; }
   }
