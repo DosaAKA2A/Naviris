@@ -23,6 +23,7 @@ Todo se puede cambiar con variables de entorno. Si no pones nada, se usa lo de l
 | `BRAVE_EXE` | `%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe` (o la instalación por usuario) |
 | `EDGE_EXE` | `%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe` |
 | `NAVIRIS_BENCH_TRABAJO` | `benchmark/trabajo/` (perfiles, semillas, medidas y registros; está en `.gitignore`) |
+| `SEMILLA_S` | 120 (segundos que se deja cada semilla; menos solo para una pasada de prueba) |
 
 Los guiones nunca tocan tus perfiles de siempre: cada navegador arranca con `--user-data-dir` dentro de la carpeta de trabajo. Puertos CDP: 9422 para Naviris y el control, 9442 Chrome, 9452 Brave, 9472 Edge, y 9462 para el servidor local del arranque. Si tienes uno de esos navegadores abierto con el mismo puerto de depuración, ciérralo antes.
 

@@ -34,6 +34,7 @@ const celda = (e) => {
   return `${num(e.mediana, d)} (${num(e.min, d)}–${num(e.max, d)})` + (e.n >= 20 ? ` · p95 ${num(p95(e.valores), d)}` : '');
 };
 
+const cuenta = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 const NOMBRES = { naviris: 'Naviris', 'naviris-sin': 'Naviris sin bloqueador', electron: 'Electron solo (control)', chrome: 'Chrome', brave: 'Brave', edge: 'Edge', firefox: 'Firefox' };
 const ORDEN = Object.keys(NOMBRES);
 const nombre = (k) => NOMBRES[k] || k;
@@ -136,7 +137,7 @@ function tablas(r) {
   const reps = (o) => Math.max(...Object.values(o).flatMap((x) => Object.values(x)).map((e) => e?.n || 0));
 
   if (M.arranque) {
-    md += `\n#### Arranque · ms, mediana (mín–máx) de ${reps(M.arranque)} repeticiones\n\n`;
+    md += `\n#### Arranque · ms, mediana (mín–máx) de ${cuenta(reps(M.arranque), 'repetición', 'repeticiones')}\n\n`;
     md += cab(['', 'Ventana, perfil nuevo', 'Página cargada, perfil nuevo', 'Ventana, perfil existente', 'Página cargada, perfil existente']);
     for (const k of ordena(Object.keys(M.arranque))) { const x = M.arranque[k]; md += fila([nombre(k), celda(x['frio.ventanaMs']), celda(x['frio.navegableMs']), celda(x['caliente.ventanaMs']), celda(x['caliente.navegableMs'])]); }
   }
@@ -144,7 +145,7 @@ function tablas(r) {
     const n = Math.max(...Object.values(M.consumo).map((x) => x.reposo.privateBytesMB.n));
     const cols = ['', 'Reposo', '1 sitio', '5 sitios, uno delante', '5 sitios al fondo', '10 sitios, uno delante', '10 sitios al fondo'];
     for (const [tit, k] of [['Private bytes (MB)', 'privateBytesMB'], ['Working set privado (MB)', 'privWsMB'], ['CPU de todo el árbol (ms en 40 s)', 'cpuMsEn40s']]) {
-      md += `\n#### ${tit} · mediana (mín–máx) de ${n} sesiones\n\n` + cab(cols);
+      md += `\n#### ${tit} · mediana (mín–máx) de ${cuenta(n, 'sesión', 'sesiones')}\n\n` + cab(cols);
       for (const c of ordena(Object.keys(M.consumo))) md += fila([nombre(c), ...SITUACIONES.map((s) => celda(M.consumo[c][s][k]))]);
     }
     md += `\n#### Procesos abiertos · mediana\n\n` + cab(cols);
@@ -155,30 +156,30 @@ function tablas(r) {
     const sitios = Object.keys(M.cargas[cuales[0]]).filter((s) => s !== '_suma');
     const n = M.cargas[cuales[0]][sitios[0]].loadMs.n;
     for (const [tit, k] of [['Carga, navigationStart → load (ms)', 'loadMs'], ['LCP (ms)', 'lcpMs']]) {
-      md += `\n#### ${tit} · mediana (mín–máx) de ${n} pasadas con caché vacía\n\n` + cab(['Sitio', ...cuales.map(nombre)]);
+      md += `\n#### ${tit} · mediana (mín–máx) de ${cuenta(n, 'pasada', 'pasadas')} con caché vacía\n\n` + cab(['Sitio', ...cuales.map(nombre)]);
       for (const s of sitios) md += fila([sitioCorto(s), ...cuales.map((c) => celda(M.cargas[c][s]?.[k]))]);
       md += fila(['**Suma de medianas**', ...cuales.map((c) => `**${num(M.cargas[c]._suma[k])}**`)]);
     }
   }
   if (M.youtube) {
     const n = Math.max(...Object.values(M.youtube).map((x) => x.cpuMs60s.n));
-    md += `\n#### YouTube, 60 s de video · mediana (mín–máx) de ${n} pasadas\n\n`;
+    md += `\n#### YouTube, 60 s de video · mediana (mín–máx) de ${cuenta(n, 'pasada', 'pasadas')}\n\n`;
     md += cab(['', 'CPU (ms en 60 s)', 'Private bytes (MB)', 'Working set (MB)', 'Procesos', 'Frames', 'Perdidos']);
     for (const c of ordena(Object.keys(M.youtube))) { const x = M.youtube[c]; md += fila([nombre(c), celda(x.cpuMs60s), celda(x.privateBytesMB), celda(x.wsMB), celda(x.procesos), celda(x.frames), celda(x.perdidos)]); }
   }
   if (M.bench) {
     const n = Math.max(...Object.values(M.bench).map((x) => x.speedometer.n));
-    md += `\n#### Benchmarks · puntos, más es mejor, mediana (mín–máx) de ${n} pasadas\n\n`;
+    md += `\n#### Benchmarks · puntos, más es mejor, mediana (mín–máx) de ${cuenta(n, 'pasada', 'pasadas')}\n\n`;
     md += cab(['', 'Speedometer 3.1', 'JetStream 2.2', 'MotionMark 1.3.1', 'Área de página']);
     for (const c of ordena(Object.keys(M.bench))) { const x = M.bench[c]; md += fila([nombre(c), celda(x.speedometer), celda(x.jetstream), celda(x.motionmark), x.viewport.map((v) => v.replace(/ dpr.*/, '').replace('x', '×')).join(', ')]); }
   }
   const ad = r.antesDespues;
   if (ad) {
-    md += `\n#### ${ad.titulo} · ms, mediana (mín–máx) de ${ad.arranque.antes['frio.ventanaMs'].n} pasadas intercaladas\n\n`;
+    md += `\n#### ${ad.titulo} · ms, mediana (mín–máx) de ${cuenta(ad.arranque.antes['frio.ventanaMs'].n, 'pasada', 'pasadas')} intercaladas\n\n`;
     md += cab(['', 'Ventana, perfil nuevo', 'Página cargada, perfil nuevo', 'Ventana, perfil existente', 'Página cargada, perfil existente']);
     for (const [k, t] of [['antes', ad.nombres.antes], ['despues', ad.nombres.despues]]) { const x = ad.arranque[k]; md += fila([t, celda(x['frio.ventanaMs']), celda(x['frio.navegableMs']), celda(x['caliente.ventanaMs']), celda(x['caliente.navegableMs'])]); }
     if (ad.tendencias) {
-      md += `\n#### Repintado del hub pasados 2 min · 25 s, mediana (mín–máx) de ${ad.tendencias.antes.cpuMs25s.n} pasadas\n\n`;
+      md += `\n#### Repintado del hub pasados 2 min · 25 s, mediana (mín–máx) de ${cuenta(ad.tendencias.antes.cpuMs25s.n, 'pasada', 'pasadas')}\n\n`;
       md += cab(['', 'CPU (ms)', 'Pico de private bytes (MB)', 'Procesos nuevos']);
       for (const [k, t] of [['antes', ad.nombres.antes], ['despues', ad.nombres.despues]]) { const x = ad.tendencias[k]; md += fila([t, celda(x.cpuMs25s), celda(x.picoPrivateBytesMB), celda(x.procesosNuevos)]); }
     }

@@ -4,6 +4,7 @@
 // semilla: un perfil limpio, sin historial ni sesiones, pero ya inicializado.
 // «naviris-sin» = la semilla de Naviris con el bloqueador apagado (adblockEnabled: false).
 // En Naviris solo se apagan los sonidos, para que no suenen en cada pasada.
+// SEMILLA_S en el entorno cambia los 120 s de espera (para una pasada de prueba).
 // Uso: node semillas.mjs [navs separados por coma]   (por defecto naviris,chrome,brave)
 import fs from 'node:fs';
 import { TRABAJO, familia, lanza, prepara, cierra, espera, borraPerfil, copiaPerfil, log } from './lib.mjs';
@@ -15,7 +16,7 @@ for (const cual of CUALES) {
   if (familia(cual) === 'naviris') fs.writeFileSync(`${perfil}/naviris-settings.json`, JSON.stringify({ sonidos: false }));
   const b = lanza(cual, perfil, { log: `${TRABAJO}/logs/semilla-${cual}.log` });
   await prepara(b);
-  await espera(120000);
+  await espera(Number(process.env.SEMILLA_S || 120) * 1000);
   if (familia(cual) === 'naviris') log('bloqueador', await b.ui.ev('window.navirisApp && window.navirisApp.adblockGet ? window.navirisApp.adblockGet() : null').catch((e) => String(e)));
   log('semilla', cual, await cierra(b));
 }
