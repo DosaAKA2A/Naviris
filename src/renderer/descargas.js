@@ -207,7 +207,7 @@ function renderDownloadsPage() {
 async function showDownloadsPage() {
   closeRightPanels();
   tabs.forEach((t) => t.webview?.classList.remove('active'));
-  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage(); cierraNovedadesPagina(true);
+  els.hub.classList.remove('active'); hideBookmarkPage(); hideAddonsPage(); cierraNovedadesPagina(true); cierraCentro(true);
   els.dlPage.classList.remove('hidden'); els.dlPage.classList.add('active'); els.sbDownloads.classList.add('open');
   dlpFiles = await window.navirisApp.listDownloadFiles();
   renderDownloadsPage();

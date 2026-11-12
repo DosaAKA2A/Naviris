@@ -153,6 +153,12 @@ contextBridge.exposeInMainWorld('navirisApp', {
   lensImagen: (datos) => ipcRenderer.invoke('lens:imagen', datos),
   sysStats: () => ipcRenderer.invoke('sys:stats'),
   perfTabs: (lista) => ipcRenderer.invoke('perf:tabs', lista),
+  // Centro de rendimiento (Ajustes): en vivo, foto de la memoria, equipo y arranque,
+  // y el servidor local de las páginas de prueba (true lo enciende, false lo apaga).
+  centroVivo: () => ipcRenderer.invoke('centro:vivo'),
+  centroMemoria: () => ipcRenderer.invoke('centro:memoria'),
+  centroInfo: () => ipcRenderer.invoke('centro:info'),
+  centroPaginas: (encender) => ipcRenderer.invoke('centro:paginas', !!encender),
   clipRead: () => ipcRenderer.invoke('clip:read'),
   clipWrite: (t) => ipcRenderer.invoke('clip:write', t),
 

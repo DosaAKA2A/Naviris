@@ -84,6 +84,7 @@ els.menuPop.addEventListener('click', (e) => {
   // Si la versión nueva no tiene firma válida, la entrada lleva a la web para bajarla a mano.
   if (a === 'update') { if (updAutoLista) window.navirisApp.updateInstall(); else if (updSoloWeb) abreWebDescarga(); else { showAbout(); setTimeout(() => $('#upd-btn').click(), 100); } }
   if (a === 'permissions') showPermManager();
+  if (a === 'centro') abreCentro();
   // Volver a ver la página de la versión instalada cuando quieras: sale sola al
   // actualizar, pero cerrarla no puede significar perderla.
   if (a === 'novedades') (async () => {

@@ -291,6 +291,60 @@
             </div>
           </div>
         </section>
+
+        <!-- ===== Centro de rendimiento (Ajustes) =====
+             Cómo va Naviris en este equipo y unas pruebas para medirlo. Lo de
+             «Ahora» se refresca cada 2 s solo mientras la página está abierta
+             (ver renderer/centro.js). -->
+        <section id="centro-page" class="overlay-page hidden">
+          <button id="cr-x" class="novp-x" data-ico="x-mark" title="Cerrar (Esc)" aria-label="Cerrar"></button>
+          <div class="bmp-inner">
+            <div class="bmp-head">
+              <h2>Centro de rendimiento</h2>
+              <div class="bmp-tools">
+                <button id="cr-copiar" class="ghost-btn"><span data-ico="clipboard"></span> Copiar resultados</button>
+              </div>
+            </div>
+            <p class="adp-sub">Cómo se comporta Naviris en tu equipo. Los resultados se guardan solo aquí y no se envían a ningún sitio: si quieres compartirlos, cópialos.</p>
+
+            <div class="cr-sec">Ahora</div>
+            <div class="cr-cifras">
+              <div class="cr-cifra"><span class="cr-k">Memoria</span><span class="cr-v" id="cr-mem">—</span><span class="cr-s" id="cr-mem-s"></span></div>
+              <div class="cr-cifra"><span class="cr-k">Procesador</span><span class="cr-v" id="cr-cpu">—</span><span class="cr-s">Del total del equipo</span></div>
+              <div class="cr-cifra"><span class="cr-k">Pestañas</span><span class="cr-v" id="cr-tabs">—</span><span class="cr-s" id="cr-tabs-s"></span></div>
+              <div class="cr-cifra"><span class="cr-k">Abierto hace</span><span class="cr-v" id="cr-activo">—</span><span class="cr-s" id="cr-activo-s"></span></div>
+            </div>
+
+            <div class="cr-sec">Memoria en esta sesión</div>
+            <div class="cr-tend">
+              <svg id="cr-tend-g" class="cr-tend-g" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="" /></svg>
+              <p id="cr-tend-t" class="cr-nota"></p>
+            </div>
+
+            <div class="cr-sec">Pruebas</div>
+            <div class="cr-prueba">
+              <div class="cr-p-txt"><b>Arranque</b><span>Lo que tardó Naviris en abrirse esta vez, desde que lo abriste.</span></div>
+              <div class="cr-p-res" id="cr-r-arranque"></div>
+            </div>
+            <div class="cr-prueba">
+              <div class="cr-p-txt"><b>Memoria</b><span>Cuánta usa Naviris ahora mismo con lo que tienes abierto, y en qué.</span></div>
+              <button class="ghost-btn cr-medir" data-prueba="memoria">Medir</button>
+              <div class="cr-p-res" id="cr-r-memoria"></div>
+            </div>
+            <div class="cr-prueba">
+              <div class="cr-p-txt"><b>Carga de páginas</b><span>Abre tres páginas de prueba guardadas en tu equipo, tres veces cada una. No usa internet.</span></div>
+              <button class="ghost-btn cr-medir" data-prueba="carga">Medir</button>
+              <div class="cr-p-res" id="cr-r-carga"></div>
+            </div>
+            <div class="cr-prueba">
+              <div class="cr-p-txt"><b>Renderizado</b><span>Durante 5 segundos mueve 400 elementos y desplaza una lista larga, y cuenta los fotogramas.</span></div>
+              <button class="ghost-btn cr-medir" data-prueba="render">Medir</button>
+              <div class="cr-p-res" id="cr-r-render"></div>
+            </div>
+            <!-- Aquí se monta, solo mientras dura una prueba, la página de prueba -->
+            <div id="cr-banco" class="cr-banco hidden"></div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -303,6 +357,7 @@
     <button data-action="bookmarks">Ver todos los marcadores</button>
     <button data-action="toggle-bookmarks">Mostrar/ocultar barra de marcadores</button>
     <button data-action="permissions">Permisos de sitios…</button>
+    <button data-action="centro">Centro de rendimiento</button>
     <button data-action="borrar-datos">Borrar datos de navegación…</button>
     <button data-action="predeterminado" class="menu-toggle"><span>Hacer de Naviris el navegador predeterminado<br /><small id="menu-predet-estado">Se elige en Configuración de Windows</small></span></button>
     <hr />
@@ -567,6 +622,7 @@
   <script src="atajos.js"></script>
   <script src="buscadores.js"></script>
   <script src="migra-claves.js"></script>
+  <script src="centro-rendimiento.js"></script>
   <!-- La interfaz: scripts clásicos que comparten el ámbito global (lo que uno declara lo ven
        los demás, y los addons también). El orden importa: lo que se ejecuta al cargar un módulo
        solo puede usar lo de los anteriores, y entre un módulo y el siguiente pueden correr
@@ -596,6 +652,7 @@
   <script src="renderer/avisos.js" defer></script>
   <script src="renderer/addons.js" defer></script>
   <script src="renderer/actualizaciones.js" defer></script>
+  <script src="renderer/centro.js" defer></script>
   <script src="renderer/buscar.js" defer></script>
   <script src="renderer/atajos-teclado.js" defer></script>
   <script src="renderer/arranque.js" defer></script>

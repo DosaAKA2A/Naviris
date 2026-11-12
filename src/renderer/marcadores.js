@@ -69,7 +69,7 @@ els.navStar.addEventListener('click', () => {
 });
 
 /* Página de marcadores */
-function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
+function showBookmarkPage() { tabs.forEach((t) => t.webview?.classList.remove('active')); els.hub.classList.remove('active'); hideAddonsPage(); hideDownloadsPage(); cierraNovedadesPagina(true); cierraCentro(true); els.bmPage.classList.remove('hidden'); els.bmPage.classList.add('active'); els.sbBookmarks.classList.add('open'); renderBookmarkTree(); }
 function hideBookmarkPage() { els.bmPage.classList.remove('active'); els.bmPage.classList.add('hidden'); els.sbBookmarks.classList.remove('open'); }
 let bmFilter = '';
 function renderBookmarkTree() {
