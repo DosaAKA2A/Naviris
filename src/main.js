@@ -1730,6 +1730,10 @@ function createWindow(isPrivate = false, conSplash = false, sacada = false) {
     // como en Chrome; la interfaz sigue sin él.
     webPreferences.spellcheck = true;
     webPreferences.preload = path.join(__dirname, 'webview-preload.js');
+    /* El webview oculto que lee las tendencias de X (widgets.js) va sin
+       multimedia ni WebRTC: ver oculto-preload.js (+120 MB en la GPU si no).
+       Es invisible y solo se lee su texto: no necesita webview-preload.js. */
+    if (/#naviris-oculto$/.test(String(params.src || ''))) webPreferences.preload = path.join(__dirname, 'oculto-preload.js');
     /* Pestañas de fondo dormidas para el pintado, como en Chrome (2026-11-03).
        Con backgroundThrottling a false (lo que había, por el AutoClaim) Electron no
        deja que el webview se marque nunca como oculto: las pestañas de detrás y las
@@ -2898,6 +2902,15 @@ ipcMain.handle('lens:imagen', soloUI(async (_e, { src, pagina } = {}) => {
 const memKb = centroRend.memoriaKb;
 // Métricas para el widget Monitor: memoria del sistema + CPU/RAM de Naviris
 // (app.getAppMetrics agrega todos los procesos del navegador).
+/* Tendencias mundiales del widget de X: solo el HTML de trends24.in, que la
+   interfaz lee con DOMParser. Antes era un webview oculto con la página entera
+   y despertaba el reproductor multimedia (+110 MB en la GPU); ver widgets.js. */
+ipcMain.handle('tendencias:mundiales', soloUI(async () => {
+  try {
+    const r = await net.fetch('https://trends24.in/', { signal: AbortSignal.timeout(15000) });
+    return r.ok ? (await r.text()).slice(0, 2000000) : '';
+  } catch { return ''; }
+}));
 ipcMain.handle('sys:stats', soloUI(async () => {
   try {
     const mem = process.getSystemMemoryInfo();               // KB

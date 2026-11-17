@@ -156,6 +156,7 @@ contextBridge.exposeInMainWorld('navirisApp', {
   gmailFeed: () => ipcRenderer.invoke('gmail:feed'),
   lensImagen: (datos) => ipcRenderer.invoke('lens:imagen', datos),
   sysStats: () => ipcRenderer.invoke('sys:stats'),
+  tendenciasMundiales: () => ipcRenderer.invoke('tendencias:mundiales'),
   perfTabs: (lista) => ipcRenderer.invoke('perf:tabs', lista),
   // Centro de rendimiento (Ajustes): en vivo, foto de la memoria, equipo y arranque,
   // y el servidor local de las páginas de prueba (true lo enciende, false lo apaga).

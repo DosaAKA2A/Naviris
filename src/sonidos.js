@@ -26,15 +26,50 @@
   const ENTRE_IGUALES = 400;
   const ultimo = {};
 
-  /* Reproduce un sonido y devuelve el <audio> (o null si no suena). Quien
-     llama decide si los sonidos están activados: este archivo no lee ajustes. */
+  /* POR WEB AUDIO, NO CON <audio> (2026-11-17). Un solo <audio> en la interfaz
+     ponía en marcha el reproductor multimedia de Chromium y el proceso de la
+     GPU se quedaba con ~110 MB más para siempre (medido: 95 MB en reposo sin
+     el sonido de arranque, 192 MB con él). Web Audio decodifica el .ogg en la
+     propia página y no toca la GPU. El contexto se suspende al acabar cada
+     sonido para no tener la salida de audio abierta todo el rato. */
+  let ctx = null, sonando = 0;
+  const buffers = {};
+  const contexto = () => (ctx ||= new AudioContext());
+  async function buffer(nombre) {
+    if (!buffers[nombre]) {
+      buffers[nombre] = fetch(`sonidos/${PALETA}/${nombre}.ogg`)
+        .then((r) => r.arrayBuffer()).then((b) => contexto().decodeAudioData(b))
+        .catch((e) => { delete buffers[nombre]; throw e; });
+    }
+    return buffers[nombre];
+  }
+
+  /* Reproduce un sonido y devuelve un objeto que avisa con 'playing', 'ended'
+     y 'error', como hacía el <audio> (o null si no suena). Quien llama decide
+     si los sonidos están activados: este archivo no lee ajustes. */
   window.navSonido = function (nombre) {
     const ahora = Date.now();
     if (ahora - (ultimo[nombre] || 0) < ENTRE_IGUALES) return null;
     ultimo[nombre] = ahora;
-    const a = new Audio(`sonidos/${PALETA}/${nombre}.ogg`);
-    a.volume = VOLUMEN;
-    a.play().catch(() => {});
-    return a;
+    const avisa = new EventTarget();
+    const emite = (tipo) => avisa.dispatchEvent(new Event(tipo));
+    (async () => {
+      try {
+        const c = contexto();
+        const b = await buffer(nombre);
+        if (c.state !== 'running') await c.resume();
+        const fuente = c.createBufferSource(); fuente.buffer = b;
+        const volumen = c.createGain(); volumen.gain.value = VOLUMEN;
+        fuente.connect(volumen).connect(c.destination);
+        sonando++;
+        fuente.onended = () => {
+          if (--sonando === 0) c.suspend().catch(() => {});
+          emite('ended');
+        };
+        fuente.start();
+        emite('playing');
+      } catch (e) { emite('error'); }
+    })();
+    return avisa;
   };
 })();

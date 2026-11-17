@@ -171,19 +171,23 @@ function scrapeOculto(url, code, timeoutMs = 15000) {
     wv.addEventListener('dom-ready', () => {
       setTimeout(() => { wv.executeJavaScript(code, false).then(acaba).catch(() => acaba(null)); }, 1500);
     });
-    wv.src = url; document.body.appendChild(wv);
+    wv.src = url + '#naviris-oculto'; document.body.appendChild(wv);   // sin multimedia: ver oculto-preload.js
   });
 }
-const XT_LEE = `(async () => {
+/* Las mundiales de trends24.in YA NO se cargan en un webview oculto
+   (2026-11-17): la página entera (sus anuncios y vídeos) despertaba el
+   reproductor multimedia y el proceso de la GPU se quedaba con ~110 MB más
+   con el hub en reposo. El main baja solo el HTML (main.js,
+   'tendencias:mundiales') y aquí se lee con DOMParser, que no carga nada. */
+function leeMundiales(html) {
+  // Sin sus on...= (no se ejecutarían, pero la CSP de la interfaz se queja de cada uno en la consola)
+  const doc = new DOMParser().parseFromString(String(html || '').replace(/\son[a-z]+\s*=/gi, ' data-on='), 'text/html');
   const out = [];
-  const tarjeta = document.querySelector('.trend-card');
+  const tarjeta = doc.querySelector('.trend-card');
   if (tarjeta) tarjeta.querySelectorAll('.trend-card__list a').forEach((a) => out.push(a.textContent.trim()));
-  if (!out.length) document.querySelectorAll('ol li a').forEach((a) => { if (out.length < 12) out.push(a.textContent.trim()); });
-  /* Fuera su service worker (auditoría 2026-10): trends24 lo registra en cada
-     visita y dejaba un proceso vivo indefinidamente con el hub en reposo. */
-  try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) { /* sin SW */ }
+  if (!out.length) doc.querySelectorAll('ol li a').forEach((a) => { if (out.length < 12) out.push(a.textContent.trim()); });
   return out.filter(Boolean).slice(0, 9);
-})()`;
+}
 // x.com/explore con TU sesion: tendencias "Para ti" (el algoritmo del propio
 // usuario). Sin sesion, X no pinta [data-testid=trend] y caemos a mundiales.
 /* ESPERA ACTIVA (2026-08-13). Se leía 1,5 s después de cargar y X todavía no
@@ -284,9 +288,9 @@ function tendenciasDeTuPestana() {
   return t.webview.executeJavaScript(XT_LEE_X, false).catch(() => null);
 }
 function leeTendencias() {
-  const mundiales = () => scrapeOculto('https://trends24.in/', XT_LEE).then((mundo) => {
+  const mundiales = () => window.navirisApp.tendenciasMundiales().then(leeMundiales).then((mundo) => {
     if (mundo && mundo.length) xtCache = { t: Date.now(), items: mundo, src: 'mundial' };
-  });
+  }).catch(() => {});
   return tendenciasDeTuPestana().then((mias) => {
     if (mias && mias.length >= 3) { xtCache = { t: Date.now(), items: mias, src: 'ti' }; return null; }
     if (Date.now() < xtSinSesionHasta) return mundiales();
