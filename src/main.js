@@ -3942,8 +3942,16 @@ ipcMain.handle('file:save-png', soloUI(async (e, { dataUrl, suggestedName }) => 
 
 
 // ---------- Actualización automática (GitHub Releases) ----------
+/* LA PORTABLE SOLO AVISA (Dosa, 2026-11-17). El actualizador baja el instalador
+   normal, que pone Naviris en Programs\ como una copia APARTE: la portable no
+   cambia. Con la instalacion al cerrar, cada vez que se abria la portable vieja
+   volvia a encontrar la version nueva y la volvia a instalar al salir, un bucle
+   sin fin (reproducido en Windows Sandbox con la 2.8.1 portable). Ahora en la
+   portable no se baja ni se instala nada por su cuenta: sale el aviso y, si el
+   usuario quiere, desde el menu pasa a la version instalada. */
+const ES_PORTABLE = !!process.env.PORTABLE_EXECUTABLE_DIR;
 autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.autoInstallOnAppQuit = !ES_PORTABLE;
 // Canal DEV o estable: lo decide canal-actualizaciones.js (ver allí).
 function applyUpdateChannel() {
   const canal = canalDeActualizacion(app.getVersion(), settings.devUpdates);
@@ -3983,7 +3991,7 @@ let bajandoSolo = false;         // evita relanzar la descarga en cada aviso
    versión nueva), pero no baja nada: el menú enseña "Actualizar a la X" y ahí
    decide él. */
 function actualizacionSolaPermitida() {
-  return app.isPackaged && settings.updatesAuto !== false;
+  return app.isPackaged && !ES_PORTABLE && settings.updatesAuto !== false;
 }
 /* NADA SE DESCARGA SIN LA FIRMA DE NAVIRIS (auditoría 2026-11, #7). Sin
    Authenticode, lo único que protegía el instalador era el sha512 del feed, que
