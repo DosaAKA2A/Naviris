@@ -125,6 +125,7 @@ els.optVtabs.addEventListener('change', async () => {
 els.vtabsNew.addEventListener('click', () => createTab());
 els.divSalir.innerHTML = window.icon('x-mark');
 els.divSalir.addEventListener('click', salirDivision);
+els.optTraducir.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ traducirBurbuja: els.optTraducir.checked }); if (!els.optTraducir.checked) cierraTraductor(); toast(els.optTraducir.checked ? 'Burbuja para traducir activada' : 'Burbuja para traducir desactivada'); });
 els.optMousenav.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ mouseNav: els.optMousenav.checked }); toast(els.optMousenav.checked ? 'Botones del mouse activados' : 'Botones del mouse desactivados'); });
 els.optSonidos.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ sonidos: els.optSonidos.checked }); });
 els.optLight.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ lightMode: els.optLight.checked }); applyTheme(settings.lightMode); });

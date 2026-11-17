@@ -341,6 +341,8 @@ const DEFAULT_SETTINGS = {
   moovinPase: '',             // pase de la biblioteca privada de MOOVIN (moovin.live)
   atajos: true,             // atajos de teclado (Ctrl+T, Ctrl+W…); F11 y F12 no se tocan
   mouseNav: true,           // botones laterales del ratón para atrás/adelante
+  traducirBurbuja: true,    // burbuja «Traducir» al seleccionar texto en una página
+  traducirA: 'es',          // idioma al que traduce (burbuja y clic derecho)
   blockPasskeys: true,      // las webs no ven passkey de plataforma (preload); si una insiste, Windows Hello real
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
@@ -1895,6 +1897,7 @@ function menuContextual(contents, host = contents.hostWebContents, ventanita = n
       const corto = limpio.length > 24 ? limpio.slice(0, 24).trimEnd() + '…' : limpio;
       items.push({ label: 'Copiar', icon: 'copy', accelerator: 'Ctrl+C', click: () => contents.copy() });
       items.push({ label: 'Buscar "' + corto + '" en una pestaña nueva', icon: 'magnifying-glass', click: () => aRenderer('buscar', p.selectionText.trim()) });
+      if (!ventanita) items.push({ label: 'Traducir "' + corto + '"', icon: 'languages', click: () => aRenderer('traducir', { texto: p.selectionText.trim(), x: p.x, y: p.y }) });
       sep();
     }
     if (p.isEditable) {
@@ -3940,6 +3943,42 @@ ipcMain.handle('file:save-png', soloUI(async (e, { dataUrl, suggestedName }) => 
   } catch (err) { return { ok: false, message: String(err.message || err) }; }
 }));
 
+
+// ---------- Traducir lo seleccionado (Dosa, 2026-11-17: «como Opera GX») ----------
+/* La burbuja y el clic derecho de una página piden aquí la traducción. Va al
+   traductor público de Google (el mismo que usan muchas extensiones) SOLO
+   cuando el usuario pulsa «Traducir»: seleccionar texto no manda nada fuera.
+   Sale por una sesión aparte, sin las cookies de las cuentas del usuario ni el
+   bloqueador de las pestañas. Si el texto ya está en el idioma de destino se
+   traduce al inglés: pasar español a español no sirve de nada. */
+const TRADUCTOR_IDIOMAS = ['es', 'en', 'pt', 'fr', 'de', 'it', 'ja', 'ko', 'zh-CN', 'ru'];
+let sesionTraductor = null;
+async function traduce(texto, destino) {
+  texto = String(texto || '').trim().slice(0, 5000);
+  if (!texto) throw new Error('vacío');
+  if (!TRADUCTOR_IDIOMAS.includes(destino)) destino = 'es';
+  sesionTraductor ||= session.fromPartition('naviris-traductor', { cache: false });
+  const pide = async (tl) => {
+    const r = await sesionTraductor.fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=' + encodeURIComponent(tl), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: 'q=' + encodeURIComponent(texto),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const frases = Array.isArray(d && d[0]) ? d[0] : [];
+    return { texto: frases.map((f) => (Array.isArray(f) && typeof f[0] === 'string' ? f[0] : '')).join(''), origen: typeof d[2] === 'string' ? d[2] : '', destino: tl };
+  };
+  let res = await pide(destino);
+  if (res.origen && res.origen.split('-')[0] === destino.split('-')[0] && destino !== 'en') res = await pide('en');
+  if (!res.texto) throw new Error('sin texto');
+  return res;
+}
+ipcMain.handle('traducir', soloUI(async (_e, texto, destino) => {
+  try { return { ok: true, ...(await traduce(texto, destino || settings.traducirA)) }; }
+  catch (err) { console.log('[Naviris] traducir:', err.message); return { ok: false }; }
+}));
 
 // ---------- Actualización automática (GitHub Releases) ----------
 /* LA PORTABLE SOLO AVISA (Dosa, 2026-11-17). El actualizador baja el instalador

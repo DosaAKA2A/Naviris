@@ -8,7 +8,7 @@ loadToolAddons();
   migraFondoPorTema(); // antes de applyTheme(): el es quien aplica el fondo del tema
   settings = await window.navirisApp.getSettings();
   els.optPowersaver.checked = settings.powerSaver; els.optGpu.checked = settings.hardwareAcceleration; els.optAgent.checked = !!settings.agentMode; els.optUpdauto.checked = settings.updatesAuto !== false;
-  els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false;
+  els.optAtajos.checked = settings.atajos !== false; els.optMousenav.checked = settings.mouseNav !== false; els.optTraducir.checked = settings.traducirBurbuja !== false;
   els.optPreguntarDescargas.checked = !!settings.preguntarDescargas; pintaBuscador();
   els.optSonidos.checked = settings.sonidos !== false;
   els.optVtabs.checked = !!settings.tabsVerticales; aplicaVerticales(settings.tabsVerticales);

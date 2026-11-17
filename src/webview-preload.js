@@ -1204,6 +1204,32 @@ window.addEventListener('mouseup', function (e) {
 }, true);
 window.addEventListener('auxclick', function (e) { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true);
 
+// --- Texto seleccionado, para la burbuja «Traducir» de la interfaz ---
+// Solo en el marco principal (en un iframe las coordenadas no serían las de la
+// pestaña) y nunca dentro de campos de texto: ahí se escribe, no se lee. Al
+// soltar el ratón o terminar de seleccionar con el teclado se manda el texto y
+// dónde está; la interfaz decide si enseña la burbuja (ajuste traducirBurbuja).
+// Nada sale del equipo hasta que el usuario pulsa «Traducir».
+if (window.top === window) (function () {
+  var hay = false;
+  function quita() { if (!hay) return; hay = false; try { ipcRenderer.sendToHost('naviris-seleccion', null); } catch (e) { /* nada */ } }
+  function informa() {
+    try {
+      var s = window.getSelection(), t = s ? String(s).trim() : '', a = document.activeElement;
+      var enCampo = a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+      if (!t || t.length > 5000 || enCampo || !s.rangeCount) { quita(); return; }
+      var r = s.getRangeAt(0).getBoundingClientRect();
+      if (!r.width && !r.height) { quita(); return; }
+      hay = true;
+      ipcRenderer.sendToHost('naviris-seleccion', { texto: t, x: r.left, y: r.top, w: r.width, h: r.height, ancho: window.innerWidth });
+    } catch (e) { /* nada */ }
+  }
+  window.addEventListener('mouseup', function (e) { if (e.button === 0) setTimeout(informa, 0); }, true);
+  window.addEventListener('keyup', function (e) { if (e.key === 'Shift' || (e.shiftKey && /^(Arrow|Home|End)/.test(e.key)) || ((e.ctrlKey || e.metaKey) && e.key === 'a')) informa(); }, true);
+  document.addEventListener('selectionchange', function () { if (hay && !String(window.getSelection() || '').trim()) quita(); });
+  window.addEventListener('scroll', quita, { capture: true, passive: true });
+})();
+
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
 ipcRenderer.on('naviris-fill', (_e, cred, host) => {
   // Una contraseña guardada en https nunca se escribe en una página http.

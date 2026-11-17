@@ -76,6 +76,8 @@ function ensureDropClaimer(sourceTab) {
 }
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Texto seleccionado en la página: la burbuja «Traducir» (ver traductor.js)
+  if (e.channel === 'naviris-seleccion') { seleccionEnPagina(wv, e.args && e.args[0]); return; }
   // Algo copiado desde un campo de contraseña de la página: el Portapapeles no lo apunta
   if (e.channel === 'naviris-copia-sensible') { if (typeof data === 'string') marcaSensible(data); return; }
   // Botones 4/5 del ratón pulsados DENTRO de la página

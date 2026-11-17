@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('navirisApp', {
   onEmergenteBloqueada: (cb) => ipcRenderer.on('tab:emergente-bloqueada', (_e, p) => cb(p)),
   permitirEmergentes: (origen, wc) => ipcRenderer.send('emergentes:permitir', origen, wc),
   onContextAction: (cb) => ipcRenderer.on('ctx:accion', (_e, m) => cb(m)),
+  traducir: (texto, destino) => ipcRenderer.invoke('traducir', texto, destino),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
   pwAvailable: () => ipcRenderer.invoke('pw:available'),

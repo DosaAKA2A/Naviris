@@ -209,6 +209,7 @@ function buscarConLens({ src, pagina }) {
 window.navirisApp.onContextAction(({ tipo, datos }) => {
   if (tipo === 'buscar') { const u = toUrl(datos); if (u) createTab(u); return; }
   if (tipo === 'lens') { buscarConLens(datos); return; }
+  if (tipo === 'traducir') { traduceEnPunto(datos.texto, datos.x, datos.y); return; }
   if (tipo === 'pantalla-completa') { window.navirisApp.toggleFullscreen(); return; }
   if (tipo === 'pip') { miniReproductor(); return; }
   if (tipo === 'marcador') {

@@ -2686,3 +2686,32 @@ html.vtabs #vtabs-slot .tab .t-cont { margin: 7px 4px 7px 0; }
    display:none y el de la prueba se quedaba en 0×0, oculto y sin pintar. */
 #centro-page .cr-banco webview { position: static; width: 100%; height: 100%; display: flex; }
 @media (max-width: 760px) { .cr-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ===== Traducir lo seleccionado (renderer/traductor.js) =====
+   Mismo material que el menú contextual: fondo de menú, aro y sombra de pop. */
+.trad { position: fixed; z-index: 585; background: var(--menu-fondo); color: var(--text); border-radius: 12px; box-shadow: var(--sombra-pop), 0 0 0 1px var(--menu-aro); font-size: 13px;
+  opacity: 0; transform: translateY(4px) scale(.97); transition: opacity 110ms ease, transform 110ms var(--acelera); }
+.trad.abierto { opacity: 1; transform: none; transition: opacity 160ms ease, transform 200ms var(--frena); }
+.trad-burbuja { border-radius: 10px; padding: 3px; }
+.trad-boton { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border: none; border-radius: 7px; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.trad-boton:hover, .trad-boton:focus-visible { background: var(--roce-2); outline: none; }
+.trad-boton svg, .trad-ic svg { width: 15px; height: 15px; }
+.trad-panel { width: min(380px, calc(100vw - 16px)); padding: 10px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
+.trad-cab { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 12px; }
+.trad-ic { display: flex; color: var(--text-dim); }
+.trad-de { white-space: nowrap; }
+.trad-flecha { opacity: .6; }
+.trad-a { min-width: 0; height: 26px; border: none; border-radius: 7px; padding: 0 6px; background: var(--roce); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.trad-a:focus-visible { outline: 1px solid var(--menu-aro); }
+.trad-x { margin-left: auto; display: flex; width: 26px; height: 26px; align-items: center; justify-content: center; border: none; border-radius: 7px; background: transparent; color: var(--text-dim); cursor: pointer; }
+.trad-x:hover { background: var(--roce-2); color: var(--text); }
+.trad-x svg { width: 14px; height: 14px; }
+.trad-texto { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.trad-texto.cargando { color: var(--text-dim); }
+.trad-texto.error { color: #e57373; font-size: 13px; }
+.trad-pie { display: flex; justify-content: flex-end; }
+.trad-copiar { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: none; border-radius: 7px; background: var(--roce); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.trad-copiar:hover:not(:disabled) { background: var(--roce-2); }
+.trad-copiar:disabled { color: var(--dim); cursor: default; }
+.trad-copiar svg { width: 13px; height: 13px; }
+@media (prefers-reduced-motion: reduce) { .trad, .trad.abierto { transition: none; transform: none; } }
