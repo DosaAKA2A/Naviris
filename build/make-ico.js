@@ -1,5 +1,6 @@
-// Genera build/icon.ico (multi-resolución) a partir de build/icon.png, para que
-// el instalador NSIS y el ejecutable muestren el logo de Naviris.
+// Genera build/icon.ico (multi-resolución) con los PNG que deja render-icon.js en
+// build/icon-sizes/ (cada tamaño dibujado a su medida), para que el instalador
+// NSIS y el ejecutable muestren el logo de Naviris.
 // Se ejecuta con Electron: los .ico con PNG embebido los soporta Windows Vista+.
 const { app, nativeImage } = require('electron');
 const fs = require('fs');
@@ -7,9 +8,10 @@ const path = require('path');
 
 app.disableHardwareAcceleration();
 app.whenReady().then(() => {
-  const src = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
-  const sizes = [256, 128, 64, 48, 32, 16];
-  const imgs = sizes.map((s) => ({ s, buf: src.resize({ width: s, height: s, quality: 'best' }).toPNG() }));
+  const carpeta = path.join(__dirname, 'icon-sizes');
+  const sizes = [256, 128, 64, 48, 40, 32, 24, 20, 16];
+  const imgs = sizes.map((s) => ({ s, buf: nativeImage.createFromPath(path.join(carpeta, s + '.png')).toPNG() }));
+  if (imgs.some((im) => !im.buf.length)) { console.error('Faltan PNG en build/icon-sizes: corre antes npm run icon'); app.exit(1); return; }
 
   const count = imgs.length;
   const header = Buffer.alloc(6);
