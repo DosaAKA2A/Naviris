@@ -2,6 +2,17 @@
 
 Lo que cambia en cada versión de Naviris para escritorio, de la más nueva a la más vieja. Las versiones **estables** llegan a todas las instalaciones; las **dev** (con `-dev`) solo a NavirisDev. Las notas largas de cada versión, con imágenes, están en `novedades/`.
 
+## 3.0.1 · estable · 17 de noviembre de 2026
+
+Todo lo de la 3.0.1-dev.1 y la 3.0.1-dev.2 (abajo) llega a todos:
+
+- **Gasta menos memoria en reposo**: con el hub abierto, de unos 455 MB a unos 300 MB.
+- **Traducir lo seleccionado**, como en Opera GX, también desde el clic derecho.
+- **Abre más rápido**: la animación de arranque solo sale tras actualizar; el sonido de abrir suena siempre.
+- **Icono nuevo** en blanco, que se ve mucho mejor en la barra de tareas.
+- **Pestañas dormidas a tu ritmo**, sin dormir nunca las que suenan, usan la cámara o tienen un formulario a medias.
+- **La portable ya no se actualiza en bucle**: solo avisa.
+
 ## 3.0.1-dev.2 · dev · 17 de noviembre de 2026
 
 - **Gasta menos memoria en reposo**: con el hub abierto y nada más, Naviris pasa de unos 455 MB a unos 300 MB. El sonido de abrir y el widget de Tendencias de X hacían que Windows cargara los controladores de vídeo de la tarjeta gráfica sin hacer falta. Ahora solo se cargan cuando de verdad ves un vídeo.
