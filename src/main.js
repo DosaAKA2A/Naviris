@@ -1539,6 +1539,14 @@ let splashDesde = 0;        // cuándo empezó su animación: el mínimo en pant
 let splashSonando = true;   // hasta que splash.js avisa de que su sonido acabó (o de que no hay)
 let splashOculto = false;   // ya hizo su salida: solo espera a que acabe el sonido para cerrarse
 let splashAnda = Promise.resolve(); // se cumple cuando arranca la animación del splash
+/* EL SPLASH SOLO TRAS ACTUALIZAR (Dosa, 2026-11-17). Su animación obligaba a
+   esperar ~1,05 s cada vez que se abría Naviris, con la interfaz lista a los
+   ~0,3-0,5 s (PERFORMANCE.md: ventana visible a 1.287 ms frente a 170 de
+   Chrome). Ahora sale solo en el primer arranque de una versión nueva (o de una
+   instalación nueva), que es cuando además puede haber migración de perfil. En
+   los demás la ventana sale en cuanto la interfaz está montada y el sonido de
+   arranque, que sí suena siempre, lo pone la propia interfaz. */
+let sonidoArranquePendiente = false;
 
 const PART_SPLASH = 'naviris-splash';
 function crearSplash() {
@@ -1604,6 +1612,10 @@ async function cerrarSplash(win) {
   const espera = splashDesde ? Math.max(0, SPLASH_MINIMO - (Date.now() - splashDesde)) : 0;
   setTimeout(() => {
     if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); if (!hitosArranque.visible) hitosArranque.visible = Date.now(); }
+    if (sonidoArranquePendiente && win && !win.isDestroyed()) {
+      sonidoArranquePendiente = false;
+      if (settings.sonidos !== false) try { win.webContents.send('app:suena-arranque'); } catch { /* nada */ }
+    }
     if (!splashWin || splashWin.isDestroyed()) return;
     const sw = splashWin;
     try { sw.webContents.send('splash:sale'); } catch {}
@@ -4239,8 +4251,10 @@ app.whenReady().then(async () => {
   protocol.handle(protocolo.ESQUEMA, sirveApp);
   session.fromPartition(PART_SPLASH).protocol.handle(protocolo.ESQUEMA, sirveApp);
   // Lo PRIMERO que ocurre: el cuadrado ya está en pantalla mientras el resto
-  // del arranque (que es lo que tarda) sigue su curso por detrás.
-  crearSplash();
+  // del arranque (que es lo que tarda) sigue su curso por detrás. Solo en el
+  // primer arranque de una versión nueva (ver sonidoArranquePendiente).
+  if (settings.versionVista !== app.getVersion()) crearSplash();
+  else sonidoArranquePendiente = true;
   // La sesión vieja (persist:cobalt) se pasa a la nueva con el splash ya a la
   // vista: en el splash se lee «Actualizando tu perfil» si tarda. Va a la vez que
   // Widevine y antes de abrir ninguna sesión. Sin nada que pasar no cambia nada.

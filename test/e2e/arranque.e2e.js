@@ -107,3 +107,66 @@ test('el splash arranca, suena y releva a la ventana sin esperas de más', { tim
     fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   }
 });
+
+/* SIN SPLASH (Dosa, 2026-11-17): el splash sale solo en el primer arranque de
+   una versión nueva. Con la versión ya vista, la única ventana es la principal,
+   sale en cuanto la interfaz está lista y el sonido de arranque suena igual,
+   desde la propia interfaz. */
+const GANCHO_SIN = `(() => {
+  const m = globalThis.__e2e = {};
+  const marca = (k) => { if (!m[k]) m[k] = Date.now(); };
+  const { app, ipcMain } = require('electron');
+  app.once('ready', () => marca('listo'));
+  ipcMain.on('ui:listo', () => marca('uiListo'));
+  app.on('browser-window-created', (_e, w) => {
+    m.n = (m.n || 0) + 1;
+    w.once('show', () => marca('ventanaVisible'));
+    w.webContents.once('media-started-playing', () => marca('sonidoEmpieza'));
+  });
+  globalThis.__salir = () => app.quit();
+  return 'ok';
+})()`;
+
+test('sin actualización no hay splash: la ventana sale ya y el arranque suena igual', { timeout: 60000 }, async () => {
+  const perfil = fs.mkdtempSync(path.join(os.tmpdir(), 'naviris-e2e-sinsplash-'));
+  const version = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8')).version;
+  fs.writeFileSync(path.join(perfil, 'naviris-settings.json'), JSON.stringify({ versionVista: version }));
+  const app = spawn(ELECTRON, ['--inspect-brk=' + PUERTO, RAIZ, '--user-data-dir=' + perfil.split('\\').join('/')], { stdio: 'ignore' });
+  try {
+    let url = null;
+    for (let i = 0; i < 500 && !url; i++) { try { url = (await (await fetch(`http://127.0.0.1:${PUERTO}/json/list`)).json())[0].webSocketDebuggerUrl; } catch { await espera(20); } }
+    assert.ok(url, 'el inspector no respondió');
+    const s = await sesion(url);
+    const pausas = []; let siguiente = null;
+    s.oyentes.push((d) => { if (d.method !== 'Debugger.paused') return; if (siguiente) { siguiente(d.params); siguiente = null; } else pausas.push(d.params); });
+    const pausa = () => pausas.length ? Promise.resolve(pausas.shift()) : new Promise((r) => { siguiente = r; });
+    await s.envia('Runtime.enable'); await s.envia('Debugger.enable'); await s.envia('Runtime.runIfWaitingForDebugger');
+    await pausa();
+    await s.envia('Debugger.setBreakpointByUrl', { urlRegex: 'src[\\/]main\.js$', lineNumber: 0 });
+    await s.envia('Debugger.resume');
+    const p = await pausa();
+    const g = await s.envia('Debugger.evaluateOnCallFrame', { callFrameId: p.callFrames[0].callFrameId, expression: GANCHO_SIN, returnByValue: true });
+    assert.strictEqual(g.result.result.value, 'ok');
+    await s.envia('Debugger.setBreakpointsActive', { active: false });
+    await s.envia('Debugger.resume');
+    let m = {};
+    for (let i = 0; i < 200 && !(m.ventanaVisible && m.sonidoEmpieza); i++) {
+      await espera(50);
+      const r = await s.envia('Runtime.evaluate', { expression: 'JSON.stringify(globalThis.__e2e)', returnByValue: true });
+      m = JSON.parse(r.result.result.value || '{}');
+    }
+    await espera(400);
+    const r = await s.envia('Runtime.evaluate', { expression: 'JSON.stringify(globalThis.__e2e)', returnByValue: true });
+    m = JSON.parse(r.result.result.value || '{}');
+    await s.envia('Runtime.evaluate', { expression: 'globalThis.__salir()' });
+    s.ws.close();
+    console.log('marcas sin splash (ms desde ready):', Object.fromEntries(Object.entries(m).filter(([k]) => k !== 'n').map(([k, v]) => [k, v - m.listo])));
+    assert.strictEqual(m.n, 1, 'solo se crea la ventana principal, sin splash');
+    assert.ok(m.uiListo && m.ventanaVisible, 'la ventana principal no llegó a mostrarse');
+    assert.ok(m.ventanaVisible - m.uiListo < 250, `la ventana salió ${m.ventanaVisible - m.uiListo} ms después de estar lista`);
+    assert.ok(m.sonidoEmpieza && m.sonidoEmpieza - m.ventanaVisible < 600, 'el sonido de arranque no sonó al abrir');
+  } finally {
+    await new Promise((r) => { if (app.exitCode !== null) return r(); app.once('exit', r); setTimeout(() => { try { app.kill(); } catch {} r(); }, 6000); });
+    fs.rmSync(perfil, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  }
+});

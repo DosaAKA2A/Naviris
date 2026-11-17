@@ -79,3 +79,6 @@ loadToolAddons();
   // Tras actualizarse sola: panel con lo que cambió (ver actualizaciones.js)
   muestraNovedades();
 })();
+
+// Sin splash (Naviris no se acaba de actualizar), el sonido de arranque suena aquí al aparecer la ventana.
+window.navirisApp.onSuenaArranque(() => suena('arranque'));
