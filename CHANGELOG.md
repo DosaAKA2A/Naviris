@@ -2,6 +2,14 @@
 
 Lo que cambia en cada versión de Naviris para escritorio, de la más nueva a la más vieja. Las versiones **estables** llegan a todas las instalaciones; las **dev** (con `-dev`) solo a NavirisDev. Las notas largas de cada versión, con imágenes, están en `novedades/`.
 
+## 3.0.1-dev.1 · dev · 17 de noviembre de 2026
+
+- **Traducir lo seleccionado**, como en Opera GX: al seleccionar texto en una página sale «Traducir» encima, con el idioma de destino a elegir y un botón para copiar. También está en el clic derecho. El texto solo sale de tu equipo cuando pulsas «Traducir». La burbuja se puede quitar en Ajustes.
+- **Abre más rápido**: la animación de arranque solo sale la primera vez tras actualizar. El resto de veces la ventana aparece en cuanto está lista, y el sonido de abrir suena igual.
+- **Icono nuevo**: el logo en blanco, más grande y sin placa, con una versión pensada para cada tamaño. Se ve mucho mejor en la barra de tareas.
+- **Pestañas dormidas a tu ritmo**: eliges tras cuánto tiempo se duermen (de 5 minutos a 2 horas) y puedes marcar sitios que no se duerman nunca con clic derecho en su pestaña. Nunca se duerme una pestaña que suena, usa la cámara o el micrófono, o tiene un formulario a medio escribir.
+- **La versión portable ya no se actualiza en bucle**: antes instalaba la versión nueva aparte en cada cierre y seguía siendo la vieja. Ahora solo avisa, y si quieres pasar a la instalada lo haces desde el menú.
+
 ## 3.0.0 · estable · 11 de noviembre de 2026
 
 Naviris 3 llega a todos. Trae todo lo de la 3.0.0-dev.1 (abajo) y además:
