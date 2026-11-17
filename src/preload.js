@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld('navirisApp', {
   traducir: (texto, destino) => ipcRenderer.invoke('traducir', texto, destino),
   // Arranque sin splash: el sonido de abrir lo pone la interfaz (main.js, sonidoArranquePendiente)
   onSuenaArranque: (cb) => ipcRenderer.on('app:suena-arranque', () => cb()),
+  onUsaMedia: (cb) => ipcRenderer.on('tab:usa-media', (_e, id) => cb(id)),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
 
   pwAvailable: () => ipcRenderer.invoke('pw:available'),

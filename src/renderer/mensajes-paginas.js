@@ -76,6 +76,8 @@ function ensureDropClaimer(sourceTab) {
 }
 async function onWebviewMessage(wv, e) {
   const data = (e.args && e.args[0]) || {};
+  // Formulario a medias: no se duerme la pestaña (ver el reloj de pestanas.js)
+  if (e.channel === 'naviris-escribe') { const t = tabs.find((x) => x.webview === wv); if (t) t.escribiendo = !!(e.args && e.args[0]); return; }
   // Texto seleccionado en la página: la burbuja «Traducir» (ver traductor.js)
   if (e.channel === 'naviris-seleccion') { seleccionEnPagina(wv, e.args && e.args[0]); return; }
   // Algo copiado desde un campo de contraseña de la página: el Portapapeles no lo apunta

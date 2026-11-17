@@ -258,6 +258,8 @@ function attachWebview(tab, url) {
   });
   // Se quita cuando ya hay otra página en su sitio (al reintentar no parpadea en blanco).
   wv.addEventListener('did-navigate', () => { tab.avisos = 0; if (tab.fallo) { tab.fallo = null; if (tab.id === activeId) pintaFallo(); } });
+  // Lo que protegía la pestaña del ahorro de energía era de la página anterior
+  wv.addEventListener('did-navigate', () => { tab.usaMedia = false; tab.escribiendo = false; });
   // Lo bloqueado era de la página anterior (main también lo olvida al navegar).
   wv.addEventListener('did-navigate', () => { if (emergAviso && emergAviso.tab === tab.id) ocultaEmergentes(); });
   /* Pestaña caída (2026-11-03): el proceso de la página murió (falta de
@@ -415,6 +417,7 @@ function menuDePestana(e, tab) {
     { label: tab.pinned ? 'Soltar pestaña' : 'Fijar pestaña', icon: 'pin', action: () => setPinned(tab, !tab.pinned) },
     ...(web ? [{ label: 'Guardar en marcadores', icon: 'bookmark-add', action: () => { if (tab.id !== activeId) activateTab(tab.id); if (!findBookmark(tab.url)) els.navStar.click(); else toast('Ya está en marcadores'); } }] : []),
     { sep: true },
+    ...(web && hostOf(tab.url) ? [{ label: (settings.noDormir || []).includes(hostOf(tab.url)) ? 'Dejar que este sitio se duerma' : 'No dormir nunca este sitio', icon: 'moon-zzz', action: () => alternaNoDormir(tab) }] : []),
     ...(web ? [{ label: tab.muted ? 'Activar sonido de la pestaña' : 'Silenciar pestaña', icon: tab.muted ? 'speaker-wave' : 'speaker-x-mark', action: () => toggleMute(tab) }] : []),
     { label: 'Silenciar otras pestañas', icon: 'speaker-x-mark', action: () => vis.forEach((t) => { if (t.id !== tab.id && t.kind === 'web' && !t.muted) toggleMute(t); }) },
     { sep: true },
@@ -485,14 +488,33 @@ function pestanaDeWebContents(id) {
   return null;
 }
 
+/* Cuándo duerme el ahorro de energía (Dosa, 2026-11-17): el tiempo se elige en
+   Ajustes (dormirTras, 30 min de fábrica) y hay pestañas que no se duermen
+   nunca, porque dormirlas rompería lo que estás haciendo en ellas. */
+function noSeDuerme(tab) {
+  return tab.autoLoot            // los drops solo cuentan si la pestaña sigue «viendo» el stream
+    || tab.audible               // suena algo
+    || tab.usaMedia              // tiene la cámara o el micrófono (una llamada con silencios no suena)
+    || tab.escribiendo           // un formulario a medias se perdería al recargar
+    || (settings.noDormir || []).includes(hostOf(tab.url));   // el usuario dijo «no dormir nunca este sitio»
+}
+const dormirTrasMs = () => (Number(settings.dormirTras) > 0 ? Number(settings.dormirTras) : SLEEP_AFTER_MS / 60000) * 60000;
 setInterval(() => {
   spCuentaPausa();   // el Spotify residente se duerme en pausa haya o no widget (no depende del ahorro)
   if (!settings.powerSaver) return; const now = Date.now(); let changed = false;
+  const tras = dormirTrasMs();
   for (const tab of tabs) {
-    // No dormir: la pestaña activa, las de auto-reclamo de Twitch ni las que reproducen audio
-    // (los drops solo cuentan si la pestaña sigue "viendo" el stream).
-    if (tab.kind !== 'web' || tab.id === activeId || tab.id === divId || tab.asleep || !tab.webview || tab.autoLoot || tab.audible) continue;
-    if (now - tab.lastActive > SLEEP_AFTER_MS) { duermePestana(tab); changed = true; }
+    if (tab.kind !== 'web' || tab.id === activeId || tab.id === divId || tab.asleep || !tab.webview || noSeDuerme(tab)) continue;
+    if (now - tab.lastActive > tras) { duermePestana(tab); changed = true; }
   }
   if (changed) renderTabs();
 }, 30000);
+window.navirisApp.onUsaMedia((id) => { const t = pestanaDeWebContents(id); if (t) t.usaMedia = true; });
+async function alternaNoDormir(tab) {
+  const h = hostOf(tab.url); if (!h) return;
+  const lista = new Set(settings.noDormir || []);
+  const quita = lista.has(h);
+  if (quita) lista.delete(h); else lista.add(h);
+  settings = await window.navirisApp.setSettings({ noDormir: [...lista] });
+  toast(quita ? h + ' ya se puede dormir' : h + ' no se dormirá nunca');
+}

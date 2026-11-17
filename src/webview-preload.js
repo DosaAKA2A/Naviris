@@ -1230,6 +1230,27 @@ if (window.top === window) (function () {
   window.addEventListener('scroll', quita, { capture: true, passive: true });
 })();
 
+// --- Formulario a medias: el ahorro de energía no duerme la pestaña ---
+// Al escribir en un campo (no en buscadores ni contraseñas) se avisa UNA vez;
+// al enviar el formulario se quita. La interfaz lo olvida al cambiar de página.
+(function () {
+  var escribiendo = false;
+  document.addEventListener('input', function (e) {
+    if (escribiendo) return;
+    var el = e.target;
+    if (!el || !e.isTrusted) return;
+    var campo = el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && /^(text|email|tel|number|url|date|datetime-local|month|week|time)$/i.test(el.type || 'text'));
+    if (!campo || el.type === 'search' || el.getAttribute('role') === 'combobox') return;
+    escribiendo = true;
+    try { ipcRenderer.sendToHost('naviris-escribe', true); } catch (err) { /* nada */ }
+  }, true);
+  document.addEventListener('submit', function () {
+    if (!escribiendo) return;
+    escribiendo = false;
+    try { ipcRenderer.sendToHost('naviris-escribe', false); } catch (err) { /* nada */ }
+  }, true);
+})();
+
 // --- Rellenar cuando el host lo pida (tras verificación de Windows) ---
 ipcRenderer.on('naviris-fill', (_e, cred, host) => {
   // Una contraseña guardada en https nunca se escribe en una página http.

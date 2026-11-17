@@ -115,7 +115,8 @@ els.optPreguntarDescargas.addEventListener('change', async () => {
 });
 els.optPasskeys.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ blockPasskeys: els.optPasskeys.checked }); toast(els.optPasskeys.checked ? 'Claves de acceso bloqueadas (recarga o reinicia)' : 'Claves de acceso permitidas (reinicia Naviris)'); activeTab()?.webview?.reload(); });
 els.optRestore.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ restoreSession: els.optRestore.checked }); if (els.optRestore.checked) saveSession(); else store.set('naviris.session', []); toast(els.optRestore.checked ? 'Se reabrirán tus pestañas al iniciar' : 'Se iniciará en el hub'); });
-els.optPowersaver.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ powerSaver: els.optPowersaver.checked }); });
+els.optPowersaver.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ powerSaver: els.optPowersaver.checked }); els.optDormir.disabled = !settings.powerSaver; });
+els.optDormir.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ dormirTras: Number(els.optDormir.value) || 30 }); toast('Las pestañas se dormirán tras ' + els.optDormir.selectedOptions[0].textContent + ' sin usarlas'); });
 els.optAtajos.addEventListener('change', async () => { settings = await window.navirisApp.setSettings({ atajos: els.optAtajos.checked }); toast(els.optAtajos.checked ? 'Atajos de teclado activados' : 'Atajos de teclado desactivados'); });
 els.optVtabs.addEventListener('change', async () => {
   settings = await window.navirisApp.setSettings({ tabsVerticales: els.optVtabs.checked });

@@ -343,6 +343,8 @@ const DEFAULT_SETTINGS = {
   mouseNav: true,           // botones laterales del ratón para atrás/adelante
   traducirBurbuja: true,    // burbuja «Traducir» al seleccionar texto en una página
   traducirA: 'es',          // idioma al que traduce (burbuja y clic derecho)
+  dormirTras: 30,           // minutos sin usar tras los que el ahorro de energía duerme una pestaña
+  noDormir: [],             // sitios (host) que el ahorro de energía nunca duerme
   blockPasskeys: true,      // las webs no ven passkey de plataforma (preload); si una insiste, Windows Hello real
   restoreSession: true,     // reabre las pestañas de la sesión anterior al iniciar
   lightMode: false,         // tema claro de la interfaz
@@ -1334,7 +1336,14 @@ function preguntaPermiso(wc, origin, permission, callback, mediaTypes = []) {
 }
 
 function setupPermissions(ses) {
-  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+  ses.setPermissionRequestHandler((wc, permission, callback0, details) => {
+    /* Cámara o micrófono concedidos: la interfaz marca la pestaña para no
+       dormirla mientras siga en esa página (una llamada con silencios deja de
+       sonar y ya no la protegía el «tiene audio»). Ver pestanas.js. */
+    const callback = (ok) => {
+      if (ok && permission === 'media' && wc && !wc.isDestroyed()) { try { wc.hostWebContents?.send('tab:usa-media', wc.id); } catch { /* nada */ } }
+      callback0(ok);
+    };
     const origin = originOf(details.requestingUrl || (wc && wc.getURL && wc.getURL()) || '');
     if (!origin) return callback(false);
     if (permission === 'openExternal') return pideAbrirFuera(wc, details && details.externalURL, callback);
